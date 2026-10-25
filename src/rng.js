@@ -73,3 +73,49 @@ export function noise2(x, y) {
   const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
   return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
 }
+
+// --- Seeds and world functions (TECH_DESIGN §5.3) ---------------------------------------------
+// Everything below is built from integer multiplies, shifts, + − × ÷, floor and sqrt, which give
+// the same bits in every JavaScript engine, so a world function gives the same terrain in Node and
+// in any browser.
+
+// A 32-bit hash of integers and strings (murmur3's mixing). Numbers are taken as 32-bit integers.
+const mix32 = (h, k) => {
+  k = Math.imul(k, 0xcc9e2d51); k = (k << 15) | (k >>> 17); k = Math.imul(k, 0x1b873593);
+  h ^= k; h = (h << 13) | (h >>> 19);
+  return (Math.imul(h, 5) + 0xe6546b64) | 0;
+};
+const strHash = (s) => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193); return h | 0; };
+export function hashInt(...parts) {
+  let h = 0x9747b28c;
+  for (const p of parts) h = mix32(h, typeof p === "number" ? p | 0 : strHash(String(p)));
+  h ^= parts.length;
+  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
+  return h >>> 0;
+}
+// A seed for one purpose of a run: seedFor(runSeed, "zone", wx, wy, z). Each purpose gets its own
+// stream, so a change in one step of generation never reshuffles another (R6).
+export const seedFor = (seed, ...purpose) => hashInt(seed, ...purpose);
+// hashInt as a number in 0..1.
+export const hashFloat = (...parts) => hashInt(...parts) / 4294967296;
+
+// Value noise like noise2, on its own lattice for each seed (an integer).
+export function seededNoise(seed, x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  let fx = x - xi, fy = y - yi;
+  fx = fx * fx * (3 - 2 * fx);
+  fy = fy * fy * (3 - 2 * fy);
+  const s = seed | 0;
+  const a = hash(xi, yi, s), b = hash(xi + 1, yi, s), c = hash(xi, yi + 1, s), d = hash(xi + 1, yi + 1, s);
+  return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+}
+// Fractal noise in 0..1: `octaves` layers of seededNoise, each twice as fine and half as strong.
+// Its steepest slope is 1.5 × (1/scale) × Σ gain^k (2^k)… per unit of x; heightAt keeps it gentle.
+export function fbm(seed, x, y, octaves = 2, gain = 0.5) {
+  let sum = 0, amp = 1, norm = 0, f = 1;
+  for (let k = 0; k < octaves; k++) {
+    sum += amp * seededNoise(seed + k * 1013, x * f, y * f);
+    norm += amp; amp *= gain; f *= 2;
+  }
+  return sum / norm;
+}
