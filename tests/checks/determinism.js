@@ -13,7 +13,10 @@
 //    Chrome's JIT tiers: use rng.js distance). In the generation code and the helpers it calls
 //    (helpers: { path: text }): no sort with a comparator that draws random numbers (engines sort
 //    differently, so they draw a different count: use rng.js seededSort). Both were found in 0A1:
-//    Chrome 152 generated about a third of the legacy levels differently from Node 20.
+//    Chrome 152 generated about a third of the legacy levels differently from Node 20. Also no
+//    Math.sin, cos, tan, exp, pow or atan2 in the generation code (0A2): engines don't promise the
+//    same last bits for them, and world functions must agree to the bit across zones and engines.
+//    story.js is exempt (its temple mosaic uses atan2) until 0A2 turns the temple into a plan.
 import { canon } from "../lib/hash.js";
 import { generateDungeonLevel, legacyParams, LEGACY_LEVELS } from "../../src/gen/dungeon.js";
 
@@ -40,6 +43,9 @@ const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|
 
 const RANDOM_SORT = /\.sort\(.*\b(rand|rng|random)\w*\(/;   // a sort call with a random draw later on its line
 
+const TRANSCENDENTAL = /Math\.(sin|cos|tan|exp|pow|atan2)\b/;
+export const TRANSCENDENTAL_EXEMPT = ["story.js"];
+
 export function checkDeterminism({ seeds = [3, 77, 2024], depths = LEGACY_LEVELS, sources = {}, helpers = {} } = {}) {
   const problems = [], notes = [];
   let levels = 0, bodies = 0, withUid = 0;
@@ -60,9 +66,11 @@ export function checkDeterminism({ seeds = [3, 77, 2024], depths = LEGACY_LEVELS
     });
   };
   const sortRule = [RANDOM_SORT, "sorts with a random comparator (engine-dependent draws: use rng.js seededSort)"];
+  const trigRule = [TRANSCENDENTAL, "uses Math.sin/cos/tan/exp/pow/atan2 in generation code (engine-dependent bits: use + − × ÷, sqrt, floor)"];
   for (const [file, text] of Object.entries(sources))
     scan(file, text, [[/Math\.random/, "uses Math.random in generation code (R6: pass a seeded rng)"],
-                      [/Math\.hypot/, "uses Math.hypot in generation code (engine-dependent bits: use rng.js distance)"], sortRule]);
+                      [/Math\.hypot/, "uses Math.hypot in generation code (engine-dependent bits: use rng.js distance)"], sortRule,
+                      ...(TRANSCENDENTAL_EXEMPT.includes(file) ? [] : [trigRule])]);
   for (const [file, text] of Object.entries(helpers)) scan(file, text, [sortRule]);
   if (withUid === 0) notes.push(`uid comparison not exercised: none of ${bodies} creatures and people has a uid yet (0C adds them)`);
   return { name: "determinism", ok: problems.length === 0, problems, notes,

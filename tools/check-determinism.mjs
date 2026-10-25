@@ -5,8 +5,9 @@ import path from "node:path";
 import { installNodeEnv, SRC } from "./node-env.mjs";
 import { report } from "./report.mjs";
 
-// The generation folders and files (TECH_DESIGN R6). Missing ones are skipped.
-const SCAN = ["gen", "world", "story.js", "story/history.js", "story/villages.js"];
+// The generation folders and files (TECH_DESIGN R6): with 0A2 the story/ folder and the world content
+// data too. Missing ones are skipped.
+const SCAN = ["gen", "world", "story.js", "story", "content/world", "content/currency.js"];
 const sources = {};
 const add = (p) => {
   if (!fs.existsSync(p)) return;
