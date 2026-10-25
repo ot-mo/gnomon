@@ -333,7 +333,8 @@ function walkOffEdge(game) {
     const dx = side === "e" ? 1 : side === "w" ? -1 : 0, dy = side === "s" ? 1 : side === "n" ? -1 : 0;
     const exact = { x: p.x - dx * w, y: p.y - dy * d, z: p.z };
     if (!tryWalkOff(game, side, dx ? p.y : p.x, { exact })) return false;
-    const nz = game.zone, tx = Math.floor(p.x), ty = Math.floor(p.y);
+    const nz = game.zone;
+    const tx = Math.max(0, Math.min(nz.w - 1, Math.floor(p.x))), ty = Math.max(0, Math.min(nz.d - 1, Math.floor(p.y)));   // by a corner you may still be over the apron
     if (bodyCollides(p, nz)) {   // the apron wasn't the zone's real ground (it was built before the zone was): stand up
       const s = nz.stand[tx + ty * nz.w];
       p.x = tx + 0.5; p.y = ty + 0.5;

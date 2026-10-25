@@ -20,7 +20,9 @@
 // a copy of A in the 2 tiles next to the seam, and the copy equals A's blocks.
 // Arrival: from every border tile of A you can stand on (ground, reachable from A's anchor), walking off
 // lands in B within ±1 of your height and not shifted (zones.js arrivalPoint "edge"); and back from B.
-// The share of arrivals on the mirrored tile itself is reported. With real = true, the real world's
+// The share of arrivals on the mirrored tile itself is reported, and the border tiles left out (not
+// reachable from A's anchor, or treetops). In 3D your exact point is kept: 2.5 blocks up in the air, and
+// half a tile past the far border along the edge (beside an open corner). With real = true, the real world's
 // landmark spans are checked too (seed 42, rules (a)-(d) and arrival; its plans are still placeholders).
 import { buildRun } from "../../src/world/run.js";
 import { TEST_WORLD } from "../../src/content/world/test-world.js";
@@ -44,13 +46,13 @@ const planWall = (zone, x, y) => !!zone.gen?.plan[x + y * zone.w] && !!zone.get(
 
 export function checkEdges({ seeds = [1, 42, 1234], pairs = 200, real = true } = {}) {
   const problems = [], notes = [], stats = {};
-  const tally = { edges: 0, tiles: 0, crossings: 0, mirrored: 0, shifted: 0, trees: 0, ports: 0, apronTiles: 0, zones: 0 };
+  const tally = { edges: 0, tiles: 0, crossings: 0, mirrored: 0, shifted: 0, exact: 0, skipUnreachable: 0, skipScenery: 0, trees: 0, ports: 0, apronTiles: 0, zones: 0 };
   const t0 = performance.now();
   for (const seed of seeds) checkWorld(TEST_WORLD, seed, { pairs, landmarks: true, near: true }, problems, tally);
   if (real) checkWorld(REAL_WORLD, 42, { pairs: 0, landmarks: true, near: false }, problems, tally);
   stats.edges = `${tally.edges} edges (${tally.tiles} seam tiles) over ${tally.zones} zones; ${tally.ports} ports, ${tally.trees} trees across an edge`;
   stats.apron = `${tally.apronTiles} apron tiles next to a seam compared`;
-  stats.arrivals = `${tally.crossings} crossings, ${tally.shifted} shifted, ${(100 * tally.mirrored / Math.max(1, tally.crossings)).toFixed(1)}% on the mirrored tile`;
+  stats.arrivals = `${tally.crossings} crossings, ${tally.shifted} shifted, ${(100 * tally.mirrored / Math.max(1, tally.crossings)).toFixed(1)}% on the mirrored tile; ${tally.exact} 3D points in the air or by a corner kept; border tiles left out: ${tally.skipUnreachable} the anchor can't reach, ${tally.skipScenery} treetops`;
   stats.seconds = ((performance.now() - t0) / 1000).toFixed(1);
   return { name: "edges", ok: problems.length === 0, problems, stats, notes };
 }
@@ -209,13 +211,28 @@ function checkSeam(run, W, A, Bz, side, at, near, problems, tally) {
     const reach = reachOf(from);
     for (let k = 0; k < len; k++) {
       const [x, y] = fromTile(k), i = x + y * from.w, s = from.stand[i];
-      if (s < 0 || reach[i] < 0 || from.gen?.scenery[i]) continue;
+      if (s < 0) continue;
+      // Tiles the from-zone's anchor can't reach (cliff tops) and treetops are left out; counted, so the
+      // exclusion stays visible.
+      if (reach[i] < 0) { tally.skipUnreachable++; continue; }
+      if (from.gen?.scenery[i]) { tally.skipScenery++; continue; }
       const arr = arrivalPoint(to, "edge", { side: leave, along: k, fromStand: s });
       tally.crossings++;
       const [mx, my] = toTile(k);
-      if (Math.floor(arr.x) === mx && Math.floor(arr.y) === my) tally.mirrored++;
+      const onMirror = Math.floor(arr.x) === mx && Math.floor(arr.y) === my;
+      if (onMirror) tally.mirrored++;
       if (arr.shifted) { tally.shifted++; fail("arrival", `${from.key} → ${to.key} at ${k}: shifted to (${Math.floor(arr.x)}, ${Math.floor(arr.y)})`); }
       else if (Math.abs(arr.z - s) > 1) fail("arrival", `${from.key} → ${to.key} at ${k}: height ${arr.z} from ${s}`);
+      // 3D (§5.1, no camera pop): your exact point is kept, also 2.5 blocks up in the air (a jump), and at
+      // the ends of the edge also half a tile past the far border along it (crossing next to an open corner).
+      if (!onMirror || Math.abs(arr.z - s) > 1) continue;
+      const acrossX = leave === "e" || leave === "w";
+      const off = k === 0 ? -0.4 : k === len - 1 ? 1.4 : 0.6;
+      const exact = acrossX ? { x: mx + 0.3, y: my + off, z: s + 2.5 } : { x: mx + off, y: my + 0.3, z: s + 2.5 };
+      const e = arrivalPoint(to, "edge", { side: leave, along: k + off, fromStand: Math.round(exact.z), exact });
+      tally.exact++;
+      if (e.x !== exact.x || e.y !== exact.y || e.z !== exact.z)
+        fail("arrival", `${from.key} → ${to.key} at ${k}: the 3D point (${exact.x}, ${exact.y}, ${exact.z}) moved to (${e.x}, ${e.y}, ${e.z})`);
     }
   }
   for (const f of fails) problems.push(`${at}: ${f}`);

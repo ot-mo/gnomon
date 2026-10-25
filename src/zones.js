@@ -323,9 +323,13 @@ function landing(zone, fx, fy, opts = {}) {
 // Walking in over an edge: you left the neighbour by opts.side ("n" | "e" | "s" | "w") at
 // opts.along, standing at opts.fromStand. The mirrored tile on this side, or the nearest tile
 // within 3 of the edge and ±4 along whose height is within 1 of where you were, reachable from
-// the anchor (the mirrored tile need not be); else the nearest reachable spot at all (shifted: true). With opts.exact (your point in
-// this zone's coordinates, from the 3D view) and the mirrored tile within the rules, that point
-// itself, so the camera doesn't move.
+// the anchor (the mirrored tile need not be); else the nearest reachable spot at all (shifted: true).
+// Deep water on a surface counts as standing at the datum (every body floats there), so a swimmer
+// crosses a river's channel straight. With opts.exact (your point in this zone's coordinates, from
+// the 3D view), that point itself whenever you are no more than a block below the mirrored column's
+// ground (above it you are in the air, and keep flying or falling where you were), so the camera
+// doesn't move. Past the far border along the edge (crossing near an open corner) the point is kept
+// as it is: the corner's apron is there, and the next crossing takes you on into the diagonal span.
 function edgeArrival(zone, { side, along = 0, fromStand = FLOOR_Z, yaw, exact } = {}) {
   const { w, d, stand } = zone;
   const dist = reachFromAnchor(zone);
@@ -334,25 +338,31 @@ function edgeArrival(zone, { side, along = 0, fromStand = FLOOR_Z, yaw, exact } 
   const ty = side === "s" ? 0 : side === "n" ? d - 1 : Math.max(0, Math.min(d - 1, a));
   const inBand = (x, y) => (side === "e" ? x <= 2 : side === "w" ? x >= w - 3 : side === "s" ? y <= 2 : y >= d - 3) &&
     Math.abs((side === "e" || side === "w" ? y : x) - a) <= 4;
+  const floats = zone.type === "surface";
+  const standAt = (i) => stand[i] >= 0 ? stand[i]
+    : floats && zone.blocks[i + (FLOOR_Z - 1) * w * d] === B.WATER_DEEP ? FLOOR_Z : -1;
   // The mirrored tile counts even when the anchor can't reach it: you can always step back the way you came.
   const mirror = tx + ty * w;
+  if (exact && standAt(mirror) >= 0 && !isStairs(zone, tx, ty) && exact.z >= standAt(mirror) - 1) {
+    const acrossX = side === "e" || side === "w";
+    const ex = acrossX ? Math.min(w - 1e-3, Math.max(0, exact.x)) : exact.x;
+    const ey = acrossX ? exact.y : Math.min(d - 1e-3, Math.max(0, exact.y));
+    return { x: ex, y: ey, z: exact.z, yaw: yaw ?? zone.spawn.yaw, shifted: false, exact: true };
+  }
   let best = -1, bestD = Infinity, any = -1, anyD = Infinity;
   for (let i = 0; i < w * d; i++) {
-    if ((dist[i] < 0 && i !== mirror) || stand[i] < 0) continue;
+    const si = standAt(i);
+    if ((dist[i] < 0 && i !== mirror) || si < 0) continue;
     const x = i % w, y = (i - x) / w;
     if (isStairs(zone, x, y)) continue;
     const dd = distance(x - tx, y - ty);
     if (dd < anyD && dist[i] >= 0) { anyD = dd; any = i; }
-    if (inBand(x, y) && Math.abs(stand[i] - fromStand) <= 1 && dd < bestD) { bestD = dd; best = i; }
+    if (inBand(x, y) && Math.abs(si - fromStand) <= 1 && dd < bestD) { bestD = dd; best = i; }
   }
   const i = best >= 0 ? best : any;
   if (i < 0) return { ...zone.spawn, shifted: true };
   const x = i % w, y = (i - x) / w;
-  if (exact && best === mirror) {
-    const ex = Math.min(w - 1e-3, Math.max(0, exact.x)), ey = Math.min(d - 1e-3, Math.max(0, exact.y));
-    if (Math.floor(ex) === tx && Math.floor(ey) === ty) return { x: ex, y: ey, z: exact.z, yaw: yaw ?? zone.spawn.yaw, shifted: false, exact: true };
-  }
-  return { x: x + 0.5, y: y + 0.5, z: stand[i], yaw: yaw ?? zone.spawn.yaw, shifted: best < 0 };
+  return { x: x + 0.5, y: y + 0.5, z: standAt(i), yaw: yaw ?? zone.spawn.yaw, shifted: best < 0 };
 }
 
 // What's reachable from the zone's anchor (pathing.reachable over the "open" door rule), kept on the
