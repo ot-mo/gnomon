@@ -20,7 +20,7 @@
 // (river bends, fords, sinkholes), never a world function.
 //
 // The height (heightAt), in order:
-//   relief  fbm noise of wavelength 16 tiles times 3 × the terrains' relief, blended bilinearly between
+//   relief  fbm noise of wavelength 24 and 12 tiles (two octaves) times 3 × the terrains' relief, blended bilinearly between
 //           the four nearest span centres. Its slope stays under 1 block per tile, so rounding never
 //           makes a 2-block step between 4-neighbours: the map (where heights are invisible) stays walkable.
 //   cliffs  a separate mask raises small areas by 5 (≥ 4, so even across the relief the step at a cliff's
@@ -50,7 +50,7 @@ import { zoneSeed } from "../world/run.js";
 import { stampVault } from "./vaults.js";
 
 export const SURFACE_RULES = {
-  reliefWave: 16,     // tiles: the relief noise's wavelength (§5.3: at least 12)
+  reliefWave: 24,     // tiles: the relief noise's base wavelength; its second octave is half that, 12 (§5.3: at least 12)
   maxRelief: 3,       // blocks: the relief's amplitude at relief 1 (§5.3: at most 3)
   cliffRise: 5,       // blocks a cliff raises its area by
   cliffWave: 9,       // tiles: the size of the cliff mask's blobs
