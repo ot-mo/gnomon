@@ -12,6 +12,13 @@
 // physics carries it onto them. Monsters are cleared on arrival and the bot can't die: this
 // exercises zone changes, not fights.
 //
+// The edge walk (runEdges, 0A2) starts in the temple's span (0, 0): in 3D it walks east along the road
+// and off the span's east edge into (1, 0), frame by frame, and checks the crossing: the neighbour was
+// already in memory (prefetch), the swap happened within one frame with no transition screen, your
+// point in the world and your height moved no more than one frame's walk (no camera pop), and the frame
+// drawn at the swap is no darker than the one before (no black frame). Then on the map it steps back
+// west, one key press, and checks it lands on the mirrored tile of (0, 0) within a block of its height.
+//
 // The smoke run (runSmoke) is the fights: on levels 3, 5, 10, 15 and 20 (the three guardians and
 // the Lich) it plays for a while with every monster alive, attacking, throwing and drawing frames,
 // in either view, and fails on any exception. It asserts nothing else.
@@ -19,12 +26,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { installNodeEnv, parseArgs } from "./node-env.mjs";
 
-await installNodeEnv();
+const env = await installNodeEnv();
 const { game, startRun, inputHandlers } = await import("../src/game.js");
 const { MONSTER_TYPES } = await import("../src/monsters.js");
 const { keys } = await import("../src/input.js");
 const { standWith, B, FLOOR_Z } = await import("../src/world.js");
 const { canWalk, PLAYER_STEP_UP, PLAYER_DROP } = await import("../src/pathing.js");
+const { cachedZone } = await import("../src/zones.js");
 
 const ARROWS = { "1,0": "ArrowRight", "-1,0": "ArrowLeft", "0,1": "ArrowDown", "0,-1": "ArrowUp" };
 const tileOf = (p) => [Math.floor(p.x), Math.floor(p.y)];
@@ -158,6 +166,67 @@ export function runStairs({ seed = 1234, view = "map", levels = 3 } = {}) {
   return { ok: problems.length === 0, steps, problems };
 }
 
+// The share of the screen drawn black (a blank cell in black): the 3D view of a missing zone.
+function blackShare() {
+  game.debug.draw();
+  const { chars, colors } = env.capture, n = chars.length, stride = colors.length / n;
+  let black = 0;
+  for (let i = 0; i < n; i++) if (chars[i] === " " && colors[i * stride] + colors[i * stride + 1] + colors[i * stride + 2] < 12) black++;
+  return black / n;
+}
+
+// Off the temple span's east edge in 3D, and back west on the map. Returns { ok, steps, problems, stats }.
+export function runEdges({ seed = 1234 } = {}) {
+  const problems = [], steps = [], stats = {};
+  startRun(seed);
+  game.pages = null; game.pendingPages = null; game.story.cube = true;
+  game.view = "3d"; game.mode = "explore"; game.paused = false;
+  const z0 = game.zone, p = game.player;
+  if (!z0.edges.e) return { ok: false, steps, problems: [`${z0.key} has no open east edge`], stats };
+  // Start on the road, 6 tiles from the east edge, facing east.
+  const port = z0.gen.ports.find((q) => q.side === "e" && q.kind === "road");
+  const y = port ? port.along + (port.width >> 1) : z0.d >> 1, x = z0.w - 6;
+  Object.assign(p, { x: x + 0.5, y: y + 0.5, z: z0.stand[x + y * z0.w], vz: 0, onGround: true, yaw: 0, pitch: -0.15 });
+  p.maxHp = p.hp = 999;
+  keys.add("KeyW"); keys.add("Space");   // (Space: hop up any one-block step on the way)
+  let crossed = false, prefetched = false, before = 0;
+  for (let k = 0; k < 600 && !crossed; k++) {
+    const from = game.zone, gx = from.wx * from.w + p.x, gy = from.wy * from.d + p.y, gz = p.z;
+    prefetched = !!cachedZone(game, "1,0,0");
+    if (k % 10 === 0 || p.x > from.w - 1) before = blackShare();
+    const t0 = performance.now();
+    game.debug.step(1 / 60);
+    const ms = performance.now() - t0;
+    if (game.zone === from) continue;
+    crossed = true;
+    const now = game.zone, ngx = now.wx * now.w + p.x, ngy = now.wy * now.d + p.y;
+    const after = blackShare();
+    stats.crossFrameMs = +ms.toFixed(1);
+    stats.black = `${(100 * before).toFixed(1)}% → ${(100 * after).toFixed(1)}%`;
+    if (now.key !== "1,0,0") problems.push(`3D: walked into ${now.key}, not 1,0,0`);
+    if (!prefetched) problems.push("3D: the neighbour was not in memory before the crossing (no prefetch)");
+    if (game.mode !== "explore") problems.push(`3D: mode ${game.mode} after the crossing (a transition screen?)`);
+    if (Math.abs(ngx - gx) > 0.2 || Math.abs(ngy - gy) > 0.2 || Math.abs(p.z - gz) > 1) problems.push(`3D: the camera jumped (${(ngx - gx).toFixed(2)}, ${(ngy - gy).toFixed(2)}, ${(p.z - gz).toFixed(2)})`);
+    if (after > before + 0.05 || after > 0.5) problems.push(`3D: a black frame at the crossing (${stats.black})`);
+    steps.push(`3D ${from.key} → ${now.key} at frame ${k} (${ms.toFixed(1)} ms)`);
+  }
+  keys.clear();
+  if (!crossed) { problems.push(`3D: never crossed the east edge (stuck at ${p.x.toFixed(2)}, ${p.y.toFixed(2)})`); return { ok: false, steps, problems, stats }; }
+  // Back west on the map: one step off the west edge.
+  game.mode = "map"; game.view = "map";
+  for (let k = 0; k < 4 && game.zone.key === "1,0,0"; k++) game.debug.mapKey("ArrowLeft");
+  const z1 = cachedZone(game, "1,0,0"), [tx, ty] = tileOf(p);
+  const fromStand = z1.stand[0 + ty * z1.w];
+  if (game.zone.key !== "0,0,0") problems.push(`map: stepping west from 1,0,0 led to ${game.zone.key}`);
+  else {
+    if (tx !== game.zone.w - 1) problems.push(`map: arrived at (${tx}, ${ty}), not on the east border`);
+    if (Math.abs(p.z - fromStand) > 1) problems.push(`map: height ${p.z} after a step from ${fromStand}`);
+    if (game.mode !== "map") problems.push(`map: mode ${game.mode} after the crossing`);
+    steps.push(`map 1,0,0 → 0,0,0 at (${tx}, ${ty})`);
+  }
+  return { ok: problems.length === 0, steps, problems, stats };
+}
+
 // Play a while with the monsters alive: no exception may escape. Returns { ok, steps, problems }.
 export function runSmoke({ seed = 1234, view = "map", levels = [3, 5, 10, 15, 20], seconds = 30 } = {}) {
   const problems = [], steps = [];
@@ -222,7 +291,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   let ok = true;
   for (const view of views) {
     for (const [what, r] of [["stairs", runStairs({ seed: Number(args.seed) || 1234, view })],
-                             ["smoke", runSmoke({ seed: Number(args.seed) || 1234, view })]]) {
+                             ["smoke", runSmoke({ seed: Number(args.seed) || 1234, view })],
+                             ...(view === "3d" ? [["edges", runEdges({ seed: Number(args.seed) || 1234 })]] : [])]) {
       console.log(`${r.ok ? "OK  " : "FAIL"} ${view} ${what}: ${r.steps.join(" · ")}`);
       for (const p of r.problems) console.log(`  ✗ ${p}`);
       ok &&= r.ok;
