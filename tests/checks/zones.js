@@ -162,7 +162,7 @@ export function checkZones({ game, startRun }) {
   expect(leaves[1][1] === "0,0,1" && leaves[1][3] === "0,0,2" && leaves[1][2] === "down", "zone:leave names the zone, the way and the destination");
   expect(log.findIndex((e) => e[0] === "prepare" && e[1] === "0,0,2") < log.findIndex((e) => e[0] === "enter" && e[1] === "0,0,2"), "zone:prepare comes before zone:enter");
   const logged = game.messages.length;
-  expect(parseKey("3,-2,5").wy === -2 && changeZone(game, "5,5,1", { how: "down" }, "You descend the stairs...") === false && game.zone === lvl1, "nothing at 5,5,1: no change");
+  expect(parseKey("3,-2,5").wy === -2 && changeZone(game, "0,0,21", { how: "down" }, "You descend the stairs...") === false && game.zone === lvl1, "nothing at 0,0,21 (below the legacy stack's last level): no change");
   expect(game.messages.length === logged, "a change that fails logs no message");
 
   // --- Patches and uids ---------------------------------------------------------------------------
@@ -214,7 +214,7 @@ export function checkZones({ game, startRun }) {
   const offFall = on("zone:prepare", (g, e) => asked.push({ key: e.zone.key, fx: e.arrival.fx, fy: e.arrival.fy }));
   const mode0 = game.mode;
   changeZone(game, "0,0,0", { how: "up" });
-  const temple = game.zone;
+  const temple = game.zone, rect0 = temple.dungeonRect;
   temple.dungeonRect = { ox: 6, oy: 4 };
   const fallFrom = (how) => {
     changeZone(game, "0,0,0", { how: "up" });
@@ -229,7 +229,7 @@ export function checkZones({ game, startRun }) {
   p.x = 30.5; p.y = 20.5; game.fallThrough();
   const a2 = asked[asked.length - 1];
   expect(a2?.key === "0,0,2" && a2.fx === 30.5 && a2.fy === 20.5, `a fall between dungeon levels keeps (x, y) (asked for ${JSON.stringify(a2)})`);
-  temple.dungeonRect = null;
+  temple.dungeonRect = rect0;
   game.mode = mode0;
   offFall();
   stats.zones = { visited: game.zones.size, events: log.length };

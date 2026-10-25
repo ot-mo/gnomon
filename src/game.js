@@ -10,16 +10,21 @@
 //   dead      – game over; R starts a new run
 //   won       – the Lich King is dead; R starts a new run
 //
-// A run starts in the Temple of Angles (the surface of world tile 0, 0: zones.js, world/legacy.js),
-// on the map only: until you find the Rotation Cube, Tab does nothing. game.story.cube says whether
-// you have it. game.zone is the zone you're in, game.zones every zone you've visited ("wx,wy,z" →
-// Zone); game.state holds what persists as plain data (uids, zone patches, when you left a zone).
+// A run is built from its seed on a world (world/run.js buildRun; the test world for now) and starts at
+// the world's start landmark: in the test world the Temple of Angles, on span (0, 0) over the legacy
+// stack (world/zonegen.js, world/legacy.js). You start on the map only: until you find the Rotation
+// Cube, Tab does nothing. game.story.cube says whether you have it. game.run is the run (its sites,
+// history, villages: saved with the slot, never rebuilt on a load), game.zone the zone you're in,
+// game.zones every zone you've visited ("wx,wy,z" → Zone); game.state holds what persists as plain
+// data (uids, zone patches, when you left a zone).
 // game.view says which picture is showing ("3d" or "map"); it survives descending and dying.
 import * as S from "./screen.js";
 import { keys, isLocked, lockPointer, unlockPointer } from "./input.js";
 import { changeZone, enterZone, cachedZone, makeZone, zoneBelow, zoneAbove, dungeonOffset, zoneKey } from "./zones.js";
 import { on, runUpdates } from "./events.js";
-import "./world/legacy.js";   // the zone generators for the legacy site under tile (0, 0)
+import "./world/zonegen.js";   // the zone generators: surfaces, site dungeons, the legacy stack
+import { buildRun } from "./world/run.js";
+import { TEST_WORLD } from "./content/world/test-world.js";
 import { makePlayer, clampPitch, updatePlayer, takeImpact, hasFeatherFall, bonus } from "./player.js";
 import { updateMonsters, pushPlayerOut, playerAttack, monsterAt } from "./monsters.js";
 import { pickUpItems, POTIONS, POTION_COLORS, scrollTitles, makeItem, makeRelic, pickRelic, randomEquipment, awayFromWalls, RELICS, RELIC_COLOR } from "./items.js";
@@ -46,6 +51,8 @@ import { openTalk, talkKey, talkClick, talkHover, drawTalk, shopKey, drawShop, o
 
 export const game = {
   seed: 0, zone: null, player: null,
+  world: TEST_WORLD,   // the world definition new runs are built on (the real one waits for its content)
+  run: null,           // the run: buildRun(seed, world) for a new game
   zones: new Map(),    // "wx,wy,z" → Zone: every zone you've visited stays as you left it
   state: null,         // persistent plain data (zones.js: uids, zonePatches, zoneLeft)
   mode: "explore", view: "3d", paused: true,
@@ -186,9 +193,11 @@ export const game = {
 
 export const randomSeed = () => 1 + Math.floor(Math.random() * 999999);
 
-export function startRun(seed) {
+// A new game on `seed` (quick start: no character to make yet), at the world's start landmark.
+export function startRun(seed, world = game.world) {
   game.seed = seed;
-  game.state = { seed, uids: {}, zonePatches: {}, zoneLeft: {} };
+  game.run = buildRun(seed, world);
+  game.state = { seed, world: { id: game.run.world.id, version: game.run.world.version }, uids: {}, zonePatches: {}, zoneLeft: {} };
   game.zone = null;
   game.zoneLru = [];
   game.player = makePlayer();
@@ -212,7 +221,8 @@ export function startRun(seed) {
   game.crystalsBought = 0;        // crystals bought from Pell (each makes the next dearer)
   game.cam = null;
   game.pendingPages = null;
-  changeZone(game, zoneKey(0, 0, 0), { how: "start" });   // the temple: the legacy site's surface
+  const start = game.run.world.start;
+  changeZone(game, zoneKey(start.wx, start.wy, 0), { how: "start" });   // the test world's: the temple, over the legacy stack
   game.view = "map";
   game.paused = false;
   openStory(game, INTRO, () => {
