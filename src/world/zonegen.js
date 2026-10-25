@@ -1,5 +1,5 @@
 // Where zones come from (TECH_DESIGN §2.2, §5.3-5.5): the run's world, its sites and the generators.
-// Importing this module registers both ZONE_GENERATORS (zones.js).
+// Importing this module registers both ZONE_GENERATORS and the apron's builder (zones.js).
 //
 //   surface  "wx,wy,0": gen/surface.js generateSurface(game.run, wx, wy), for every span you can be in
 //            (a span whose edges are shut, the sea, has no zone)
@@ -7,10 +7,13 @@
 //            temple, DECISIONS.md) is world/legacy.js legacyZone; any other site's level z is
 //            generateDungeonLevel(zoneSeed(run, wx, wy, z), dungeonParams(run, site, z)).
 //
+//   apron    APRON_BUILDERS.surface = gen/surface.js buildApronBand (the neighbour's blocks, or the world
+//            functions)
+//
 //   siteWithDungeon(run, wx, wy) → Site | null    the span's site that has a dungeon below it
 //   dungeonParams(run, site, z) → p               generateDungeonLevel's parameters for its level z
-import { ZONE_GENERATORS } from "../zones.js";
-import { generateSurface } from "../gen/surface.js";
+import { ZONE_GENERATORS, APRON_BUILDERS } from "../zones.js";
+import { generateSurface, buildApronBand } from "../gen/surface.js";
 import { generateDungeonLevel } from "../gen/dungeon.js";
 import { legacyZone } from "./legacy.js";
 import { zoneSeed } from "./run.js";
@@ -59,3 +62,4 @@ function dungeonZone(game, { wx, wy, z }) {
 
 ZONE_GENERATORS.surface = surfaceZone;
 ZONE_GENERATORS.dungeon = dungeonZone;
+APRON_BUILDERS.surface = buildApronBand;

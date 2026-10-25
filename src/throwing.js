@@ -107,7 +107,8 @@ export function updateProjectiles(game, dt) {
         hitPlayer(game, pr.from, pr.dmg, `the ${pr.from.name}'s ${what}`, `the ${what}`, true);
         done = true;
       } else if (m) { impact(game, pr, nx, ny, nz, m); done = true; }
-      else if (zone.solid(bx, by, bz) || zone.get(bx, by, bz) === B.WATER_DEEP || nz < -1) {
+      else if (zone.solid(bx, by, bz) || zone.get(bx, by, bz) === B.WATER_DEEP || nz < -1 ||
+               bx < 0 || by < 0 || bx >= zone.w || by >= zone.d) {   // nothing leaves its zone, even over the apron
         impact(game, pr, pr.x, pr.y, pr.z, null);   // stop just before the surface it hit
         done = true;
       } else { pr.x = nx; pr.y = ny; pr.z = nz; }

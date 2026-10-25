@@ -45,11 +45,12 @@ export class Zone {
     this.look = new Uint8Array(w * d);      // the block that sets the column's map glyph (TECH_DESIGN §6.5)
     this.skyLight = this.lampLight = this.litMask = null;
     this.navVersion = 0;                    // bumps whenever the blocks change
+    this.reach = null;                      // { v, x, y, dist }: what's reachable from the anchor (zones.js)
     // outdoors (0A2 and WS2/WS3 fill these in)
     this.hasSky = false;                    // sun and sky dome in the 3D view
     this.outdoor = false;                   // apron, horizon, haze, daylight
     this.edges = { n: false, e: false, s: false, w: false };   // true: you can walk off that side
-    this.apron = null;                      // { n, e, s, w, ne, nw, se, sw }: neighbour voxel bands (0A2)
+    this.apron = null;                      // { n, e, s, w, ne, nw, se, sw }: neighbour voxel bands (see apronBlock)
     this.liquid = "water";                  // what water blocks hold; liquids[column] overrides
     this.liquids = {};
     this.hasBelow = false;                  // a level exists below: holes and deep water drop you into it
@@ -97,12 +98,27 @@ export class Zone {
   }
 
   // For collision: the sides and top are solid, but below is open (that's how you fall through a
-  // pit, or sink through deep water, to the level below). (0A2: beyond an open side, the apron.)
+  // pit, or sink through deep water, to the level below). Beyond an open side of a surface zone the
+  // apron's voxel counts instead (TECH_DESIGN §5.1, §6.1): you walk past the border onto the ground
+  // of the zone you are about to enter. Beyond a solid side, or where no band is built, it is solid.
   solid(x, y, z) {
     if (z < 0) return false;
-    if (z >= this.h || x < 0 || y < 0 || x >= this.w || y >= this.d) return true;
-    const b = this.blocks[x + y * this.w + z * this.w * this.d];
+    if (z >= this.h) return true;
+    let b;
+    if (x < 0 || y < 0 || x >= this.w || y >= this.d) {
+      b = this.apron ? apronBlock(this, x, y, z) : -1;
+      if (b < 0) return true;
+    } else b = this.blocks[x + y * this.w + z * this.w * this.d];
     return b !== 0 && b !== B.WATER_DEEP;   // deep water: you sink right through it, like a chasm
+  }
+
+  // The block at (x, y, z), the apron's beyond an open side; 0 anywhere else outside the grid.
+  // (get() stays inside the grid: creatures, the map and the derived arrays never see the apron.)
+  voxel(x, y, z) {
+    if (z < 0 || z >= this.h) return 0;
+    if (x >= 0 && y >= 0 && x < this.w && y < this.d) return this.blocks[x + y * this.w + z * this.w * this.d];
+    const b = this.apron ? apronBlock(this, x, y, z) : -1;
+    return b < 0 ? 0 : b;
   }
 
   // The lowest spot in column (x, y) with solid ground under it and two blocks of air above.
@@ -132,9 +148,12 @@ export class Zone {
 
   get hasDerived() { return !!(this.stand && this.skyLight); }
   ensureDerived() { if (!this.hasDerived) this.refresh(); }
-  // A dormant zone keeps its blocks, map memory and contents; light, stand, kind and look are
-  // rebuilt by one refresh() when you come back (zones.keepDerived decides when).
-  dropDerived() { this.skyLight = this.lampLight = this.litMask = this.sunlit = null; this.stand = this.kind = this.look = null; }
+  // A dormant zone keeps its blocks, map memory and contents; light, stand, kind, look and the apron
+  // are rebuilt when you come back (one refresh(), and zones.js fillApron; keepDerived decides when).
+  dropDerived() {
+    this.skyLight = this.lampLight = this.litMask = this.sunlit = null; this.stand = this.kind = this.look = null;
+    this.apron = null; this.reach = null;
+  }
 
   // End of generation: from here on, any set() marks the zone as changed.
   seal() { this.sealed = true; this.dirty = false; return this; }
@@ -176,6 +195,34 @@ export class Zone {
   }
 }
 
+// --- The apron (TECH_DESIGN §6.1) -----------------------------------------------------------------
+// zone.apron holds one voxel band per open side and open corner of a surface zone, APRON tiles deep:
+//   n: x 0..w−1, y −APRON..−1     s: x 0..w−1, y d..d+APRON−1     (the zone's own w long)
+//   w: x −APRON..−1, y 0..d−1     e: x w..w+APRON−1, y 0..d−1     (its own d long)
+//   nw, ne, sw, se: APRON × APRON, in the matching corner
+// A band is { x0, y0, bw, bd, blocks: Uint8Array(bw·bd·h), from: "zone" | "world" }, indexed
+// (x − x0) + (y − y0)·bw + z·bw·bd in the zone's own coordinates; a side or corner that isn't open has
+// none (null). zones.js fillApron builds the bands through APRON_BUILDERS.surface: a copy of the
+// neighbour's edge band when it is in memory, else the world functions. Dungeons have no apron.
+export const APRON_SIDES = ["n", "e", "s", "w", "ne", "nw", "se", "sw"];
+export function apronRect(zone, side) {
+  const { w, d } = zone, A = APRON;
+  const x0 = side.includes("w") ? -A : side.includes("e") ? w : 0;
+  const y0 = side.includes("n") ? -A : side.includes("s") ? d : 0;
+  const bw = side.includes("w") || side.includes("e") ? A : w, bd = side.includes("n") || side.includes("s") ? A : d;
+  return { x0, y0, bw, bd };
+}
+// The apron's block at (x, y, z) outside the grid (0 ≤ z < h), or −1 where no band covers it.
+export function apronBlock(zone, x, y, z) {
+  const ap = zone.apron;
+  const sy = y < 0 ? "n" : y >= zone.d ? "s" : "", sx = x < 0 ? "w" : x >= zone.w ? "e" : "";
+  const band = ap[sy + sx];
+  if (!band) return -1;
+  const lx = x - band.x0, ly = y - band.y0;
+  if (lx < 0 || ly < 0 || lx >= band.bw || ly >= band.bd) return -1;
+  return band.blocks[lx + ly * band.bw + z * band.bw * band.bd];
+}
+
 // Every column's standing height under one door rule (a fresh array; zone.stand is "solid").
 export function standWith(zone, doors) {
   const { w, d } = zone, stand = new Int8Array(w * d);
@@ -192,5 +239,5 @@ export const floatsOn = (zone, e) => zone.type === "surface" || !!e?.perks?.has?
 // One rule for both views (player.js collision, turns.js standing heights).
 export function solidFor(zone, e) {
   if (!floatsOn(zone, e)) return (x, y, z) => zone.solid(x, y, z);
-  return (x, y, z) => zone.solid(x, y, z) || zone.get(x, y, z) === B.WATER_DEEP;
+  return (x, y, z) => zone.solid(x, y, z) || zone.voxel(x, y, z) === B.WATER_DEEP;   // the apron's water too
 }

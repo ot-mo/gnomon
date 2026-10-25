@@ -71,6 +71,11 @@ function ambientAt(zone, x, y, z, airOnly = false) {
   return sky;
 }
 
+function openSky() {
+  lightR = AMBIENT[0] + SKY_COLOR[0]; lightG = AMBIENT[1] + SKY_COLOR[1]; lightB = AMBIENT[2] + SKY_COLOR[2];
+  return 1;
+}
+
 // Your torch this frame: strength and reach (perks and potions change them).
 const torch = { power: 0, range: 0 };
 
@@ -98,11 +103,13 @@ function shadeHit(zone, player, dx, dy, dz) {
     }
   }
   // A thin wall with a lit room behind it: in the dark, up close, light shows through the cracks.
-  if (!player.torch && t < 4.5 && nz === 0 && hit.z >= FLOOR_Z && hit.z <= FLOOR_Z + 1 &&
+  if (!player.torch && t < 4.5 && nz === 0 && hit.z >= FLOOR_Z && hit.z <= FLOOR_Z + 1 && !hit.apron &&
       zone.secretWalls.has(hit.x + hit.y * zone.w)) crackLight(nx !== 0 ? py : px, pz - FLOOR_Z, t);
   const ar = albedo.r, ag = albedo.g, ab = albedo.b, glow = albedo.glow;
 
-  const sky = ambientAt(zone, px + nx * 0.5, py + ny * 0.5, pz + nz * 0.5);
+  // The apron (the next zone's ground beyond an open edge) has no light arrays of its own: it gets the
+  // open sky's light, so it doesn't draw dark (its real shading is WS3's, TECH_DESIGN §6.1).
+  const sky = hit.apron ? openSky() : ambientAt(zone, px + nx * 0.5, py + ny * 0.5, pz + nz * 0.5);
   if (zone.hasSky && sky > 0.05) {
     const facing = nx * SUN[0] + ny * SUN[1] + nz * SUN[2];
     if (facing > 0 && !castRay(zone, px + nx * 0.001, py + ny * 0.001, pz + nz * 0.001, SUN[0], SUN[1], SUN[2], 40)) {

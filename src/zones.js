@@ -2,17 +2,22 @@
 //
 // A zone's address is "wx,wy,z": world tile (wx, wy), z = 0 its surface, z = 1..n the dungeon
 // levels under it. game.zones caches every zone you've been to (a Map, key → Zone) and game.zone
-// is the one you're in. Moves go up and down a column (z ± 1); walking off a surface zone's edge
-// into the next tile comes in 0A2.
+// is the one you're in. Moves go up and down a column (z ± 1), and at z = 0 sideways: walking off an
+// open edge of a surface zone into the next span's (tryWalkOff, §5.1).
 //
 // Where zones come from: ZONE_GENERATORS[type](game, addr) → Zone | null, registered by whoever
 // builds that kind of zone (today world/legacy.js; later the surface generator and dungeon sites).
 // A saved zone would come from ZONE_LOADER.load (WS9) before that.
 //
+// The apron (§6.1): a surface zone you are in carries voxel bands of its neighbours beyond its open
+// sides (world.js). fillApron builds them on every entry, a band is rebuilt when its neighbour arrives
+// in memory later, and prefetchNeighbours (a registered update) makes the neighbours ahead of time so
+// that both the band and the swap at the edge use the real zone.
+//
 // Persistent state lives in game.state (plain JSON): uids, zonePatches, zoneLeft.
-import { B, FLOOR_Z, standWith } from "./world.js";
+import { B, FLOOR_Z, APRON, APRON_SIDES, standWith } from "./world.js";
 import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "./pathing.js";
-import { emit } from "./events.js";
+import { emit, registerUpdate } from "./events.js";
 import { hash, distance } from "./rng.js";
 
 export const zoneKey = (wx, wy, z) => `${wx},${wy},${z}`;
@@ -24,13 +29,22 @@ const keyOf = (addr) => (typeof addr === "string" ? addr : addr.key || zoneKey(a
 
 // (game, { wx, wy, z, key }) → a new, unsealed Zone, or null if nothing is there.
 export const ZONE_GENERATORS = { surface: null, dungeon: null };
-// (run, zone, side) → fills zone.apron[side] (0A2 stub, WS2).
+// (run, zone, side, neighbour | null) → the band for zone.apron[side] (world.js; gen/surface.js
+// buildApronBand, registered by world/zonegen.js).
 export const APRON_BUILDERS = { surface: null };
 // WS9: async (game, key) → a stored Zone or null. While it is null, zones are only generated.
 export const ZONE_LOADER = { load: null };
 // Zone patch operations: op → (game, zone, patch, { at, arrival }) => void. See addZonePatch.
 export const PATCH_OPS = {};
-export const ZONE_RULES = { keepDerived: 2 };   // zones that keep light/stand arrays (current + previous)
+export const ZONE_RULES = {
+  keepDerived: 2,       // zones that keep light/stand arrays (current + previous; the current one's neighbours too)
+  prefetchNear: APRON,  // 3D: make an open side's neighbour once you are this many tiles from that edge
+  walkOffPast: 0.5,     // 3D: you cross once the body's centre is this far past the edge
+};
+// What a solid edge says when you try it (once per visit and side); the world's own border has no terrain.
+export const EDGE_RULES = { border: "Nothing lies past this edge of the world." };
+const SIDE_STEP = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0], ne: [1, -1], nw: [-1, -1], se: [1, 1], sw: [-1, 1] };
+const MIRROR = { n: "s", s: "n", e: "w", w: "e" };
 
 export function zoneState(game) {
   const st = (game.state ||= {});
@@ -52,6 +66,12 @@ export function makeZone(game, addr) {
   if (!zone) return null;
   zone.seal();
   (game.zones ||= new Map()).set(key, zone);
+  // A neighbour of the zone you are in has just arrived in memory: its band of your apron becomes a copy.
+  const cur = game.zone;
+  if (cur?.apron && z === 0 && cur.z === 0 && Math.abs(wx - cur.wx) <= 1 && Math.abs(wy - cur.wy) <= 1 && zone !== cur) {
+    const side = Object.keys(SIDE_STEP).find((s) => SIDE_STEP[s][0] === wx - cur.wx && SIDE_STEP[s][1] === wy - cur.wy);
+    if (side && cur.apron[side]) fillApron(game, cur, [side]);
+  }
   return zone;
 }
 
@@ -117,13 +137,16 @@ export function enterZone(game, zone, arrival = {}) {
   }
   (game.zones ||= new Map()).set(zone.key, zone);
   zone.ensureDerived();
+  if (zone.type === "surface" && game.run && APRON_BUILDERS.surface) fillApron(game, zone);
+  game.edgeTold = null;
   const left = st.zoneLeft[zone.key];
   const away = left === undefined ? null : game.time - left;
   game.zone = zone;
   emit(game, "zone:prepare", { zone, arrival, from });
   const at = arrivalPoint(zone, how, arrival);
   const p = game.player;
-  p.x = at.x; p.y = at.y; p.z = at.z; p.vz = 0;
+  p.x = at.x; p.y = at.y; p.z = at.z;
+  if (!arrival.keepMotion) p.vz = 0;   // over an edge in 3D you keep falling or jumping as you were
   if (!arrival.keepFacing) { p.yaw = at.yaw ?? p.yaw; p.pitch = 0; }
   applyPatches(game, zone, at);
   game.flow = null;
@@ -136,15 +159,97 @@ export function enterZone(game, zone, arrival = {}) {
 
 // Only the most recent zones keep their light/stand/kind/look arrays (about 0.2 MB each for a
 // dungeon level, 0.6 MB for a surface zone); older ones drop them and rebuild on re-entry. That
-// includes zones made without being entered (debug.zone, 0A2's prefetch): they keep their arrays
-// until the next zone change, then drop them unless they are in the LRU by then.
+// includes zones made without being entered (debug.zone): they keep their arrays until the next zone
+// change, then drop them unless they are in the LRU by then. The four straight neighbours of a surface
+// zone you are in keep theirs too (prefetched), so crossing an edge never waits for a refresh().
 export function keepDerived(game, n = 2) {
   const lru = (game.zoneLru ||= []);
   const cur = game.zone?.key;
   if (cur) { const k = lru.indexOf(cur); if (k >= 0) lru.splice(k, 1); lru.unshift(cur); }
   lru.splice(Math.max(1, n));
-  for (const [key, z] of game.zones || []) if (z !== game.zone && z.hasDerived && !lru.includes(key)) z.dropDerived();
+  const near = (z) => game.zone && z.z === 0 && game.zone.z === 0 && Math.abs(z.wx - game.zone.wx) + Math.abs(z.wy - game.zone.wy) === 1;
+  for (const [key, z] of game.zones || []) if (z !== game.zone && z.hasDerived && !lru.includes(key) && !near(z)) z.dropDerived();
 }
+
+// --- Edges, the apron and prefetch (TECH_DESIGN §5.1, §6.1, §2.2) ------------------------------------
+// The surface zone beyond `side` of a surface zone ("n" | "e" | "s" | "w", or a corner "ne" | "nw" |
+// "se" | "sw"), as { wx, wy, z: 0, key }, or null when that way is shut. A straight side is open when
+// zone.edges says so (world.edgeOpen: both spans exist and have open edges). A corner is open when both
+// of its sides are and the diagonal span can be walked into from one of them.
+export function neighbourAddr(game, zone, side) {
+  if (!zone || zone.type !== "surface" || zone.z !== 0) return null;
+  const step = SIDE_STEP[side];
+  if (!step) return null;
+  const [dx, dy] = step, wx = zone.wx + dx, wy = zone.wy + dy;
+  if (side.length === 1) return zone.edges[side] ? { wx, wy, z: 0, key: zoneKey(wx, wy, 0) } : null;
+  const ns = side[0], ew = side[1], world = game.run?.world;
+  if (!zone.edges[ns] || !zone.edges[ew] || !world) return null;
+  if (!world.edgeOpen(zone.wx + dx, zone.wy, ns) && !world.edgeOpen(zone.wx, zone.wy + dy, ew)) return null;
+  return { wx, wy, z: 0, key: zoneKey(wx, wy, 0) };
+}
+
+// Build zone.apron (every side and corner, or only those in `sides`): each open one through
+// APRON_BUILDERS.surface, from the neighbour zone when it is in memory, else from the world functions.
+export function fillApron(game, zone, sides = APRON_SIDES) {
+  const build = APRON_BUILDERS.surface;
+  if (!build || zone.type !== "surface" || !game.run) return;
+  const ap = (zone.apron ||= { n: null, e: null, s: null, w: null, ne: null, nw: null, se: null, sw: null });
+  for (const side of sides) {
+    const addr = neighbourAddr(game, zone, side);
+    ap[side] = addr ? build(game.run, zone, side, cachedZone(game, addr.key)) : null;
+  }
+}
+
+// Walk off `side` of the surface zone you are in, `along` tiles along that edge (x for n and s, y for e
+// and w), standing at opts.fromStand (default: where you stand). An open edge takes you into the
+// neighbour at once, without the transition screen, and logs its name (the HUD toast is 0D1's); returns
+// true. A solid edge or the world's border stays shut and says why, once per visit and side (the
+// neighbour terrain's edgeMessage); returns false. opts.exact = { x, y, z }: your exact point in the
+// neighbour's coordinates (3D), kept when it is within the rules (arrivalPoint "edge"); facing and
+// vertical speed are kept (opts.keepMotion, default true).
+export function tryWalkOff(game, side, along, opts = {}) {
+  const zone = game.zone, p = game.player;
+  if (!zone || zone.type !== "surface" || !MIRROR[side]) return false;
+  const addr = neighbourAddr(game, zone, side);
+  const target = addr && (cachedZone(game, addr.key) || makeZone(game, addr.key));
+  if (!target) {
+    const told = `${zone.key}:${side}`;
+    if (game.edgeTold !== told) {
+      game.edgeTold = told;
+      const [dx, dy] = SIDE_STEP[side], t = game.run?.world.tileAt(zone.wx + dx, zone.wy + dy);
+      const T = t && game.run.world.terrains[t.terrain];
+      game.log(t ? T?.edgeMessage || `You can't go on into ${T?.name || t.terrain} from here.` : EDGE_RULES.border, [170, 170, 170]);
+    }
+    return false;
+  }
+  const fromStand = opts.fromStand ?? Math.round(p.z);
+  const ok = changeZone(game, addr.key, { how: "edge", side, along, fromStand, exact: opts.exact || null,
+                                          keepFacing: true, keepMotion: opts.keepMotion !== false });
+  if (ok === true) game.log(target.name, [200, 220, 200]);
+  return ok === true;
+}
+
+// Make the neighbours you may walk into next before you reach them, so the swap at the edge happens in
+// the same frame and the apron shows their real ground. On the map (time stands still between actions)
+// every missing open neighbour at once; in 3D only sides within ZONE_RULES.prefetchNear tiles, at most
+// one zone per frame. Registered as an update below.
+export function prefetchNeighbours(game) {
+  const zone = game.zone;
+  if (!zone || zone.type !== "surface" || !game.run || game.zoneLoading) return 0;
+  const p = game.player, near = ZONE_RULES.prefetchNear, map = game.mode === "map";
+  let made = 0;
+  for (const side of ["n", "e", "s", "w"]) {
+    const addr = neighbourAddr(game, zone, side);
+    if (!addr || cachedZone(game, addr.key)) continue;
+    const gap = side === "n" ? p.y : side === "s" ? zone.d - p.y : side === "w" ? p.x : zone.w - p.x;
+    if (!map && gap > near) continue;
+    if (ZONE_LOADER.load) continue;   // WS9: read stored neighbours asynchronously instead
+    if (makeZone(game, addr.key)) made++;
+    if (!map) break;
+  }
+  return made;
+}
+registerUpdate("prefetchNeighbours", (game) => { prefetchNeighbours(game); }, { modes: ["explore", "map"] });
 
 // --- Where you appear ---------------------------------------------------------------------------
 //   "down"     came down the stairs: beside this level's stairs up
@@ -152,7 +257,8 @@ export function keepDerived(game, n = 2) {
 //   "fall"     fell through a pit or deep water at (fx, fy) above: the nearest spot to that, out of
 //              the places reachable from the zone's anchor (never sealed in a locked room)
 //   "teleport" like a fall, at (fx, fy) or, if not given, a random point drawn from opts.rng
-//   "edge"     walked off the neighbour's `side` at `along` (0A2 uses it): the mirrored tile
+//   "edge"     walked off the neighbour's `side` at `along` (tryWalkOff): the mirrored tile, or your
+//              exact point (opts.exact) when it is that tile
 //   "travel" | "start" | "load"   the anchor (spawn), or opts.at
 // The facing for "fall" and "teleport" comes from the caller (opts.yaw, or opts.rng), so
 // generation never needs Math.random.
@@ -217,10 +323,12 @@ function landing(zone, fx, fy, opts = {}) {
 // Walking in over an edge: you left the neighbour by opts.side ("n" | "e" | "s" | "w") at
 // opts.along, standing at opts.fromStand. The mirrored tile on this side, or the nearest tile
 // within 3 of the edge and ±4 along whose height is within 1 of where you were, reachable from
-// the anchor; else the nearest reachable spot at all (shifted: true).
-function edgeArrival(zone, { side, along = 0, fromStand = FLOOR_Z, yaw } = {}) {
+// the anchor; else the nearest reachable spot at all (shifted: true). With opts.exact (your point in
+// this zone's coordinates, from the 3D view) and the mirrored tile within the rules, that point
+// itself, so the camera doesn't move.
+function edgeArrival(zone, { side, along = 0, fromStand = FLOOR_Z, yaw, exact } = {}) {
   const { w, d, stand } = zone;
-  const dist = reachable(standWith(zone, "open"), w, d, Math.floor(zone.spawn.x), Math.floor(zone.spawn.y), PLAYER_STEP_UP, PLAYER_DROP);
+  const dist = reachFromAnchor(zone);
   const a = Math.floor(along);
   const tx = side === "e" ? 0 : side === "w" ? w - 1 : Math.max(0, Math.min(w - 1, a));
   const ty = side === "s" ? 0 : side === "n" ? d - 1 : Math.max(0, Math.min(d - 1, a));
@@ -238,7 +346,21 @@ function edgeArrival(zone, { side, along = 0, fromStand = FLOOR_Z, yaw } = {}) {
   const i = best >= 0 ? best : any;
   if (i < 0) return { ...zone.spawn, shifted: true };
   const x = i % w, y = (i - x) / w;
+  if (exact && best === tx + ty * w) {
+    const ex = Math.min(w - 1e-3, Math.max(0, exact.x)), ey = Math.min(d - 1e-3, Math.max(0, exact.y));
+    if (Math.floor(ex) === tx && Math.floor(ey) === ty) return { x: ex, y: ey, z: exact.z, yaw: yaw ?? zone.spawn.yaw, shifted: false, exact: true };
+  }
   return { x: x + 0.5, y: y + 0.5, z: stand[i], yaw: yaw ?? zone.spawn.yaw, shifted: best < 0 };
+}
+
+// What's reachable from the zone's anchor (pathing.reachable over the "open" door rule), kept on the
+// zone until its blocks change (navVersion) or it drops its derived arrays.
+function reachFromAnchor(zone) {
+  const ax = Math.floor(zone.spawn.x), ay = Math.floor(zone.spawn.y), r = zone.reach;
+  if (r && r.v === zone.navVersion && r.x === ax && r.y === ay) return r.dist;
+  const dist = reachable(standWith(zone, "open"), zone.w, zone.d, ax, ay, PLAYER_STEP_UP, PLAYER_DROP);
+  zone.reach = { v: zone.navVersion, x: ax, y: ay, dist };
+  return dist;
 }
 
 // --- Zone patches -------------------------------------------------------------------------------
