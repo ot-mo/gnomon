@@ -1,0 +1,8 @@
+{
+  "name": "gnomon",
+  "private": true,
+  "description": "GNOMON: a two-view ASCII voxel roguelike with a fixed overworld. No dependencies; this file only tells Node that src/*.js are ES modules.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": { "test": "node tools/run-all.mjs" }
+}

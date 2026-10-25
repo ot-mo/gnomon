@@ -1,0 +1,90 @@
+{
+ "format": 1,
+ "source": "src tree c5c83bf8892263cc106130834ef122de47e86c31",
+ "temples": {
+  "1": {
+   "blocks": "04513e65f6e54d88",
+   "entrance": null,
+   "items": [
+    {
+     "kind": "cube",
+     "x": 37.5,
+     "y": 28.5,
+     "z": 3
+    }
+   ],
+   "creatures": [],
+   "npcs": [
+    {
+     "type": "maren",
+     "tx": 10,
+     "ty": 12,
+     "z": 2,
+     "state": "ff40b220ccbbf7ad"
+    }
+   ],
+   "layout": "de90a450b201d420",
+   "spawn": {
+    "x": 6.5,
+    "y": 5.5,
+    "z": 2,
+    "yaw": 1.5707963267948966
+   },
+   "returnPoint": {
+    "x": 10.5,
+    "y": 14.5,
+    "z": 2,
+    "yaw": -1.5707963267948966
+   },
+   "cubeWall": [
+    [
+     37,
+     34
+    ]
+   ],
+   "hasSky": true
+  },
+  "1234": {
+   "blocks": "9de161ab4b2d74fd",
+   "entrance": null,
+   "items": [
+    {
+     "kind": "cube",
+     "x": 37.5,
+     "y": 28.5,
+     "z": 3
+    }
+   ],
+   "creatures": [],
+   "npcs": [
+    {
+     "type": "maren",
+     "tx": 10,
+     "ty": 12,
+     "z": 2,
+     "state": "ff40b220ccbbf7ad"
+    }
+   ],
+   "layout": "5ae8896c1268a358",
+   "spawn": {
+    "x": 6.5,
+    "y": 5.5,
+    "z": 2,
+    "yaw": 1.5707963267948966
+   },
+   "returnPoint": {
+    "x": 10.5,
+    "y": 14.5,
+    "z": 2,
+    "yaw": -1.5707963267948966
+   },
+   "cubeWall": [
+    [
+     37,
+     34
+    ]
+   ],
+   "hasSky": true
+  }
+ }
+}

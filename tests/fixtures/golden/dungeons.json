@@ -1,0 +1,1435 @@
+{
+ "format": 1,
+ "source": "src tree c5c83bf8892263cc106130834ef122de47e86c31",
+ "seeds": [
+  1,
+  7,
+  42,
+  1234,
+  31337
+ ],
+ "depths": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14,
+  15,
+  16,
+  17,
+  18,
+  19,
+  20
+ ],
+ "levels": {
+  "1/1": {
+   "blocks": "2d5c07976e89f7aa",
+   "items": "fa27dfd506cec3fe",
+   "creatures": "bd3369376b60fa9b",
+   "creatureStats": "76b442066f55ec5b",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "4851463b37fc5f44",
+   "attempts": 1,
+   "counts": {
+    "creatures": 5,
+    "items": 19,
+    "npcs": 0
+   }
+  },
+  "1/2": {
+   "blocks": "8a61800b1f935a35",
+   "items": "432d711ec507bbe6",
+   "creatures": "3fcca67c9b912721",
+   "creatureStats": "92ae0a9d87b59050",
+   "npcs": "14a21b0d1f4dca5a",
+   "layout": "ab96b30be985d211",
+   "attempts": 1,
+   "counts": {
+    "creatures": 7,
+    "items": 18,
+    "npcs": 2
+   }
+  },
+  "1/3": {
+   "blocks": "4e6a46fcf96985c6",
+   "items": "1e707478e26b8fff",
+   "creatures": "ba273a3a074fee87",
+   "creatureStats": "6fb0ab1a755a3938",
+   "npcs": "5ed9fcdb65c06edb",
+   "layout": "a488ffc71a198d60",
+   "attempts": 1,
+   "counts": {
+    "creatures": 9,
+    "items": 18,
+    "npcs": 1
+   }
+  },
+  "1/4": {
+   "blocks": "07c815dbf1aac68c",
+   "items": "8a08e7f7a42aa4be",
+   "creatures": "ff22a6463d88a865",
+   "creatureStats": "290b80ea290047ad",
+   "npcs": "1a887ace1e4871c0",
+   "layout": "d0680bb284675489",
+   "attempts": 1,
+   "counts": {
+    "creatures": 10,
+    "items": 13,
+    "npcs": 1
+   }
+  },
+  "1/5": {
+   "blocks": "559d149c38d2f156",
+   "items": "2956728d09284948",
+   "creatures": "8edd76c520e87adf",
+   "creatureStats": "8b3b34918a002ed9",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "4e2e860a16479122",
+   "attempts": 1,
+   "counts": {
+    "creatures": 14,
+    "items": 18,
+    "npcs": 0
+   }
+  },
+  "1/6": {
+   "blocks": "f870c99cca95abff",
+   "items": "5af72e9b5950a700",
+   "creatures": "131fe804e6292525",
+   "creatureStats": "f3825b70813f5dae",
+   "npcs": "ead1f829e41aab22",
+   "layout": "d2f22480088f20fb",
+   "attempts": 2,
+   "counts": {
+    "creatures": 15,
+    "items": 16,
+    "npcs": 1
+   }
+  },
+  "1/7": {
+   "blocks": "97475239997333f3",
+   "items": "aeee06d14ff076dc",
+   "creatures": "96426075bc1ed2ae",
+   "creatureStats": "d6e60e94eaa66006",
+   "npcs": "cb44dc30bbe0ecb0",
+   "layout": "7fbf2887b6f74e5f",
+   "attempts": 1,
+   "counts": {
+    "creatures": 15,
+    "items": 19,
+    "npcs": 2
+   }
+  },
+  "1/8": {
+   "blocks": "c0197c7cae0344f5",
+   "items": "1049073044645660",
+   "creatures": "f4b9cd52837b1799",
+   "creatureStats": "b70c1215dff3b7f0",
+   "npcs": "0cb3b1561b8572fb",
+   "layout": "2da1229313298126",
+   "attempts": 1,
+   "counts": {
+    "creatures": 19,
+    "items": 17,
+    "npcs": 1
+   }
+  },
+  "1/9": {
+   "blocks": "be2ae96249d34568",
+   "items": "5c6323e1a49c86b3",
+   "creatures": "e827798ffca7f4f9",
+   "creatureStats": "7dcb8b52ca7c56cd",
+   "npcs": "0d4b7d6d2247b97e",
+   "layout": "6f0dcce78c1f9766",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 14,
+    "npcs": 2
+   }
+  },
+  "1/10": {
+   "blocks": "4463eb007035ba16",
+   "items": "3b1e237fa4518861",
+   "creatures": "f606df794e1fb0e0",
+   "creatureStats": "ed41897e0faffb4d",
+   "npcs": "56f90b0caca56a4f",
+   "layout": "10271ebe383a4516",
+   "attempts": 1,
+   "counts": {
+    "creatures": 17,
+    "items": 19,
+    "npcs": 1
+   }
+  },
+  "1/11": {
+   "blocks": "7c72b37f6167b375",
+   "items": "aa0d00f78cde4b67",
+   "creatures": "674cccdb8d2f81e1",
+   "creatureStats": "e0be075e028e87fa",
+   "npcs": "9762dfa63ccfa64e",
+   "layout": "a3dda3db9f5037bf",
+   "attempts": 1,
+   "counts": {
+    "creatures": 19,
+    "items": 14,
+    "npcs": 3
+   }
+  },
+  "1/12": {
+   "blocks": "ad907dcb811a2b86",
+   "items": "25ceed09ba286e18",
+   "creatures": "3d1293b39d3afd51",
+   "creatureStats": "b8cf3f110b626769",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "a59aa0e21c72d9c3",
+   "attempts": 2,
+   "counts": {
+    "creatures": 18,
+    "items": 15,
+    "npcs": 0
+   }
+  },
+  "1/13": {
+   "blocks": "0239ae3b773ead64",
+   "items": "d92da78a05b0832b",
+   "creatures": "d84261adc98eebbf",
+   "creatureStats": "e61d3d6afb1b7641",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "29b90503713c308c",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 19,
+    "npcs": 0
+   }
+  },
+  "1/14": {
+   "blocks": "ccd52eec9de27cee",
+   "items": "96ba20fc6a31be42",
+   "creatures": "4b4a61ec9c093085",
+   "creatureStats": "62aed0976e74ead1",
+   "npcs": "4ff7a5b0fd7638ab",
+   "layout": "06ea406e83872b8c",
+   "attempts": 1,
+   "counts": {
+    "creatures": 14,
+    "items": 20,
+    "npcs": 1
+   }
+  },
+  "1/15": {
+   "blocks": "9425b1662ddb20e6",
+   "items": "2b85bae8792cc014",
+   "creatures": "9790986bb6f40ad4",
+   "creatureStats": "bf019e9e0494af88",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "fee61b609e4ae31b",
+   "attempts": 1,
+   "counts": {
+    "creatures": 19,
+    "items": 12,
+    "npcs": 0
+   }
+  },
+  "1/16": {
+   "blocks": "e68a40e742cc8831",
+   "items": "5998aa1177741a30",
+   "creatures": "459db19d8f6c97e4",
+   "creatureStats": "2f33c45f9002f9b5",
+   "npcs": "3b076d6b1bdc4f83",
+   "layout": "bf4e2d535c8e8ea9",
+   "attempts": 1,
+   "counts": {
+    "creatures": 17,
+    "items": 19,
+    "npcs": 1
+   }
+  },
+  "1/17": {
+   "blocks": "c7707d53fbf85351",
+   "items": "4e90efde22e96e95",
+   "creatures": "30cb56bdb5c8d283",
+   "creatureStats": "cf7eeae707caefd5",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "8a789109994967fd",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 17,
+    "npcs": 0
+   }
+  },
+  "1/18": {
+   "blocks": "8b2b24070b1cc500",
+   "items": "32269b38df9c7aea",
+   "creatures": "4c98f2f4afe621f0",
+   "creatureStats": "85d656c7e83c7691",
+   "npcs": "6c76c6d31ea908a6",
+   "layout": "39d5c7a3bd621997",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 16,
+    "npcs": 1
+   }
+  },
+  "1/19": {
+   "blocks": "81160c60bece0463",
+   "items": "c118705479778bad",
+   "creatures": "7b33cef74c798c5a",
+   "creatureStats": "ae6905b6899cebab",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "3a68bc5ad5721603",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 19,
+    "npcs": 0
+   }
+  },
+  "1/20": {
+   "blocks": "ecc1ee05bed73a9c",
+   "items": "866cce2f9ee417c4",
+   "creatures": "2e52fd63a9f1345c",
+   "creatureStats": "ab67c36e46d4a715",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "64d7be6bc63a43cc",
+   "attempts": 1,
+   "counts": {
+    "creatures": 13,
+    "items": 11,
+    "npcs": 0
+   }
+  },
+  "7/1": {
+   "blocks": "391d9d516be25731",
+   "items": "21865aa55370a321",
+   "creatures": "c15eaccdee0dcffa",
+   "creatureStats": "db45b18cabce5294",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "eee352ec32d85577",
+   "attempts": 2,
+   "counts": {
+    "creatures": 5,
+    "items": 15,
+    "npcs": 0
+   }
+  },
+  "7/2": {
+   "blocks": "3e2f9ae2e04ab636",
+   "items": "8cfad86d448f03ac",
+   "creatures": "38584b22cde06f6a",
+   "creatureStats": "9c76d0981b839f7b",
+   "npcs": "a752e291a6143a43",
+   "layout": "7277231df4370a22",
+   "attempts": 1,
+   "counts": {
+    "creatures": 6,
+    "items": 22,
+    "npcs": 1
+   }
+  },
+  "7/3": {
+   "blocks": "bb472e671999d76c",
+   "items": "2e42c2b7dd203b40",
+   "creatures": "3905c1d84a68341a",
+   "creatureStats": "36bece4c5b799835",
+   "npcs": "bf00cd51025f76c3",
+   "layout": "8477b0f04f0e09d9",
+   "attempts": 1,
+   "counts": {
+    "creatures": 9,
+    "items": 21,
+    "npcs": 1
+   }
+  },
+  "7/4": {
+   "blocks": "76a74f86c402e580",
+   "items": "e01cce5a73319148",
+   "creatures": "0f86028c5cb57ce3",
+   "creatureStats": "15eaf021dddc808d",
+   "npcs": "198e7cfc07c46911",
+   "layout": "9ee415979beff1da",
+   "attempts": 2,
+   "counts": {
+    "creatures": 10,
+    "items": 17,
+    "npcs": 1
+   }
+  },
+  "7/5": {
+   "blocks": "44005293034db85d",
+   "items": "e68e4853cefcda42",
+   "creatures": "ce4a350a308bd5af",
+   "creatureStats": "64ecf8eb77918848",
+   "npcs": "0669e61d8ef77b20",
+   "layout": "244c2945905caa3b",
+   "attempts": 1,
+   "counts": {
+    "creatures": 13,
+    "items": 16,
+    "npcs": 1
+   }
+  },
+  "7/6": {
+   "blocks": "790f4620a4c26fc6",
+   "items": "d0129b3f0d7a7540",
+   "creatures": "f674568fad6e684e",
+   "creatureStats": "984d556f70fe1f9b",
+   "npcs": "f8b0ced594373d45",
+   "layout": "0a12e434ac32f484",
+   "attempts": 1,
+   "counts": {
+    "creatures": 14,
+    "items": 20,
+    "npcs": 1
+   }
+  },
+  "7/7": {
+   "blocks": "8afebbbdb2fec5b4",
+   "items": "f91697ed24c64d31",
+   "creatures": "825da91b91bf9867",
+   "creatureStats": "03f3ba58f94e114f",
+   "npcs": "63fb1926bff8614f",
+   "layout": "dfb29a167a5985cc",
+   "attempts": 1,
+   "counts": {
+    "creatures": 17,
+    "items": 21,
+    "npcs": 2
+   }
+  },
+  "7/8": {
+   "blocks": "cd103bd1a5fd30d0",
+   "items": "131227f7ea402128",
+   "creatures": "fbe5a69940a72b7f",
+   "creatureStats": "b4006b16bfdbafd9",
+   "npcs": "639e0227a76c4e81",
+   "layout": "b03d855acfd107cd",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 15,
+    "npcs": 1
+   }
+  },
+  "7/9": {
+   "blocks": "acdedbefef0a86fd",
+   "items": "19d6ca5347041e63",
+   "creatures": "d14baae3b492fdd0",
+   "creatureStats": "691cfd283ee2381b",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "bda6086be8f8821d",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 23,
+    "npcs": 0
+   }
+  },
+  "7/10": {
+   "blocks": "02a6fd111e76c6f3",
+   "items": "5e7292240cbc0b9d",
+   "creatures": "4a4e06c15fd396c9",
+   "creatureStats": "8c50ada40cba1eb9",
+   "npcs": "5f4991751a2f173d",
+   "layout": "d6bbe5e69c5e70be",
+   "attempts": 1,
+   "counts": {
+    "creatures": 19,
+    "items": 13,
+    "npcs": 1
+   }
+  },
+  "7/11": {
+   "blocks": "5669b552b0e85f03",
+   "items": "6ddd9018649ff5d9",
+   "creatures": "72576887dd6c5229",
+   "creatureStats": "9b80ecc223489af2",
+   "npcs": "e217f9237856b124",
+   "layout": "e56bd9ef2a877abc",
+   "attempts": 1,
+   "counts": {
+    "creatures": 16,
+    "items": 14,
+    "npcs": 2
+   }
+  },
+  "7/12": {
+   "blocks": "fe23df042e517894",
+   "items": "5f5510ab7fc09d3c",
+   "creatures": "7a5b8fe489130130",
+   "creatureStats": "e69c6d7f75342a51",
+   "npcs": "3df1c9c0585f6c59",
+   "layout": "70b841b62201b448",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 18,
+    "npcs": 1
+   }
+  },
+  "7/13": {
+   "blocks": "8c64aae92f5c4b29",
+   "items": "b1113a2eeca5bd12",
+   "creatures": "175fb8fc54735489",
+   "creatureStats": "c5c99be1c47ca5f2",
+   "npcs": "cb4720ee8200954a",
+   "layout": "35e12e805ac18d6a",
+   "attempts": 1,
+   "counts": {
+    "creatures": 20,
+    "items": 15,
+    "npcs": 2
+   }
+  },
+  "7/14": {
+   "blocks": "d12ffb9105e871d9",
+   "items": "1377168b320bec28",
+   "creatures": "b6f063f608e9dac2",
+   "creatureStats": "ae5e56008c3e8caf",
+   "npcs": "545ea4fb8c56a438",
+   "layout": "b534310302bd9063",
+   "attempts": 1,
+   "counts": {
+    "creatures": 17,
+    "items": 18,
+    "npcs": 1
+   }
+  },
+  "7/15": {
+   "blocks": "d78123779d8f1d1f",
+   "items": "ec4209edae3435fc",
+   "creatures": "aeab69baf9c1e08b",
+   "creatureStats": "81410af317833321",
+   "npcs": "a9c20273e555af6f",
+   "layout": "0bee653d184e5d56",
+   "attempts": 2,
+   "counts": {
+    "creatures": 19,
+    "items": 16,
+    "npcs": 1
+   }
+  },
+  "7/16": {
+   "blocks": "d37e38dcb4aadc4d",
+   "items": "79bcd0d521ef314e",
+   "creatures": "6e314385afeb282b",
+   "creatureStats": "d2093999fcdcd7cf",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "5a97aa5b63c98302",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 17,
+    "npcs": 0
+   }
+  },
+  "7/17": {
+   "blocks": "ddf3419f35acfe4c",
+   "items": "52570cc24f55e2fe",
+   "creatures": "341c529fd70d8eed",
+   "creatureStats": "f0c723196c57432a",
+   "npcs": "1599256d6b0f32f6",
+   "layout": "2e78410d67be70a2",
+   "attempts": 1,
+   "counts": {
+    "creatures": 19,
+    "items": 16,
+    "npcs": 1
+   }
+  },
+  "7/18": {
+   "blocks": "9dba61ff2f78d27e",
+   "items": "5ac0221b7a88ba16",
+   "creatures": "88a5b0acb7e7fb64",
+   "creatureStats": "0506a297272bccea",
+   "npcs": "00c875ce8e2c7767",
+   "layout": "79c183e5cf5b7e41",
+   "attempts": 1,
+   "counts": {
+    "creatures": 17,
+    "items": 21,
+    "npcs": 2
+   }
+  },
+  "7/19": {
+   "blocks": "569a14d165c62d17",
+   "items": "4fca9ff37c74d515",
+   "creatures": "dd28ee9551ad3f3d",
+   "creatureStats": "86deb2893e89a9cd",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "ac781920f58ae8de",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 16,
+    "npcs": 0
+   }
+  },
+  "7/20": {
+   "blocks": "1304b7954c504152",
+   "items": "8a4e92f19a78bb12",
+   "creatures": "2024022a010ab877",
+   "creatureStats": "8b1b92104e39732e",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "520bae70f5df351d",
+   "attempts": 1,
+   "counts": {
+    "creatures": 13,
+    "items": 10,
+    "npcs": 0
+   }
+  },
+  "42/1": {
+   "blocks": "f702ec5cce5bb746",
+   "items": "e0e41d94693f7a15",
+   "creatures": "8bae5e0cca7e09b6",
+   "creatureStats": "d272c57e77394450",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "2e7d840827dbaff9",
+   "attempts": 1,
+   "counts": {
+    "creatures": 5,
+    "items": 17,
+    "npcs": 0
+   }
+  },
+  "42/2": {
+   "blocks": "cb41145f7d4dc766",
+   "items": "5627b268d6ece793",
+   "creatures": "e1a17de6bd0c9f83",
+   "creatureStats": "f28feb57ab803ae4",
+   "npcs": "4783f0fd30feff5f",
+   "layout": "166194be9e5b3e5e",
+   "attempts": 1,
+   "counts": {
+    "creatures": 6,
+    "items": 17,
+    "npcs": 1
+   }
+  },
+  "42/3": {
+   "blocks": "306173102b230bb8",
+   "items": "046cac0cf24eb896",
+   "creatures": "562604db1205f778",
+   "creatureStats": "a06755814e9ab9e8",
+   "npcs": "c85225b45218374f",
+   "layout": "59ec93335154bec3",
+   "attempts": 1,
+   "counts": {
+    "creatures": 9,
+    "items": 18,
+    "npcs": 1
+   }
+  },
+  "42/4": {
+   "blocks": "4e11c05612674978",
+   "items": "52b48a1e557cd067",
+   "creatures": "e23b1dde52c6bb5d",
+   "creatureStats": "dd2011fc37d2276e",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "dc22f106dbf6e3e2",
+   "attempts": 1,
+   "counts": {
+    "creatures": 11,
+    "items": 20,
+    "npcs": 0
+   }
+  },
+  "42/5": {
+   "blocks": "c2fd39d2c8932ea6",
+   "items": "6f1d7e4e8b8629a9",
+   "creatures": "31283c76a7f0792a",
+   "creatureStats": "0d2b03b0384a7483",
+   "npcs": "a4fb3913e89712c6",
+   "layout": "0dced35b0de888e5",
+   "attempts": 1,
+   "counts": {
+    "creatures": 13,
+    "items": 13,
+    "npcs": 2
+   }
+  },
+  "42/6": {
+   "blocks": "7c6a98283fd869d5",
+   "items": "34c6f27a823190db",
+   "creatures": "9176b7f5387cc10a",
+   "creatureStats": "6c3f5f340e3e3b3f",
+   "npcs": "efe3b401b5b2f2c2",
+   "layout": "f6262e2ec41a6853",
+   "attempts": 1,
+   "counts": {
+    "creatures": 14,
+    "items": 18,
+    "npcs": 1
+   }
+  },
+  "42/7": {
+   "blocks": "7f42cda9fe78df33",
+   "items": "adf51a22652f5ab1",
+   "creatures": "7e1f94777581662e",
+   "creatureStats": "c2751c24c31ef0ea",
+   "npcs": "8a016cddaadb24e0",
+   "layout": "a36543202560f7aa",
+   "attempts": 3,
+   "counts": {
+    "creatures": 17,
+    "items": 16,
+    "npcs": 1
+   }
+  },
+  "42/8": {
+   "blocks": "e118a7ec95a284ca",
+   "items": "4cf48fb6628c2828",
+   "creatures": "dd58486ca276c8b6",
+   "creatureStats": "cd6e62a33b15762e",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "a8a74af1a08f8ef1",
+   "attempts": 1,
+   "counts": {
+    "creatures": 20,
+    "items": 13,
+    "npcs": 0
+   }
+  },
+  "42/9": {
+   "blocks": "25b34681136529d4",
+   "items": "bc6baf7b251bd283",
+   "creatures": "34fd90813dff5169",
+   "creatureStats": "da75123ae8775720",
+   "npcs": "225ffd5c5d348a61",
+   "layout": "a19c6cbb914fb431",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 13,
+    "npcs": 1
+   }
+  },
+  "42/10": {
+   "blocks": "06d594488959395d",
+   "items": "0a0cb2b76471a66f",
+   "creatures": "0b16bf6dba6d6353",
+   "creatureStats": "85c206f84931b38e",
+   "npcs": "4ce8ab2f369a8041",
+   "layout": "5a23f4f032931450",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 13,
+    "npcs": 2
+   }
+  },
+  "42/11": {
+   "blocks": "3ce23f053398ef4e",
+   "items": "9985c6552afd138a",
+   "creatures": "9d557cf672fb514c",
+   "creatureStats": "c2b6fac2fcbf0e86",
+   "npcs": "2c1eacf698378080",
+   "layout": "9cad2f5d124e2983",
+   "attempts": 1,
+   "counts": {
+    "creatures": 19,
+    "items": 16,
+    "npcs": 2
+   }
+  },
+  "42/12": {
+   "blocks": "97e232f4cb8b5671",
+   "items": "0b82b00b20d30afb",
+   "creatures": "aeb5ed523415e03d",
+   "creatureStats": "7e90fbcf13622997",
+   "npcs": "bafd7eacaff35cd3",
+   "layout": "4b7bd6baeeb354ff",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 19,
+    "npcs": 2
+   }
+  },
+  "42/13": {
+   "blocks": "bb33fd74ab8b80dc",
+   "items": "d65e71483cef3328",
+   "creatures": "21bc462e001be1fc",
+   "creatureStats": "cc177d0232eb548a",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "92df3fe84d899edc",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 18,
+    "npcs": 0
+   }
+  },
+  "42/14": {
+   "blocks": "8b3c7a0f87e1d582",
+   "items": "d870ba197a45e9e2",
+   "creatures": "d2e3afb90d9e8687",
+   "creatureStats": "4ba1e0bf12de79d6",
+   "npcs": "356965d8a515584a",
+   "layout": "7ecf43f53fdb0350",
+   "attempts": 1,
+   "counts": {
+    "creatures": 17,
+    "items": 20,
+    "npcs": 2
+   }
+  },
+  "42/15": {
+   "blocks": "fddfd5b7371019e9",
+   "items": "e911970ab255abf3",
+   "creatures": "1e2dbe6cad00e727",
+   "creatureStats": "af644a9948a951f4",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "6399d7741c6451b1",
+   "attempts": 1,
+   "counts": {
+    "creatures": 19,
+    "items": 15,
+    "npcs": 0
+   }
+  },
+  "42/16": {
+   "blocks": "ee0b9e273af265ef",
+   "items": "bf61df94274a8050",
+   "creatures": "128dc2bed2a330b3",
+   "creatureStats": "87a73324e0197369",
+   "npcs": "dc2a0874cbdb21a6",
+   "layout": "ff74e21a52e706f6",
+   "attempts": 1,
+   "counts": {
+    "creatures": 17,
+    "items": 18,
+    "npcs": 2
+   }
+  },
+  "42/17": {
+   "blocks": "ce0e1e5817f10214",
+   "items": "ab3853cdc55b62ba",
+   "creatures": "28a616d43fe10030",
+   "creatureStats": "18ef2c11ecda8590",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "09633133e56f2a4d",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 16,
+    "npcs": 0
+   }
+  },
+  "42/18": {
+   "blocks": "c374168cb7986bb3",
+   "items": "40dbf625df0026a7",
+   "creatures": "e8e811f376e0f63b",
+   "creatureStats": "ea03699a809d70ba",
+   "npcs": "88eb3ac4a5b1a117",
+   "layout": "8f1c08367ea4c9c7",
+   "attempts": 1,
+   "counts": {
+    "creatures": 16,
+    "items": 17,
+    "npcs": 3
+   }
+  },
+  "42/19": {
+   "blocks": "1a5c6b87cd0ffd0f",
+   "items": "577a7d8fbc712b6a",
+   "creatures": "611a0d695e5fc656",
+   "creatureStats": "7c6116ca8c5df712",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "9ca15b4d283250e9",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 16,
+    "npcs": 0
+   }
+  },
+  "42/20": {
+   "blocks": "0ad1703ccee42e1b",
+   "items": "f028213cbe573890",
+   "creatures": "feb81a71e6035ac7",
+   "creatureStats": "71b3249552eb921e",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "65f997f418b95d45",
+   "attempts": 1,
+   "counts": {
+    "creatures": 13,
+    "items": 15,
+    "npcs": 0
+   }
+  },
+  "1234/1": {
+   "blocks": "f31db311093cc2d0",
+   "items": "87a0abf4898db1da",
+   "creatures": "9a075ef2ceac0432",
+   "creatureStats": "460c4c9f6e2d995f",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "c6f3b8203c1bf93d",
+   "attempts": 1,
+   "counts": {
+    "creatures": 5,
+    "items": 19,
+    "npcs": 0
+   }
+  },
+  "1234/2": {
+   "blocks": "7b639c992f9471a7",
+   "items": "174d308983ce7547",
+   "creatures": "e14cb70cb0c197e7",
+   "creatureStats": "f698caa28bc04667",
+   "npcs": "50dfa82be35564b7",
+   "layout": "2902b50256dc3687",
+   "attempts": 2,
+   "counts": {
+    "creatures": 5,
+    "items": 23,
+    "npcs": 1
+   }
+  },
+  "1234/3": {
+   "blocks": "52e1db5a0404f77d",
+   "items": "0b39bc121000934a",
+   "creatures": "2e20b6f26b644ee9",
+   "creatureStats": "b660e819fb51b6f5",
+   "npcs": "6ba156c90663474c",
+   "layout": "1796e1e05087ddfa",
+   "attempts": 1,
+   "counts": {
+    "creatures": 8,
+    "items": 17,
+    "npcs": 1
+   }
+  },
+  "1234/4": {
+   "blocks": "c0f789b264e141d4",
+   "items": "0390da6e60c158e7",
+   "creatures": "f6f72230f5649dfc",
+   "creatureStats": "2823c1abe6701b30",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "373977bb0a6b760f",
+   "attempts": 1,
+   "counts": {
+    "creatures": 11,
+    "items": 18,
+    "npcs": 0
+   }
+  },
+  "1234/5": {
+   "blocks": "e47f702ebd39a285",
+   "items": "07d941bc2a7b1cfb",
+   "creatures": "bb4da8276c028026",
+   "creatureStats": "fcd8e38be9593b55",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "7cbb9627f6f0f04c",
+   "attempts": 2,
+   "counts": {
+    "creatures": 14,
+    "items": 17,
+    "npcs": 0
+   }
+  },
+  "1234/6": {
+   "blocks": "fe2577cb081ac930",
+   "items": "922b6e4176f55a4f",
+   "creatures": "edb52e879748b3c7",
+   "creatureStats": "2d702695f6cadfd0",
+   "npcs": "e554a2fdd5f11122",
+   "layout": "728ae226ab6e8320",
+   "attempts": 1,
+   "counts": {
+    "creatures": 15,
+    "items": 21,
+    "npcs": 1
+   }
+  },
+  "1234/7": {
+   "blocks": "13e9e7f9e09f68a9",
+   "items": "f8f2125e90bfad63",
+   "creatures": "c85e41d09741c989",
+   "creatureStats": "8ae45b51348a457a",
+   "npcs": "d05895396c420780",
+   "layout": "5a813a8e8c3791a2",
+   "attempts": 1,
+   "counts": {
+    "creatures": 16,
+    "items": 16,
+    "npcs": 2
+   }
+  },
+  "1234/8": {
+   "blocks": "eb24a5fa688fab27",
+   "items": "efe9cbc2642840cd",
+   "creatures": "9a57a06c706db804",
+   "creatureStats": "91b247e956b276b7",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "42ff51e3f532b30c",
+   "attempts": 1,
+   "counts": {
+    "creatures": 20,
+    "items": 17,
+    "npcs": 0
+   }
+  },
+  "1234/9": {
+   "blocks": "04ce44bb4a202bd7",
+   "items": "31e3fc0b60a67e6e",
+   "creatures": "304f100bd8645132",
+   "creatureStats": "0163638aae4ef4c1",
+   "npcs": "d8de8b0d8a0a3f78",
+   "layout": "5b7a557872a5d99f",
+   "attempts": 2,
+   "counts": {
+    "creatures": 18,
+    "items": 17,
+    "npcs": 2
+   }
+  },
+  "1234/10": {
+   "blocks": "56f4c79ad2cce7b6",
+   "items": "9153bb6e0e9c842f",
+   "creatures": "11467fbf76f23183",
+   "creatureStats": "a7710a56843693bd",
+   "npcs": "17a69c01105d9926",
+   "layout": "ae6e89dc77ff64bb",
+   "attempts": 1,
+   "counts": {
+    "creatures": 15,
+    "items": 14,
+    "npcs": 3
+   }
+  },
+  "1234/11": {
+   "blocks": "c82492a9d4ec8d47",
+   "items": "7dc37e9862f76a9b",
+   "creatures": "4f68d64acb7980c7",
+   "creatureStats": "6ad2dcc76d996286",
+   "npcs": "211ec3eef3ca6e79",
+   "layout": "3e2ae83b67c6508b",
+   "attempts": 1,
+   "counts": {
+    "creatures": 19,
+    "items": 15,
+    "npcs": 1
+   }
+  },
+  "1234/12": {
+   "blocks": "1bb1d324c66b8d17",
+   "items": "1bf0f65338593ffd",
+   "creatures": "130580be54b22da5",
+   "creatureStats": "75ac749ac1d032eb",
+   "npcs": "c03d52359a05c585",
+   "layout": "ec2fa0d7c0c6b0e8",
+   "attempts": 1,
+   "counts": {
+    "creatures": 17,
+    "items": 17,
+    "npcs": 1
+   }
+  },
+  "1234/13": {
+   "blocks": "a050af3b6fd33231",
+   "items": "82f0c908458abbd1",
+   "creatures": "6a965e24b114d75e",
+   "creatureStats": "7fba144f2d321b40",
+   "npcs": "b3578023f9519c4e",
+   "layout": "c01bcb3eee5e187d",
+   "attempts": 1,
+   "counts": {
+    "creatures": 16,
+    "items": 17,
+    "npcs": 2
+   }
+  },
+  "1234/14": {
+   "blocks": "be0049471b954733",
+   "items": "297fad1427015d7b",
+   "creatures": "e79c4e094d1a65bf",
+   "creatureStats": "bb4a3ef6484f9b7e",
+   "npcs": "5c2a016e04e56ae6",
+   "layout": "1f042f160833fca5",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 17,
+    "npcs": 1
+   }
+  },
+  "1234/15": {
+   "blocks": "d453ffe5229b2e88",
+   "items": "e2eb670b1d0fb363",
+   "creatures": "04f8d6fb10ab0299",
+   "creatureStats": "2852326112878816",
+   "npcs": "2ad3b4ea8f815bc7",
+   "layout": "f405225278e53b93",
+   "attempts": 1,
+   "counts": {
+    "creatures": 19,
+    "items": 12,
+    "npcs": 2
+   }
+  },
+  "1234/16": {
+   "blocks": "fc6bd1092a306b6f",
+   "items": "3d02b7bc5cda5076",
+   "creatures": "26c0dc29e810592e",
+   "creatureStats": "21b03ec49b4e175a",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "3f89e80700a3c9b4",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 18,
+    "npcs": 0
+   }
+  },
+  "1234/17": {
+   "blocks": "3bb75b5a79c6adbf",
+   "items": "85009571bc13c3c6",
+   "creatures": "e1a968052b491730",
+   "creatureStats": "b6f1169e6e579f5c",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "3fe546574c8e8a9a",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 17,
+    "npcs": 0
+   }
+  },
+  "1234/18": {
+   "blocks": "0551e302d94b46c3",
+   "items": "86a5a64a865253ab",
+   "creatures": "dd28f992933b6600",
+   "creatureStats": "15c401dc27972d1e",
+   "npcs": "f3c8b18f941f2ba4",
+   "layout": "1838af458ba24b55",
+   "attempts": 1,
+   "counts": {
+    "creatures": 16,
+    "items": 17,
+    "npcs": 2
+   }
+  },
+  "1234/19": {
+   "blocks": "bf285c93105e2899",
+   "items": "2df69e9439c67b34",
+   "creatures": "9d222115638c9468",
+   "creatureStats": "9e5223a7fce475bf",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "0539d8b9336be7bc",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 20,
+    "npcs": 0
+   }
+  },
+  "1234/20": {
+   "blocks": "85719200e24d6bf9",
+   "items": "eb56a31ebad31197",
+   "creatures": "0ee533d5a767c004",
+   "creatureStats": "850095fdc1c60f0b",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "a973fc31aa294a59",
+   "attempts": 1,
+   "counts": {
+    "creatures": 13,
+    "items": 13,
+    "npcs": 0
+   }
+  },
+  "31337/1": {
+   "blocks": "b2d3021fedcb6144",
+   "items": "57a403185e01f2d3",
+   "creatures": "7f8c933771a0f1a7",
+   "creatureStats": "8892b0dd03234d08",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "88c44e0f2c6b7160",
+   "attempts": 1,
+   "counts": {
+    "creatures": 5,
+    "items": 17,
+    "npcs": 0
+   }
+  },
+  "31337/2": {
+   "blocks": "834e7cc1cd2a1dc3",
+   "items": "557b03a0aefd1fa9",
+   "creatures": "3996d35c9cf558f4",
+   "creatureStats": "e404a2112e7662c6",
+   "npcs": "23efdcb5d0bbc5b3",
+   "layout": "a3caa3913caf9457",
+   "attempts": 1,
+   "counts": {
+    "creatures": 7,
+    "items": 19,
+    "npcs": 2
+   }
+  },
+  "31337/3": {
+   "blocks": "9bea92e7812fed22",
+   "items": "2fc53a6b0961bae9",
+   "creatures": "8e3fc5c143e9ae1b",
+   "creatureStats": "a3493df6abc1d2a9",
+   "npcs": "22b79acdabcfe883",
+   "layout": "5166c82b8d0c9689",
+   "attempts": 1,
+   "counts": {
+    "creatures": 8,
+    "items": 15,
+    "npcs": 1
+   }
+  },
+  "31337/4": {
+   "blocks": "232c7fc6287a1b53",
+   "items": "bb20a0e8dffae0ea",
+   "creatures": "79aa26bfa2acf472",
+   "creatureStats": "5179e9953e9cf131",
+   "npcs": "b1e533d0961718c6",
+   "layout": "3412d6bc64a6abb1",
+   "attempts": 1,
+   "counts": {
+    "creatures": 9,
+    "items": 14,
+    "npcs": 2
+   }
+  },
+  "31337/5": {
+   "blocks": "eb35e51f41085a76",
+   "items": "4b558e70532b3142",
+   "creatures": "5fff3adfb7d8a41b",
+   "creatureStats": "0c8c8c66d90df792",
+   "npcs": "6a2bdb6048663130",
+   "layout": "2fbed29836ee7aeb",
+   "attempts": 1,
+   "counts": {
+    "creatures": 12,
+    "items": 14,
+    "npcs": 3
+   }
+  },
+  "31337/6": {
+   "blocks": "87cf0a98721d9ef6",
+   "items": "7a8de4b3dd73b509",
+   "creatures": "3dee5c2926013eb7",
+   "creatureStats": "94517135b42f19ea",
+   "npcs": "177f3dd1ecc09d85",
+   "layout": "df53c911091cdd4f",
+   "attempts": 1,
+   "counts": {
+    "creatures": 15,
+    "items": 16,
+    "npcs": 1
+   }
+  },
+  "31337/7": {
+   "blocks": "216561d05c63ff2b",
+   "items": "2eff738dc7ffc6e3",
+   "creatures": "9057db00031a0d44",
+   "creatureStats": "2fc1368efa7301c7",
+   "npcs": "6d8b746ce66d82eb",
+   "layout": "aec3752de60f4a8d",
+   "attempts": 1,
+   "counts": {
+    "creatures": 16,
+    "items": 19,
+    "npcs": 2
+   }
+  },
+  "31337/8": {
+   "blocks": "86fb4ee97913a30a",
+   "items": "a8a12b97ebed9234",
+   "creatures": "59a3d8640ab57b74",
+   "creatureStats": "aa336256517f6ea5",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "6320d0989b486810",
+   "attempts": 1,
+   "counts": {
+    "creatures": 20,
+    "items": 19,
+    "npcs": 0
+   }
+  },
+  "31337/9": {
+   "blocks": "b82ae34e589aaacc",
+   "items": "3ed1dfe15e9d73b0",
+   "creatures": "634b73a492714be9",
+   "creatureStats": "d85eee4b6c9810db",
+   "npcs": "b5df7598650c46e6",
+   "layout": "e4809ef30ba36a4f",
+   "attempts": 1,
+   "counts": {
+    "creatures": 16,
+    "items": 16,
+    "npcs": 1
+   }
+  },
+  "31337/10": {
+   "blocks": "b399773e48a29ece",
+   "items": "f6132c7aeddf8b21",
+   "creatures": "bb3f1899986b17ce",
+   "creatureStats": "2e68820e38f815b3",
+   "npcs": "0d6588701db2f1af",
+   "layout": "cc9d016bea79a49b",
+   "attempts": 1,
+   "counts": {
+    "creatures": 16,
+    "items": 13,
+    "npcs": 2
+   }
+  },
+  "31337/11": {
+   "blocks": "4d2eb7a36e7bec06",
+   "items": "d9d7d46d373686be",
+   "creatures": "fb9ffeb32cb99d90",
+   "creatureStats": "039d0f5406d3fc5d",
+   "npcs": "c5f174bcbf97121e",
+   "layout": "9e4f853fd8a3d032",
+   "attempts": 1,
+   "counts": {
+    "creatures": 14,
+    "items": 19,
+    "npcs": 2
+   }
+  },
+  "31337/12": {
+   "blocks": "65b8e3516ffb3b4a",
+   "items": "8e4e47535a146519",
+   "creatures": "d43e0522d2b9ff37",
+   "creatureStats": "f89521d20fdecf3a",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "bfcb2c72f521cdd2",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 15,
+    "npcs": 0
+   }
+  },
+  "31337/13": {
+   "blocks": "591a8283fe9b2ef0",
+   "items": "a3fb1b873311a5f9",
+   "creatures": "0af58a87b7799205",
+   "creatureStats": "43fb5f98f7564a48",
+   "npcs": "367f168525b79093",
+   "layout": "c6dcbe97a9d3ba13",
+   "attempts": 1,
+   "counts": {
+    "creatures": 17,
+    "items": 21,
+    "npcs": 1
+   }
+  },
+  "31337/14": {
+   "blocks": "26e3dce89805e63b",
+   "items": "14fe2e5f50b4d383",
+   "creatures": "e170ae5abcc59e73",
+   "creatureStats": "c448a0b091d481ee",
+   "npcs": "4ad958fea14a7d48",
+   "layout": "439ca4d73dce6598",
+   "attempts": 2,
+   "counts": {
+    "creatures": 18,
+    "items": 19,
+    "npcs": 1
+   }
+  },
+  "31337/15": {
+   "blocks": "0ef271a7dde291aa",
+   "items": "18acd1960105baec",
+   "creatures": "6e9d9d337044e0d0",
+   "creatureStats": "9ff904f5d78ca9ae",
+   "npcs": "6d0395e00484bf31",
+   "layout": "d186c9c9c839e4e4",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 16,
+    "npcs": 1
+   }
+  },
+  "31337/16": {
+   "blocks": "caab7e02b6869bc4",
+   "items": "1ce8482cc959eef5",
+   "creatures": "522f60005580f18b",
+   "creatureStats": "f743e5a9ed5677d4",
+   "npcs": "b7f3878e5bb93628",
+   "layout": "3f096b9a9d20f572",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 19,
+    "npcs": 1
+   }
+  },
+  "31337/17": {
+   "blocks": "90199eff22127758",
+   "items": "595926711468a73a",
+   "creatures": "25be1a729766571a",
+   "creatureStats": "9102f3a2988f72df",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "e29fa887036fbf34",
+   "attempts": 1,
+   "counts": {
+    "creatures": 18,
+    "items": 17,
+    "npcs": 0
+   }
+  },
+  "31337/18": {
+   "blocks": "cca2ce246ccb5a69",
+   "items": "a4c1ff55a688e93b",
+   "creatures": "0a3679ced1058fac",
+   "creatureStats": "a4f098fe57dca190",
+   "npcs": "3436733dc137b3ab",
+   "layout": "690f3b8cf1a54844",
+   "attempts": 1,
+   "counts": {
+    "creatures": 15,
+    "items": 19,
+    "npcs": 1
+   }
+  },
+  "31337/19": {
+   "blocks": "510c519752a16a54",
+   "items": "f95447d7b4dfc21f",
+   "creatures": "4e3994151d9e969e",
+   "creatureStats": "0b77ffd8f8a2121b",
+   "npcs": "d6b1a964f6098cd8",
+   "layout": "d74d26a51a3ee0b7",
+   "attempts": 1,
+   "counts": {
+    "creatures": 15,
+    "items": 21,
+    "npcs": 2
+   }
+  },
+  "31337/20": {
+   "blocks": "2a213218df50a3a2",
+   "items": "cef8be61f400dca2",
+   "creatures": "24c7f349912742bd",
+   "creatureStats": "5cf6bc4a7dfe4b8b",
+   "npcs": "c83b10e26d2cafaf",
+   "layout": "b182d4199c33023c",
+   "attempts": 1,
+   "counts": {
+    "creatures": 13,
+    "items": 11,
+    "npcs": 0
+   }
+  }
+ }
+}

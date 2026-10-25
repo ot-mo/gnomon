@@ -1,0 +1,1028 @@
+{
+ "format": 1,
+ "source": "src tree c5c83bf8892263cc106130834ef122de47e86c31",
+ "vaults": {
+  "The Rune Lever#1": {
+   "blocks": "e9a9fedfec673895",
+   "entrance": {
+    "x": 11,
+    "y": 8,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "scroll",
+     "effect": "shock",
+     "x": 5.5,
+     "y": 5.5,
+     "z": 2
+    },
+    {
+     "kind": "potion",
+     "effect": "darkness",
+     "x": 4.5,
+     "y": 6.5,
+     "z": 2
+    },
+    {
+     "kind": "scroll",
+     "effect": "shock",
+     "x": 5.5,
+     "y": 6.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [],
+   "layout": "34eb2b3bf7b29076"
+  },
+  "The Rune Lever#2": {
+   "blocks": "da09551a09bbe185",
+   "entrance": {
+    "x": 12,
+    "y": 8,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "scroll",
+     "effect": "uncurse",
+     "x": 5.5,
+     "y": 5.5,
+     "z": 2
+    },
+    {
+     "kind": "potion",
+     "effect": "descent",
+     "x": 4.5,
+     "y": 6.5,
+     "z": 2
+    },
+    {
+     "kind": "scroll",
+     "effect": "fire",
+     "x": 5.5,
+     "y": 6.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [],
+   "layout": "125d286460e46602"
+  },
+  "The Rune Lever#3": {
+   "blocks": "da09551a09bbe185",
+   "entrance": {
+    "x": 12,
+    "y": 8,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "weapon",
+     "id": "waraxe",
+     "ench": 0,
+     "known": false,
+     "props": [
+      "keen"
+     ],
+     "x": 5.5,
+     "y": 5.5,
+     "z": 2
+    },
+    {
+     "kind": "potion",
+     "effect": "healing",
+     "x": 4.5,
+     "y": 6.5,
+     "z": 2
+    },
+    {
+     "kind": "scroll",
+     "effect": "summon",
+     "x": 5.5,
+     "y": 6.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [],
+   "layout": "3eec543869a2ae02"
+  },
+  "The Mosaic Hall#1": {
+   "blocks": "cc5a059804c2b7ae",
+   "entrance": {
+    "x": 11,
+    "y": 15,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "gold",
+     "amount": 18,
+     "x": 4.5,
+     "y": 5.5,
+     "z": 2
+    },
+    {
+     "kind": "weapon",
+     "id": "longsword",
+     "ench": 2,
+     "known": false,
+     "props": [
+      "vampiric"
+     ],
+     "x": 5.5,
+     "y": 5.5,
+     "z": 2
+    },
+    {
+     "kind": "potion",
+     "effect": "seeing",
+     "x": 4.5,
+     "y": 6.5,
+     "z": 2
+    },
+    {
+     "kind": "scroll",
+     "effect": "frost",
+     "x": 5.5,
+     "y": 6.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [],
+   "layout": "c9bd75b939c2c5c5"
+  },
+  "The Mosaic Hall#2": {
+   "blocks": "e8054d5923979746",
+   "entrance": {
+    "x": 8,
+    "y": 15,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "weapon",
+     "id": "longsword",
+     "ench": 0,
+     "known": false,
+     "element": "frost",
+     "x": 14.5,
+     "y": 5.5,
+     "z": 2
+    },
+    {
+     "kind": "gold",
+     "amount": 18,
+     "x": 15.5,
+     "y": 5.5,
+     "z": 2
+    },
+    {
+     "kind": "scroll",
+     "effect": "teleport",
+     "x": 14.5,
+     "y": 6.5,
+     "z": 2
+    },
+    {
+     "kind": "potion",
+     "effect": "flying",
+     "x": 15.5,
+     "y": 6.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [],
+   "layout": "16b1849e8e2451c3"
+  },
+  "The Mosaic Hall#3": {
+   "blocks": "0b1c846232639b73",
+   "entrance": {
+    "x": 11,
+    "y": 15,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "gold",
+     "amount": 23,
+     "x": 4.5,
+     "y": 5.5,
+     "z": 2
+    },
+    {
+     "kind": "armour",
+     "id": "chain",
+     "ench": 0,
+     "known": false,
+     "x": 5.5,
+     "y": 5.5,
+     "z": 2
+    },
+    {
+     "kind": "potion",
+     "effect": "descent",
+     "x": 4.5,
+     "y": 6.5,
+     "z": 2
+    },
+    {
+     "kind": "scroll",
+     "effect": "teleport",
+     "x": 5.5,
+     "y": 6.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [],
+   "layout": "c9bd75b939c2c5c5"
+  },
+  "The Flat Lie#1": {
+   "blocks": "32908f9cfd7ef41c",
+   "entrance": {
+    "x": 5,
+    "y": 13,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "scroll",
+     "effect": "uncurse",
+     "x": 13.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "weapon",
+     "id": "waraxe",
+     "ench": 3,
+     "known": false,
+     "x": 13.5,
+     "y": 5.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [],
+   "layout": "0d35a763749a59d6"
+  },
+  "The Flat Lie#2": {
+   "blocks": "32908f9cfd7ef41c",
+   "entrance": {
+    "x": 5,
+    "y": 13,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "scroll",
+     "effect": "frost",
+     "x": 13.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "weapon",
+     "id": "longsword",
+     "ench": 0,
+     "known": false,
+     "x": 13.5,
+     "y": 5.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [],
+   "layout": "0d35a763749a59d6"
+  },
+  "The Flat Lie#3": {
+   "blocks": "32908f9cfd7ef41c",
+   "entrance": {
+    "x": 5,
+    "y": 13,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "scroll",
+     "effect": "uncurse",
+     "x": 13.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "weapon",
+     "id": "waraxe",
+     "ench": 0,
+     "known": false,
+     "x": 13.5,
+     "y": 5.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [],
+   "layout": "0d35a763749a59d6"
+  },
+  "The Gauntlet#1": {
+   "blocks": "d02c42e8b6bc3115",
+   "entrance": {
+    "x": 9,
+    "y": 14,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "heart",
+     "x": 6.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "gold",
+     "amount": 21,
+     "x": 9.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "potion",
+     "effect": "healing",
+     "x": 12.5,
+     "y": 4.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [],
+   "layout": "4b89801cc263d784"
+  },
+  "The Gauntlet#2": {
+   "blocks": "d02c42e8b6bc3115",
+   "entrance": {
+    "x": 9,
+    "y": 14,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "armour",
+     "id": "scale",
+     "ench": 0,
+     "known": false,
+     "x": 6.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "gold",
+     "amount": 21,
+     "x": 9.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "scroll",
+     "effect": "malice",
+     "x": 12.5,
+     "y": 4.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [],
+   "layout": "b505e0277e203368"
+  },
+  "The Gauntlet#3": {
+   "blocks": "d02c42e8b6bc3115",
+   "entrance": {
+    "x": 9,
+    "y": 14,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "scroll",
+     "effect": "shock",
+     "x": 6.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "gold",
+     "amount": 25,
+     "x": 9.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "potion",
+     "effect": "poison",
+     "x": 12.5,
+     "y": 4.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [],
+   "layout": "d7350f8ac214a39c"
+  },
+  "The Braziers#1": {
+   "blocks": "ddfd3c5189566096",
+   "entrance": {
+    "x": 8,
+    "y": 8,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "armour",
+     "id": "leather",
+     "ench": 2,
+     "known": false,
+     "x": 14.5,
+     "y": 5.5,
+     "z": 2
+    },
+    {
+     "kind": "potion",
+     "effect": "haste",
+     "x": 15.5,
+     "y": 5.5,
+     "z": 2
+    },
+    {
+     "kind": "scroll",
+     "effect": "shock",
+     "x": 14.5,
+     "y": 6.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [],
+   "layout": "3ba22645fb18622e"
+  },
+  "The Braziers#2": {
+   "blocks": "3f5db99ec129b5e7",
+   "entrance": {
+    "x": 8,
+    "y": 8,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "scroll",
+     "effect": "shock",
+     "x": 14.5,
+     "y": 5.5,
+     "z": 2
+    },
+    {
+     "kind": "potion",
+     "effect": "flying",
+     "x": 15.5,
+     "y": 5.5,
+     "z": 2
+    },
+    {
+     "kind": "scroll",
+     "effect": "teleport",
+     "x": 14.5,
+     "y": 6.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [],
+   "layout": "83d5f01553771727"
+  },
+  "The Braziers#3": {
+   "blocks": "b30c39f982800ee2",
+   "entrance": {
+    "x": 8,
+    "y": 8,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "weapon",
+     "id": "waraxe",
+     "ench": 0,
+     "known": false,
+     "props": [
+      "swift"
+     ],
+     "x": 14.5,
+     "y": 5.5,
+     "z": 2
+    },
+    {
+     "kind": "potion",
+     "effect": "poison",
+     "x": 15.5,
+     "y": 5.5,
+     "z": 2
+    },
+    {
+     "kind": "scroll",
+     "effect": "holy",
+     "x": 14.5,
+     "y": 6.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [],
+   "layout": "882821d0e4c0f7ef"
+  },
+  "The Speaking Door#1": {
+   "blocks": "fd412956307a0ea9",
+   "entrance": {
+    "x": 9,
+    "y": 19,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "scroll",
+     "effect": "malice",
+     "x": 8.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "scroll",
+     "effect": "uncurse",
+     "x": 9.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "gold",
+     "amount": 27,
+     "x": 10.5,
+     "y": 4.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [
+    {
+     "type": "door",
+     "tx": 8,
+     "ty": 6,
+     "z": 2,
+     "state": "89593ae02122702d"
+    }
+   ],
+   "layout": "0d35a763749a59d6"
+  },
+  "The Speaking Door#2": {
+   "blocks": "2d42dfad1ff7c589",
+   "entrance": {
+    "x": 9,
+    "y": 19,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "armour",
+     "id": "leather",
+     "ench": 0,
+     "known": false,
+     "x": 8.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "scroll",
+     "effect": "fire",
+     "x": 9.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "gold",
+     "amount": 20,
+     "x": 10.5,
+     "y": 4.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [
+    {
+     "type": "door",
+     "tx": 8,
+     "ty": 6,
+     "z": 2,
+     "state": "7f4322d552f0f539"
+    }
+   ],
+   "layout": "0d35a763749a59d6"
+  },
+  "The Speaking Door#3": {
+   "blocks": "857920cc4e614554",
+   "entrance": {
+    "x": 9,
+    "y": 19,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "weapon",
+     "id": "waraxe",
+     "ench": 0,
+     "known": false,
+     "props": [
+      "keen"
+     ],
+     "x": 8.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "scroll",
+     "effect": "teleport",
+     "x": 9.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "gold",
+     "amount": 23,
+     "x": 10.5,
+     "y": 4.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [
+    {
+     "type": "door",
+     "tx": 8,
+     "ty": 6,
+     "z": 2,
+     "state": "01255f413a6c5f9d"
+    }
+   ],
+   "layout": "0d35a763749a59d6"
+  },
+  "The Dark Maze#1": {
+   "blocks": "4691b4710645c825",
+   "entrance": {
+    "x": 10,
+    "y": 15,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "armour",
+     "id": "scale",
+     "ench": 1,
+     "known": false,
+     "props": [
+      "thorns"
+     ],
+     "x": 4.5,
+     "y": 13.5,
+     "z": 2
+    },
+    {
+     "kind": "scroll",
+     "effect": "uncurse",
+     "x": 4.5,
+     "y": 14.5,
+     "z": 2
+    }
+   ],
+   "creatures": [
+    {
+     "type": "goblin",
+     "tx": 13,
+     "ty": 4,
+     "z": 2,
+     "state": "wander"
+    },
+    {
+     "type": "skeleton",
+     "tx": 4,
+     "ty": 10,
+     "z": 2,
+     "state": "wander"
+    }
+   ],
+   "npcs": [],
+   "layout": "0d35a763749a59d6"
+  },
+  "The Dark Maze#2": {
+   "blocks": "b56b2b419075649d",
+   "entrance": {
+    "x": 10,
+    "y": 15,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "armour",
+     "id": "scale",
+     "ench": 0,
+     "known": false,
+     "x": 13.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "knife",
+     "count": 4,
+     "x": 14.5,
+     "y": 4.5,
+     "z": 2
+    }
+   ],
+   "creatures": [
+    {
+     "type": "skeleton",
+     "tx": 4,
+     "ty": 4,
+     "z": 2,
+     "state": "wander"
+    },
+    {
+     "type": "goblin",
+     "tx": 6,
+     "ty": 8,
+     "z": 2,
+     "state": "wander"
+    }
+   ],
+   "npcs": [],
+   "layout": "0d35a763749a59d6"
+  },
+  "The Dark Maze#3": {
+   "blocks": "864c48301da82e8e",
+   "entrance": {
+    "x": 10,
+    "y": 15,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "armour",
+     "id": "scale",
+     "ench": 0,
+     "known": false,
+     "x": 4.5,
+     "y": 7.5,
+     "z": 2
+    },
+    {
+     "kind": "amulet",
+     "id": "feather",
+     "ench": 1,
+     "known": false,
+     "x": 4.5,
+     "y": 8.5,
+     "z": 2
+    }
+   ],
+   "creatures": [
+    {
+     "type": "skeleton",
+     "tx": 13,
+     "ty": 4,
+     "z": 2,
+     "state": "wander"
+    },
+    {
+     "type": "goblin",
+     "tx": 6,
+     "ty": 10,
+     "z": 2,
+     "state": "wander"
+    }
+   ],
+   "npcs": [],
+   "layout": "0d35a763749a59d6"
+  },
+  "The Unseen Path#1": {
+   "blocks": "98d88aaecfb4c42e",
+   "entrance": {
+    "x": 8,
+    "y": 12,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "armour",
+     "id": "scale",
+     "ench": 0,
+     "known": false,
+     "props": [
+      "stars"
+     ],
+     "x": 9.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "potion",
+     "effect": "haste",
+     "x": 10.5,
+     "y": 4.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [],
+   "layout": "0d35a763749a59d6"
+  },
+  "The Unseen Path#2": {
+   "blocks": "af7d738c9c72a143",
+   "entrance": {
+    "x": 8,
+    "y": 12,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "scroll",
+     "effect": "uncurse",
+     "x": 10.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "scroll",
+     "effect": "teleport",
+     "x": 11.5,
+     "y": 4.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [],
+   "layout": "0d35a763749a59d6"
+  },
+  "The Unseen Path#3": {
+   "blocks": "e25a96efaf2253cb",
+   "entrance": {
+    "x": 8,
+    "y": 12,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [
+    {
+     "kind": "weapon",
+     "id": "waraxe",
+     "ench": 0,
+     "known": false,
+     "props": [
+      "keen"
+     ],
+     "x": 10.5,
+     "y": 4.5,
+     "z": 2
+    },
+    {
+     "kind": "scroll",
+     "effect": "uncurse",
+     "x": 11.5,
+     "y": 4.5,
+     "z": 2
+    }
+   ],
+   "creatures": [],
+   "npcs": [],
+   "layout": "0d35a763749a59d6"
+  },
+  "The Flat Queen's Court#1": {
+   "blocks": "5b109b21d0aa63e6",
+   "entrance": {
+    "x": 11,
+    "y": 17,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [],
+   "creatures": [
+    {
+     "type": "flatqueen",
+     "tx": 11,
+     "ty": 11,
+     "z": 2,
+     "state": "idle"
+    }
+   ],
+   "npcs": [],
+   "layout": "3e49d6a29a0e5d68"
+  },
+  "The Gloom Warden's Hall#1": {
+   "blocks": "c6abf6986a26090f",
+   "entrance": {
+    "x": 11,
+    "y": 17,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [],
+   "creatures": [
+    {
+     "type": "warden",
+     "tx": 11,
+     "ty": 11,
+     "z": 2.4,
+     "state": "idle"
+    }
+   ],
+   "npcs": [],
+   "layout": "07f73420b87dd0f3"
+  },
+  "The Colossus's Hall#1": {
+   "blocks": "fb7d92d95bd25e3b",
+   "entrance": {
+    "x": 12,
+    "y": 16,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [],
+   "creatures": [
+    {
+     "type": "colossus",
+     "tx": 12,
+     "ty": 11,
+     "z": 2,
+     "state": "idle"
+    }
+   ],
+   "npcs": [],
+   "layout": "4a8d1b30e9285be5"
+  },
+  "The Lich's Throne#1": {
+   "blocks": "4a6523740023ae69",
+   "entrance": {
+    "x": 12,
+    "y": 17,
+    "dx": 0,
+    "dy": 1
+   },
+   "items": [],
+   "creatures": [
+    {
+     "type": "lich",
+     "tx": 12,
+     "ty": 7,
+     "z": 3,
+     "state": "idle"
+    },
+    {
+     "type": "skeleton",
+     "tx": 10,
+     "ty": 11,
+     "z": 2,
+     "state": "wander"
+    },
+    {
+     "type": "skeleton",
+     "tx": 14,
+     "ty": 11,
+     "z": 2,
+     "state": "wander"
+    }
+   ],
+   "npcs": [],
+   "layout": "0d35a763749a59d6"
+  }
+ }
+}
