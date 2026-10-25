@@ -46,9 +46,13 @@ surveys of the parent code that the tech design cites.
   `C:\Users\Otto Mörner\Code\gnomon-wt\<ws>`, on branch `ws/<ws>` created from tag `p0-done`. Make it with
   `git worktree add` from the main checkout, and edit only the files the ownership matrix (§8.4) gives you. Anything that
   needs a change to someone else's file goes in `docs/<ws>.md` under "Integration requests".
-- **Commits.** Commit your own work in the fork with a clear message, ending with the line
-  `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Never push; the orchestrator pushes. Never rewrite history
-  on `main`.
+- **Commits.** Commit early and often: each logical step gets its own commit (a module moved, a check passing, a
+  feature working), so that `main` and every `ws/*` branch show the work as it happens. End every message with the line
+  `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Never rewrite history on `main`.
+- **Pushing.** The fork is public at https://github.com/ot-mo/gnomon (remote `origin`), and GitHub Pages serves `main` at
+  https://ot-mo.github.io/gnomon/. A post-commit hook pushes every commit, on any branch, to `origin` automatically, so
+  don't push branches by hand. Annotated tags go up with the next commit's push (`--follow-tags`). If a tag must be up at
+  once, run `git push origin <tag>`. The `parent` remote can't be pushed to.
 - **Node.** Node 20.11 is installed, with no npm dependencies. Run scripts as ES modules (`.mjs`), or pass
   `--experimental-default-type=module` for `.js` entry points.
 - **Browser checks.** Use the built-in browser pane and the preview server `gnomon` in `.claude/launch.json`
