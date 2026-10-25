@@ -26,6 +26,7 @@
 import { runRng } from "./run.js";
 import { levelOfTier, tierOfLevel, SIDES, SITE_MARGIN } from "./worldmodel.js";
 import { SURFACE } from "../world.js";
+import { countGen } from "./genstats.js";
 
 export const SITE_BUILDERS = {};
 export function registerSiteBuilder(kind, fn) {
@@ -101,6 +102,7 @@ export function dungeonParams(run, site, z) {
 }
 
 export function placeSites(run) {
+  countGen("sites");
   const { world } = run, rng = runRng(run, "sites");
   run.sites = new Map(); run.sitesAt = new Map();
 

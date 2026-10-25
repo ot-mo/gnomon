@@ -20,6 +20,7 @@ import { REAL_WORLD, WORLD_ROWS, TIER_ROWS, LANDMARK_INDEX, ROADS, RIVERS, TERRA
 import { TERRAINS } from "../../src/content/world/terrains.js";
 import { CURRENCY } from "../../src/content/currency.js";
 import { distance } from "../../src/rng.js";
+import { GEN_CALLS } from "../../src/world/genstats.js";
 import { readFileSync } from "node:fs";
 import { SURFACE } from "../../src/world.js";
 
@@ -237,9 +238,10 @@ function checkRun(problems, seeds) {
         buildMs = Math.max(buildMs, performance.now() - t0); builds++;
         const data = serializeRun(run), text = JSON.stringify(data);
         if (JSON.stringify(JSON.parse(text)) !== text) problems.push(`${name} seed ${seed}: the saved run isn't plain JSON`);
-        const before = { ...calls }, b0 = RUN_STATS.builds;
+        const before = { ...calls }, b0 = RUN_STATS.builds, g0 = JSON.stringify(GEN_CALLS);
         const back = restoreRun(JSON.parse(text), world);
         if (RUN_STATS.builds !== b0) problems.push(`${name} seed ${seed}: restoreRun called buildRun`);
+        if (JSON.stringify(GEN_CALLS) !== g0) problems.push(`${name} seed ${seed}: restoreRun ran a generator (${g0} → ${JSON.stringify(GEN_CALLS)})`);
         for (const id of Object.keys(calls)) if (calls[id] !== before[id]) problems.push(`${name} seed ${seed}: restoreRun ran the build step ${id}`);
         for (const d of deepEqual(run, back)) problems.push(`${name} seed ${seed}: restored run differs at ${d}`);
         if (back.world !== world) problems.push(`${name} seed ${seed}: the restored run has another world`);
@@ -256,6 +258,7 @@ function checkRun(problems, seeds) {
     RUN_STEPS.forEach((s, i) => { s.run = originals[i]; });
   }
   for (const id of Object.keys(calls)) if (calls[id] !== builds * 2) problems.push(`build step ${id} ran ${calls[id]} times in ${builds * 2} builds`);
+  for (const id of ["history", "sites", "villages"]) if (!GEN_CALLS[id]) problems.push(`the spy never saw the generator ${id} run`);
   // Different seeds place different sites (on the test world, whose regions have site rules).
   const a = compileWorld(TEST_WORLD);
   const placements = new Set(seeds.map((s) => JSON.stringify([...buildRun(s, a).sites.keys()])));

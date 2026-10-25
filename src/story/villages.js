@@ -8,7 +8,10 @@
 //
 // P0 stub: one record per village site with the site's name and empty culture, roles and layout. WS7
 // replaces it with the generator (drawing from runRng(run, "villages") only).
+import { countGen } from "../world/genstats.js";
+
 export function makeVillages(run) {
+  countGen("villages");
   const out = new Map();
   for (const site of run.sites.values()) {
     if (site.kind !== "village") continue;

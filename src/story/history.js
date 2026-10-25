@@ -9,6 +9,8 @@
 // P0 fixture: the same History for every seed (two Hours, two site requests, one relic), so the site
 // code can be built against the real contract while WS7 writes the generator. The generator will draw
 // only from seedFor(seed, "history"), never Math.random (R6). A fresh copy each call: callers may keep it.
+import { countGen } from "../world/genstats.js";
+
 const FIXTURE = {
   rulers: [
     {
@@ -57,5 +59,6 @@ const FIXTURE = {
 };
 
 export function generateHistory(seed, world) {
+  countGen("history");
   return JSON.parse(JSON.stringify(FIXTURE));
 }
