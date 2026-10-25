@@ -74,6 +74,11 @@ export function checkDungeonParams() {
   test(lich >= 0 && validateDungeonLevel(last).includes("boss missing or unreachable"), "the zone's own bottom keeps the boss rule");
   const noUp = generateDungeonLevel(42, { ...legacyParams(3, 42), hasUp: false });
   test(!noUp.upStairs && validateDungeonLevel(noUp).length === 0, `a level made without stairs up validates alone (${validateDungeonLevel(noUp).join(", ")})`);
+  // Parts of p that WS10 implements are refused until then, never silently ignored.
+  for (const extra of [{ creatureTable: [["rat", 1]] }, { holesIn: { x0: 0, y0: 0, x1: 10, y1: 10 } },
+                       { final: true, bottom: { kind: "boss", id: "lich", uid: "legend:lich" } }])
+    test(throws(() => generateDungeonLevel(3, { ...legacyParams(LEGACY_LEVELS, 3), ...extra })), `p ${JSON.stringify(extra)} must throw (not supported yet)`);
+  test(!throws(() => generateDungeonLevel(3, { ...legacyParams(2, 3), creatureTable: null, holesIn: undefined })), "null or missing WS10 parts are fine");
   return { name: "dungeon params", ok: problems.length === 0, problems, stats: { cases } };
 }
 

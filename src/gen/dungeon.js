@@ -12,6 +12,9 @@
 //   final   the last level: no way down, no holes, the bottom's hall (a boss's throne)
 //   hasUp   stairs up in the start room (level 1's lead to the surface entrance)
 //   theme   a DUNGEON_THEMES id: room materials, how many rooms are dark, how many monsters
+//   bottom  { kind: "guardian" | "boss", id }: the hall the last level gets (pickVault)
+//   not yet used (WS10): creatureTable, holesIn and bottom.uid (the named creature's claimUid).
+//           A value other than null/undefined throws (NOT_YET below), so nothing is silently dropped.
 import { Zone, B, FLOOR_Z, ROOM_TOP, CORRIDOR_TOP, standWith } from "../world.js";
 import { makeRng, noise2, distance } from "../rng.js";
 import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../pathing.js";
@@ -42,10 +45,14 @@ export const DUNGEON_THEMES = {
 // validateDungeonLevel passing. WS10 registers flooded, lightless, flatland, haunted…
 export const GIMMICKS = {};
 const MAX_ATTEMPTS = 40;
+// Parts of p the generator doesn't read yet. WS10 implements them and takes them off this list.
+const NOT_YET = { creatureTable: (p) => p.creatureTable, holesIn: (p) => p.holesIn, "bottom.uid": (p) => p.bottom?.uid };
 
 export function generateDungeonLevel(seed, p) {
   const theme = DUNGEON_THEMES[p.theme || "legacy"];
   if (!theme) throw new Error(`unknown dungeon theme "${p.theme}"`);
+  for (const [name, get] of Object.entries(NOT_YET))
+    if (get(p) != null) throw new Error(`generateDungeonLevel: p.${name} is not supported yet (WS10); it would be ignored`);
   let zone = null;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const mix = (Math.imul(seed, 7919) + Math.imul(p.z, 104729) + Math.imul(attempt, 2654435761)) >>> 0;
