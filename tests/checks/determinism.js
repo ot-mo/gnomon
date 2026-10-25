@@ -5,6 +5,8 @@
 // 1. Every level is generated twice and compared: blocks byte for byte, every item field, and each
 //    creature's type, position, elite, uid and looks (the cosmetic stream), and each person's type,
 //    position, uid and state. Ids are runtime handles from a counter and are left out.
+//    The uid part has nothing to compare until 0C: legacy creatures and people carry no uid yet
+//    (undefined on both sides). The stats count how many do, and a note says so while it is 0.
 // 2. A static scan (comments stripped). In the generation code (sources: { path: text }; 0A1 scans
 //    src/gen/, src/world/ and story.js, WS7 adds story/history.js and story/villages.js): no
 //    Math.random, and no Math.hypot (its last bits differ between engines and even between
@@ -39,13 +41,15 @@ const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|
 const RANDOM_SORT = /\.sort\(.*\b(rand|rng|random)\w*\(/;   // a sort call with a random draw later on its line
 
 export function checkDeterminism({ seeds = [3, 77, 2024], depths = LEGACY_LEVELS, sources = {}, helpers = {} } = {}) {
-  const problems = [];
-  let levels = 0;
+  const problems = [], notes = [];
+  let levels = 0, bodies = 0, withUid = 0;
   for (const seed of seeds)
     for (let depth = 1; depth <= depths; depth++) {
       const p = legacyParams(depth, seed);
-      const diff = compareZones(generateDungeonLevel(seed, p), generateDungeonLevel(seed, p));
+      const a = generateDungeonLevel(seed, p);
+      const diff = compareZones(a, generateDungeonLevel(seed, p));
       levels++;
+      for (const e of [...a.monsters, ...a.npcs]) { bodies++; if (e.uid !== undefined && e.uid !== null) withUid++; }
       if (diff.length) problems.push(`seed ${seed} level ${depth}: two generations differ in ${diff.join(", ")}`);
     }
   let scanned = 0;
@@ -60,5 +64,7 @@ export function checkDeterminism({ seeds = [3, 77, 2024], depths = LEGACY_LEVELS
     scan(file, text, [[/Math\.random/, "uses Math.random in generation code (R6: pass a seeded rng)"],
                       [/Math\.hypot/, "uses Math.hypot in generation code (engine-dependent bits: use rng.js distance)"], sortRule]);
   for (const [file, text] of Object.entries(helpers)) scan(file, text, [sortRule]);
-  return { name: "determinism", ok: problems.length === 0, problems, stats: { levelsTwice: levels, filesScanned: scanned } };
+  if (withUid === 0) notes.push(`uid comparison not exercised: none of ${bodies} creatures and people has a uid yet (0C adds them)`);
+  return { name: "determinism", ok: problems.length === 0, problems, notes,
+           stats: { levelsTwice: levels, filesScanned: scanned, bodies, withUid } };
 }
