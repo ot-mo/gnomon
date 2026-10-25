@@ -32,7 +32,7 @@ function dungeonZone(game, { wx, wy, z }) {
   if (!run) return null;
   const site = siteWithDungeon(run, wx, wy);
   if (!site || z < 1 || z > site.dungeon.levels) return null;
-  if (site.dungeon.legacy) return legacyZone(game, { wx, wy, z });
+  if (site.dungeon.legacy) return legacyZone(game, { wx, wy, z }, site);
   const zone = generateDungeonLevel(zoneSeed(run, wx, wy, z), dungeonParams(run, site, z));
   zone.siteId = site.id;
   zone.landmarkId = site.landmarkId || null;

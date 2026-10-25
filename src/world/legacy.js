@@ -9,10 +9,13 @@ import { generateDungeonLevel, legacyParams, LEGACY_LEVELS } from "../gen/dungeo
 export const LEGACY_SITE = { id: "legacy", wx: 0, wy: 0, levels: LEGACY_LEVELS };
 export const isLegacy = (zone) => zone?.siteId === LEGACY_SITE.id;
 
-// (game, { wx, wy, z }) → legacy level z (1..20), or null. Every level is generated from the run's seed
-// exactly as the parent game did (levels 2-20 block for block). The surface (z = 0) is not here.
-export function legacyZone(game, { wx, wy, z }) {
-  if (wx !== LEGACY_SITE.wx || wy !== LEGACY_SITE.wy || z < 1 || z > LEGACY_LEVELS) return null;
+// (game, { wx, wy, z }, site) → legacy level z (1..20), or null. Every level is generated from the run's seed
+// exactly as the parent game did (levels 2-20 block for block). The surface (z = 0) is not here. With the
+// site whose dungeon is the legacy one (zonegen.js), wherever the world puts it (the real world's Keeper's
+// Stair at (5, 16)); without, only under LEGACY_SITE's tile.
+export function legacyZone(game, { wx, wy, z }, site = null) {
+  const here = site?.dungeon?.legacy || (wx === LEGACY_SITE.wx && wy === LEGACY_SITE.wy);
+  if (!here || z < 1 || z > LEGACY_LEVELS) return null;
   const zone = generateDungeonLevel(game.seed, legacyParams(z, game.seed));
   zone.siteId = LEGACY_SITE.id;
   return zone;

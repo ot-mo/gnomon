@@ -12,6 +12,7 @@ import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../../src/pathing.js";
 import { generateDungeonLevel, legacyParams } from "../../src/gen/dungeon.js";
 import { makeRng, noise2 } from "../../src/rng.js";
 import { mapStep } from "../../src/turns.js";
+import { REAL_WORLD } from "../../src/content/world/worldmap.js";
 
 // A rolling outdoor zone: grass hills 0-3 blocks over the datum, a pond of deep water (rock bottom),
 // a 4-block cliff plateau you can't walk onto, a ruined wall, and a few bottomless pits.
@@ -249,5 +250,9 @@ export function checkZones({ game, startRun }) {
   offFall();
   stats.zones = { visited: game.zones.size, events: log.length };
   for (const off of offs) off();
+  // The real world: the legacy stack is the Keeper's Stair under Hollowmere (5, 16), not at (0, 0).
+  startRun(42, REAL_WORLD);
+  expect(game.zone?.key === "5,16,0" && game.zone.hasBelow && changeZone(game, "5,16,1", { how: "down" }) === true &&
+         game.zone.siteId === "legacy" && changeZone(game, "5,16,20", { how: "down" }) === true, "the real world's Keeper's Stair leads down the legacy levels");
   return { name: "zones", ok: problems.length === 0, problems, stats };
 }
