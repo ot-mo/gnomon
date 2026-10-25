@@ -11,24 +11,26 @@
 <body>
 <pre id="out">Running…</pre>
 <script type="module">
-// Generates many floors and checks each can be finished (stairs, rooms, vault, keys reachable),
-// then sanity-checks the monster and item art. Open with ?seeds=50&depths=20 to change the size.
-import { generateFloor, validateFloor } from "./src/gen/dungeon.js";
+// Generates many dungeon levels and checks each can be finished (stairs, rooms, vault, keys
+// reachable), then sanity-checks the monster and item art. Open with ?seeds=50&depths=20 to change
+// the size. The levels are the legacy stack's (the fixture site under world tile 0, 0):
+// generateDungeonLevel(seed, legacyParams(depth, seed)). tools/check-dungeons.mjs does the same in Node.
+import { generateDungeonLevel, validateDungeonLevel, legacyParams, LEGACY_GUARDIANS } from "./src/gen/dungeon.js";
+import { buildTemple } from "./src/story.js";
 import { MONSTER_TYPES } from "./src/monsters.js";
 import { NPC_TYPES } from "./src/npcs.js";
 import { FLOOR_ART, WEAPONS, WEAPON_PALETTE, itemPalette, POTIONS, POTION_COLORS, RINGS, AMULETS, RELICS, makeRelic, itemName, itemInfo } from "./src/items.js";
-import { GUARDIAN_FLOORS } from "./src/gen/vaults.js";
 
 const out = document.getElementById("out");
 const params = new URLSearchParams(location.search);
 const SEEDS = +params.get("seeds") || 50, DEPTHS = +params.get("depths") || 20;
 const lines = [], failures = [];
 let floors = 0, retries = 0, slowest = 0, totalMs = 0;
-const features = { vaults: {}, sky: 0, locked: 0, monsters: 0, climbs: 0, stones: 0, gear: 0, strength: 0, potions: 0 };
+const features = { vaults: {}, locked: 0, monsters: 0, climbs: 0, stones: 0, gear: 0, strength: 0, potions: 0 };
 
-// The temple (depth 0) is drawn by hand: check it has what the story needs.
+// The temple (the legacy site's surface) is drawn by hand: check it has what the story needs.
 for (const seed of [1, 2, 3]) {
-  const t = generateFloor(seed, 0);
+  const t = buildTemple(seed);
   if (!t.npcs.some((n) => n.type === "maren") || !t.items.some((i) => i.kind === "cube") || !t.stairs || !t.spikes.size || !t.cubeWall?.length)
     failures.push(`temple (seed ${seed}) is missing something`);
 }
@@ -36,14 +38,14 @@ for (const seed of [1, 2, 3]) {
 for (let seed = 1; seed <= SEEDS; seed++) {
   for (let depth = 1; depth <= DEPTHS; depth++) {
     const t0 = performance.now();
-    const f = generateFloor(seed, depth);
+    const p = legacyParams(depth, seed);
+    const f = generateDungeonLevel(seed, p);
     const ms = performance.now() - t0;
     totalMs += ms; slowest = Math.max(slowest, ms); floors++;
     retries += f.attempts - 1;
-    const problems = validateFloor(f);
+    const problems = validateDungeonLevel(f, p);
     if (problems.length) failures.push(`seed ${seed} depth ${depth}: ${problems.join(", ")}`);
     features.vaults[f.vault.name] = (features.vaults[f.vault.name] || 0) + 1;
-    if (f.hasSky) features.sky++;
     if (f.rooms.some((r) => r.locked)) features.locked++;
     features.monsters += f.monsters.length;
     features.npcs = (features.npcs || 0) + f.npcs.length;
@@ -61,7 +63,7 @@ for (let seed = 1; seed <= SEEDS; seed++) {
     features.relics = (features.relics || 0) + f.items.filter((i) => i.kind === "relic?").length;
     features.shrines = (features.shrines || 0) + f.npcs.filter((n) => n.type === "shrine").length;
     // A guardian's floor: the guardian, its hall, and stairs in the hall's alcove.
-    if (GUARDIAN_FLOORS.includes(depth) && (!f.guardianHall || !f.monsters.some((m) => m.guardian === f.guardianHall.type) || !f.stairs))
+    if (LEGACY_GUARDIANS[depth] && (!f.guardianHall || !f.monsters.some((m) => m.guardian === f.guardianHall.type) || !f.stairs))
       failures.push(`seed ${seed} depth ${depth}: guardian hall incomplete`);
   }
 }
@@ -101,7 +103,7 @@ for (const key of Object.keys(RELICS)) {
 
 lines.push(`<span class="${failures.length ? "bad" : "ok"}">${floors - failures.length}/${floors} floors pass</span>` +
   ` · ${retries} regenerations · avg ${(totalMs / floors).toFixed(1)} ms, slowest ${slowest.toFixed(1)} ms`);
-lines.push(`vaults: ${JSON.stringify(features.vaults)} · sky wells: ${features.sky} · locked rooms: ${features.locked} · ` +
+lines.push(`vaults: ${JSON.stringify(features.vaults)} · locked rooms: ${features.locked} · ` +
   `monsters: ${(features.monsters / floors).toFixed(1)} per floor`);
 lines.push(`platforming: ${features.climbs} climb rooms, ${features.stones} stepping-stone halls · per floor: ` +
   `${(features.potions / floors).toFixed(1)} potions, ${(features.gear / floors).toFixed(1)} gear, ${(features.strength / floors).toFixed(2)} strength crystals, ${(features.hearts / floors).toFixed(2)} heart crystals`);

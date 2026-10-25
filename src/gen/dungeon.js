@@ -1,38 +1,72 @@
-// Procedural floors: rooms joined by corridors, then height features, lamps, stairs,
-// monsters and loot — plus one hand-made vault. Every floor is checked before use
-// (validateFloor) and regenerated if something important can't be reached.
-import { Floor, W, D, H, B, FLOOR_Z, ROOM_TOP, CORRIDOR_TOP, FINAL_DEPTH } from "../world.js";
-import { makeRng, noise2 } from "../rng.js";
+// Procedural dungeon levels: rooms joined by corridors, then height features, lamps, stairs,
+// monsters and loot — plus one hand-made vault. Every level is checked before use
+// (validateDungeonLevel) and regenerated if something important can't be reached.
+//
+//   generateDungeonLevel(seed, p) → Zone      p: the level's parameters (below)
+//   validateDungeonLevel(zone, p) → problems  (empty: the level can be finished)
+//   legacyParams(depth, runSeed) → p          the old 20-level stack, level for level
+//
+// p = { key, wx, wy, z, level, tier, index, count, final, theme, hasUp = true, forcedVault, vaultPool,
+//       gimmicks: [id], bottom: { kind, id, uid }, encounters: [...], creatureTable, holesIn, simpleAfter = 25, name }
+//   level   the difficulty every balance call reads (it was the depth)
+//   final   the last level: no way down, no holes, the bottom's hall (a boss's throne)
+//   hasUp   stairs up in the start room (level 1's lead to the surface entrance)
+//   theme   a DUNGEON_THEMES id: room materials, how many rooms are dark, how many monsters
+import { Zone, B, FLOOR_Z, ROOM_TOP, CORRIDOR_TOP, standWith } from "../world.js";
+import { makeRng, noise2, distance } from "../rng.js";
 import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../pathing.js";
-import { spawnMonster, pickMonsterType, rollElite } from "../monsters.js";
+import { spawnMonster, pickMonsterType, rollElite, MONSTER_TYPES } from "../monsters.js";
 import { makeItem, randomPotion, randomScroll, randomEquipment, randomTreasure, randomJewel } from "../items.js";
-import { pickVault, stampVault } from "./vaults.js";
-import { buildTemple } from "../story.js";
+import { pickVault, stampVault, VAULTS } from "./vaults.js";
 import { planEncounters, spawnNpc, peddlerStock, bountyTarget } from "../npcs.js";
 import { layoutSpikes } from "../traps.js";
 
-const THEMES = [
-  { wall: B.STONE, floor: B.TILE },
-  { wall: B.BRICK, floor: B.PLANK },
-  { wall: B.MOSS, floor: B.ROCK },
-  { wall: B.STONE, floor: B.PLANK },
-];
+// Room layout and corridor routing work on this fixed grid (the validated generator's home).
+export const DUNGEON_W = 48, DUNGEON_D = 48, DUNGEON_H = 10;
+const W = DUNGEON_W, D = DUNGEON_D;
+
+// Theme id → { rooms: [{ wall, floor }], darkRate(level), count(level) }. WS10 adds more.
+export const DUNGEON_THEMES = {
+  legacy: {
+    rooms: [
+      { wall: B.STONE, floor: B.TILE },
+      { wall: B.BRICK, floor: B.PLANK },
+      { wall: B.MOSS, floor: B.ROCK },
+      { wall: B.STONE, floor: B.PLANK },
+    ],
+    darkRate: (level) => Math.min(0.6, 0.12 + 0.08 * level),   // deeper levels have more dark rooms
+    count: (level) => Math.min(18, 3 + level * 2),              // how many monsters
+  },
+};
+// Gimmick id → (zone, rng, rooms, p) => void, run after monsters and loot. Each must keep
+// validateDungeonLevel passing. WS10 registers flooded, lightless, flatland, haunted…
+export const GIMMICKS = {};
 const MAX_ATTEMPTS = 40;
 
-export function generateFloor(seed, depth) {
-  if (depth === 0) return buildTemple(seed);   // the Temple of Angles: drawn by hand (story.js)
-  let floor = null;
+export function generateDungeonLevel(seed, p) {
+  const theme = DUNGEON_THEMES[p.theme || "legacy"];
+  if (!theme) throw new Error(`unknown dungeon theme "${p.theme}"`);
+  let zone = null;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const rng = makeRng((Math.imul(seed, 7919) + Math.imul(depth, 104729) + Math.imul(attempt, 2654435761)) >>> 0);
-    floor = buildFloor(rng, seed, depth, attempt >= 25);   // after many failures, skip risky features
-    floor.attempts = attempt + 1;
-    if (validateFloor(floor).length === 0) return floor;
+    const mix = (Math.imul(seed, 7919) + Math.imul(p.z, 104729) + Math.imul(attempt, 2654435761)) >>> 0;
+    const rng = makeRng(mix);
+    const cosmetic = makeRng((mix ^ 0x5eedc05e) >>> 0);   // creature looks: never touches the layout
+    zone = buildLevel(rng, cosmetic, seed, p, theme, attempt >= (p.simpleAfter ?? 25));   // after many failures, skip risky features
+    zone.attempts = attempt + 1;
+    if (validateDungeonLevel(zone, p).length === 0) return zone;
   }
-  return floor;   // test.html flags this; it hasn't happened in testing
+  return zone;   // test.html flags this; it hasn't happened in testing
 }
 
-function buildFloor(rng, seed, depth, simple) {
-  const f = new Floor(depth, seed);
+function buildLevel(rng, cosmetic, seed, p, theme, simple) {
+  const depth = p.level;   // (the balance curves below still call it depth: it is the level)
+  const final = !!p.final;
+  const f = new Zone({ key: p.key, wx: p.wx, wy: p.wy, z: p.z, type: "dungeon", level: p.level, tier: p.tier ?? 1, seed,
+                       w: W, d: D, h: DUNGEON_H, name: p.name || "" });
+  f.dungeonIndex = p.index ?? p.z;     // which level of its dungeon this is (1 = the top one)
+  f.dungeonLevels = p.count ?? null;   // and how many levels the dungeon has
+  f.final = final;
+  f.hasBelow = !final;
   f.blocks.fill(B.ROCK);
   const roomAt = new Int16Array(W * D).fill(-1);   // room interiors
   const ringAt = new Int16Array(W * D).fill(-1);   // room walls
@@ -41,12 +75,12 @@ function buildFloor(rng, seed, depth, simple) {
   for (let j = 0; j < D; j++) { blocked[j * W] = blocked[W - 1 + j * W] = 1; }
 
   // --- 1. The vault goes in first, so rooms and corridors keep clear of it.
-  const vault = pickVault(rng, depth);
+  const vault = pickVault(rng, p);
   let vaultRect = null, entrance = null;
   for (let tries = 0; tries < 60 && !vaultRect; tries++) {
     const vx = rng.int(2, W - vault.w - 2), vy = rng.int(2, D - vault.d - 4);
     vaultRect = { x0: vx, y0: vy, x1: vx + vault.w - 1, y1: vy + vault.d - 1 };
-    entrance = stampVault(f, vault, vx, vy, rng);
+    entrance = stampVault(f, vault, vx, vy, rng, { cosmetic });
   }
   for (let y = vaultRect.y0 - 1; y <= vaultRect.y1 + 1; y++)
     for (let x = vaultRect.x0 - 1; x <= vaultRect.x1 + 1; x++) blocked[x + y * W] = 1;
@@ -66,7 +100,7 @@ function buildFloor(rng, seed, depth, simple) {
     const x1 = x0 + w - 1, y1 = y0 + d - 1;
     if (!rooms.every((r) => clear(x0, y0, x1, y1, r, 3)) || !clear(x0, y0, x1, y1, vaultRect, 4)) continue;
     rooms.push({ id: rooms.length, x0, y0, x1, y1, cx: (x0 + x1) >> 1, cy: (y0 + y1) >> 1,
-                 theme: rng.pick(THEMES), doors: [], dark: false, hall });
+                 theme: rng.pick(theme.rooms), doors: [], dark: false, hall });
   }
   for (const r of rooms) {
     for (let y = r.y0 - 1; y <= r.y1 + 1; y++) {
@@ -123,7 +157,7 @@ function buildFloor(rng, seed, depth, simple) {
 
   // The vault connects to its nearest room.
   const nearest = rooms.reduce((best, r) =>
-    Math.hypot(r.cx - vaultDoor.x, r.cy - vaultDoor.y) < Math.hypot(best.cx - vaultDoor.x, best.cy - vaultDoor.y) ? r : best);
+    distance(r.cx - vaultDoor.x, r.cy - vaultDoor.y) < distance(best.cx - vaultDoor.x, best.cy - vaultDoor.y) ? r : best);
   dig(route(vaultDoor.x, vaultDoor.y, nearest.cx, nearest.cy));
 
   // --- 4. Doors in some doorways (only where there's a proper frame on both sides).
@@ -138,32 +172,21 @@ function buildFloor(rng, seed, depth, simple) {
     }
   }
 
-  // --- 5. Start room (with the stairs back up, below the first floor); a light well
-  // open to the sky on the first floor.
+  // --- 5. Start room, with the stairs back up (on level 1 they lead to the surface entrance).
+  // (The old first floor's light well open to the sky is gone: the ground above isn't open.)
   const start = rng.pick(rooms.filter((r) => !r.hall)) || rooms[0];
-  if (depth === 1) {
+  if (p.hasUp === false) {
     f.spawn = { x: start.cx + 0.5, y: start.cy + 0.5, z: FLOOR_Z, yaw: rng() * Math.PI * 2 };
   } else {
     f.set(start.cx, start.cy, FLOOR_Z - 1, B.STAIRS_UP);
     f.upStairs = { x: start.cx, y: start.cy };
     f.spawn = { x: start.cx + 1.5, y: start.cy + 0.5, z: FLOOR_Z, yaw: 0 };   // beside them, facing away
   }
-  if (depth === 1) {
-    const well = rng.pick(rooms.filter((r) => r !== start)) || start;
-    for (let y = well.y0; y <= well.y1; y++)
-      for (let x = well.x0; x <= well.x1; x++) {
-        f.set(x, y, FLOOR_Z - 1, B.GRASS);
-        for (let z = ROOM_TOP; z < H; z++) f.set(x, y, z, B.AIR);
-      }
-    f.hasSky = true;
-    well.sky = true;
-  }
 
   // --- 6. Height features, so the map's flat picture can mislead.
   // Cells next to doorways stay clear so rooms can't be sealed off by accident.
-  // The last floor has no holes at all (pits, chasms, deep water): there's nowhere lower to fall.
+  // The last level has no holes at all (pits, chasms, deep water): there's nowhere lower to fall.
   const nearDoor = (r, x, y) => r.doors.some((d) => Math.abs(d.x - x) <= 2 && Math.abs(d.y - y) <= 2);
-  const final = depth >= FINAL_DEPTH;
   if (!simple) {
     for (const r of rooms) {
       if (r === start) continue;
@@ -185,9 +208,9 @@ function buildFloor(rng, seed, depth, simple) {
     }
   }
 
-  // --- 7. Lamps on the walls. Deeper floors have more dark rooms.
+  // --- 7. Lamps on the walls. Deeper levels have more dark rooms.
   for (const r of rooms) {
-    r.dark = r !== start && !r.sky && !r.hall && rng.chance(Math.min(0.6, 0.12 + 0.08 * depth));
+    r.dark = r !== start && !r.hall && rng.chance(theme.darkRate(depth));
     if (r.dark) continue;
     const spots = [];
     for (let x = r.x0; x <= r.x1; x++) spots.push([x, r.y0 - 1], [x, r.y1 + 1]);
@@ -236,7 +259,7 @@ function buildFloor(rng, seed, depth, simple) {
   }
 
   // --- 9. Sometimes: a locked treasure room, with its key somewhere else.
-  const lockable = rooms.filter((r) => r !== start && r !== stairsRoom && !r.sky && r.doors.length > 0 && r.doors.length <= 2);
+  const lockable = rooms.filter((r) => r !== start && r !== stairsRoom && r.doors.length > 0 && r.doors.length <= 2);
   if (rng.chance(0.45) && lockable.length) {
     const r = rng.pick(lockable);
     for (const d of r.doors) { f.set(d.x, d.y, FLOOR_Z, B.LOCKED); f.set(d.x, d.y, FLOOR_Z + 1, B.LOCKED); }
@@ -248,18 +271,18 @@ function buildFloor(rng, seed, depth, simple) {
 
   // --- 10. Monsters (never in the start room) and loot.
   f.refresh();
-  // Which kinds turn up depends on the depth (see MONSTER_TYPES' depths); a few are elites.
-  const count = final ? 10 : Math.min(18, 3 + depth * 2);
+  // Which kinds turn up depends on the level (see MONSTER_TYPES' depths); a few are elites.
+  const count = final ? 10 : theme.count(depth);
   const taken = new Set();
   for (let k = 0; k < count; k++) {
     const r = rng.pick(rooms.filter((o) => o !== start));
     const spots = interior(r).filter(([x, y]) => f.stand[x + y * W] >= 0 && !taken.has(x + y * W) &&
-      Math.hypot(x - start.cx, y - start.cy) > 8);
+      distance(x - start.cx, y - start.cy) > 8);
     if (!spots.length) continue;
     const [x, y] = rng.pick(spots);
     taken.add(x + y * W);
     f.monsters.push(spawnMonster(pickMonsterType(rng, depth), x, y, f.stand[x + y * W], rng.chance(0.5) ? "idle" : "wander",
-                                 depth, rollElite(rng, depth)));
+                                 depth, rollElite(rng, depth), cosmetic));
   }
   // Loot lying around: a few potions and scrolls, a piece of gear (sometimes two), usually a few
   // throwing knives, once in a while a strength crystal, and from floor 3 now and then a ring
@@ -273,8 +296,11 @@ function buildFloor(rng, seed, depth, simple) {
   if (rng.chance(0.75)) placeItem(f, rng, rng.pick(rooms), { kind: "bomb", count: rng.chance(0.3) ? 2 : 1 });
   for (let k = rng.int(1, 2); k > 0; k--) placeItem(f, rng, rng.pick(rooms), { kind: "gold", amount: rng.int(5, 10) + depth });
 
-  // --- 11. The people of this floor (who's where is planned for the whole run: npcs.js).
-  placeEncounters(f, rng, rooms, start, depth, planEncounters(seed).get(depth) || []);
+  // --- 10½. The site's gimmicks (none on the legacy stack).
+  for (const id of p.gimmicks || []) GIMMICKS[id](f, rng, rooms, p);
+
+  // --- 11. The people of this level (the site plans who's where; for the legacy stack, npcs.js).
+  placeEncounters(f, rng, cosmetic, rooms, start, depth, p.encounters || []);
 
   // --- 12. The Rune Lever room's record, in some other room.
   if (f.leverRecord) addLeverRecord(f, rng, rooms);
@@ -290,7 +316,7 @@ function buildFloor(rng, seed, depth, simple) {
 function addLeverRecord(f, rng, rooms) {
   const right = f.leverRecord, n = right.length, v = f.vault;
   const vx = (v.x0 + v.x1) / 2, vy = (v.y0 + v.y1) / 2;
-  const far = [...rooms].filter((r) => !r.locked).sort((a, b) => Math.hypot(b.cx - vx, b.cy - vy) - Math.hypot(a.cx - vx, a.cy - vy));
+  const far = [...rooms].filter((r) => !r.locked).sort((a, b) => distance(b.cx - vx, b.cy - vy) - distance(a.cx - vx, a.cy - vy));
   const order = [...rng.shuffle(far.slice(0, Math.ceil(far.length / 2))), ...far.slice(Math.ceil(far.length / 2))];
   const kinds = rng.chance(0.5) ? ["mural", "floor"] : ["floor", "mural"];
   for (const kind of kinds)
@@ -344,7 +370,7 @@ function placeFloorRecord(f, rng, r, right) {
 // People. Each stands somewhere open in a room of its own, not crowding a doorway, with any
 // monsters nearby shooed away. Some bring extras: Pell his pack, Rook a quarry somewhere
 // else on the floor, Lio a cell (and a lever in another room's wall), Brann a skull below.
-function placeEncounters(f, rng, rooms, start, depth, list) {
+function placeEncounters(f, rng, cosmetic, rooms, start, depth, list) {
   const used = new Set();
   const plain = (x, y) => {
     const g = f.get(x, y, FLOOR_Z - 1);
@@ -362,7 +388,7 @@ function placeEncounters(f, rng, rooms, start, depth, list) {
       const spot = spotIn(r);
       if (!spot) continue;
       used.add(r);
-      f.monsters = f.monsters.filter((m) => Math.hypot(m.tx - spot[0], m.ty - spot[1]) > 3);
+      f.monsters = f.monsters.filter((m) => distance(m.tx - spot[0], m.ty - spot[1]) > 3);
       return spot;
     }
     return null;
@@ -384,7 +410,7 @@ function placeEncounters(f, rng, rooms, start, depth, list) {
       const rook = place("rook");
       if (!rook) continue;
       const b = bountyTarget(rng, depth), lair = findSpot();   // the quarry gets a room of its own
-      const m = lair ? spawnMonster(b.type, lair[0], lair[1], FLOOR_Z, "wander", depth, b.elite) : f.monsters[0];
+      const m = lair ? spawnMonster(b.type, lair[0], lair[1], FLOOR_Z, "wander", depth, b.elite, cosmetic) : f.monsters[0];
       if (!m) { f.npcs.splice(f.npcs.indexOf(rook), 1); continue; }
       if (lair) f.monsters.push(m);
       m.bounty = true;
@@ -521,14 +547,14 @@ function addClimb(f, rng, r, nearDoor, depth) {
   for (let y = r.y0 - 1; y <= r.y1 + 1; y++)
     for (let x = r.x0 - 1; x <= r.x1 + 1; x++) {
       const inside = x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1;
-      for (let z = ROOM_TOP; z < H - 1; z++) f.set(x, y, z, inside ? B.AIR : r.theme.wall);
+      for (let z = ROOM_TOP; z < f.h - 1; z++) f.set(x, y, z, inside ? B.AIR : r.theme.wall);
     }
   steps.forEach(([x, y], k) => f.set(x, y, FLOOR_Z + k, B.PLANK));   // wooden, to stand out from the walls; tops at +1 … +5
   const [tx, ty] = steps[4];
   f.items.push(makeItem(randomTreasure(rng, depth), tx + 0.5, ty + 0.5, FLOOR_Z + 5));
   // A lamp on the nearest wall, up high, so you can see what's waiting.
   const [wx, wy] = [[r.x0 - 1, ty], [r.x1 + 1, ty], [tx, r.y0 - 1], [tx, r.y1 + 1]]
-    .sort((a, b) => Math.hypot(a[0] - tx, a[1] - ty) - Math.hypot(b[0] - tx, b[1] - ty))[0];
+    .sort((a, b) => distance(a[0] - tx, a[1] - ty) - distance(b[0] - tx, b[1] - ty))[0];
   f.set(wx, wy, FLOOR_Z + 5, B.LAMP);
   r.climb = true;
 }
@@ -537,7 +563,7 @@ function addClimb(f, rng, r, nearDoor, depth) {
 // apart, leading from a shore tile toward a target. Cross them by jumping in 3D (or fly).
 function steppingStones(f, rng, from, to, isGap) {
   const [fx, fy] = from, [tx, ty] = to;
-  const n = Math.max(2, Math.round(Math.hypot(tx - fx, ty - fy) / 3));
+  const n = Math.max(2, Math.round(distance(tx - fx, ty - fy) / 3));
   for (let k = 1; k < n; k++) {
     const x = Math.round(fx + ((tx - fx) * k) / n), y = Math.round(fy + ((ty - fy) * k) / n);
     if (!isGap(x, y)) continue;
@@ -598,7 +624,7 @@ function blob(rng, r, nearDoor, inner, outer) {
   const core = [], edge = [];
   for (const [x, y] of interior(r)) {
     if (x === r.x0 || x === r.x1 || y === r.y0 || y === r.y1 || nearDoor(r, x, y)) continue;
-    const e = Math.hypot((x + 0.5 - cx) / rx, (y + 0.5 - cy) / ry) + (noise2(x * 0.5 + ns, y * 0.5) - 0.5) * 0.4;
+    const e = distance((x + 0.5 - cx) / rx, (y + 0.5 - cy) / ry) + (noise2(x * 0.5 + ns, y * 0.5) - 0.5) * 0.4;
     if (e < inner) core.push([x, y]);
     else if (e < outer) edge.push([x, y]);
   }
@@ -660,7 +686,7 @@ function addBigChasm(f, rng, r, nearDoor, depth) {
   };
   const [dx, dy] = rng.pick([[1, 0], [-1, 0], [0, 1], [0, -1]]);
   const shore = shoreFrom(r, cx, cy, dx, dy, isGap);
-  if (shore && Math.hypot(shore[0] - cx, shore[1] - cy) >= 4 && rng.chance(0.5)) {
+  if (shore && distance(shore[0] - cx, shore[1] - cy) >= 4 && rng.chance(0.5)) {
     platform();
     steppingStones(f, rng, shore, [cx, cy], isGap);
     r.stones = true;
@@ -711,7 +737,7 @@ function addSecretRoom(f, rng, rooms, start, roomAt, ringAt, corridor, blocked, 
         for (let y = y0 - 1; y <= y0 + sd && ok; y++)
           for (let x = x0 - 1; x <= x0 + sw && ok; x++) if (rooms[ringAt[x + y * W]] === start) ok = false;
         if (!ok || !walls.length) continue;
-        const score = touched.size * 1000 + Math.hypot(mx - start.cx, my - start.cy);
+        const score = touched.size * 1000 + distance(mx - start.cx, my - start.cy);
         if (!best || score > best.score) best = { score, x0, y0, sw, sd, walls };
       }
     if (best) break;
@@ -744,51 +770,6 @@ function placeItem(f, rng, room, item) {
   if (!spots.length) return;
   const [x, y] = rng.pick(spots);
   f.items.push(makeItem(item, x + 0.5, y + 0.5, f.stand[x + y * W]));
-}
-
-// ---------------------------------------------------------------------------
-// Where you appear when you arrive on a floor:
-//   "down" – came down the stairs: beside this floor's stairs up
-//   "up"   – came up the stairs: beside this floor's stairs down
-//   "fall" – fell through a pit or deep water at (fx, fy) on the floor above: the nearest
-//            spot to that, out of the places reachable from the start (never sealed in a
-//            locked room or behind a gate)
-export function arrivalPoint(f, how, fx = 0, fy = 0) {
-  if (how === "up" && f.returnPoint) return { ...f.returnPoint };   // back up to the temple: by Maren
-  if (how === "down" && f.upStairs) return beside(f, f.upStairs);
-  if (how === "up" && f.stairs) return beside(f, f.stairs);
-  if (how === "fall") return landing(f, fx, fy);
-  return { ...f.spawn };
-}
-
-function beside(f, s) {
-  for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
-    const x = s.x + ox, y = s.y + oy;
-    if (f.stand[x + y * W] === FLOOR_Z && !isStairs(f, x, y))
-      return { x: x + 0.5, y: y + 0.5, z: FLOOR_Z, yaw: Math.atan2(oy, ox) };   // facing away from the stairs
-  }
-  return { ...f.spawn };
-}
-
-function landing(f, fx, fy) {
-  const dist = reachable(standWith(f, "open"), W, D, Math.floor(f.spawn.x), Math.floor(f.spawn.y), PLAYER_STEP_UP, PLAYER_DROP);
-  let best = -1, bestD = Infinity;
-  for (let i = 0; i < W * D; i++) {
-    if (dist[i] < 0 || f.stand[i] < 0) continue;
-    const x = i % W, y = (i - x) / W;
-    if (isStairs(f, x, y)) continue;
-    const d = Math.hypot(x + 0.5 - fx, y + 0.5 - fy);
-    if (d < bestD) { bestD = d; best = i; }
-  }
-  if (best < 0) return { ...f.spawn };
-  const x = best % W, y = (best - x) / W;
-  return { x: x + 0.5, y: y + 0.5, z: f.stand[best], yaw: Math.random() * Math.PI * 2 };
-}
-
-function standWith(f, doors) {
-  const stand = new Int8Array(W * D);
-  for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) stand[x + y * W] = f.standHeight(x, y, doors);
-  return stand;
 }
 
 // ---------------------------------------------------------------------------
@@ -853,21 +834,24 @@ class MinHeap {
 }
 
 // ---------------------------------------------------------------------------
-// Is this floor finishable? Returns a list of problems (empty = fine).
-export function validateFloor(f) {
+// Can this level be finished? Returns a list of problems (empty = fine).
+export function validateDungeonLevel(f, p = {}) {
   const problems = [];
+  const w = f.w, d = f.d;
   const sx = Math.floor(f.spawn.x), sy = Math.floor(f.spawn.y);
-  if (f.stand[sx + sy * W] !== FLOOR_Z) problems.push("spawn is not on open floor");
-  const noLocked = reachable(standWith(f, "open"), W, D, sx, sy, PLAYER_STEP_UP, PLAYER_DROP);
-  const all = reachable(standWith(f, "all"), W, D, sx, sy, PLAYER_STEP_UP, PLAYER_DROP);
-  const at = (dist, x, y) => dist[Math.floor(x) + Math.floor(y) * W] >= 0;
+  if (f.stand[sx + sy * w] !== FLOOR_Z) problems.push("spawn is not on open floor");
+  const noLocked = reachable(standWith(f, "open"), w, d, sx, sy, PLAYER_STEP_UP, PLAYER_DROP);
+  const all = reachable(standWith(f, "all"), w, d, sx, sy, PLAYER_STEP_UP, PLAYER_DROP);
+  const at = (dist, x, y) => dist[Math.floor(x) + Math.floor(y) * w] >= 0;
 
-  if (f.depth >= FINAL_DEPTH) {
-    const boss = f.monsters.find((m) => m.type === "lich");
-    if (!boss || !at(all, boss.x, boss.y)) problems.push("boss missing or unreachable");
+  if (p.final) {
+    if (p.bottom?.kind === "boss") {
+      const boss = f.monsters.find((m) => MONSTER_TYPES[m.type].boss);
+      if (!boss || !at(all, boss.x, boss.y)) problems.push("boss missing or unreachable");
+    }
     if (f.stairs) problems.push("stairs down on the last floor");
     const hole = (x, y) => !f.get(x, y, 0) || f.get(x, y, 0) === B.WATER_DEEP || f.get(x, y, FLOOR_Z - 1) === B.WATER_DEEP;
-    outer: for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) if (hole(x, y)) { problems.push("a hole on the last floor"); break outer; }
+    outer: for (let y = 0; y < d; y++) for (let x = 0; x < w; x++) if (hole(x, y)) { problems.push("a hole on the last floor"); break outer; }
   } else if (!f.stairs) problems.push("no stairs");
   else if (f.guardianHall) {   // the stairs wait behind the guardian's gate: the gate must be reachable
     const g = f.monsters.find((m) => m.guardian);
@@ -882,11 +866,11 @@ export function validateFloor(f) {
         if (g === B.WATER_SHALLOW || g === B.WATER_DEEP || !g) problems.push("stairs in or next to water or a drop");
       }
   }
-  if (f.depth > 1 && (!f.upStairs || !at(noLocked, f.upStairs.x, f.upStairs.y))) problems.push("no reachable stairs up");
+  if (p.hasUp !== false && (!f.upStairs || !at(noLocked, f.upStairs.x, f.upStairs.y))) problems.push("no reachable stairs up");
   if (f.blocks.includes(B.LOCKED) && !f.items.some((i) => i.kind === "key" && at(noLocked, i.x, i.y)))
     problems.push("no reachable key for the locked door");
   for (const r of f.rooms)
-    if (!interior(r).some(([x, y]) => all[x + y * W] >= 0)) problems.push(`room ${r.id} unreachable`);
+    if (!interior(r).some(([x, y]) => all[x + y * w] >= 0)) problems.push(`room ${r.id} unreachable`);
   if (!f.vault || !at(all, f.vault.entrance.x, f.vault.entrance.y)) problems.push("vault unreachable");
   for (const link of f.links.values()) if (!link.cells.length) problems.push("lever linked to nothing");
   // People must be reachable (Lio is behind bars: his lever must be).
@@ -903,7 +887,29 @@ export function validateFloor(f) {
     const ns = f.braziers.list.map((b) => b.n).sort().join("");
     if (ns !== "1234".slice(0, f.braziers.list.length) || !f.braziers.gate.length) problems.push("brazier numerals broken");
   }
-  for (const m of f.monsters) if (f.stand[m.tx + m.ty * W] < 0) problems.push(`${m.type} stuck in a wall`);
+  for (const m of f.monsters) if (f.stand[m.tx + m.ty * w] < 0) problems.push(`${m.type} stuck in a wall`);
   if (f.leverRecord && !f.leverRecordAt) problems.push("the Rune Lever room's record is missing");
   return problems;
+}
+
+// ---------------------------------------------------------------------------
+// The old game's 20-level stack (The Rotation Cube), as parameters: level n is exactly the floor
+// generateFloor(seed, n) made at 75edbd3, for n = 2..20 (tests/fixtures/golden/dungeons.json).
+// Level 1 now has stairs up (to the temple above it) and no sky well, so it differs on purpose.
+// It runs as the fixture site under world tile (0, 0) (world/legacy.js).
+export const LEGACY_LEVELS = 20;
+export const LEGACY_GUARDIANS = { 5: "flatqueen", 10: "warden", 15: "colossus" };
+export function legacyParams(depth, runSeed = 0) {
+  const final = depth >= LEGACY_LEVELS;
+  // Levels 1-9 each get a different vault so you meet all of them (level 5 has a guardian
+  // instead); after that, random. The last level always gets the Lich's throne room.
+  const k = depth - 1 - (depth > 5 ? 1 : 0);
+  const forcedVault = final ? null : LEGACY_GUARDIANS[depth] || (k < VAULTS.length ? VAULTS[k].id : null);
+  return {
+    key: `0,0,${depth}`, wx: 0, wy: 0, z: depth, level: depth, tier: 1, index: depth, count: LEGACY_LEVELS, final,
+    theme: "legacy", hasUp: true, forcedVault, vaultPool: null, gimmicks: [],
+    bottom: final ? { kind: "boss", id: "lich" } : null,
+    encounters: planEncounters(runSeed).get(depth) || [], creatureTable: null, holesIn: null, simpleAfter: 25,
+    name: `Depth ${depth}`,
+  };
 }

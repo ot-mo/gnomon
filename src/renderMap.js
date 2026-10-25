@@ -34,16 +34,16 @@ const GLYPHS = {
 
 // How a tile looks on the map, given what you know. Unexplored holes look like floor,
 // and so do bridges until you can see what they cross.
-function mapKind(floor, x, y) {
-  const i = x + y * floor.w;
-  const k = floor.kind[i];
-  if (k === KIND.HOLE) return floor.holeSeen[i] ? KIND.HOLE : KIND.FLOOR;
+function mapKind(zone, x, y) {
+  const i = x + y * zone.w;
+  const k = zone.kind[i];
+  if (k === KIND.HOLE) return zone.holeSeen[i] ? KIND.HOLE : KIND.FLOOR;
   if (k === KIND.BRIDGE) {
     for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const nx = x + ox, ny = y + oy;
-      if (nx < 0 || ny < 0 || nx >= floor.w || ny >= floor.d) continue;
-      const n = nx + ny * floor.w, nk = floor.kind[n];
-      if ((nk === KIND.HOLE && floor.holeSeen[n]) || nk === KIND.SHALLOW || nk === KIND.DEEP) return KIND.BRIDGE;
+      if (nx < 0 || ny < 0 || nx >= zone.w || ny >= zone.d) continue;
+      const n = nx + ny * zone.w, nk = zone.kind[n];
+      if ((nk === KIND.HOLE && zone.holeSeen[n]) || nk === KIND.SHALLOW || nk === KIND.DEEP) return KIND.BRIDGE;
     }
     return KIND.FLOOR;
   }
@@ -52,9 +52,9 @@ function mapKind(floor, x, y) {
 
 export function renderMap(game) {
   S.clear();
-  const { floor, player } = game;
+  const { zone, player } = game;
   const top = mapView.top;
-  const legend = S.cols >= floor.w * TILE_W + LEGEND_W + 4;
+  const legend = S.cols >= zone.w * TILE_W + LEGEND_W + 4;
   const viewW = Math.floor((S.cols - (legend ? LEGEND_W : 0)) / TILE_W);
   const viewH = S.rows - top - 2;
 
@@ -62,29 +62,29 @@ export function renderMap(game) {
   const pickOrigin = (size, view, at, pan) =>
     size <= view ? -Math.floor((view - size) / 2)
                  : Math.max(0, Math.min(size - view, Math.floor(at - view / 2) + pan));
-  const tx0 = pickOrigin(floor.w, viewW, player.x, mapView.panX);
-  const ty0 = pickOrigin(floor.d, viewH, player.y, mapView.panY);
+  const tx0 = pickOrigin(zone.w, viewW, player.x, mapView.panX);
+  const ty0 = pickOrigin(zone.d, viewH, player.y, mapView.panY);
   mapView.tx0 = tx0; mapView.ty0 = ty0;
   const toScreen = (tx, ty) => [(tx - tx0) * TILE_W, top + ty - ty0];
   const onScreen = (tx, ty) => tx - tx0 >= 0 && tx - tx0 < viewW && ty - ty0 >= 0 && ty - ty0 < viewH;
 
   // Tiles
-  for (let ty = 0; ty < floor.d; ty++) {
-    for (let tx = 0; tx < floor.w; tx++) {
-      const i = tx + ty * floor.w;
-      if (!floor.seen[i] || !onScreen(tx, ty)) continue;
+  for (let ty = 0; ty < zone.d; ty++) {
+    for (let tx = 0; tx < zone.w; tx++) {
+      const i = tx + ty * zone.w;
+      if (!zone.seen[i] || !onScreen(tx, ty)) continue;
       const [sx, sy] = toScreen(tx, ty);
-      const kind = mapKind(floor, tx, ty);
+      const kind = mapKind(zone, tx, ty);
       if (kind === KIND.WALL) {
-        const c = BLOCKS[floor.get(tx, ty, FLOOR_Z + 1)].color || [120, 120, 120];
+        const c = BLOCKS[zone.get(tx, ty, FLOOR_Z + 1)].color || [120, 120, 120];
         S.put(sx, sy, "#", c[0] * 0.75, c[1] * 0.75, c[2] * 0.75);
         S.put(sx + 1, sy, "#", c[0] * 0.75, c[1] * 0.75, c[2] * 0.75);
       } else if (kind === KIND.MOSAIC) {   // from above, the picture is plain as day
-        const c = BLOCKS[floor.get(tx, ty, FLOOR_Z - 1)].color;
+        const c = BLOCKS[zone.get(tx, ty, FLOOR_Z - 1)].color;
         S.put(sx, sy, "█", ...c);
         S.put(sx + 1, sy, "█", ...c);
       } else if (kind === KIND.SPIKES) {   // up now, up next beat, or down
-        const st = spikeState(floor, i, game.time);
+        const st = spikeState(zone, i, game.time);
         if (st === "up") S.put(sx, sy, "▲", 255, 70, 60);
         else if (st === "warn") S.put(sx, sy, "^", 255, 170, 60);
         else S.put(sx, sy, ",", 130, 110, 100);
@@ -96,10 +96,10 @@ export function renderMap(game) {
   }
 
   // The Colossus's quake: the tiles about to shake (^), and the ones shaking now (▲).
-  if (floor.slam || floor.slamDone) {
-    for (let ty = 0; ty < floor.d; ty++)
-      for (let tx = 0; tx < floor.w; tx++) {
-        const st = onScreen(tx, ty) && floor.seen[tx + ty * floor.w] && slamState(floor, tx + ty * floor.w, game.time);
+  if (zone.slam || zone.slamDone) {
+    for (let ty = 0; ty < zone.d; ty++)
+      for (let tx = 0; tx < zone.w; tx++) {
+        const st = onScreen(tx, ty) && zone.seen[tx + ty * zone.w] && slamState(zone, tx + ty * zone.w, game.time);
         if (!st) continue;
         const [sx, sy] = toScreen(tx, ty);
         if (st === "up") S.put(sx, sy, "▲", 255, 70, 60);
@@ -108,14 +108,14 @@ export function renderMap(game) {
   }
 
   // Items you've seen, monsters where you last saw them, your markers
-  for (const item of floor.items) {
+  for (const item of zone.items) {
     const tx = Math.floor(item.x), ty = Math.floor(item.y);
-    if (!floor.seen[tx + ty * floor.w] || !onScreen(tx, ty)) continue;
+    if (!zone.seen[tx + ty * zone.w] || !onScreen(tx, ty)) continue;
     const [glyph, color] = itemGlyph(game, item);
     const [sx, sy] = toScreen(tx, ty);
     S.put(sx, sy, glyph, ...color);
   }
-  for (const mk of floor.markers) {
+  for (const mk of zone.markers) {
     if (!onScreen(mk.x, mk.y)) continue;
     const [sx, sy] = toScreen(mk.x, mk.y);
     S.put(sx, sy, "*", 90, 230, 255);
@@ -134,14 +134,14 @@ export function renderMap(game) {
   const area = (cx, cy, r, ch, color) => {
     for (let ty = Math.floor(cy - r); ty <= Math.ceil(cy + r); ty++)
       for (let tx = Math.floor(cx - r); tx <= Math.ceil(cx + r); tx++) {
-        if (!onScreen(tx, ty) || Math.hypot(tx + 0.5 - cx, ty + 0.5 - cy) > r || floor.kind[tx + ty * floor.w] === KIND.WALL) continue;
+        if (!onScreen(tx, ty) || Math.hypot(tx + 0.5 - cx, ty + 0.5 - cy) > r || zone.kind[tx + ty * zone.w] === KIND.WALL) continue;
         const [sx, sy] = toScreen(tx, ty);
         S.put(sx, sy, ch, ...color);
       }
   };
-  for (const c of floor.clouds) area(c.x, c.y, c.r, "%", [110, 200, 80].map((v) => v * Math.min(1, c.time / 2)));
+  for (const c of zone.clouds) area(c.x, c.y, c.r, "%", [110, 200, 80].map((v) => v * Math.min(1, c.time / 2)));
   for (const e of game.effects) if (e.kind === "burst" && game.time - e.time < 1) area(e.x, e.y, e.big ? 2.3 : 1.8, "*", e.color);
-  for (const b of floor.bombs) area(b.x, b.y, 0.75, "0", Math.floor(game.time * 6) % 2 ? [255, 90, 40] : [255, 200, 90]);   // a lit bomb, blinking
+  for (const b of zone.bombs) area(b.x, b.y, 0.75, "0", Math.floor(game.time * 6) % 2 ? [255, 90, 40] : [255, 200, 90]);   // a lit bomb, blinking
 
   // Damage numbers from the last couple of turns, just above whoever took the hit.
   for (const e of game.effects) {
@@ -153,15 +153,15 @@ export function renderMap(game) {
   }
 
   // People: anyone on a tile you've seen (a ghost only once you've met it in the dark).
-  for (const n of floor.npcs) {
+  for (const n of zone.npcs) {
     const t = NPC_TYPES[n.type];
-    if (!floor.seen[n.tx + n.ty * floor.w] || !onScreen(n.tx, n.ty) || (t.ghost && !n.met)) continue;
+    if (!zone.seen[n.tx + n.ty * zone.w] || !onScreen(n.tx, n.ty) || (t.ghost && !n.met)) continue;
     const [sx, sy] = toScreen(n.tx, n.ty);
     S.put(sx, sy, t.glyph, ...t.color);
   }
 
   // Monsters: bright if you can see them right now, fading if it's an old memory.
-  for (const s of floor.sightings.values()) {
+  for (const s of zone.sightings.values()) {
     const tx = Math.floor(s.x), ty = Math.floor(s.y);
     if (!onScreen(tx, ty)) continue;
     const k = s.time === game.time ? 1 : Math.max(0.3, 0.7 - (game.time - s.time) / 40);
@@ -253,32 +253,32 @@ export function tileAtCell(cell) {
 function hoveredTile() { return tileAtCell(mapView.hover); }
 
 function describeTile(game, tile) {
-  const { floor } = game;
-  if (!tile || tile.x < 0 || tile.y < 0 || tile.x >= floor.w || tile.y >= floor.d) return "Hover over a tile to inspect it.";
-  const i = tile.x + tile.y * floor.w;
-  if (!floor.seen[i]) return "Unexplored.";
+  const { zone } = game;
+  if (!tile || tile.x < 0 || tile.y < 0 || tile.x >= zone.w || tile.y >= zone.d) return "Hover over a tile to inspect it.";
+  const i = tile.x + tile.y * zone.w;
+  if (!zone.seen[i]) return "Unexplored.";
   const parts = [];
-  const kind = mapKind(floor, tile.x, tile.y);
-  if (kind === KIND.WALL) parts.push(capitalize(BLOCKS[floor.get(tile.x, tile.y, FLOOR_Z + 1)].name || "wall") + ".");
+  const kind = mapKind(zone, tile.x, tile.y);
+  if (kind === KIND.WALL) parts.push(capitalize(BLOCKS[zone.get(tile.x, tile.y, FLOOR_Z + 1)].name || "wall") + ".");
   else parts.push({ [KIND.FLOOR]: "Floor.", [KIND.DOOR]: "A wooden door.", [KIND.LOCKED]: "A locked door.",
                     [KIND.GATE]: "An iron gate.", [KIND.LEVER]: "A lever.", [KIND.STAIRS]: "Stairs leading down.", [KIND.STAIRS_UP]: "Stairs back up to the floor above.",
                     [KIND.HOLE]: "A drop into the dark. It leads down a floor.",
                     [KIND.SHALLOW]: "Shallow water. Wading is slow.", [KIND.DEEP]: "Deep water. Go in and it sweeps you down a floor.",
                     [KIND.BRIDGE]: "A wooden bridge.", [KIND.MOSAIC]: "Mosaic tiles. From up here, the picture is clear.",
-                    [KIND.SPIKES]: { up: "A spike trap: the spikes are UP.", warn: "A spike trap: the spikes come up next beat!", down: "A spike trap, down for now." }[spikeState(floor, i, game.time)] }[kind]);
-  for (const n of floor.npcs)
+                    [KIND.SPIKES]: { up: "A spike trap: the spikes are UP.", warn: "A spike trap: the spikes come up next beat!", down: "A spike trap, down for now." }[spikeState(zone, i, game.time)] }[kind]);
+  for (const n of zone.npcs)
     if (n.tx === tile.x && n.ty === tile.y && (!NPC_TYPES[n.type].ghost || n.met)) {
       const t = NPC_TYPES[n.type];
       parts.push(`${t.name}${t.title ? ", " + t.title : ""}, is here.${t.flat ? " (A flat being: in 3D you'd only see a shadow.)" : ""} Walk into them to talk.`);
     }
-  for (const item of floor.items)
+  for (const item of zone.items)
     if (Math.floor(item.x) === tile.x && Math.floor(item.y) === tile.y) parts.push(`There is ${withArticle(itemName(game, item))} here.`);
-  for (const [id, s] of floor.sightings)
+  for (const [id, s] of zone.sightings)
     if (Math.floor(s.x) === tile.x && Math.floor(s.y) === tile.y) {
-      const m = floor.monsters.find((o) => o.id === id), what = m && resistText(m);
+      const m = zone.monsters.find((o) => o.id === id), what = m && resistText(m);
       parts.push(`You last saw a ${s.name} here ${Math.round(game.time - s.time)} s ago.${what ? ` (${capitalize(what)}.)` : ""}`);
     }
-  if (floor.markers.some((m) => m.x === tile.x && m.y === tile.y)) parts.push("Your marker.");
+  if (zone.markers.some((m) => m.x === tile.x && m.y === tile.y)) parts.push("Your marker.");
   return parts.join(" ");
 }
 

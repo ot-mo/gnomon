@@ -14,9 +14,9 @@ export const hit = { t: 0, block: 0, nx: 0, ny: 0, nz: 0, x: 0, y: 0, z: 0 };
 // If `holes` is given, a column is also marked there when the ray passes down through
 // its floor layer: you've looked into a pit or chasm (only the 3D view passes this).
 const HOLE_Z = 1;   // the floor layer (world.js FLOOR_Z - 1)
-export function castRay(floor, ox, oy, oz, dx, dy, dz, maxT, seen = null, torchRange = 0, holes = null) {
-  const W = floor.w, D = floor.d, H = floor.h, WD = W * D;
-  const blocks = floor.blocks, lit = floor.litMask;
+export function castRay(zone, ox, oy, oz, dx, dy, dz, maxT, seen = null, torchRange = 0, holes = null) {
+  const W = zone.w, D = zone.d, H = zone.h, WD = W * D;
+  const blocks = zone.blocks, lit = zone.litMask;
   let x = Math.floor(ox), y = Math.floor(oy), z = Math.floor(oz);
   const stepX = dx > 0 ? 1 : -1, stepY = dy > 0 ? 1 : -1, stepZ = dz > 0 ? 1 : -1;
   const tDeltaX = Math.abs(1 / dx), tDeltaY = Math.abs(1 / dy), tDeltaZ = Math.abs(1 / dz);
@@ -56,9 +56,9 @@ export function castRay(floor, ox, oy, oz, dx, dy, dz, maxT, seen = null, torchR
 }
 
 // Can a point see another point? (Nothing solid in between.)
-export function lineOfSight(floor, ax, ay, az, bx, by, bz) {
+export function lineOfSight(zone, ax, ay, az, bx, by, bz) {
   const dx = bx - ax, dy = by - ay, dz = bz - az;
   const dist = Math.hypot(dx, dy, dz);
   if (dist < 1e-6) return true;
-  return !castRay(floor, ax, ay, az, dx / dist, dy / dist, dz / dist, dist);
+  return !castRay(zone, ax, ay, az, dx / dist, dy / dist, dz / dist, dist);
 }

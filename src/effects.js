@@ -2,10 +2,10 @@
 // (flying, haste, shadows, poison, paralysis, darkness), plus the Regeneration perk.
 import { POTIONS, POTION_COLORS, SCROLLS, ELEMENTS, WEAPONS, itemName, isGear } from "./items.js";
 import { bonus, regear, worn } from "./player.js";
-import { FLOOR_Z, FINAL_DEPTH } from "./world.js";
+import { FLOOR_Z } from "./world.js";
 import { sfx } from "./sfx.js";
 import { spawnMonster, pickMonsterType } from "./monsters.js";
-import { arrivalPoint } from "./gen/dungeon.js";
+import { arrivalPoint } from "./zones.js";
 
 export function drinkPotion(game, effect) {
   const p = game.player;
@@ -45,7 +45,7 @@ export function drinkPotion(game, effect) {
       game.log("Shadows cling to you. Monsters will struggle to notice you.", [140, 130, 170]);
       break;
     case "descent":
-      if (game.depth >= FINAL_DEPTH) { game.log("You grow light, then heavy... but the floor here is warded. Nothing happens.", [180, 170, 140]); break; }
+      if (!game.zone.hasBelow) { game.log("You grow light, then heavy... but the floor here is warded. Nothing happens.", [180, 170, 140]); break; }
       game.log("You grow light, then heavy... and sink right through the floor.", [180, 170, 140]);
       game.fallThrough();
       break;
@@ -92,21 +92,21 @@ export function readScroll(game, effect) {
       game.log(`Your weapon glows softly. It's now a ${wname()}.`, [255, 245, 200]);
       break;
     case "teleport": {
-      const f = game.floor;
-      const at = arrivalPoint(f, "fall", 2 + Math.random() * (f.w - 4), 2 + Math.random() * (f.d - 4));
+      const f = game.zone;
+      const at = arrivalPoint(f, "teleport", { rng: Math.random });
       Object.assign(p, { x: at.x, y: at.y, z: at.z, vz: 0 });
       game.travel = null;
       game.log("The world twists around you. You're somewhere else.", [200, 160, 255]);
       break;
     }
     case "summon": {
-      const f = game.floor;
+      const f = game.zone;
       let n = 0;
       for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
         if (n >= 2 + Math.floor(Math.random() * 2)) break;
         const x = Math.floor(p.x) + ox, y = Math.floor(p.y) + oy, z = f.stand[x + y * f.w];
         if (z < 0 || f.monsters.some((m) => m.tx === x && m.ty === y)) continue;
-        f.monsters.push(spawnMonster(pickMonsterType(Math.random, game.depth), x, y, z, "chase", game.depth));
+        f.monsters.push(spawnMonster(pickMonsterType(Math.random, game.zone.level), x, y, z, "chase", game.zone.level));
         n++;
       }
       game.log(n ? "The scroll shrieks! Monsters appear around you!" : "The scroll shrieks, but nothing comes.", [255, 120, 100]);
@@ -173,19 +173,19 @@ export function tickEffects(game, dt) {
 // Potion of seeing, part 1: every open space on the floor (and the walls around it) appears
 // on the map, and every monster is shown where it stands right now. Chasms still look like floor.
 export function revealFloor(game) {
-  const { floor } = game;
-  const { w, d } = floor;
+  const { zone } = game;
+  const { w, d } = zone;
   for (let y = 0; y < d; y++)
     for (let x = 0; x < w; x++) {
-      if (floor.get(x, y, FLOOR_Z) && floor.get(x, y, FLOOR_Z + 1)) continue;   // solid at body height
+      if (zone.get(x, y, FLOOR_Z) && zone.get(x, y, FLOOR_Z + 1)) continue;   // solid at body height
       for (let oy = -1; oy <= 1; oy++)
         for (let ox = -1; ox <= 1; ox++) {
           const nx = x + ox, ny = y + oy;
-          if (nx >= 0 && ny >= 0 && nx < w && ny < d) floor.seen[nx + ny * w] = 1;
+          if (nx >= 0 && ny >= 0 && nx < w && ny < d) zone.seen[nx + ny * w] = 1;
         }
     }
-  for (const m of floor.monsters) {
-    floor.sightings.set(m.id, { x: m.x, y: m.y, glyph: m.glyph, color: m.color, name: m.name, time: game.time });
+  for (const m of zone.monsters) {
+    zone.sightings.set(m.id, { x: m.x, y: m.y, glyph: m.glyph, color: m.color, name: m.name, time: game.time });
   }
 }
 

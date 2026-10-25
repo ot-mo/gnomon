@@ -37,21 +37,21 @@ export function guardianThink(game, m, dt, occ) {
 
 // Monsters appear on free tiles around the guardian (2–4 tiles away).
 function summon(game, m, type, n, occ) {
-  const { floor } = game, { w, stand } = floor;
+  const { zone } = game, { w, stand } = zone;
   const spots = [];
   for (let oy = -4; oy <= 4; oy++)
     for (let ox = -4; ox <= 4; ox++) {
       const x = m.tx + ox, y = m.ty + oy, d = Math.max(Math.abs(ox), Math.abs(oy));
-      if (d < 2 || x < 0 || y < 0 || x >= w || y >= floor.d || stand[x + y * w] !== FLOOR_Z || occ[x + y * w]) continue;
+      if (d < 2 || x < 0 || y < 0 || x >= w || y >= zone.d || stand[x + y * w] !== FLOOR_Z || occ[x + y * w]) continue;
       if (Math.hypot(x + 0.5 - game.player.x, y + 0.5 - game.player.y) < 1.5) continue;
       spots.push([x, y]);
     }
   const made = [];
   for (let k = 0; k < n && spots.length; k++) {
     const [x, y] = spots.splice(Math.floor(Math.random() * spots.length), 1)[0];
-    const o = spawnMonster(type, x, y, stand[x + y * w], "chase", floor.depth);
+    const o = spawnMonster(type, x, y, stand[x + y * w], "chase", zone.level);
     o.xp = Math.ceil(o.xp / 2);   // summoned things are worth less
-    floor.monsters.push(o);
+    zone.monsters.push(o);
     occ[x + y * w] = o.id;
     made.push(o);
   }
@@ -67,7 +67,7 @@ function queen(game, m, dt, occ) {
     m.risen = true;
     game.log("The Flat Queen peels herself up off the floor and stands, suddenly deep! (Only a blow in 3D will touch her now.)", m.color);
     sfx("rotate", { up: true, at: m });
-    for (const o of game.floor.monsters) if (o.type === "flatling") { o.blind = QUEEN_RISEN; o.state = "wander"; }   // her court scatters
+    for (const o of game.zone.monsters) if (o.type === "flatling") { o.blind = QUEEN_RISEN; o.state = "wander"; }   // her court scatters
   } else if (m.risen && g.t >= QUEEN_RISEN) {
     g.t = 0;
     m.risen = false;
@@ -76,7 +76,7 @@ function queen(game, m, dt, occ) {
   }
   if (!m.risen && (g.summon -= dt) <= 0) {
     g.summon = 10;
-    const court = game.floor.monsters.filter((o) => o.type === "flatling").length;
+    const court = game.zone.monsters.filter((o) => o.type === "flatling").length;
     if (court < 2 && summon(game, m, "flatling", 2 - court, occ).length) game.log("The Flat Queen calls her court. Flatlings slide out of the cracks in the floor!", m.color);
   }
   return false;
@@ -84,19 +84,19 @@ function queen(game, m, dt, occ) {
 
 // --- The Gloom Warden ---------------------------------------------------------------------
 function warden(game, m, dt, occ) {
-  const g = m.g, floor = game.floor;
+  const g = m.g, zone = game.zone;
   if ((g.summon -= dt) <= 0) {
     g.summon = 7;
-    const shades = floor.monsters.filter((o) => o.type === "shade").length;
+    const shades = zone.monsters.filter((o) => o.type === "shade").length;
     if (shades < 4 && summon(game, m, "shade", 2, occ).length) game.log("The Gloom Warden lifts its lantern. Shades pour out of the dark!", m.color);
   }
   if ((g.snuff -= dt) <= 0) {
     g.snuff = 12;
-    const lit = (floor.guardianHall?.braziers || []).filter(([x, y]) => floor.get(x, y, FLOOR_Z) === B.BRAZIER_LIT);
+    const lit = (zone.guardianHall?.braziers || []).filter(([x, y]) => zone.get(x, y, FLOOR_Z) === B.BRAZIER_LIT);
     if (lit.length) {
       const [x, y] = lit[Math.floor(Math.random() * lit.length)];
-      floor.set(x, y, FLOOR_Z, B.BRAZIER);
-      floor.refresh();
+      zone.set(x, y, FLOOR_Z, B.BRAZIER);
+      zone.refresh();
       game.log("A cold wind howls through the hall, and a brazier gutters out.", [170, 190, 255]);
     }
   }
@@ -105,7 +105,7 @@ function warden(game, m, dt, occ) {
 
 // Shades hate firelight: standing in a lit brazier's (or lamp's) glow burns them away.
 export function fearLight(game, m, dt) {
-  const light = sampleLight(game.floor, game.floor.lampLight, m.x, m.y, m.z + 0.6);
+  const light = sampleLight(game.zone, game.zone.lampLight, m.x, m.y, m.z + 0.6);
   if (light < 0.3) return false;
   m.lightBurn = (m.lightBurn || 0) + dt * 6;
   m.hurt = 0.1;
@@ -114,7 +114,7 @@ export function fearLight(game, m, dt) {
     m.lightBurn -= n;
     m.hp -= n;
     if (m.hp <= 0) {
-      game.floor.monsters = game.floor.monsters.filter((o) => o !== m);
+      game.zone.monsters = game.zone.monsters.filter((o) => o !== m);
       if (Math.hypot(game.player.x - m.x, game.player.y - m.y) < 14) game.log("A shade shrivels away in the firelight.", [255, 200, 140]);
       return true;
     }
@@ -129,31 +129,31 @@ export function colossusCore(game, m) {
 }
 
 function colossus(game, m, dt) {
-  const g = m.g, floor = game.floor, p = game.player;
-  const hall = floor.guardianHall;
+  const g = m.g, zone = game.zone, p = game.player;
+  const hall = zone.guardianHall;
   // A slam: warn (the tiles shake on the map), then the quake.
-  if (floor.slam && game.time >= floor.slam.at) {
+  if (zone.slam && game.time >= zone.slam.at) {
     const onGround = p.z < FLOOR_Z + 0.5 && !(p.flyTime > 0);
-    const ptile = Math.floor(p.x) + Math.floor(p.y) * floor.w;
+    const ptile = Math.floor(p.x) + Math.floor(p.y) * zone.w;
     game.effects.push({ kind: "boom", x: m.x, y: m.y, z: m.z, time: game.time });
     sfx("boom", { at: m });
-    if (onGround && floor.slam.cells.has(ptile)) {
-      game.hurtPlayer(7 + Math.floor(Math.random() * 5) + Math.floor(floor.depth / 5), "the Colossus's quake");
+    if (onGround && zone.slam.cells.has(ptile)) {
+      game.hurtPlayer(7 + Math.floor(Math.random() * 5) + Math.floor(zone.level / 5), "the Colossus's quake");
     }
-    floor.slamDone = { cells: floor.slam.cells, time: game.time };
-    floor.slam = null;
+    zone.slamDone = { cells: zone.slam.cells, time: game.time };
+    zone.slam = null;
     g.slam = SLAM_EVERY;
-  } else if (!floor.slam && (g.slam -= dt) <= 0 && hall) {
+  } else if (!zone.slam && (g.slam -= dt) <= 0 && hall) {
     // Rings of ground around it, alternating near and far. Platform tops never shake.
     g.ring = g.ring === "near" ? "far" : "near";
     const cells = new Set();
     for (let y = hall.y0; y <= hall.y1; y++)
       for (let x = hall.x0; x <= hall.x1; x++) {
-        if (floor.stand[x + y * floor.w] !== FLOOR_Z) continue;
+        if (zone.stand[x + y * zone.w] !== FLOOR_Z) continue;
         const d = Math.hypot(x + 0.5 - m.x, y + 0.5 - m.y);
-        if (g.ring === "near" ? d < 3.6 : d >= 3.6 && d < 7.5) cells.add(x + y * floor.w);
+        if (g.ring === "near" ? d < 3.6 : d >= 3.6 && d < 7.5) cells.add(x + y * zone.w);
       }
-    floor.slam = { cells, at: game.time + SLAM_WARN, start: game.time };
+    zone.slam = { cells, at: game.time + SLAM_WARN, start: game.time };
     game.log(g.ring === "near" ? "The Colossus raises both fists high... (the ground close to it will shake)" : "The Colossus stamps, and cracks race outward... (the far ground will shake)", m.color);
   }
   // A sweep of its arm at you up on a platform (on the ground the usual blow does it). It draws
@@ -180,25 +180,25 @@ function colossus(game, m, dt) {
 // 3D: the shaking ground before a slam (dust and grit over every tile about to quake), and
 // the burst of rubble right after.
 export function guardianSprites(game) {
-  const floor = game.floor, out = [];
+  const zone = game.zone, out = [];
   const add = (cells, color, glow) => {
     for (const c of cells) {
-      const x = c % floor.w, y = (c - x) / floor.w;
+      const x = c % zone.w, y = (c - x) / zone.w;
       if (Math.hypot(x + 0.5 - game.player.x, y + 0.5 - game.player.y) > 14) continue;
       out.push({ x: x + 0.5, y: y + 0.5, z: FLOOR_Z, w: 0.9, h: 0.18, art: [" c c c ", "ccccccc"], palette: { c: [color, glow] } });
     }
   };
-  if (floor.slam) {
-    const blink = Math.floor((game.time - floor.slam.start) * 8) % 2 === 0;
-    add(floor.slam.cells, blink ? [255, 170, 60] : [180, 110, 50], 0.6);
+  if (zone.slam) {
+    const blink = Math.floor((game.time - zone.slam.start) * 8) % 2 === 0;
+    add(zone.slam.cells, blink ? [255, 170, 60] : [180, 110, 50], 0.6);
   }
-  if (floor.slamDone && game.time - floor.slamDone.time < 0.4) add(floor.slamDone.cells, [200, 190, 170], 0.2);
+  if (zone.slamDone && game.time - zone.slamDone.time < 0.4) add(zone.slamDone.cells, [200, 190, 170], 0.2);
   return out;
 }
 
 // The map: tiles about to quake.
-export function slamState(floor, i, time) {
-  if (floor.slam?.cells.has(i)) return "warn";
-  if (floor.slamDone && time - floor.slamDone.time < 0.4 && floor.slamDone.cells.has(i)) return "up";
+export function slamState(zone, i, time) {
+  if (zone.slam?.cells.has(i)) return "warn";
+  if (zone.slamDone && time - zone.slamDone.time < 0.4 && zone.slamDone.cells.has(i)) return "up";
   return null;
 }

@@ -1,11 +1,11 @@
 // The story: Hollowmere, the Temple of Angles, the Rotation Cube, and Vorlath the Lich King.
 //
-// You start in the temple (depth 0) seeing the world the only way anyone in Hollowmere ever
+// You start in the temple (the surface of world tile 0, 0) seeing the world the only way anyone in Hollowmere ever
 // has: flat, from above (the map view). On the altar of the lower sanctum lies the Rotation
 // Cube. Touch it, and the world turns: the camera swings down into first person, and from
 // then on Tab rotates you between the two ways of seeing.
-import { Floor, B, FLOOR_Z, ROOM_TOP, H } from "./world.js";
-import { makeRng } from "./rng.js";
+import { Zone, B, FLOOR_Z, ROOM_TOP } from "./world.js";
+import { makeRng, distance } from "./rng.js";
 import { stampVault } from "./gen/vaults.js";
 import { makeItem } from "./items.js";
 import { spawnNpc } from "./npcs.js";
@@ -43,7 +43,7 @@ export const EPILOGUE = [
   { title: "THE END", text: "Thank you for playing." },
 ];
 
-// --- The Temple of Angles (depth 0), drawn by hand ---------------------------------------------
+// --- The Temple of Angles (the legacy site's surface zone), drawn by hand ---------------------------------------------
 //   ,  wooden floor   b  a bed   @  where you wake up   M  Maren   C  marble column
 //   ^  spike floor    A  the altar, with the cube on it   X  the wall that opens when you take it
 //   o  stepping stone (O: a block higher)   >  stairs down into the dungeon
@@ -74,7 +74,8 @@ export function buildTemple(seed) {
   at(30, 36, "l"); at(40, 38, "l");
 
   const plan = g.map((row) => row.join(""));
-  const f = new Floor(0, seed);
+  const f = new Zone({ key: "0,0,0", wx: 0, wy: 0, z: 0, type: "surface", level: 0, tier: 1, seed, w: 48, d: 48, h: 10,
+                       name: "The Temple of Angles" });
   f.blocks.fill(B.ROCK);
   const ox = 2, oy = 2;
   stampVault(f, { plan, height: 4, wall: B.STONE, floorBlock: B.TILE, links: [] }, ox, oy, rng);
@@ -118,8 +119,8 @@ export function buildTemple(seed) {
   // The sanctum: open to the sky, with a ring of white mosaic around the altar.
   for (let y = oy + 21; y <= oy + 31; y++)
     for (let x = ox + 29; x <= ox + 41; x++) {
-      for (let z = FLOOR_Z + 4; z < H; z++) f.set(x, y, z, B.AIR);
-      const d = Math.hypot(x - ax, y - ay);
+      for (let z = FLOOR_Z + 4; z < f.h; z++) f.set(x, y, z, B.AIR);
+      const d = distance(x - ax, y - ay);
       if (d > 2.2 && d < 3.4) f.set(x, y, FLOOR_Z - 1, B.MOSAIC_WHITE);
       else if (d >= 3.4 && d < 4.3 && (Math.round(Math.atan2(y - ay, x - ax) * 4) & 1)) f.set(x, y, FLOOR_Z - 1, B.MOSAIC_BLUE);
     }
@@ -131,7 +132,7 @@ export function buildTemple(seed) {
 }
 
 // The cube is taken: the wall behind the altar grinds aside, showing the way down.
-export function openCubeWall(floor) {
-  for (const [x, y] of floor.cubeWall || []) for (let z = FLOOR_Z; z < ROOM_TOP; z++) floor.set(x, y, z, B.AIR);
-  floor.refresh();
+export function openCubeWall(zone) {
+  for (const [x, y] of zone.cubeWall || []) for (let z = FLOOR_Z; z < ROOM_TOP; z++) zone.set(x, y, z, B.AIR);
+  zone.refresh();
 }

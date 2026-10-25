@@ -18,12 +18,15 @@
 //   Z  the guardian (the vault says which)   >  stairs down   f  a brazier (no puzzle)
 //   y  a flatling
 // A plan can also come with mosaics: [[x, y, block]] laid into the floor after stamping.
+// Each letter is a named legend handler (DEFAULT_LEGEND below); a plan can map its own letters
+// with `legend: { ch: handlerId }`, and other modules add handlers with registerLegend.
 //
 // links: which lever letter does what to the target letter's tiles (see interact.js):
 //   open: remove them (gates) | part: one of `need` levers that together open them
 //   pit: drop the floor away | summon: monsters appear there | gas: poison gas
 // hint: logged the first time you step inside.
-import { B, FLOOR_Z, ROOM_TOP, H, FINAL_DEPTH } from "../world.js";
+import { B, FLOOR_Z, ROOM_TOP } from "../world.js";
+import { makeRng } from "../rng.js";
 import { spawnMonster } from "../monsters.js";
 import { makeItem, randomPotion, randomScroll, randomEquipment, randomTreasure } from "../items.js";
 import { spawnNpc } from "../npcs.js";
@@ -36,7 +39,7 @@ export const VAULTS = [
     // record is somewhere else on the floor (dungeon.js addLeverRecord), either a carved mural
     // in another room's wall (it shows only in the dark) or a row of floor tiles in another
     // room (it reads only on the map).
-    name: "The Rune Lever", height: 4, wall: B.STONE, floorBlock: B.TILE,
+    id: "runeLever", name: "The Rune Lever", height: 4, wall: B.STONE, floorBlock: B.TILE,
     build: runeLeverPlan,
     hint: "A row of levers, all alike, and nothing to tell them apart. Whoever built this must have kept a record of the right ones... somewhere else.",
   },
@@ -44,14 +47,14 @@ export const VAULTS = [
     // Levers on the far wall again, and trap floor in front of them. This time the answer is
     // written in the floor: a golden arrow pointing at the right lever. From above it's
     // obvious. At eye level it's a jumble of faded tiles.
-    name: "The Mosaic Hall", height: 4, wall: B.STONE, floorBlock: B.TILE,
+    id: "mosaicHall", name: "The Mosaic Hall", height: 4, wall: B.STONE, floorBlock: B.TILE,
     build: mosaicHallPlan,
     hint: "More levers, and a floor of coloured tiles. From down here the tiles are just a jumble.",
   },
   {
     // On the map: an open room with treasure in the far corner. In 3D: it's a chasm,
     // and the only way across is a narrow winding path.
-    name: "The Flat Lie", height: 4, wall: B.MOSS, floorBlock: B.ROCK,
+    id: "flatLie", name: "The Flat Lie", height: 4, wall: B.MOSS, floorBlock: B.ROCK,
     plan: [
       "############",
       "#~~~~~~~~.*#",
@@ -70,35 +73,35 @@ export const VAULTS = [
   {
     // Treasure beyond a field of spike traps keeping a rhythm. On the map you can watch the
     // pattern and step through it turn by turn; in 3D it's nerve and timing (or a good jump).
-    name: "The Gauntlet", height: 4, wall: B.BRICK, floorBlock: B.TILE,
+    id: "gauntlet", name: "The Gauntlet", height: 4, wall: B.BRICK, floorBlock: B.TILE,
     build: gauntletPlan,
     hint: "Treasure gleams beyond a floor full of holes. Listen: tk... tk... tk. The rhythm never stops.",
   },
   {
     // A dark room of cold braziers. Light them in the order of the numerals carved behind
     // them: you read the numerals in the dark, but you need your torch lit to light a fire.
-    name: "The Braziers", height: 4, wall: B.BRICK, floorBlock: B.TILE,
+    id: "braziers", name: "The Braziers", height: 4, wall: B.BRICK, floorBlock: B.TILE,
     build: brazierPlan,
     hint: "Cold braziers stand in a row. Something is carved into the wall behind them.",
   },
   {
     // A stone face beside a gate asks for a number. The number is written across the hall's
     // floor in giant mosaic digits, which you can only really read from above.
-    name: "The Speaking Door", height: 4, wall: B.STONE, floorBlock: B.TILE,
+    id: "speakingDoor", name: "The Speaking Door", height: 4, wall: B.STONE, floorBlock: B.TILE,
     build: speakingDoorPlan,
     hint: "A hall of faded tiles, and a stone face beside a gate. The face seems to be waiting for something.",
   },
   {
     // A lightless maze with something in it. Your torch shows a few steps;
     // the map (which only fills in as you go) is how you keep your bearings.
-    name: "The Dark Maze", height: 2, wall: B.MOSS, floorBlock: B.ROCK,
+    id: "darkMaze", name: "The Dark Maze", height: 2, wall: B.MOSS, floorBlock: B.ROCK,
     build: mazePlan,
     links: [],
   },
   {
     // A chasm with treasure on the far side, and a winding bridge of ghost planks that
     // only shows with your torch out. The map, of course, shows only the chasm.
-    name: "The Unseen Path", height: 4, wall: B.STONE, floorBlock: B.ROCK,
+    id: "unseenPath", name: "The Unseen Path", height: 4, wall: B.STONE, floorBlock: B.ROCK,
     build: unseenPathPlan,
     hint: "A chasm, and treasure on the far side. They say the old builders made bridges only the dark can see.",
   },
@@ -271,9 +274,10 @@ function unseenPathPlan(rng) {
   return { plan: g.map((row) => row.join("")), links: [] };
 }
 
-// The last floor: a pillared hall where the Lich King waits on its dais.
-export const BOSS_VAULT = {
-  name: "The Lich's Throne", height: 4, wall: B.STONE, floorBlock: B.TILE,
+// Boss halls (the last level of a dungeon whose bottom is a boss). The legacy stack's last level:
+// a pillared hall where the Lich King waits on its dais.
+const LICH_THRONE = {
+  id: "lich", name: "The Lich's Throne", height: 4, wall: B.STONE, floorBlock: B.TILE,
   plan: [
     "#########l#########",
     "#.................#",
@@ -293,8 +297,9 @@ export const BOSS_VAULT = {
   ],
   links: [],
 };
+export const BOSS_HALLS = { lich: LICH_THRONE };
 
-// The guardians' halls (floors 5, 10, 15; guardians.js): the guardian in the middle, and
+// The guardians' halls (in the legacy stack on levels 5, 10 and 15; guardians.js): the guardian in the middle, and
 // the stairs down in an alcove behind a gate that opens when it dies.
 const hallTop = (w) => {
   const pad = (n) => "#".repeat(n);
@@ -303,139 +308,211 @@ const hallTop = (w) => {
 };
 const hallBottom = (w) => "#".repeat((w - 1) / 2) + "E" + "#".repeat((w - 1) / 2);
 export const GUARDIAN_HALLS = {
-  5: {
-    name: "The Flat Queen's Court", height: 4, wall: B.STONE, floorBlock: B.TILE, guardian: "flatqueen",
+  flatqueen: {
+    id: "flatqueen", name: "The Flat Queen's Court", height: 4, wall: B.STONE, floorBlock: B.TILE, guardian: "flatqueen",
     hint: "A wide, bare hall. On the map, something enormous is drawn on the floor... and it's moving.",
     plan: [...hallTop(17),
       "#...............#", "l...............l", "#...............#", "#...............#", "#.......Z.......#", "#...............#",
       "#...............#", "l...............l", "#...............#", "#...............#", hallBottom(17)],
   },
-  10: {
-    name: "The Gloom Warden's Hall", height: 4, wall: B.MOSS, floorBlock: B.ROCK, guardian: "warden",
+  warden: {
+    id: "warden", name: "The Gloom Warden's Hall", height: 4, wall: B.MOSS, floorBlock: B.ROCK, guardian: "warden",
     hint: "A dark hall with cold braziers in its corners. Your torchlight shows nothing else, but something is breathing.",
     plan: [...hallTop(17),
       "#...............#", "#..f.........f..#", "#...............#", "#...............#", "#.......Z.......#", "#...............#",
       "#...............#", "#..f.........f..#", "#...............#", "#...............#", hallBottom(17)],
   },
-  15: {
-    name: "The Colossus's Hall", height: 6, wall: B.BRICK, floorBlock: B.TILE, guardian: "colossus",
+  colossus: {
+    id: "colossus", name: "The Colossus's Hall", height: 6, wall: B.BRICK, floorBlock: B.TILE, guardian: "colossus",
     hint: "A towering hall. In the middle stands a statue of a giant, with a glowing stone set in its head... and its eyes just opened.",
     plan: [...hallTop(19),
       "#.................#", "l.................l", "#.....1.....1.....#", "#......2...2......#", "#........Z........#",
       "#......2...2......#", "#.....1.....1.....#", "l.................l", "#.................#", hallBottom(19)],
   },
 };
-export const GUARDIAN_FLOORS = [5, 10, 15];
 
-// Floors 1–9 each get a different vault so you meet all of them (floor 5 has a guardian
-// instead); after that, random. The last floor always gets the throne room.
-export function pickVault(rng, depth) {
-  const k = depth - 1 - (depth > 5 ? 1 : 0);
-  const v = depth >= FINAL_DEPTH ? BOSS_VAULT : GUARDIAN_HALLS[depth] || (k < VAULTS.length ? VAULTS[k] : rng.pick(VAULTS));
+// Any vault or hall by its id.
+export function vaultById(id) {
+  return VAULTS.find((v) => v.id === id) || GUARDIAN_HALLS[id] || BOSS_HALLS[id] || null;
+}
+
+// A vault ready to stamp: its plan built (the puzzle rooms roll theirs), with its size.
+export function buildVault(v, rng) {
   const built = v.build ? v.build(rng) : { plan: v.plan, links: v.links };
   const { plan, links = [], ...extra } = Array.isArray(built) ? { plan: built } : built;
   return { ...v, ...extra, plan, links, w: plan[0].length, d: plan.length };
 }
 
-// Write a vault into the floor with its top-left corner at (vx, vy).
-// Returns the entrance tile and the direction a corridor should leave it in.
-export function stampVault(floor, vault, vx, vy, rng) {
-  const top = FLOOR_Z + vault.height;      // first solid layer above the vault's floor
-  const cells = {};                         // letter → list of [x, y] tiles
-  let entrance = null;
+// Which vault a dungeon level gets (p: the level's parameters, gen/dungeon.js):
+//   p.forcedVault        that one (the legacy stack's fixed sequence, a site's own hall)
+//   p.final + p.bottom   the bottom's hall: { kind: "guardian", id } or { kind: "boss", id }
+//   otherwise            a pick from p.vaultPool (ids, or [id, weight]; default every puzzle vault),
+//                        keeping vaults whose `levels` range holds p.level. Equal weights draw
+//                        exactly as rng.pick does, so the legacy stack's random vaults don't move.
+export function pickVault(rng, p = {}) {
+  let v = p.forcedVault ? vaultById(p.forcedVault) : null;
+  if (!v && p.final && p.bottom) v = (p.bottom.kind === "guardian" ? GUARDIAN_HALLS : BOSS_HALLS)[p.bottom.id] || null;
+  if (!v) {
+    const level = p.level ?? 1;
+    const pool = (p.vaultPool || VAULTS.map((o) => o.id))
+      .map((e) => (Array.isArray(e) ? { v: vaultById(e[0]), w: e[1] } : { v: vaultById(e), w: 1 }))
+      .filter(({ v: o }) => o && (!o.levels || (level >= o.levels[0] && level <= o.levels[1])));
+    if (!pool.length) throw new Error(`no vault fits level ${level}`);
+    if (pool.every((e) => e.w === pool[0].w)) v = pool[Math.floor(rng() * pool.length)].v;
+    else {
+      let pick = rng() * pool.reduce((s, e) => s + e.w, 0);
+      v = pool.find((e) => (pick -= e.w) < 0)?.v || pool[pool.length - 1].v;
+    }
+  }
+  return buildVault(v, rng);
+}
 
-  const column = (x, y, fill) => { for (let z = 0; z < H; z++) floor.set(x, y, z, fill(z)); };
-  const wallCol = (x, y) => column(x, y, (z) => (z >= FLOOR_Z && z < ROOM_TOP ? vault.wall : B.ROCK));
-  const floorCol = (x, y) => column(x, y, (z) => (z === FLOOR_Z - 1 ? vault.floorBlock : z >= FLOOR_Z && z < top ? B.AIR : B.ROCK));
+// --- Stamping ---------------------------------------------------------------------------------
+// Write a vault into a zone with its top-left corner at (vx, vy). Returns the entrance tile and
+// the direction a corridor should leave it in.
+//   opts.roof        "rock" (solid above the room: underground), "none" (open to the sky above the
+//                    walls and the room) or "slab" (a one-block roof at the room's height)
+//   opts.wallHeight  wall blocks from the floor up (default ROOM_TOP − FLOOR_Z = 4)
+//   opts.baseZ       the feet height of the vault's floor (default FLOOR_Z, the datum)
+//   opts.cosmetic    an rng for creature looks, kept apart from the layout rng (a fixed one if not given)
+// The defaults stamp every legacy vault exactly as before (tests/fixtures/golden/vaults.json).
+export const STAMP_DEFAULTS = { roof: "rock", wallHeight: ROOM_TOP - FLOOR_Z, baseZ: FLOOR_Z };
+
+// The letter map. Anything not listed is plain floor ("floor"): . _ ^ and plan-specific letters.
+export const DEFAULT_LEGEND = {
+  "#": "wall", "~": "chasm", "1": "step1", "2": "step2", "3": "step3", L: "lever", Y: "lever", Q: "speakingDoor",
+  R: "runeLever", U: "rune", G: "gate", D: "door", K: "locked", l: "lamp", p: "ghostPlanks", F: "brazierPuzzle",
+  "5": "numeral1", "6": "numeral2", "7": "numeral3", "8": "numeral4", B: "boss", Z: "guardian", ">": "stairs",
+  f: "brazier", E: "entrance", "!": "potion", "?": "scroll", k: "key", h: "heart", $: "gold", S: "strength",
+  ")": "weapon", "[": "armour", "*": "treasure", r: "rat", g: "goblin", s: "skeleton", y: "flatling",
+};
+
+const LEGEND = {};
+// Add a named legend handler: fn(ctx) builds the column at (ctx.x, ctx.y). ctx = { zone, x, y,
+// px, py, ch, z0 (the floor's feet height), top (first layer above the room), plan, vault, rng,
+// cosmetic, cells, opts, out }. Helpers for handlers: wallCol, floorCol, column, roofAt.
+export function registerLegend(id, fn) {
+  if (LEGEND[id]) throw new Error(`legend handler "${id}" is already registered`);
+  LEGEND[id] = fn;
+}
+export const legendHandlers = () => Object.keys(LEGEND);
+
+// What sits above the room (and above the walls) for each roof.
+export function roofAt(c, z) {
+  if (c.opts.roof === "none") return B.AIR;
+  if (c.opts.roof === "slab") return z === c.top ? c.vault.wall : B.AIR;
+  return B.ROCK;
+}
+export function column(c, fill) { for (let z = 0; z < c.zone.h; z++) c.zone.set(c.x, c.y, z, fill(z)); }
+export function wallCol(c) {
+  const wallTop = c.z0 + c.opts.wallHeight, slab = c.opts.roof === "slab";
+  column(c, (z) => (z < c.z0 ? B.ROCK : z < wallTop || (slab && z <= c.top) ? c.vault.wall : roofAt(c, z)));
+}
+export function floorCol(c) {
+  column(c, (z) => (z === c.z0 - 1 ? c.vault.floorBlock : z >= c.z0 && z < c.top ? B.AIR : z < c.z0 ? B.ROCK : roofAt(c, z)));
+}
+
+const at = (c, dz, block) => c.zone.set(c.x, c.y, c.z0 + dz, block);
+registerLegend("floor", (c) => floorCol(c));
+registerLegend("wall", (c) => wallCol(c));
+registerLegend("chasm", (c) => column(c, (z) => (z < c.top ? B.AIR : roofAt(c, z))));   // bottomless: down a level
+for (const n of [1, 2, 3])
+  registerLegend(`step${n}`, (c) => { floorCol(c); for (let dz = 0; dz < n; dz++) at(c, dz, c.vault.wall); });
+registerLegend("lever", (c) => { wallCol(c); at(c, 1, B.LEVER); });
+registerLegend("runeLever", (c) => { wallCol(c); at(c, 1, B.LEVER); at(c, 2, B.RUNE); });
+registerLegend("rune", (c) => { wallCol(c); at(c, 2, B.RUNE); });
+registerLegend("gate", (c) => { wallCol(c); at(c, 0, B.GATE); at(c, 1, B.GATE); });
+registerLegend("door", (c) => { wallCol(c); at(c, 0, B.DOOR); at(c, 1, B.DOOR); });
+registerLegend("locked", (c) => { wallCol(c); at(c, 0, B.LOCKED); at(c, 1, B.LOCKED); });
+registerLegend("lamp", (c) => { wallCol(c); at(c, 2, B.LAMP); });
+registerLegend("ghostPlanks", (c) => column(c, (z) => (z === c.z0 - 1 ? B.GHOST : z < c.top ? B.AIR : roofAt(c, z))));
+registerLegend("brazierPuzzle", (c) => { floorCol(c); at(c, 0, B.BRAZIER); });
+registerLegend("brazier", (c) => { floorCol(c); at(c, 0, B.BRAZIER); });
+for (const n of [1, 2, 3, 4]) registerLegend(`numeral${n}`, (c) => { wallCol(c); at(c, 2, B.RUNE_1 + n - 1); });
+registerLegend("speakingDoor", (c) => { floorCol(c); c.zone.npcs.push(spawnNpc("door", c.x, c.y, c.z0, c.zone.level)); });
+registerLegend("boss", (c) => {
+  floorCol(c);
+  at(c, 0, c.vault.wall);
+  c.zone.monsters.push(spawnMonster(c.vault.boss || "lich", c.x, c.y, c.z0 + 1, "idle", c.zone.level, null, c.cosmetic));
+});
+registerLegend("guardian", (c) => {
+  floorCol(c);
+  c.zone.monsters.push(spawnMonster(c.vault.guardian, c.x, c.y, c.z0, "idle", c.zone.level, null, c.cosmetic));
+});
+registerLegend("stairs", (c) => { floorCol(c); at(c, -1, B.STAIRS); c.zone.stairs = { x: c.x, y: c.y }; });
+registerLegend("entrance", (c) => {
+  wallCol(c);
+  at(c, -1, c.vault.floorBlock); at(c, 0, B.AIR); at(c, 1, B.AIR);
+  c.out.entrance = { x: c.x, y: c.y, dx: c.px === 0 ? -1 : c.px === c.plan[c.py].length - 1 ? 1 : 0,
+                     dy: c.py === 0 ? -1 : c.py === c.plan.length - 1 ? 1 : 0 };
+});
+// Things lying on the floor. ")" and "[" ask for a weapon / armour specifically: re-roll until it is one.
+const lying = (make, want) => (c) => {
+  floorCol(c);
+  let it = make(c);
+  for (let n = 0; n < 20 && want && it.kind !== want; n++) it = make(c);
+  c.zone.items.push(makeItem(it, c.x + 0.5, c.y + 0.5, c.z0));
+};
+registerLegend("potion", lying((c) => randomPotion(c.rng)));
+registerLegend("scroll", lying((c) => randomScroll(c.rng)));
+registerLegend("key", lying(() => ({ kind: "key" })));
+registerLegend("heart", lying(() => ({ kind: "heart" })));
+registerLegend("strength", lying(() => ({ kind: "strength" })));
+registerLegend("gold", lying((c) => ({ kind: "gold", amount: c.rng.int(10, 20) + c.zone.level })));
+registerLegend("weapon", lying((c) => randomEquipment(c.rng, c.zone.level + 1, 0.15), "weapon"));
+registerLegend("armour", lying((c) => randomEquipment(c.rng, c.zone.level + 1, 0.15), "armour"));
+registerLegend("treasure", lying((c) => randomTreasure(c.rng, c.zone.level)));
+for (const type of ["rat", "goblin", "skeleton", "flatling"])
+  registerLegend(type, (c) => { floorCol(c); c.zone.monsters.push(spawnMonster(type, c.x, c.y, c.z0, "wander", c.zone.level, null, c.cosmetic)); });
+
+export function stampVault(zone, vault, vx, vy, rng, opts = {}) {
+  const o = { ...STAMP_DEFAULTS, ...opts };
+  const cosmetic = o.cosmetic || makeRng((zone.seed ^ Math.imul(vx + 1, 73856093) ^ Math.imul(vy + 1, 19349663)) >>> 0);
+  const legend = vault.legend ? { ...DEFAULT_LEGEND, ...vault.legend } : DEFAULT_LEGEND;
+  const z0 = o.baseZ, top = z0 + vault.height;   // top: the first layer above the vault's room
+  const cells = {};                               // letter → list of [x, y] tiles
+  const out = { entrance: null };
+  const c = { zone, vault, plan: vault.plan, rng, cosmetic, cells, opts: o, z0, top, out, x: 0, y: 0, px: 0, py: 0, ch: "" };
 
   vault.plan.forEach((row, py) => {
     for (let px = 0; px < row.length; px++) {
-      const ch = row[px], x = vx + px, y = vy + py;
-      (cells[ch] ||= []).push([x, y]);
-      switch (ch) {
-        case "#": wallCol(x, y); break;
-        case "~": column(x, y, (z) => (z < top ? B.AIR : B.ROCK)); break;
-        case "1": case "2": case "3":
-          floorCol(x, y);
-          for (let z = FLOOR_Z; z < FLOOR_Z + Number(ch); z++) floor.set(x, y, z, vault.wall);
-          break;
-        case "L": case "Y": wallCol(x, y); floor.set(x, y, FLOOR_Z + 1, B.LEVER); break;
-        case "Q": floorCol(x, y); floor.npcs.push(spawnNpc("door", x, y, FLOOR_Z, floor.depth)); break;
-        case "R": wallCol(x, y); floor.set(x, y, FLOOR_Z + 1, B.LEVER); floor.set(x, y, FLOOR_Z + 2, B.RUNE); break;
-        case "U": wallCol(x, y); floor.set(x, y, FLOOR_Z + 2, B.RUNE); break;
-        case "G": wallCol(x, y); floor.set(x, y, FLOOR_Z, B.GATE); floor.set(x, y, FLOOR_Z + 1, B.GATE); break;
-        case "D": wallCol(x, y); floor.set(x, y, FLOOR_Z, B.DOOR); floor.set(x, y, FLOOR_Z + 1, B.DOOR); break;
-        case "K": wallCol(x, y); floor.set(x, y, FLOOR_Z, B.LOCKED); floor.set(x, y, FLOOR_Z + 1, B.LOCKED); break;
-        case "l": wallCol(x, y); floor.set(x, y, FLOOR_Z + 2, B.LAMP); break;
-        case "p": column(x, y, (z) => (z === FLOOR_Z - 1 ? B.GHOST : z < top ? B.AIR : B.ROCK)); break;
-        case "F": floorCol(x, y); floor.set(x, y, FLOOR_Z, B.BRAZIER); break;
-        case "5": case "6": case "7": case "8":
-          wallCol(x, y); floor.set(x, y, FLOOR_Z + 2, B.RUNE_1 + Number(ch) - 5); break;
-        case "B":
-          floorCol(x, y);
-          floor.set(x, y, FLOOR_Z, vault.wall);
-          floor.monsters.push(spawnMonster("lich", x, y, FLOOR_Z + 1, "idle", floor.depth));
-          break;
-        case "Z": floorCol(x, y); floor.monsters.push(spawnMonster(vault.guardian, x, y, FLOOR_Z, "idle", floor.depth)); break;
-        case ">": floorCol(x, y); floor.set(x, y, FLOOR_Z - 1, B.STAIRS); floor.stairs = { x, y }; break;
-        case "f": floorCol(x, y); floor.set(x, y, FLOOR_Z, B.BRAZIER); break;
-        case "E":
-          wallCol(x, y);
-          floor.set(x, y, FLOOR_Z - 1, vault.floorBlock);
-          floor.set(x, y, FLOOR_Z, B.AIR); floor.set(x, y, FLOOR_Z + 1, B.AIR);
-          entrance = { x, y, dx: px === 0 ? -1 : px === row.length - 1 ? 1 : 0,
-                       dy: py === 0 ? -1 : py === vault.plan.length - 1 ? 1 : 0 };
-          break;
-        default: {   // floor, possibly with something on it
-          floorCol(x, y);
-          const item = {
-            "!": () => randomPotion(rng), "?": () => randomScroll(rng), k: () => ({ kind: "key" }), h: () => ({ kind: "heart" }),
-            $: () => ({ kind: "gold", amount: rng.int(10, 20) + floor.depth }),
-            S: () => ({ kind: "strength" }), ")": () => randomEquipment(rng, floor.depth + 1, 0.15),
-            "*": () => randomTreasure(rng, floor.depth),
-            "[": () => randomEquipment(rng, floor.depth + 1, 0.15),
-          }[ch];
-          if (item) {
-            let it = item();
-            // ")" and "[" ask for a weapon / armour specifically: re-roll until it is one.
-            for (let n = 0; n < 20 && ((ch === ")" && it.kind !== "weapon") || (ch === "[" && it.kind !== "armour")); n++) it = item();
-            floor.items.push(makeItem(it, x + 0.5, y + 0.5, FLOOR_Z));
-          }
-          const monster = { r: "rat", g: "goblin", s: "skeleton", y: "flatling" }[ch];
-          if (monster) floor.monsters.push(spawnMonster(monster, x, y, FLOOR_Z, "wander", floor.depth));
-        }
-      }
+      const ch = row[px];
+      c.x = vx + px; c.y = vy + py; c.px = px; c.py = py; c.ch = ch;
+      (cells[ch] ||= []).push([c.x, c.y]);
+      const handler = LEGEND[legend[ch] || "floor"];
+      if (!handler) throw new Error(`no legend handler "${legend[ch]}" for "${ch}" in ${vault.name}`);
+      handler(c);
     }
   });
 
   for (const link of vault.links) {
     const gate = link.action === "open" || link.action === "part";
-    const targets = (cells[link.target] || []).flatMap(([x, y]) => (gate ? [[x, y, FLOOR_Z], [x, y, FLOOR_Z + 1]] : [[x, y]]));
-    if (link.action === "part") floor.groups.set(link.group, { need: link.need, pulled: 0, cells: targets });
+    const targets = (cells[link.target] || []).flatMap(([x, y]) => (gate ? [[x, y, z0], [x, y, z0 + 1]] : [[x, y]]));
+    if (link.action === "part") zone.groups.set(link.group, { need: link.need, pulled: 0, cells: targets });
     for (const [x, y] of cells[link.lever] || [])
-      floor.links.set(floor.index(x, y, FLOOR_Z + 1), { action: link.action, cells: targets, group: link.group });
+      zone.links.set(zone.index(x, y, z0 + 1), { action: link.action, cells: targets, group: link.group });
   }
 
   // Floor pictures, spike traps, and the Speaking Door's riddle.
-  for (const [x, y, b] of vault.mosaics || []) floor.set(vx + x, vy + y, FLOOR_Z - 1, b);
-  if (vault.spikes && cells["^"]) layoutSpikes(floor, cells["^"], rng, vault.spikes);
+  for (const [x, y, b] of vault.mosaics || []) zone.set(vx + x, vy + y, z0 - 1, b);
+  if (vault.spikes && cells["^"]) layoutSpikes(zone, cells["^"], rng, vault.spikes);
   if (vault.door) {
-    const face = floor.npcs.find((n) => n.type === "door" && n.tx === cells.Q[0][0] && n.ty === cells.Q[0][1]);
-    face.state = { ...vault.door, gate: (cells.G || []).flatMap(([x, y]) => [[x, y, FLOOR_Z], [x, y, FLOOR_Z + 1]]),
+    const face = zone.npcs.find((n) => n.type === "door" && n.tx === cells.Q[0][0] && n.ty === cells.Q[0][1]);
+    face.state = { ...vault.door, gate: (cells.G || []).flatMap(([x, y]) => [[x, y, z0], [x, y, z0 + 1]]),
                    spawns: (cells["."] || []).filter(([, y]) => y >= vy + 10) };
   }
 
   // The Rune Lever room: which of its levers are the right ones, left to right as you face them
   // (they're in the north wall, so that's west to east). dungeon.js writes this down elsewhere.
   if (vault.leverRecord)
-    floor.leverRecord = [...(cells.Y || []).map(([x]) => [x, true]), ...(cells.L || []).map(([x]) => [x, false])]
+    zone.leverRecord = [...(cells.Y || []).map(([x]) => [x, true]), ...(cells.L || []).map(([x]) => [x, false])]
       .sort((a, b) => a[0] - b[0]).map(([, right]) => right);
 
   // A guardian's hall: the gate to the stairs, and (for the Warden) its braziers.
   if (vault.guardian) {
-    floor.guardianHall = {
+    zone.guardianHall = {
       x0: vx, y0: vy, x1: vx + vault.w - 1, y1: vy + vault.d - 1, type: vault.guardian,
-      gate: (cells.G || []).flatMap(([x, y]) => [[x, y, FLOOR_Z], [x, y, FLOOR_Z + 1]]),
+      gate: (cells.G || []).flatMap(([x, y]) => [[x, y, z0], [x, y, z0 + 1]]),
       front: [cells.G[1][0], cells.G[1][1] + 1],
       braziers: cells.f || [],
     };
@@ -444,13 +521,13 @@ export function stampVault(floor, vault, vx, vy, rng) {
   // Braziers: each one's number is the numeral carved in the wall straight behind it.
   if (cells.F) {
     const numerals = ["5", "6", "7", "8"].flatMap((ch) => (cells[ch] || []).map(([x]) => [x, Number(ch) - 4]));
-    floor.braziers = {
-      list: cells.F.map(([x, y]) => ({ x, y, z: FLOOR_Z, n: numerals.find(([nx]) => nx === x)[1] })),
+    zone.braziers = {
+      list: cells.F.map(([x, y]) => ({ x, y, z: z0, n: numerals.find(([nx]) => nx === x)[1] })),
       next: 1, solved: false,
-      gate: (cells.G || []).flatMap(([x, y]) => [[x, y, FLOOR_Z], [x, y, FLOOR_Z + 1]]),
+      gate: (cells.G || []).flatMap(([x, y]) => [[x, y, z0], [x, y, z0 + 1]]),
     };
   }
-  return entrance;
+  return out.entrance;
 }
 
 // A 13×13 maze (recursive backtracker), with a few extra openings so it has loops.

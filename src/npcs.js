@@ -72,7 +72,7 @@ export function spawnNpc(type, tx, ty, z, depth, state = {}) {
   return { id: nextId++, type, tx, ty, x: tx + 0.5, y: ty + 0.5, z, depth, state, met: false };
 }
 
-export const npcAt = (floor, x, y) => floor.npcs.find((n) => n.tx === x && n.ty === y) || null;
+export const npcAt = (zone, x, y) => zone.npcs.find((n) => n.tx === x && n.ty === y) || null;
 export const npcName = (n) => NPC_TYPES[n.type].name;
 
 // The 3D picture: nothing for flat beings (render3d draws their shadow), ghosts only in the dark.
@@ -180,7 +180,7 @@ function offering(game, n, gold, bold) {
 }
 
 export function shrineAfterTrial(game, n) {
-  const left = game.floor.monsters.filter((m) => n.state.trial.includes(m.id));
+  const left = game.zone.monsters.filter((m) => n.state.trial.includes(m.id));
   if (left.length) return node(`"THE TRIAL IS NOT OVER." (${left.length} left.)`, [bye()]);
   n.state.trial = null;
   return node(bless(game, true), [bye("Thank you.")]);
@@ -210,7 +210,7 @@ function bless(game, bold) {
     () => { p.str += 1; return "Strength floods your arms. (+1 STR)"; },
     () => { for (const it of gear) regear(p, it, (o) => { o.ench = Math.min(5, o.ench + 1); o.known = true; }); return "Everything you wear and wield glows for a moment. (+1 to each.)"; },
     () => {
-      const j = randomJewel(Math.random, game.depth + 2, 0.3);
+      const j = randomJewel(Math.random, game.zone.level + 2, 0.3);
       j.ench = Math.abs(j.ench); j.known = true;
       addToInventory(p, j);
       return `Something clinks into your hand: ${itemName(game, j)}.`;
@@ -227,19 +227,19 @@ function bless(game, bold) {
 
 // Monsters appear on free tiles around you (for a shrine's trial). Returns them, or null.
 function summonAround(game, n) {
-  const { floor, player: p } = game, made = [];
+  const { zone, player: p } = game, made = [];
   const spots = [];
   for (let oy = -3; oy <= 3; oy++)
     for (let ox = -3; ox <= 3; ox++) {
       const x = Math.floor(p.x) + ox, y = Math.floor(p.y) + oy;
-      if (Math.max(Math.abs(ox), Math.abs(oy)) < 2 || x < 1 || y < 1 || x >= floor.w - 1 || y >= floor.d - 1) continue;
-      if (floor.stand[x + y * floor.w] < 0 || floor.monsters.some((m) => m.tx === x && m.ty === y) || floor.npcs.some((o) => o.tx === x && o.ty === y)) continue;
+      if (Math.max(Math.abs(ox), Math.abs(oy)) < 2 || x < 1 || y < 1 || x >= zone.w - 1 || y >= zone.d - 1) continue;
+      if (zone.stand[x + y * zone.w] < 0 || zone.monsters.some((m) => m.tx === x && m.ty === y) || zone.npcs.some((o) => o.tx === x && o.ty === y)) continue;
       spots.push([x, y]);
     }
   for (let k = 0; k < n && spots.length; k++) {
     const [x, y] = spots.splice(Math.floor(Math.random() * spots.length), 1)[0];
-    const m = spawnMonster(pickMonsterType(Math.random, game.depth), x, y, floor.stand[x + y * floor.w], "chase", game.depth, k === 0 ? "hulking" : null);
-    floor.monsters.push(m);
+    const m = spawnMonster(pickMonsterType(Math.random, game.zone.level), x, y, zone.stand[x + y * zone.w], "chase", game.zone.level, k === 0 ? "hulking" : null);
+    zone.monsters.push(m);
     made.push(m);
   }
   return made.length ? made : null;
@@ -259,9 +259,9 @@ function give(game, it) {
 }
 
 // The share of this floor (everything that isn't solid rock) that's on your map.
-export function mapPercent(floor) {
+export function mapPercent(zone) {
   let total = 0, seen = 0;
-  for (let i = 0; i < floor.w * floor.d; i++) if (floor.kind[i] !== KIND.WALL) { total++; if (floor.seen[i]) seen++; }
+  for (let i = 0; i < zone.w * zone.d; i++) if (zone.kind[i] !== KIND.WALL) { total++; if (zone.seen[i]) seen++; }
   return Math.round((seen / Math.max(1, total)) * 100);
 }
 
@@ -399,7 +399,7 @@ export function talkTo(game, n) {
 
     // --- Mira, the cartographer -----------------------------------------------------------------------
     case "mira": {
-      const pct = mapPercent(game.floor);
+      const pct = mapPercent(game.zone);
       if (s.done) return node("Your map is the best on my shelf. Safe travels.", [bye()]);
       if (questActive(game, "mira")) {
         if (pct >= 80) return node(`Let me see... ${pct}%! That's a proper map. Here, as promised.`, [
@@ -422,7 +422,7 @@ export function talkTo(game, n) {
 
     // --- Rook, the bounty hunter -------------------------------------------------------------------------
     case "rook": {
-      const target = game.floor.monsters.find((m) => m.id === s.target);
+      const target = game.zone.monsters.find((m) => m.id === s.target);
       if (s.done) return node("Pleasure doing business.", [bye()]);
       if (questActive(game, "rook") && (s.killed || !target)) return node("Dead? Truly? Here's your cut. You earned it.", [
         { label: "Take the bounty.", go: () => { s.done = true; giveGold(game, 40 + n.depth * 4); finishQuest(game, "rook"); return null; } },
@@ -471,16 +471,16 @@ export function talkTo(game, n) {
         ...s.choices.map((c) => ({ label: `"${c}."`, go: () => {
           if (c === s.answer) {
             s.open = true;
-            for (const [x, y, z] of s.gate) game.floor.set(x, y, z, B.AIR);
-            game.floor.refresh();
+            for (const [x, y, z] of s.gate) game.zone.set(x, y, z, B.AIR);
+            game.zone.refresh();
             game.log("Iron grinds against stone. The gate opens.", [160, 220, 255]);
             return node("\"Wise. Pass.\"", [bye()]);
           }
-          const f = game.floor;
+          const f = game.zone;
           const spots = s.spawns.filter(([x, y]) => f.stand[x + y * f.w] >= 0 && !f.monsters.some((m) => m.tx === x && m.ty === y));
           for (let k = 0; k < 2 && spots.length; k++) {
             const [x, y] = spots.splice(Math.floor(Math.random() * spots.length), 1)[0];
-            f.monsters.push(spawnMonster(pickMonsterType(Math.random, game.depth), x, y, f.stand[x + y * f.w], "chase", game.depth));
+            f.monsters.push(spawnMonster(pickMonsterType(Math.random, game.zone.level), x, y, f.stand[x + y * f.w], "chase", game.zone.level));
           }
           game.log("Hidden hatches clank open in the walls!", [255, 120, 100]);
           return node("\"No.\"", [bye()]);

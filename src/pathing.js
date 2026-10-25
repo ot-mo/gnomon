@@ -25,8 +25,8 @@ export function canWalk(stand, w, ax, ay, bx, by, up, down) {
 
 // Breadth-first "distance to the target" for every tile, following the step rules
 // backwards. A monster walks downhill on this field to reach the player.
-export function flowField(floor, tx, ty, up = MONSTER_STEP_UP, down = MONSTER_DROP) {
-  const { w, d, stand } = floor;
+export function flowField(zone, tx, ty, up = MONSTER_STEP_UP, down = MONSTER_DROP) {
+  const { w, d, stand } = zone;
   const dist = new Int16Array(w * d).fill(UNREACHABLE);
   if (tx < 0 || ty < 0 || tx >= w || ty >= d || stand[tx + ty * w] < 0) return dist;
   const start = tx + ty * w;

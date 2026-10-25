@@ -332,9 +332,11 @@ export function rollElite(rand, depth) {
 }
 
 let nextId = 1;
-// Deeper monsters are tougher: +6% health per floor, and +1 damage every four floors.
-// z is the ground it stands on.
-export function spawnMonster(type, tx, ty, z, state = "idle", depth = 1, elite = null) {
+// Tougher at higher levels: +6% health per level, and +1 damage every four levels.
+// z is the ground it stands on. `rand` draws its looks (when it next blinks, flaps, shoots):
+// generators pass their own cosmetic stream so the layout's random numbers stay untouched, and a
+// level generates the same whatever else has happened; at runtime it's Math.random.
+export function spawnMonster(type, tx, ty, z, state = "idle", depth = 1, elite = null, rand = Math.random) {
   const t = MONSTER_TYPES[type], e = elite ? ELITES[elite] : null;
   const hp = Math.round(t.hp * (t.boss || t.guardian ? 1 : 1 + 0.06 * (depth - 1)) * (e?.hp || 1));
   const size = e?.size || 1;
@@ -349,22 +351,22 @@ export function spawnMonster(type, tx, ty, z, state = "idle", depth = 1, elite =
     xp: Math.round(t.xp * (1 + 0.1 * (depth - 1)) * (e ? 2.5 : 1)),   // what killing it is worth
     burn: 0, burnTick: 0, chill: 0,                                      // elemental effects on it
     stun: 0, blind: 0, poison: 0, poisonTick: 0, haste: 0,               // from potions thrown at it
-    regenAcc: 0, shot: 1 + Math.random(), phase: 0, sees: false,
+    regenAcc: 0, shot: 1 + rand(), phase: 0, sees: false,
     tx, ty, nx: tx, ny: ty, p: 0,          // current tile, next tile, progress of the step
     x: tx + 0.5, y: ty + 0.5, z: z + (t.hover || 0),
     state,                                  // "idle" | "wander" | "chase"
-    cd: 0, hurt: 0, anim: Math.random() * 10,
-    think: Math.random() * 0.25, lost: 0, pause: Math.random() * 2,
+    cd: 0, hurt: 0, anim: rand() * 10,
+    think: rand() * 0.25, lost: 0, pause: rand() * 2,
   };
 }
 
-export function monsterSprite(m, floor) {
+export function monsterSprite(m, zone) {
   const t = MONSTER_TYPES[m.type];
   const moving = m.nx !== m.tx || m.ny !== m.ty;
   // Flyers flap all the time; the boss's orb pulses.
   const frame = moving || t.hover || t.boss ? Math.floor(m.anim * (t.hover ? 9 : 6)) % 2 : 0;
   // Wading: sink it a little and the water surface hides its feet (depth buffer does the rest).
-  const wet = !t.hover && floor.get(Math.floor(m.x), Math.floor(m.y), FLOOR_Z - 1) === B.WATER_SHALLOW;
+  const wet = !t.hover && zone.get(Math.floor(m.x), Math.floor(m.y), FLOOR_Z - 1) === B.WATER_SHALLOW;
   const bob = t.hover ? Math.sin(m.anim * 3) * 0.08 : 0;
   // Burning monsters flicker orange; chilled ones go pale blue.
   const flicker = 0.8 + 0.2 * Math.sin(m.anim * 25);
@@ -380,8 +382,8 @@ export function monsterSprite(m, floor) {
 }
 
 // The monster standing on (or stepping into) tile (x, y), if any.
-export function monsterAt(floor, x, y) {
-  return floor.monsters.find((m) =>
+export function monsterAt(zone, x, y) {
+  return zone.monsters.find((m) =>
     (m.tx === x && m.ty === y) || (m.nx === x && m.ny === y) ||
     (Math.floor(m.x) === x && Math.floor(m.y) === y)) || null;
 }
@@ -390,24 +392,24 @@ export function monsterAt(floor, x, y) {
 // Advance every monster by dt seconds. On the map only monsters within `radius`
 // tiles (or already hunting you) act; the rest wait until you come closer.
 export function updateMonsters(game, dt, radius = Infinity) {
-  const { floor, player } = game;
-  const { w, stand } = floor;
+  const { zone, player } = game;
+  const { w, stand } = zone;
   const ptx = Math.floor(player.x), pty = Math.floor(player.y);
 
   // Re-plan routes when the player reaches a new tile we can stand on, or the level changed.
-  const pTileOk = ptx >= 0 && pty >= 0 && ptx < w && pty < floor.d && stand[ptx + pty * w] >= 0;
-  if (!game.flow || game.flowVersion !== floor.navVersion ||
+  const pTileOk = ptx >= 0 && pty >= 0 && ptx < w && pty < zone.d && stand[ptx + pty * w] >= 0;
+  if (!game.flow || game.flowVersion !== zone.navVersion ||
       (pTileOk && (ptx !== game.flowX || pty !== game.flowY))) {
-    game.flow = flowField(floor, ptx, pty);
-    game.flowX = ptx; game.flowY = pty; game.flowVersion = floor.navVersion;
+    game.flow = flowField(zone, ptx, pty);
+    game.flowX = ptx; game.flowY = pty; game.flowVersion = zone.navVersion;
   }
 
-  const occ = new Int32Array(w * floor.d);
-  for (const m of floor.monsters) { occ[m.tx + m.ty * w] = m.id; occ[m.nx + m.ny * w] = m.id; }
-  for (const n of floor.npcs) occ[n.tx + n.ty * w] = -1;   // people stand their ground
+  const occ = new Int32Array(w * zone.d);
+  for (const m of zone.monsters) { occ[m.tx + m.ty * w] = m.id; occ[m.nx + m.ny * w] = m.id; }
+  for (const n of zone.npcs) occ[n.tx + n.ty * w] = -1;   // people stand their ground
 
-  for (const m of [...floor.monsters]) {
-    if (!floor.monsters.includes(m)) continue;   // killed earlier this update (lightning, a split…)
+  for (const m of [...zone.monsters]) {
+    if (!zone.monsters.includes(m)) continue;   // killed earlier this update (lightning, a split…)
     const t = MONSTER_TYPES[m.type];
     if (m.state !== "chase" && Math.hypot(m.x - player.x, m.y - player.y) > radius) continue;
     const pace = (m.chill > 0 ? 0.5 : 1) * (m.haste > 0 ? 1.6 : 1);
@@ -464,14 +466,14 @@ export function updateMonsters(game, dt, radius = Infinity) {
 
     if (moving) {
       const len = m.nx !== m.tx && m.ny !== m.ty ? Math.SQRT2 : 1;
-      const wet = !t.hover && (floor.get(m.tx, m.ty, FLOOR_Z - 1) === B.WATER_SHALLOW || floor.get(m.nx, m.ny, FLOOR_Z - 1) === B.WATER_SHALLOW);
+      const wet = !t.hover && (zone.get(m.tx, m.ty, FLOOR_Z - 1) === B.WATER_SHALLOW || zone.get(m.nx, m.ny, FLOOR_Z - 1) === B.WATER_SHALLOW);
       m.p += (t.speed * m.speedMul * (m.state === "chase" ? 1 : 0.45) * (wet ? 0.6 : 1) * pace * dt) / len;
       if (m.p >= 1) {
         occ[m.tx + m.ty * w] = 0;
         m.tx = m.nx; m.ty = m.ny; m.p = 0;
       }
     } else if (m.state === "chase" && inReach) {
-      if (m.cd <= 0 && lineOfSight(floor, m.x, m.y, m.z + m.h * 0.7, player.x, player.y, player.z + EYE * 0.6)) {
+      if (m.cd <= 0 && lineOfSight(zone, m.x, m.y, m.z + m.h * 0.7, player.x, player.y, player.z + EYE * 0.6)) {
         m.cd = t.cooldown * m.cdMul;
         const dmg = t.damage[0] + Math.floor(Math.random() * (t.damage[1] - t.damage[0] + 1)) + (m.bonus || 0);
         if (isFlat(m) && game.view !== "map") {   // bitten by something you can't see
@@ -509,8 +511,8 @@ export function updateMonsters(game, dt, radius = Infinity) {
 export function hitPlayer(game, m, dmg, source, blocked, ranged = false) {
   const p = game.player;
   if (p.guardTime > 0) { game.log(`The blow passes through you: you're still half turned out of the world.`, [200, 230, 255]); return; }
-  if (bonus(p, "firstBlock") > 0 && !game.floor.firstBlocked) {
-    game.floor.firstBlocked = true;
+  if (bonus(p, "firstBlock") > 0 && !game.zone.firstBlocked) {
+    game.zone.firstBlocked = true;
     game.log(`Your amulet flares, and ${blocked} misses you!`, [220, 225, 240]);
     sfx("block", { at: m });
     return;
@@ -522,7 +524,7 @@ export function hitPlayer(game, m, dmg, source, blocked, ranged = false) {
   game.hurtPlayer(dmg, source);
   // Thorns: whoever hit you (up close) gets hurt back.
   const thorns = bonus(p, "thorns");
-  if (thorns > 0 && !ranged && m.hp > 0 && game.floor.monsters.includes(m)) {
+  if (thorns > 0 && !ranged && m.hp > 0 && game.zone.monsters.includes(m)) {
     hurtMonster(game, m, thorns, `${thorns}`, [150, 200, 90]);
     if (m.hp <= 0) killMonster(game, m, `The ${m.name} dies on your thorns.`);
   }
@@ -548,7 +550,7 @@ function shoot(game, m, r) {
   const dx = p.x - sx, dy = p.y - sy, dz = p.z + 1.1 - sz;
   const flat = Math.hypot(dx, dy), time = Math.hypot(flat, dz) / r.speed;
   const ang = Math.atan2(dy, dx) + (Math.random() - 0.5) * 0.08;
-  game.floor.projectiles.push({
+  game.zone.projectiles.push({
     kind: r.kind, hostile: true, from: m,
     dmg: r.damage[0] + Math.floor(Math.random() * (r.damage[1] - r.damage[0] + 1)) + (m.bonus || 0),
     x: sx, y: sy, z: sz,
@@ -564,18 +566,18 @@ function bossPhase(game, m, occ) {
   if (!next) return;
   m.phase++;
   const [type, n] = next;
-  const { floor } = game, { w, stand } = floor;
+  const { zone } = game, { w, stand } = zone;
   const spots = [];
   for (let oy = -3; oy <= 3; oy++)
     for (let ox = -3; ox <= 3; ox++) {
       const x = m.tx + ox, y = m.ty + oy;
-      if (Math.max(Math.abs(ox), Math.abs(oy)) < 2 || x < 0 || y < 0 || x >= w || y >= floor.d) continue;
+      if (Math.max(Math.abs(ox), Math.abs(oy)) < 2 || x < 0 || y < 0 || x >= w || y >= zone.d) continue;
       if (stand[x + y * w] >= 0 && !occ[x + y * w]) spots.push([x, y]);
     }
   for (let k = 0; k < n && spots.length; k++) {
     const [x, y] = spots.splice(Math.floor(Math.random() * spots.length), 1)[0];
-    const o = spawnMonster(type, x, y, stand[x + y * w], "chase", floor.depth);
-    floor.monsters.push(o);
+    const o = spawnMonster(type, x, y, stand[x + y * w], "chase", zone.level);
+    zone.monsters.push(o);
     occ[x + y * w] = o.id;
   }
   game.log(m.phase === 1 ? "The Lich King raises its staff. The dead rise around it!" :
@@ -584,7 +586,7 @@ function bossPhase(game, m, occ) {
 
 // Can it see the player? Torchlight makes you easier to spot; sprinting is loud.
 function perceive(game, m, t) {
-  const { floor, player } = game;
+  const { zone, player } = game;
   if (m.blind > 0) {   // blinded (darkness or shadows splashed on it): it loses track of you
     if (m.state === "chase") m.state = "wander";
     m.sees = false;
@@ -595,7 +597,7 @@ function perceive(game, m, t) {
   const range = t.sight * (player.torch || t.darkSight ? 1 : 0.55) * (hidden ? 0.35 : 1) *
     (player.darkTime > 0 && !t.darkSight ? 0.7 : 1) * Math.max(0.3, 1 - bonus(player, "stealth"));
   let sees = dist < range &&
-    lineOfSight(floor, m.x, m.y, m.z + m.h * 0.8, player.x, player.y, player.z + EYE);
+    lineOfSight(zone, m.x, m.y, m.z + m.h * 0.8, player.x, player.y, player.z + EYE);
   m.sees = sees;
   if (!sees && !hidden && player.sprinting && dist < 6) sees = true;
   if (sees) {
@@ -615,8 +617,8 @@ function perceive(game, m, t) {
 // Pick the next tile: downhill on the flow field when chasing, a random neighbour when
 // wandering (or now and then for erratic flyers like bats).
 function chooseStep(game, m, t, occ, ptx, pty) {
-  const { floor, player, flow } = game;
-  const { w, d, stand } = floor;
+  const { zone, player, flow } = game;
+  const { w, d, stand } = zone;
   const here = m.tx + m.ty * w;
   const chasing = m.state === "chase" && !(t.erratic && Math.random() < t.erratic);
   const hereDist = Math.hypot(m.tx + 0.5 - player.x, m.ty + 0.5 - player.y);
@@ -654,16 +656,16 @@ function eliteLoot(depth, luck = 0) {
 
 // byPlayer: you killed it (by blade, fire or lightning), so you get its XP.
 function killMonster(game, m, message, dropLoot = true, byPlayer = true) {
-  const { floor } = game;
+  const { zone } = game;
   const t = MONSTER_TYPES[m.type];
-  floor.monsters = floor.monsters.filter((o) => o !== m);
-  floor.sightings.delete(m.id);
+  zone.monsters = zone.monsters.filter((o) => o !== m);
+  zone.sightings.delete(m.id);
   if (Math.hypot(game.player.x - m.x, game.player.y - m.y) < 14) { game.log(message, [230, 230, 230]); sfx("kill", { at: m }); }
   if (byPlayer && m.xp > 0) {
     game.effects.push({ kind: "damage", x: m.x, y: m.y, z: m.z + m.h + 0.5, text: `+${m.xp} XP`, color: [160, 230, 255], time: game.time });
     gainXp(game, m.xp);
   }
-  const ground = floor.stand[m.tx + m.ty * floor.w];
+  const ground = zone.stand[m.tx + m.ty * zone.w];
   const p = game.player;
   if (byPlayer) {
     const heal = bonus(p, "killHeal") + (t.undead ? bonus(p, "undeadHeal") : 0);
@@ -675,20 +677,20 @@ function killMonster(game, m, message, dropLoot = true, byPlayer = true) {
     // Lucky: twice as likely to drop something.
     const luck = p.perks.has("lucky") ? 2 : 1;
     if (m.elite || Math.random() < 0.25 * luck)
-      floor.items.push(makeItem({ kind: "gold", amount: Math.round((1 + Math.floor(Math.random() * (2 + floor.depth * 0.6))) * (m.elite ? 1.5 : 1)) }, ...awayFromWalls(floor, m.x + 0.15, m.y + 0.1, ground), ground));
-    const [ix, iy] = awayFromWalls(floor, m.x, m.y, ground);
-    if (m.elite) floor.items.push(makeItem(eliteLoot(floor.depth, luck > 1 ? 0.15 : 0), ix, iy, ground));
+      zone.items.push(makeItem({ kind: "gold", amount: Math.round((1 + Math.floor(Math.random() * (2 + zone.level * 0.6))) * (m.elite ? 1.5 : 1)) }, ...awayFromWalls(zone, m.x + 0.15, m.y + 0.1, ground), ground));
+    const [ix, iy] = awayFromWalls(zone, m.x, m.y, ground);
+    if (m.elite) zone.items.push(makeItem(eliteLoot(zone.level, luck > 1 ? 0.15 : 0), ix, iy, ground));
     else if (Math.random() < 0.25 * luck) {
       const r = Math.random();
-      floor.items.push(makeItem(r < 0.5 ? randomPotion() : r < 0.8 ? randomScroll() : { kind: "bomb", count: 1 }, ix, iy, ground));
+      zone.items.push(makeItem(r < 0.5 ? randomPotion() : r < 0.8 ? randomScroll() : { kind: "bomb", count: 1 }, ix, iy, ground));
     }
   }
   // A slime splits in two (into the free tiles around it).
   if (t.splits && dropLoot) {
     const spots = [[0, 0], ...DIRS8].map(([ox, oy]) => [m.tx + ox, m.ty + oy])
-      .filter(([x, y]) => x >= 0 && y >= 0 && x < floor.w && y < floor.d && floor.stand[x + y * floor.w] >= 0 &&
-        !floor.monsters.some((o) => o.tx === x && o.ty === y));
-    for (const [x, y] of spots.slice(0, 2)) floor.monsters.push(spawnMonster(t.splits, x, y, floor.stand[x + y * floor.w], "chase", floor.depth));
+      .filter(([x, y]) => x >= 0 && y >= 0 && x < zone.w && y < zone.d && zone.stand[x + y * zone.w] >= 0 &&
+        !zone.monsters.some((o) => o.tx === x && o.ty === y));
+    for (const [x, y] of spots.slice(0, 2)) zone.monsters.push(spawnMonster(t.splits, x, y, zone.stand[x + y * zone.w], "chase", zone.level));
     if (spots.length) game.log(`The ${m.name} splits in two!`, m.color);
   }
   if (m.bounty) game.questEvent?.("bounty", m);
@@ -697,14 +699,14 @@ function killMonster(game, m, message, dropLoot = true, byPlayer = true) {
 
 // Monsters are solid: push the player out of any they overlap.
 export function pushPlayerOut(game) {
-  const { floor, player: p } = game;
-  for (const m of floor.monsters) {
+  const { zone, player: p } = game;
+  for (const m of zone.monsters) {
     if (isFlat(m) || (MONSTER_TYPES[m.type].ghostly && p.torch) || p.z > m.z + m.h || p.z + HEIGHT < m.z) continue;   // you walk right over flat things
     const dx = p.x - m.x, dy = p.y - m.y, dist = Math.hypot(dx, dy);
     const minDist = RADIUS + m.w * 0.4;
     if (dist < minDist && dist > 1e-4) {
-      moveAxis(p, floor, "x", (dx / dist) * (minDist - dist));
-      moveAxis(p, floor, "y", (dy / dist) * (minDist - dist));
+      moveAxis(p, zone, "x", (dx / dist) * (minDist - dist));
+      moveAxis(p, zone, "y", (dy / dist) * (minDist - dist));
     }
   }
 }
@@ -722,14 +724,14 @@ export function playerAttack(game) {
   const fx = cp * Math.cos(p.yaw), fy = cp * Math.sin(p.yaw), fz = Math.sin(p.pitch);
   const ex = p.x, ey = p.y, ez = p.z + EYE;
   let best = null, bestDist = Infinity;
-  for (const m of game.floor.monsters) {
+  for (const m of game.zone.monsters) {
     if (!touchable(game, m, true)) continue;   // a flat being: your blade passes through its shadow
     const cz = m.z + m.h * 0.5;
     const vx = m.x - ex, vy = m.y - ey, vz = cz - ez;
     const dist = Math.hypot(vx, vy, vz);
     if (dist > reach + m.w * 0.5) continue;
     if ((vx * fx + vy * fy + vz * fz) / dist < (dist < 1.2 ? 0.2 : 0.7)) continue;
-    if (!lineOfSight(game.floor, ex, ey, ez, m.x, m.y, cz)) continue;
+    if (!lineOfSight(game.zone, ex, ey, ez, m.x, m.y, cz)) continue;
     if (dist < bestDist) { bestDist = dist; best = m; }
   }
   if (best) attackMonster(game, best);
@@ -791,9 +793,9 @@ export function attackMonster(game, m) {
   }
   if (el === "shock" && vs !== "resist") {
     // Lightning jumps to the nearest other monster within 3 tiles that you can see.
-    const other = game.floor.monsters
+    const other = game.zone.monsters
       .filter((o) => o !== m && touchable(game, o) && elementVs(o, "shock") !== "resist" && Math.hypot(o.x - m.x, o.y - m.y) < 3 &&
-        lineOfSight(game.floor, m.x, m.y, m.z + 0.5, o.x, o.y, o.z + 0.5))
+        lineOfSight(game.zone, m.x, m.y, m.z + 0.5, o.x, o.y, o.z + 0.5))
       .sort((a, b) => Math.hypot(a.x - m.x, a.y - m.y) - Math.hypot(b.x - m.x, b.y - m.y))[0];
     if (other) {
       const arc = soak(other, Math.max(1, Math.ceil(dmg / 2)));

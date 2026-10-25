@@ -295,7 +295,7 @@ export function drawJournal(game) {
   for (const q of active) {
     lines.push([q.title, [255, 220, 120]]);
     for (const l of wrap(q.text, inner - 2)) lines.push(["  " + l, [200, 200, 205]]);
-    if (q.id === "mira" && game.floor.npcs.some((n) => n.type === "mira")) lines.push([`  (This floor: ${mapPercent(game.floor)}% mapped so far.)`, [120, 220, 200]]);
+    if (q.id === "mira" && game.zone.npcs.some((n) => n.type === "mira")) lines.push([`  (This floor: ${mapPercent(game.zone)}% mapped so far.)`, [120, 220, 200]]);
     lines.push(["", null]);
   }
   if (done.length) lines.push(["Done:", [120, 200, 130]]);

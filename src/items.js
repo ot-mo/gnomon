@@ -6,6 +6,7 @@
 // sense the auras of everything you're carrying, even before you know what it is.
 
 import { sfx } from "./sfx.js";
+import { seededSort } from "./rng.js";
 
 // --- Potions ----------------------------------------------------------------
 // Each run shuffles which colour is which effect. Drinking one tells you, for the rest of the run.
@@ -419,7 +420,7 @@ export function randomEquipment(rand, depth, luck = 0) {
   // Properties: none on the first floors, then one now and then, two deep down.
   const props = Object.keys(PROPERTIES).filter((k) => PROPERTIES[k].slot === it.kind);
   const count = depth < 5 ? 0 : rand() < Math.min(0.55, 0.06 * depth) ? (depth >= 12 && rand() < 0.35 ? 2 : 1) : 0;
-  if (count) it.props = props.sort(() => rand() - 0.5).slice(0, count);
+  if (count) it.props = seededSort(props, () => rand() - 0.5).slice(0, count);   // (not Array sort: see rng.js)
   return it;
 }
 
@@ -471,12 +472,12 @@ export const sellPrice = (it) => Math.floor(itemPrice(it) * 0.3);
 
 // Where something dropped at (x, y) comes to rest: not pressed up against a wall (it would
 // half disappear into it), but at least 0.3 from any wall of its tile.
-export function awayFromWalls(floor, x, y, z) {
+export function awayFromWalls(zone, x, y, z) {
   const tx = Math.floor(x), ty = Math.floor(y), zz = Math.floor(z);
-  if (floor.solid(tx - 1, ty, zz)) x = Math.max(x, tx + 0.3);
-  if (floor.solid(tx + 1, ty, zz)) x = Math.min(x, tx + 0.7);
-  if (floor.solid(tx, ty - 1, zz)) y = Math.max(y, ty + 0.3);
-  if (floor.solid(tx, ty + 1, zz)) y = Math.min(y, ty + 0.7);
+  if (zone.solid(tx - 1, ty, zz)) x = Math.max(x, tx + 0.3);
+  if (zone.solid(tx + 1, ty, zz)) x = Math.min(x, tx + 0.7);
+  if (zone.solid(tx, ty - 1, zz)) y = Math.max(y, ty + 0.3);
+  if (zone.solid(tx, ty + 1, zz)) y = Math.min(y, ty + 0.7);
   return [x, y];
 }
 
@@ -496,8 +497,8 @@ export function addToInventory(p, it) {
 }
 
 export function pickUpItems(game) {
-  const { floor, player: p } = game;
-  floor.items = floor.items.filter((it) => {
+  const { zone, player: p } = game;
+  zone.items = zone.items.filter((it) => {
     const near = Math.hypot(it.x - p.x, it.y - p.y) <= 0.65 && Math.abs(it.z - p.z) <= 1.2;
     if (it.dropped) {                      // just dropped: leave it until you've stepped away
       if (Math.hypot(it.x - p.x, it.y - p.y) > 1) delete it.dropped;

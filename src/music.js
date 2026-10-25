@@ -57,16 +57,18 @@ export function toggleMusic() {
 
 // Once a frame: what should be playing, how tense, how flat.
 export function updateMusic(game) {
-  const f = game.floor, p = game.player;
+  const f = game.zone, p = game.player;
   let chasing = 0, bossAwake = false;
   for (const m of f?.monsters || []) {
     if (m.state !== "chase" || Math.hypot(m.x - p.x, m.y - p.y) > 14) continue;
     chasing++;
     if (m.type === "lich" || m.guardian) bossAwake = true;   // the Lich King, or a guardian
   }
-  st.want = game.mode === "won" || game.depth === 0 ? "temple" : bossAwake ? "boss" : game.depth >= 12 ? "deep" : "dungeon";
+  // The surface (the temple, for now) plays the temple mood; deep levels sound murkier. WS3: moods by region.
+  const surface = !f || f.type === "surface", level = f ? f.level : 0;
+  st.want = game.mode === "won" || surface ? "temple" : bossAwake ? "boss" : level >= 12 ? "deep" : "dungeon";
   st.intensity += ((Math.min(1, chasing / 3)) - st.intensity) * 0.02;
-  st.depth = game.depth;
+  st.depth = surface ? 0 : level;
   const flat = !game.story.cube || game.view === "map" ? 1 : 0;
   const silent = game.mode === "dead";
   if (!out) { st.flat = flat; st.silent = silent; return; }

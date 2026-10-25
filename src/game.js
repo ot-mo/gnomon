@@ -3,20 +3,24 @@
 //   map       – top-down, turn-based: time passes only when you act (see turns.js)
 //   inventory – the inventory screen over either view; the game is paused
 //   levelup   – choosing a perk after gaining a level; the game is paused
-//   descend   – brief "DEPTH n" screen between floors
+//   descend   – brief "DEPTH n" screen between zones
 //   story     – full-screen story pages (the intro, the cube, the ending)
 //   rotate    – the moment the cube turns the world: the camera swings down from above
 //   talk      – a conversation (dialogue.js); shop – the peddler's pack; journal – your quests
 //   dead      – game over; R starts a new run
 //   won       – the Lich King is dead; R starts a new run
 //
-// A run starts in the Temple of Angles (depth 0), on the map only: until you find the Rotation
-// Cube, Tab does nothing. game.story.cube says whether you have it.
+// A run starts in the Temple of Angles (the surface of world tile 0, 0: zones.js, world/legacy.js),
+// on the map only: until you find the Rotation Cube, Tab does nothing. game.story.cube says whether
+// you have it. game.zone is the zone you're in, game.zones every zone you've visited ("wx,wy,z" →
+// Zone); game.state holds what persists as plain data (uids, zone patches, when you left a zone).
 // game.view says which picture is showing ("3d" or "map"); it survives descending and dying.
 import * as S from "./screen.js";
 import { keys, isLocked, lockPointer, unlockPointer } from "./input.js";
-import { generateFloor, arrivalPoint } from "./gen/dungeon.js";
-import { makePlayer, placePlayer, clampPitch, updatePlayer, takeImpact, hasFeatherFall, bonus } from "./player.js";
+import { changeZone, enterZone, cachedZone, makeZone, zoneBelow, zoneAbove, dungeonOffset, zoneKey } from "./zones.js";
+import { on, runUpdates } from "./events.js";
+import "./world/legacy.js";   // the zone generators for the legacy site under tile (0, 0)
+import { makePlayer, clampPitch, updatePlayer, takeImpact, hasFeatherFall, bonus } from "./player.js";
 import { updateMonsters, pushPlayerOut, playerAttack, monsterAt } from "./monsters.js";
 import { pickUpItems, POTIONS, POTION_COLORS, scrollTitles, makeItem, makeRelic, pickRelic, randomEquipment, awayFromWalls, RELICS, RELIC_COLOR } from "./items.js";
 import { render3d } from "./render3d.js";
@@ -29,7 +33,7 @@ import { drinkPotion, tickEffects } from "./effects.js";
 import { openInventory, closeInventory, inventoryKey, inventoryClick, drawInventory, swapWeapons } from "./inventory.js";
 import { throwReady, throwAtNearest, updateProjectiles, updateClouds, updateBombs, THROW_TIME } from "./throwing.js";
 import { makeRng } from "./rng.js";
-import { B, FLOOR_Z, FINAL_DEPTH } from "./world.js";
+import { B, FLOOR_Z } from "./world.js";
 import { updateSpikes } from "./traps.js";
 import { toggleMusic, updateMusic, playCubeTheme } from "./music.js";
 import { unlockAudio, audioFrame } from "./audio.js";
@@ -40,8 +44,9 @@ import { openTalk, talkKey, talkClick, talkHover, drawTalk, shopKey, drawShop, o
          openStory, storyKey, nextPage, drawStory, updateTalk } from "./dialogue.js";
 
 export const game = {
-  seed: 0, depth: 1, floor: null, player: null,
-  floors: new Map(),   // depth → Floor: every floor you've visited stays as you left it
+  seed: 0, zone: null, player: null,
+  zones: new Map(),    // "wx,wy,z" → Zone: every zone you've visited stays as you left it
+  state: null,         // persistent plain data (zones.js: uids, zonePatches, zoneLeft)
   mode: "explore", view: "3d", paused: true,
   time: 0, fov: 75, sensitivity: 0.0025,
   messages: [], effects: [], target: null, travel: null, fps: 60, frameMs: 0,
@@ -56,9 +61,10 @@ export const game = {
   cam: null, rotT: 0,       // the cube's rotation: a camera override for render3d
   pendingPages: null,       // story pages to show once the "DEPTH n" screen is done
 
-  // Potion of descent: sink straight through to the floor below, unhurt.
+  // Potion of descent: sink straight through to the level below, unhurt.
   fallThrough() {
-    changeFloor(this.depth + 1, "fall", "", this.player.x, this.player.y);
+    const below = zoneBelow(this, this.zone);
+    if (below) changeFloor(below, "fall", "", this.player.x, this.player.y);
   },
 
   // The Lich King falls: the run is won (after the epilogue).
@@ -73,7 +79,7 @@ export const game = {
   onCube() {
     this.story.cube = true;
     playCubeTheme();   // and the music turns with it
-    openCubeWall(this.floor);
+    openCubeWall(this.zone);
     this.travel = null;
     this.mode = "rotate";
     this.view = "3d";
@@ -95,19 +101,19 @@ export const game = {
   },
   // A guardian falls: the gate to the stairs opens, and it leaves a relic behind.
   onGuardianDies(m) {
-    const floor = this.floor, hall = floor.guardianHall;
-    if (hall) for (const [x, y, z] of hall.gate) floor.set(x, y, z, B.AIR);
-    floor.slam = null;
-    floor.refresh();
+    const zone = this.zone, hall = zone.guardianHall;
+    if (hall) for (const [x, y, z] of hall.gate) zone.set(x, y, z, B.AIR);
+    zone.slam = null;
+    zone.refresh();
     this.log(`The ${m.name} falls! Behind it, the gate to the stairs grinds open.`, [255, 230, 140]);
-    const ground = floor.stand[m.tx + m.ty * floor.w] >= 0 ? floor.stand[m.tx + m.ty * floor.w] : FLOOR_Z;
+    const ground = zone.stand[m.tx + m.ty * zone.w] >= 0 ? zone.stand[m.tx + m.ty * zone.w] : FLOOR_Z;
     const key = pickRelic(this.relicsFound);
-    const it = key ? makeRelic(key) : { ...randomEquipment(Math.random, this.depth + 2, 0.5), known: true };
+    const it = key ? makeRelic(key) : { ...randomEquipment(Math.random, zone.level + 2, 0.5), known: true };
     if (key) this.relicsFound.add(key);
-    floor.items.push(makeItem(it, ...awayFromWalls(floor, m.x, m.y, ground), ground));
+    zone.items.push(makeItem(it, ...awayFromWalls(zone, m.x, m.y, ground), ground));
     if (key) this.log(`Where it stood lies a relic: ${RELICS[key].name}.`, RELIC_COLOR);
     // Its summoned helpers fade with it.
-    floor.monsters = floor.monsters.filter((o) => !(o.type === "shade" || (m.guardian === "flatqueen" && o.type === "flatling")));
+    zone.monsters = zone.monsters.filter((o) => !(o.type === "shade" || (m.guardian === "flatqueen" && o.type === "flatling")));
   },
   questEvent(what, data) { questEvent(this, what, data); },
 
@@ -128,8 +134,8 @@ export const game = {
     const p = this.player;
     p.hp -= dmg;
     // Second wind: once per floor, a killing blow leaves you on 1 HP.
-    if (p.hp <= 0 && p.perks.has("secondWind") && !this.floor.secondWind) {
-      this.floor.secondWind = true;
+    if (p.hp <= 0 && p.perks.has("secondWind") && !this.zone.secondWind) {
+      this.zone.secondWind = true;
       p.hp = 1;
       this.log("Everything goes grey... and you get up again. (Second wind!)", [255, 230, 140]);
     }
@@ -148,25 +154,32 @@ export const game = {
     }
   },
 
-  // Stairs under your feet, or nothing under them at all? Returns true if you left the floor.
+  // Stairs under your feet, or nothing under them at all? Returns true if you left the zone.
+  // Down and up go along the zone graph: the level below (zoneBelow) or above (zoneAbove).
   checkFloorEvents() {
-    const p = this.player, floor = this.floor;
+    const p = this.player, zone = this.zone;
     if (p.z < -1.5) {
-      const x = p.x, y = p.y;
-      if (floor.get(Math.floor(x), Math.floor(y), FLOOR_Z - 1) === B.WATER_DEEP) {
-        changeFloor(this.depth + 1, "fall", "You sink beneath the dark water and are swept down to the floor below.", x, y);
+      const x = p.x, y = p.y, below = zoneBelow(this, zone);
+      if (!below) {   // nothing below this zone (no valid level has a hole there): back onto solid ground
+        enterZone(this, zone, { how: "fall", fx: x, fy: y, rng: Math.random });
+        return true;
+      }
+      const { ox, oy } = zone.type === "surface" ? dungeonOffset(this, zone) : { ox: 0, oy: 0 };
+      if (zone.get(Math.floor(x), Math.floor(y), FLOOR_Z - 1) === B.WATER_DEEP) {
+        changeFloor(below, "fall", "You sink beneath the dark water and are swept down to the floor below.", x - ox, y - oy);
       } else if (hasFeatherFall(p)) {
-        changeFloor(this.depth + 1, "fall", "You fall through the dark... and drift down gently.", x, y);
+        changeFloor(below, "fall", "You fall through the dark... and drift down gently.", x - ox, y - oy);
       } else {
-        changeFloor(this.depth + 1, "fall", "You fall through the dark and land hard.", x, y);
+        changeFloor(below, "fall", "You fall through the dark and land hard.", x - ox, y - oy);
         this.hurtPlayer(2 + Math.floor(Math.random() * 3), "the fall");
       }
       return true;
     }
     if (!p.onGround) return false;
-    const under = floor.get(Math.floor(p.x), Math.floor(p.y), Math.round(p.z) - 1);
-    if (under === B.STAIRS) { changeFloor(this.depth + 1, "down", "You descend the stairs..."); return true; }
-    if (under === B.STAIRS_UP) { changeFloor(this.depth - 1, "up", "You climb the stairs back up..."); return true; }
+    const under = zone.get(Math.floor(p.x), Math.floor(p.y), Math.round(p.z) - 1);
+    const below = under === B.STAIRS ? zoneBelow(this, zone) : null, above = under === B.STAIRS_UP ? zoneAbove(this, zone) : null;
+    if (below) { changeFloor(below, "down", "You descend the stairs..."); return true; }
+    if (above) { changeFloor(above, "up", "You climb the stairs back up..."); return true; }
     return false;
   },
 };
@@ -175,7 +188,9 @@ export const randomSeed = () => 1 + Math.floor(Math.random() * 999999);
 
 export function startRun(seed) {
   game.seed = seed;
-  game.depth = 0;
+  game.state = { seed, uids: {}, zonePatches: {}, zoneLeft: {} };
+  game.zone = null;
+  game.zoneLru = [];
   game.player = makePlayer();
   game.messages = [];
   game.effects = [];
@@ -189,7 +204,7 @@ export function startRun(seed) {
   game.knownScrolls = new Set();
   game.auraKnown = new Set();
   game.invSel = 0;
-  game.floors = new Map();
+  game.zones = new Map();
   game.story = { cube: false };
   game.quests = [];
   game.hints = new Set();
@@ -197,7 +212,7 @@ export function startRun(seed) {
   game.crystalsBought = 0;        // crystals bought from Pell (each makes the next dearer)
   game.cam = null;
   game.pendingPages = null;
-  enterFloor(0, "start");
+  changeZone(game, zoneKey(0, 0, 0), { how: "start" });   // the temple: the legacy site's surface
   game.view = "map";
   game.paused = false;
   openStory(game, INTRO, () => {
@@ -212,48 +227,43 @@ function finishMainQuest() {
   if (q) q.done = true;
 }
 
-// Arrive on a floor: the one you left there if you've been before, otherwise a new one.
-// `how` ("start" | "down" | "up" | "fall") decides where you appear (see arrivalPoint).
-function enterFloor(depth, how, fx, fy) {
-  game.depth = depth;
-  if (!game.floors.has(depth)) {
-    game.floors.set(depth, generateFloor(game.seed, depth));
-    if (TAUNTS[depth]) game.log(TAUNTS[depth], depth === 1 ? [255, 220, 140] : LICH_COLOR);
-    if (depth >= FINAL_DEPTH) game.pendingPages = FINAL_PAGES;
+// Arriving in a zone (zones.js enterZone emits these). Before you're placed: treasure marked
+// "relic?" becomes a relic you haven't found yet; and coming back up to a guardian's level from
+// below (you fell past it), you arrive by its stairs, behind its gate, which opens from this side.
+on("zone:prepare", (game, { zone, arrival }) => {
+  resolveRelics(zone);
+  const hall = zone.guardianHall;
+  if (arrival.how === "up" && hall && hall.gate.some(([x, y, z]) => zone.get(x, y, z) === B.GATE)) {
+    for (const [x, y, z] of hall.gate) zone.set(x, y, z, B.AIR);
+    zone.refresh();
   }
-  game.floor = game.floors.get(depth);
-  resolveRelics(game.floor);
-  // Coming back up to a guardian's floor from below (you fell past it): you arrive by its stairs,
-  // behind its gate, which opens from this side.
-  const hall = game.floor.guardianHall;
-  if (how === "up" && hall && hall.gate.some(([x, y, z]) => game.floor.get(x, y, z) === B.GATE)) {
-    for (const [x, y, z] of hall.gate) game.floor.set(x, y, z, B.AIR);
-    game.floor.refresh();
-  }
-  placePlayer(game.player, arrivalPoint(game.floor, how, fx, fy));
-  game.flow = null;
-  game.travel = null;
-  game.effects = [];   // damage numbers and splashes belong to the floor you left
-  game.confirmJump = -1;
+});
+// After you're placed: the map recentres, and the first time you reach a legacy level Vorlath
+// has something to say (and on the last one, a page of story).
+on("zone:enter", (game, { zone, first }) => {
   mapView.panX = mapView.panY = 0;
-}
+  if (!first || zone.siteId !== "legacy" || zone.type !== "dungeon") return;
+  if (TAUNTS[zone.dungeonIndex]) game.log(TAUNTS[zone.dungeonIndex], zone.dungeonIndex === 1 ? [255, 220, 140] : LICH_COLOR);
+  if (zone.final) game.pendingPages = FINAL_PAGES;
+});
 
-// Treasure marked "relic?" (deep floors) becomes a relic you haven't found yet, chosen now so
+// Treasure marked "relic?" (deep levels) becomes a relic you haven't found yet, chosen now so
 // none turns up twice; once they're all found, fine gear instead.
-function resolveRelics(floor) {
-  for (const it of floor.items) {
+function resolveRelics(zone) {
+  for (const it of zone.items) {
     if (it.kind !== "relic?") continue;
     const key = pickRelic(game.relicsFound);
     const { x, y, z } = it;
     for (const k of Object.keys(it)) delete it[k];
-    Object.assign(it, key ? makeRelic(key) : randomEquipment(Math.random, floor.depth + 2, 0.4), { x, y, z });
+    Object.assign(it, key ? makeRelic(key) : randomEquipment(Math.random, zone.level + 2, 0.4), { x, y, z });
     if (key) game.relicsFound.add(key);
   }
 }
 
-function changeFloor(depth, how, message, fx, fy) {
-  if (message) game.log(message, [255, 220, 140]);
-  enterFloor(depth, how, fx, fy);
+// Go to another zone (stairs, a hole, a potion of descent), then show its name for a moment.
+// `how` ("start" | "down" | "up" | "fall") and (fx, fy) decide where you appear (zones.arrivalPoint).
+function changeFloor(addr, how, message, fx, fy) {
+  if (!changeZone(game, addr, { how, fx, fy, rng: Math.random }, message)) return;
   game.mode = "descend";   // shows "DEPTH n" for a moment, going down or up
   game.descendT = 1.2;
 }
@@ -262,9 +272,9 @@ function changeFloor(depth, how, message, fx, fy) {
 // Real time (3D view)
 function update(dt) {
   const { player: p } = game;
-  updatePlayer(p, game.floor, keys, dt);
+  updatePlayer(p, game.zone, keys, dt);
   pushPlayerOut(game);
-  const floor = game.floor;
+  const zone = game.zone;
   const fall = takeImpact(p);
   if (fall) game.hurtPlayer(fall, "the fall");
 
@@ -272,7 +282,7 @@ function update(dt) {
   const ptx = Math.floor(p.x), pty = Math.floor(p.y);
   for (let y = pty - 1; y <= pty + 1; y++)
     for (let x = ptx - 1; x <= ptx + 1; x++)
-      if (x >= 0 && y >= 0 && x < floor.w && y < floor.d) floor.seen[x + y * floor.w] = 1;
+      if (x >= 0 && y >= 0 && x < zone.w && y < zone.d) zone.seen[x + y * zone.w] = 1;
 
   pickUpItems(game);
   if (game.checkFloorEvents()) return;
@@ -293,10 +303,10 @@ function update(dt) {
 
 // The first time you step into a puzzle room, a line about what you notice.
 function vaultHint(game) {
-  const v = game.floor.vault, p = game.player;
-  if (!v?.hint || game.floor.vaultHinted) return;
+  const v = game.zone.vault, p = game.player;
+  if (!v?.hint || game.zone.flags.vaultHinted) return;
   if (p.x >= v.x0 && p.x < v.x1 + 1 && p.y >= v.y0 && p.y < v.y1 + 1) {
-    game.floor.vaultHinted = true;
+    game.zone.flags.vaultHinted = true;
     game.log(v.hint, [200, 190, 255]);
   }
 }
@@ -356,6 +366,7 @@ export function step(dt) {
       }
     }
   }
+  runUpdates(game, dt);   // registered per-frame hooks for this mode (events.js)
   game.effects = game.effects.filter((e) => game.time - e.time < 1.2);
 }
 
@@ -402,7 +413,7 @@ function foldPowers() {
   const guard = bonus(p, "foldGuard");
   if (guard > 0) p.guardTime = guard;
   if (p.perks.has("foldingStrike") && game.time >= (p.foldReady || 0)) {
-    const near = game.floor.monsters.filter((m) => Math.hypot(m.x - p.x, m.y - p.y) < 1.9 && !m.guardian);
+    const near = game.zone.monsters.filter((m) => Math.hypot(m.x - p.x, m.y - p.y) < 1.9 && !m.guardian);
     if (near.length) {
       for (const m of near) m.stun = Math.max(m.stun, 2);
       p.foldReady = game.time + 10;
@@ -431,13 +442,13 @@ function toggleTorch() {
 }
 
 function toggleMarker(tile) {
-  const floor = game.floor;
-  if (!tile || tile.x < 0 || tile.y < 0 || tile.x >= floor.w || tile.y >= floor.d) return;
-  const k = floor.markers.findIndex((m) => m.x === tile.x && m.y === tile.y);
-  if (k >= 0) floor.markers.splice(k, 1);
-  else if (!floor.seen[tile.x + tile.y * floor.w]) game.log("You can only mark places you've seen.", [170, 170, 170]);
-  else if (floor.markers.length >= 9) game.log("You can place at most 9 markers.", [170, 170, 170]);
-  else floor.markers.push({ x: tile.x, y: tile.y });
+  const zone = game.zone;
+  if (!tile || tile.x < 0 || tile.y < 0 || tile.x >= zone.w || tile.y >= zone.d) return;
+  const k = zone.markers.findIndex((m) => m.x === tile.x && m.y === tile.y);
+  if (k >= 0) zone.markers.splice(k, 1);
+  else if (!zone.seen[tile.x + tile.y * zone.w]) game.log("You can only mark places you've seen.", [170, 170, 170]);
+  else if (zone.markers.length >= 9) game.log("You can place at most 9 markers.", [170, 170, 170]);
+  else zone.markers.push({ x: tile.x, y: tile.y });
 }
 
 // Inventory: close it after using something; on the map, using takes game time.
@@ -503,7 +514,7 @@ function mapClick(button, clientX, clientY) {
   if (button !== 0 || !tile) return;
   const p = game.player;
   const dx = tile.x - Math.floor(p.x), dy = tile.y - Math.floor(p.y);
-  if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && (dx || dy) && monsterAt(game.floor, tile.x, tile.y)) mapStep(game, dx, dy);
+  if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && (dx || dy) && monsterAt(game.zone, tile.x, tile.y)) mapStep(game, dx, dy);
   else startTravel(game, tile.x, tile.y);
 }
 
@@ -588,5 +599,9 @@ export function tick(dt) {
 }
 
 // For automated checks from the console: run the simulation without the render loop.
-game.debug = { update, step, startRun, enterFloor, changeFloor, toggleMap, draw, mapKey, mapClick, openInv, inventoryAction, choosePerk, throwReady, throwAtNearest,
+//   enterZone(key, how, opts)    go straight to a zone (generated if new), placed by `how`
+//   changeFloor(key, how, …)     the same with the "DEPTH n" beat, as stairs and holes do
+game.debug = { update, step, startRun, changeFloor, toggleMap, draw, mapKey, mapClick, openInv, inventoryAction, choosePerk, throwReady, throwAtNearest,
+               enterZone: (key, how = "down", opts = {}) => changeZone(game, key, { how, rng: Math.random, ...opts }),
+               zone: (key) => cachedZone(game, key) || makeZone(game, key),
                openTalk: (n) => openTalk(game, n), talkKey: (c) => talkKey(game, c), storyKey: (c) => storyKey(game, c) };

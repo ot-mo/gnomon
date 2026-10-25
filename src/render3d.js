@@ -61,9 +61,9 @@ function applyFog(t) {
 
 // Light arriving at a point from sky wells and lamps (no direction needed).
 let lightR = 0, lightG = 0, lightB = 0;
-function ambientAt(floor, x, y, z, airOnly = false) {
-  const sky = sampleLight(floor, floor.skyLight, x, y, z, airOnly);
-  const lamp = sampleLight(floor, floor.lampLight, x, y, z, airOnly);
+function ambientAt(zone, x, y, z, airOnly = false) {
+  const sky = sampleLight(zone, zone.skyLight, x, y, z, airOnly);
+  const lamp = sampleLight(zone, zone.lampLight, x, y, z, airOnly);
   const lamp2 = lamp * Math.sqrt(lamp);   // lamp^1.5: bright near the lamp, a soft edge further out
   lightR = AMBIENT[0] + SKY_COLOR[0] * sky + LAMP_COLOR[0] * lamp2;
   lightG = AMBIENT[1] + SKY_COLOR[1] * sky + LAMP_COLOR[1] * lamp2;
@@ -83,7 +83,7 @@ function torchAt(dx, dy, dz, t, facing) {
   lightR += TORCH_COLOR[0] * k; lightG += TORCH_COLOR[1] * k; lightB += TORCH_COLOR[2] * k;
 }
 
-function shadeHit(floor, player, dx, dy, dz) {
+function shadeHit(zone, player, dx, dy, dz) {
   const t = hit.t, block = hit.block, nx = hit.nx, ny = hit.ny, nz = hit.nz;
   const px = cam.ex + dx * t, py = cam.ey + dy * t, pz = cam.ez + dz * t;
   material(block, nx !== 0 ? py : px, nz !== 0 ? py : pz, nz > 0);
@@ -99,13 +99,13 @@ function shadeHit(floor, player, dx, dy, dz) {
   }
   // A thin wall with a lit room behind it: in the dark, up close, light shows through the cracks.
   if (!player.torch && t < 4.5 && nz === 0 && hit.z >= FLOOR_Z && hit.z <= FLOOR_Z + 1 &&
-      floor.secretWalls.has(hit.x + hit.y * floor.w)) crackLight(nx !== 0 ? py : px, pz - FLOOR_Z, t);
+      zone.secretWalls.has(hit.x + hit.y * zone.w)) crackLight(nx !== 0 ? py : px, pz - FLOOR_Z, t);
   const ar = albedo.r, ag = albedo.g, ab = albedo.b, glow = albedo.glow;
 
-  const sky = ambientAt(floor, px + nx * 0.5, py + ny * 0.5, pz + nz * 0.5);
-  if (floor.hasSky && sky > 0.05) {
+  const sky = ambientAt(zone, px + nx * 0.5, py + ny * 0.5, pz + nz * 0.5);
+  if (zone.hasSky && sky > 0.05) {
     const facing = nx * SUN[0] + ny * SUN[1] + nz * SUN[2];
-    if (facing > 0 && !castRay(floor, px + nx * 0.001, py + ny * 0.001, pz + nz * 0.001, SUN[0], SUN[1], SUN[2], 40)) {
+    if (facing > 0 && !castRay(zone, px + nx * 0.001, py + ny * 0.001, pz + nz * 0.001, SUN[0], SUN[1], SUN[2], 40)) {
       lightR += SUN_COLOR[0] * facing; lightG += SUN_COLOR[1] * facing; lightB += SUN_COLOR[2] * facing;
     }
   }
@@ -155,11 +155,11 @@ function shadeSky(dx, dy, dz, time) {
 let shadows = [];
 
 export function render3d(game) {
-  const { floor, player } = game;
+  const { zone, player } = game;
   setCamera(player, game.fov, game.cam);
   shadows = [];
-  for (const m of floor.monsters) if (isFlat(m) && Math.hypot(m.x - player.x, m.y - player.y) < 20) shadows.push(m);
-  for (const n of floor.npcs) if (NPC_TYPES[n.type].flat && Math.hypot(n.x - player.x, n.y - player.y) < 20) shadows.push(n);
+  for (const m of zone.monsters) if (isFlat(m) && Math.hypot(m.x - player.x, m.y - player.y) < 20) shadows.push(m);
+  for (const n of zone.npcs) if (NPC_TYPES[n.type].flat && Math.hypot(n.x - player.x, n.y - player.y) < 20) shadows.push(n);
   setMaterialTime(game.time);   // water ripples move
   if (depth.length !== S.cols * S.rows) depth = new Float32Array(S.cols * S.rows);
   torch.power = torchPower(player);
@@ -180,12 +180,12 @@ export function render3d(game) {
 
       const i = cy * S.cols + cx;
       let density = 1;
-      if (castRay(floor, cam.ex, cam.ey, cam.ez, dx, dy, dz, MAX_DIST, floor.seen, seeRange, floor.holeSeen)) {
-        shadeHit(floor, player, dx, dy, dz);
+      if (castRay(zone, cam.ex, cam.ey, cam.ez, dx, dy, dz, MAX_DIST, zone.seen, seeRange, zone.holeSeen)) {
+        shadeHit(zone, player, dx, dy, dz);
         depth[i] = hit.t;
       } else {
         depth[i] = Infinity;
-        if (dz > 0 && floor.hasSky) density = shadeSky(dx, dy, dz, game.time);
+        if (dz > 0 && zone.hasSky) density = shadeSky(dx, dy, dz, game.time);
         else outR = outG = outB = 0;        // looking into a bottomless pit, or into the far dark
       }
       plot(cx, cy, density);
@@ -200,7 +200,7 @@ export function render3d(game) {
     if (e.kind === "boom" && game.time - e.time < 0.15 && Math.hypot(e.x - player.x, e.y - player.y) < 10) S.tint(1.7, 1.4, 1.1);
   if (player.hurt > 0) S.tint(1 + player.hurt * 1.6, 1 - player.hurt * 1.4, 1 - player.hurt * 1.4);
   // Sinking in deep water: everything goes murky blue.
-  if (floor.get(Math.floor(cam.ex), Math.floor(cam.ey), Math.floor(cam.ez)) === B.WATER_DEEP) S.tint(0.3, 0.55, 1.1);
+  if (zone.get(Math.floor(cam.ex), Math.floor(cam.ey), Math.floor(cam.ez)) === B.WATER_DEEP) S.tint(0.3, 0.55, 1.1);
 }
 
 // Numbers that pop up above a monster when you hit it, then float up and fade.
@@ -241,26 +241,26 @@ function drawBurst(game, e) {
 // Sprites ("billboards"): flat pixel-art pictures that always face the camera,
 // scaled by distance and hidden behind walls using the depth buffer.
 function drawSprites(game) {
-  const { floor } = game;
+  const { zone } = game;
   // Marker beacons first: they show faintly through walls, but monsters and items cover them.
-  for (const mk of floor.markers) {
-    const z = floor.stand[mk.x + mk.y * floor.w];
+  for (const mk of zone.markers) {
+    const z = zone.stand[mk.x + mk.y * zone.w];
     drawSprite(game, {
       x: mk.x + 0.5, y: mk.y + 0.5, z: z >= 0 ? z : FLOOR_Z, w: 0.12, h: 3.6,
       art: ["c"], palette: { c: [[90, 230, 255], 1.6] }, beacon: true,
     });
   }
   // (Flat beings only cast a shadow; a ghostly guardian is only there with your torch out.)
-  for (const m of floor.monsters) if (!isFlat(m) && !(MONSTER_TYPES[m.type].ghostly && game.player.torch)) drawSprite(game, monsterSprite(m, floor));
+  for (const m of zone.monsters) if (!isFlat(m) && !(MONSTER_TYPES[m.type].ghostly && game.player.torch)) drawSprite(game, monsterSprite(m, zone));
   for (const sp of guardianSprites(game)) drawSprite(game, sp);
-  for (const n of floor.npcs) { const sp = npcSprite(game, n); if (sp) drawSprite(game, sp); }
+  for (const n of zone.npcs) { const sp = npcSprite(game, n); if (sp) drawSprite(game, sp); }
   for (const sp of spikeSprites(game)) drawSprite(game, sp);
-  for (const item of floor.items) drawSprite(game, itemSprite(game, item, game.time));
+  for (const item of zone.items) drawSprite(game, itemSprite(game, item, game.time));
   for (const s of projectileSprites(game)) drawSprite(game, s);   // knives and potions in flight, gas clouds
 }
 
 function drawSprite(game, s) {
-  const { floor, player } = game;
+  const { zone, player } = game;
   const cz = s.z + s.h * 0.5;
   const vx = s.x - cam.ex, vy = s.y - cam.ey, vz = cz - cam.ez;
   const zc = vx * cam.fX + vy * cam.fY + vz * cam.fZ;       // distance straight ahead
@@ -282,7 +282,7 @@ function drawSprite(game, s) {
   if (x1 < 0 || y1 < 0 || x0 >= S.cols || y0 >= S.rows) return;
 
   // Light at the sprite (it faces the camera, so the torch hits it head-on).
-  ambientAt(floor, s.x, s.y, cz, true);
+  ambientAt(zone, s.x, s.y, cz, true);
   torchAt(vx / dist, vy / dist, vz / dist, dist, 1);
   let lr = lightR, lg = lightG, lb = lightB;
   if (s.emit) { lr += s.emit[0]; lg += s.emit[1]; lb += s.emit[2]; }   // its own glow (on fire)
@@ -321,6 +321,6 @@ function drawSprite(game, s) {
   // remembered on the map at this spot.
   if (s.monster && visible > 0 && (lr + lg + lb > 0.35 || dist < torch.range)) {
     const m = s.monster;
-    floor.sightings.set(m.id, { x: m.x, y: m.y, glyph: m.glyph, color: m.color, name: m.name, time: game.time });
+    zone.sightings.set(m.id, { x: m.x, y: m.y, glyph: m.glyph, color: m.color, name: m.name, time: game.time });
   }
 }

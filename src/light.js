@@ -4,8 +4,8 @@ const SKY_FALLOFF = 0.13;
 const LAMP_FALLOFF = 0.07;
 const NEIGHBOURS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
-export function computeLight(floor, lampId, lampId2 = -1) {
-  const { w, d, h, blocks } = floor;
+export function computeLight(zone, lampId, lampId2 = -1) {
+  const { w, d, h, blocks } = zone;
   const n = w * d * h;
   const sky = new Float32Array(n), lamp = new Float32Array(n);
   const skySeeds = [], lampSeeds = [];
@@ -20,20 +20,20 @@ export function computeLight(floor, lampId, lampId2 = -1) {
       }
   for (let i = 0; i < n; i++) if (blocks[i] === lampId || blocks[i] === lampId2) { lamp[i] = 1; lampSeeds.push(i); }
 
-  flood(floor, sky, skySeeds, SKY_FALLOFF);
-  flood(floor, lamp, lampSeeds, LAMP_FALLOFF);
+  flood(zone, sky, skySeeds, SKY_FALLOFF);
+  flood(zone, lamp, lampSeeds, LAMP_FALLOFF);
 
   // Which air cells are bright enough to see into (used by the auto-map).
   const lit = new Uint8Array(n);
   for (let i = 0; i < n; i++) lit[i] = !blocks[i] && sky[i] * 0.7 + lamp[i] * lamp[i] > 0.06 ? 1 : 0;
 
-  floor.skyLight = sky;
-  floor.lampLight = lamp;
-  floor.litMask = lit;
+  zone.skyLight = sky;
+  zone.lampLight = lamp;
+  zone.litMask = lit;
 }
 
-function flood(floor, grid, queue, falloff) {
-  const { w, d, h, blocks } = floor;
+function flood(zone, grid, queue, falloff) {
+  const { w, d, h, blocks } = zone;
   for (let head = 0; head < queue.length; head++) {
     const i = queue[head];
     const level = grid[i] - falloff;
@@ -54,8 +54,8 @@ function flood(floor, grid, queue, falloff) {
 // airOnly: leave out solid blocks (their light is always 0) and blend the rest. Sprites use
 // this: otherwise an item lying in a corner averages in the dark inside of two walls and
 // comes out at a third of its proper brightness.
-export function sampleLight(floor, grid, x, y, z, airOnly = false) {
-  const { w, d, h, blocks } = floor;
+export function sampleLight(zone, grid, x, y, z, airOnly = false) {
+  const { w, d, h, blocks } = zone;
   x -= 0.5; y -= 0.5; z -= 0.5;
   const x0 = Math.floor(x), y0 = Math.floor(y), z0 = Math.floor(z);
   const fx = x - x0, fy = y - y0, fz = z - z0;

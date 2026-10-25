@@ -133,7 +133,7 @@ function dropSelected(game) {
   const one = takeOne(p, game.invSel);
   const item = makeItem(one, p.x, p.y, p.z);
   item.dropped = true;   // don't pick it straight back up
-  game.floor.items.push(item);
+  game.zone.items.push(item);
   game.log(`You drop the ${itemName(game, one)}.`, [170, 170, 170]);
   game.invSel = Math.min(game.invSel, Math.max(0, p.inv.length - 1));
   return 0;

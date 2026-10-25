@@ -1,6 +1,6 @@
 // E: use whatever the crosshair points at — levers, doors, gates, braziers.
 import { castRay, hit } from "./raycast.js";
-import { BLOCKS, B, FLOOR_Z, H } from "./world.js";
+import { BLOCKS, B, FLOOR_Z } from "./world.js";
 import { EYE } from "./player.js";
 import { spawnMonster, pickMonsterType } from "./monsters.js";
 import { NPC_TYPES } from "./npcs.js";
@@ -13,7 +13,7 @@ export function lookTarget(game) {
   const person = lookPerson(game);
   if (person) return person;
   const cp = Math.cos(p.pitch);
-  if (!castRay(game.floor, p.x, p.y, p.z + EYE, cp * Math.cos(p.yaw), cp * Math.sin(p.yaw), Math.sin(p.pitch), REACH)) return null;
+  if (!castRay(game.zone, p.x, p.y, p.z + EYE, cp * Math.cos(p.yaw), cp * Math.sin(p.yaw), Math.sin(p.pitch), REACH)) return null;
   const info = BLOCKS[hit.block];
   const target = { x: hit.x, y: hit.y, z: hit.z, block: hit.block };
   if (info.lever) return { ...target, label: info.on ? "lever (already pulled)" : "pull the lever" };
@@ -29,13 +29,13 @@ function lookPerson(game) {
   const p = game.player;
   const fx = Math.cos(p.yaw), fy = Math.sin(p.yaw);
   let best = null, bestD = 2.6;
-  for (const n of game.floor.npcs) {
+  for (const n of game.zone.npcs) {
     const t = NPC_TYPES[n.type];
     if (t.ghost && p.torch) continue;
     const dx = n.x - p.x, dy = n.y - p.y, d = Math.hypot(dx, dy);
     if (d > bestD || d < 0.05 || (dx * fx + dy * fy) / d < (t.flat ? 0.7 : 0.82)) continue;
     if (t.flat && p.pitch > -0.25) continue;   // you have to be looking down at a shadow
-    if (!lineOfSight(game.floor, p.x, p.y, p.z + EYE, n.x, n.y, n.z + (t.flat ? 0.05 : 1.2))) continue;
+    if (!lineOfSight(game.zone, p.x, p.y, p.z + EYE, n.x, n.y, n.z + (t.flat ? 0.05 : 1.2))) continue;
     best = n; bestD = d;
   }
   if (!best) return null;
@@ -56,7 +56,7 @@ export function interact(game) {
 // Map: walking into a door, lever, gate or brazier uses it. Returns true if that took a turn.
 export function useColumn(game, x, y) {
   for (const z of [FLOOR_Z + 1, FLOOR_Z, FLOOR_Z + 2]) {
-    const info = BLOCKS[game.floor.get(x, y, z)];
+    const info = BLOCKS[game.zone.get(x, y, z)];
     if (info.lever || info.door || info.gate || info.brazier) return useBlock(game, x, y, z);
   }
   return false;
@@ -64,14 +64,14 @@ export function useColumn(game, x, y) {
 
 // Use one block. Returns true if something actually happened.
 function useBlock(game, x, y, z) {
-  const { floor, player } = game;
-  const info = BLOCKS[floor.get(x, y, z)];
+  const { zone, player } = game;
+  const info = BLOCKS[zone.get(x, y, z)];
 
   if (info.lever) {
     if (info.on) { game.log("The lever won't move back.", [170, 170, 170]); return false; }
-    floor.set(x, y, z, B.LEVER_ON);
+    zone.set(x, y, z, B.LEVER_ON);
     game.log("You pull the lever. *clunk*", [220, 220, 220]);
-    const link = floor.links.get(floor.index(x, y, z));
+    const link = zone.links.get(zone.index(x, y, z));
     if (link) runLink(game, link);
   } else if (info.door) {
     if (info.locked) {
@@ -79,18 +79,18 @@ function useBlock(game, x, y, z) {
       player.keys--;
       game.log("You unlock the door.", [240, 200, 80]);
     } else game.log("The door creaks open.", [200, 150, 100]);
-    for (let k = 0; k < H; k++) if (BLOCKS[floor.get(x, y, k)].door) floor.set(x, y, k, B.AIR);
+    for (let k = 0; k < zone.h; k++) if (BLOCKS[zone.get(x, y, k)].door) zone.set(x, y, k, B.AIR);
   } else if (info.gate) {
     game.log("The iron gate won't budge. There must be a mechanism somewhere.", [170, 170, 190]);
     return false;
   } else if (info.brazier) {
     if (info.on) { game.log("The brazier is already burning.", [170, 170, 170]); return false; }
     if (!player.torch) { game.log("You need a flame to light it. Your torch is out.", [255, 200, 120]); return false; }
-    floor.set(x, y, z, B.BRAZIER_LIT);
+    zone.set(x, y, z, B.BRAZIER_LIT);
     game.log("You light the brazier. Flames leap up.", [255, 190, 100]);
     brazierLit(game, x, y);
   } else return false;
-  floor.refresh();
+  zone.refresh();
   return true;
 }
 
@@ -101,37 +101,37 @@ function useBlock(game, x, y, z) {
 //   summon – monsters appear on `cells`
 //   gas    – poison gas fills the room around `cells`
 function runLink(game, link) {
-  const { floor } = game;
+  const { zone } = game;
   if (link.action === "open") {
-    for (const [x, y, z] of link.cells) floor.set(x, y, z, B.AIR);
+    for (const [x, y, z] of link.cells) zone.set(x, y, z, B.AIR);
     game.log("Somewhere close, iron grinds against stone.", [160, 220, 255]);
   } else if (link.action === "free") {   // Lio's cell
-    for (const [x, y, z] of link.cells) floor.set(x, y, z, B.AIR);
-    const lio = floor.npcs.find((n) => n.type === "lio");
+    for (const [x, y, z] of link.cells) zone.set(x, y, z, B.AIR);
+    const lio = zone.npcs.find((n) => n.type === "lio");
     if (lio) lio.state.free = true;
     game.log("Somewhere on this floor, bars grind down into the stone. A distant voice: \"Yes! YES!\"", [160, 220, 255]);
   } else if (link.action === "dud") {
     game.log(link.msg || "The lever clanks. Nothing happens.", [170, 170, 170]);
   } else if (link.action === "part") {
-    const g = floor.groups.get(link.group);
+    const g = zone.groups.get(link.group);
     g.pulled++;
     if (g.pulled >= g.need) {
-      for (const [x, y, z] of g.cells) floor.set(x, y, z, B.AIR);
+      for (const [x, y, z] of g.cells) zone.set(x, y, z, B.AIR);
       game.log("The last mechanism engages. Iron grinds against stone!", [160, 220, 255]);
     } else game.log("Something clicks inside the wall... but nothing else happens. Yet.", [160, 200, 230]);
   } else if (link.action === "pit") {
-    for (const [x, y] of link.cells) for (let z = 0; z < FLOOR_Z; z++) floor.set(x, y, z, B.AIR);
+    for (const [x, y] of link.cells) for (let z = 0; z < FLOOR_Z; z++) zone.set(x, y, z, B.AIR);
     game.log("The floor gives way beneath you!", [255, 120, 100]);
   } else if (link.action === "summon") {
-    const spots = link.cells.filter(([x, y]) => floor.stand[x + y * floor.w] >= 0 && !floor.monsters.some((m) => m.tx === x && m.ty === y));
+    const spots = link.cells.filter(([x, y]) => zone.stand[x + y * zone.w] >= 0 && !zone.monsters.some((m) => m.tx === x && m.ty === y));
     for (let k = 0; k < 3 && spots.length; k++) {
       const [x, y] = spots.splice(Math.floor(Math.random() * spots.length), 1)[0];
-      floor.monsters.push(spawnMonster(pickMonsterType(Math.random, game.depth), x, y, floor.stand[x + y * floor.w], "chase", game.depth));
+      zone.monsters.push(spawnMonster(pickMonsterType(Math.random, game.zone.level), x, y, zone.stand[x + y * zone.w], "chase", game.zone.level));
     }
     game.log("Hidden doors slam open in the walls. Monsters pour out!", [255, 120, 100]);
   } else if (link.action === "gas") {
     const [cx, cy] = link.cells.reduce(([ax, ay], [x, y]) => [ax + x / link.cells.length, ay + y / link.cells.length], [0, 0]);
-    floor.clouds.push({ x: cx + 0.5, y: cy + 0.5, z: FLOOR_Z + 1, r: 3, time: 8, kind: "poison" });
+    zone.clouds.push({ x: cx + 0.5, y: cy + 0.5, z: FLOOR_Z + 1, r: 3, time: 8, kind: "poison" });
     game.log("Green gas hisses out of the walls!", [150, 210, 80]);
   }
 }
@@ -139,7 +139,7 @@ function runLink(game, link) {
 // The brazier puzzle: light them in the order of the numerals carved behind them.
 // The wrong one snuffs them all out — and wakes something.
 function brazierLit(game, x, y) {
-  const { floor } = game, puzzle = floor.braziers;
+  const { zone } = game, puzzle = zone.braziers;
   if (!puzzle || puzzle.solved) return;
   const b = puzzle.list.find((o) => o.x === x && o.y === y);
   if (!b) return;
@@ -147,17 +147,17 @@ function brazierLit(game, x, y) {
     puzzle.next++;
     if (puzzle.next > puzzle.list.length) {
       puzzle.solved = true;
-      for (const [gx, gy, gz] of puzzle.gate) floor.set(gx, gy, gz, B.AIR);
+      for (const [gx, gy, gz] of puzzle.gate) zone.set(gx, gy, gz, B.AIR);
       game.log("All the flames roar up together. Somewhere, iron grinds against stone!", [255, 220, 120]);
     }
     return;
   }
-  for (const o of puzzle.list) floor.set(o.x, o.y, o.z, B.BRAZIER);
+  for (const o of puzzle.list) zone.set(o.x, o.y, o.z, B.BRAZIER);
   puzzle.next = 1;
   game.log("The flames gutter and die. A cold wind howls through the room...", [170, 190, 255]);
-  const spots = puzzle.list.map((o) => [o.x, o.y + 2]).filter(([sx, sy]) => floor.stand[sx + sy * floor.w] >= 0);
+  const spots = puzzle.list.map((o) => [o.x, o.y + 2]).filter(([sx, sy]) => zone.stand[sx + sy * zone.w] >= 0);
   if (spots.length) {
     const [sx, sy] = spots[Math.floor(Math.random() * spots.length)];
-    floor.monsters.push(spawnMonster(pickMonsterType(Math.random, game.depth), sx, sy, floor.stand[sx + sy * floor.w], "chase", game.depth));
+    zone.monsters.push(spawnMonster(pickMonsterType(Math.random, game.zone.level), sx, sy, zone.stand[sx + sy * zone.w], "chase", game.zone.level));
   }
 }

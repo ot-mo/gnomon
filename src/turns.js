@@ -7,7 +7,7 @@
 //
 // It's the same world and the same player as the 3D view, so when you switch back
 // you're standing on the tile you walked to.
-import { KIND, H, B, FLOOR_Z } from "./world.js";
+import { KIND, B, FLOOR_Z, solidFor as zoneSolidFor } from "./world.js";
 import { castRay, lineOfSight } from "./raycast.js";
 import { sampleLight } from "./light.js";
 import { updateMonsters, attackMonster, monsterAt, MONSTER_TYPES } from "./monsters.js";
@@ -53,12 +53,8 @@ export function passTime(game, seconds) {
 // --- Standing heights -------------------------------------------------------------
 // A column can have more than one place to stand (the floor under a floating platform,
 // and the platform's top). These find the right one. `S` says what's solid for you:
-// for a swimmer, deep water holds you up.
-const solidFor = (game) => {
-  const f = game.floor;
-  return canSwim(game.player) ? (x, y, z) => f.solid(x, y, z) || f.get(x, y, z) === B.WATER_DEEP
-                              : (x, y, z) => f.solid(x, y, z);
-};
+// for a swimmer (or anyone on the surface), deep water holds you up: world.js solidFor.
+const solidFor = (game) => zoneSolidFor(game.zone, game.player);
 const bodyFits = (S, x, y, z) => !S(x, y, Math.floor(z)) && !S(x, y, Math.floor(z + HEIGHT - 0.01));
 const canStand = (S, x, y, z) => S(x, y, z - 1) && bodyFits(S, x, y, z);
 
@@ -69,8 +65,8 @@ function groundBelow(S, x, y, z) {
 }
 
 // The highest place to stand in the column at all (where flying takes you).
-function topSurface(S, x, y) {
-  return groundBelow(S, x, y, H - 2);
+function topSurface(S, x, y, h) {
+  return groundBelow(S, x, y, h - 2);
 }
 
 // Come down to the ground under you; nothing there means you fall (or sink) to the next floor.
@@ -88,32 +84,32 @@ function land(game) {
 // where the visible monsters are right now. With the Cartographer perk, chasms you see
 // from here are marked on the map too.
 export function refreshView(game) {
-  const { floor, player: p } = game;
+  const { zone, player: p } = game;
   const ex = p.x, ey = p.y, ez = p.z + EYE;
   const torch = torchRange(p);
-  const holes = p.perks.has("cartographer") ? floor.holeSeen : null;
+  const holes = p.perks.has("cartographer") ? zone.holeSeen : null;
   const tx = Math.floor(p.x), ty = Math.floor(p.y);
   for (let y = ty - 1; y <= ty + 1; y++)
     for (let x = tx - 1; x <= tx + 1; x++)
-      if (x >= 0 && y >= 0 && x < floor.w && y < floor.d) floor.seen[x + y * floor.w] = 1;
+      if (x >= 0 && y >= 0 && x < zone.w && y < zone.d) zone.seen[x + y * zone.w] = 1;
   for (let k = 0; k < 240; k++) {
     const a = (k / 240) * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
     for (const pitch of [-0.5, -0.2, 0.05, 0.3]) {
       const cp = Math.cos(pitch);
-      castRay(floor, ex, ey, ez, ca * cp, sa * cp, Math.sin(pitch), 24, floor.seen, torch, holes);
+      castRay(zone, ex, ey, ez, ca * cp, sa * cp, Math.sin(pitch), 24, zone.seen, torch, holes);
     }
   }
   const sense = bonus(p, "sense");   // an amulet of sight: monsters close by show, seen or not
-  for (const m of floor.monsters) {
+  for (const m of zone.monsters) {
     if (MONSTER_TYPES[m.type].ghostly && p.torch) continue;   // the Gloom Warden: not with your torch lit
     const cz = m.z + m.h * 0.6;
     const dist = Math.hypot(m.x - p.x, m.y - p.y);
-    if (dist < sense) { floor.sightings.set(m.id, { x: m.x, y: m.y, glyph: m.glyph, color: m.color, name: m.name, time: game.time }); continue; }
+    if (dist < sense) { zone.sightings.set(m.id, { x: m.x, y: m.y, glyph: m.glyph, color: m.color, name: m.name, time: game.time }); continue; }
     if (dist > 24) continue;
-    const lamp = sampleLight(floor, floor.lampLight, m.x, m.y, cz);
-    const lit = sampleLight(floor, floor.skyLight, m.x, m.y, cz) * 0.6 + lamp * Math.sqrt(lamp) * 2 > 0.15 || dist < torch;
-    if (lit && lineOfSight(floor, ex, ey, ez, m.x, m.y, cz))
-      floor.sightings.set(m.id, { x: m.x, y: m.y, glyph: m.glyph, color: m.color, name: m.name, time: game.time });
+    const lamp = sampleLight(zone, zone.lampLight, m.x, m.y, cz);
+    const lit = sampleLight(zone, zone.skyLight, m.x, m.y, cz) * 0.6 + lamp * Math.sqrt(lamp) * 2 > 0.15 || dist < torch;
+    if (lit && lineOfSight(zone, ex, ey, ez, m.x, m.y, cz))
+      zone.sightings.set(m.id, { x: m.x, y: m.y, glyph: m.glyph, color: m.color, name: m.name, time: game.time });
   }
 }
 
@@ -133,26 +129,26 @@ function settle(game) {
 // Moves are always to a neighbouring tile: you can't jump gaps on the map (that's what
 // the 3D view is for), but you can climb up to 2 blocks, and fly anywhere while flying.
 export function mapStep(game, dx, dy) {
-  const { floor, player: p } = game;
+  const { zone, player: p } = game;
   settle(game);
   const S = solidFor(game);
   const flying = p.flyTime > 0, swimmer = canSwim(p);
   const climb = PLAYER_STEP_UP + (jumpBonus(p) >= 1 ? 1 : 0);
   const tx = Math.floor(p.x), ty = Math.floor(p.y);
   const nx = tx + dx, ny = ty + dy;
-  if (nx < 0 || ny < 0 || nx >= floor.w || ny >= floor.d) return false;
+  if (nx < 0 || ny < 0 || nx >= zone.w || ny >= zone.d) return false;
   p.yaw = Math.atan2(dy, dx);   // face where you're going, so the 3D view matches
 
   // Walking into someone talks to them (it takes no time). A ghost you haven't met is just a
   // cold spot in the way: you'd have to see it in 3D, in the dark.
-  const npc = npcAt(floor, nx, ny);
+  const npc = npcAt(zone, nx, ny);
   if (npc) {
     if (NPC_TYPES[npc.type].ghost && !npc.met) game.log("The air here is icy, as if someone were standing in your way. Someone you can't see from up here.", [150, 210, 240]);
     else game.onTalk(npc);
     return false;
   }
 
-  const m = monsterAt(floor, nx, ny);
+  const m = monsterAt(zone, nx, ny);
   if (m) {
     if (Math.abs(m.z - p.z) > 1.5) { game.log(`You can't reach the ${m.name} from here.`, [170, 170, 170]); return false; }
     sfx("swing");
@@ -161,8 +157,8 @@ export function mapStep(game, dx, dy) {
     return true;
   }
 
-  const kind = floor.kind[nx + ny * floor.w];
-  const coldBrazier = floor.get(nx, ny, FLOOR_Z) === B.BRAZIER;   // bump it to light it
+  const kind = zone.kind[nx + ny * zone.w];
+  const coldBrazier = zone.get(nx, ny, FLOOR_Z) === B.BRAZIER;   // bump it to light it
   if (kind === KIND.DOOR || kind === KIND.LOCKED || kind === KIND.GATE || kind === KIND.LEVER || coldBrazier) {
     if (!useColumn(game, nx, ny)) return false;
     if (!flying && groundBelow(S, tx, ty, p.z) < 0) { p.z = -2; game.checkFloorEvents(); return true; }   // a trap opened under you
@@ -172,8 +168,8 @@ export function mapStep(game, dx, dy) {
   if (kind === KIND.WALL) return false;
 
   // A chasm you've seen, or deep water: ask before going in (step the same way again to do it).
-  const target = nx + ny * floor.w;
-  const drop = !flying && ((kind === KIND.HOLE && floor.holeSeen[target]) || (kind === KIND.DEEP && !swimmer));
+  const target = nx + ny * zone.w;
+  const drop = !flying && ((kind === KIND.HOLE && zone.holeSeen[target]) || (kind === KIND.DEEP && !swimmer));
   if (drop && game.confirmJump !== target) {
     game.confirmJump = target;
     game.log(kind === KIND.DEEP ? "The water is deep. Step that way again to dive in."
@@ -187,7 +183,7 @@ export function mapStep(game, dx, dy) {
 
   if (flying) {
     // Fly onto the highest surface there, or hover at this height over a chasm or water.
-    const top = topSurface(S, nx, ny);
+    const top = topSurface(S, nx, ny, zone.h);
     const z = top >= 0 ? top : p.z;
     if (!bodyFits(S, nx, ny, z)) { game.log("Something blocks your way.", [170, 170, 170]); return false; }
     p.x = nx + 0.5; p.y = ny + 0.5; p.z = z;
@@ -201,7 +197,7 @@ export function mapStep(game, dx, dy) {
       game.checkFloorEvents();
       return true;
     } else {
-      game.log(topSurface(S, nx, ny) > p.z ? "That's too high to climb." : "Something blocks your way.", [170, 170, 170]);
+      game.log(topSurface(S, nx, ny, zone.h) > p.z ? "That's too high to climb." : "Something blocks your way.", [170, 170, 170]);
       return false;
     }
   }
@@ -210,8 +206,8 @@ export function mapStep(game, dx, dy) {
   if (game.checkFloorEvents()) return true;   // stairs
   const swimming = !flying && kind === KIND.DEEP;   // (only possible for a swimmer)
   const wading = !flying && (kind === KIND.SHALLOW || swimming);
-  if (kind === KIND.SHALLOW && !floor.waterHint) {
-    floor.waterHint = true;
+  if (kind === KIND.SHALLOW && !zone.flags.waterHint) {
+    zone.flags.waterHint = true;
     game.log("You wade into the shallow water. It slows you down.", [110, 180, 220]);
   }
   p.wade = swimming ? 1.6 : wading ? 1 : 0;
@@ -245,25 +241,25 @@ export function mapUseTime(game, seconds) {
 // floor. Not through stairs (they'd take you away), spike traps (step through those yourself,
 // turn by turn), or people.
 function routable(game, x, y) {
-  const { floor, player: p } = game;
-  const i = x + y * floor.w, k = floor.kind[i];
-  if (!floor.seen[i] || npcAt(floor, x, y)) return false;
-  if (k === KIND.HOLE) return !floor.holeSeen[i];
+  const { zone, player: p } = game;
+  const i = x + y * zone.w, k = zone.kind[i];
+  if (!zone.seen[i] || npcAt(zone, x, y)) return false;
+  if (k === KIND.HOLE) return !zone.holeSeen[i];
   if (k === KIND.DEEP) return canSwim(p);
   return k === KIND.FLOOR || k === KIND.DOOR || k === KIND.SHALLOW || k === KIND.BRIDGE || k === KIND.MOSAIC;
 }
 
 export function planTravel(game, gx, gy) {
-  const { floor } = game;
-  const w = floor.w, d = floor.d;
-  if (gx < 0 || gy < 0 || gx >= w || gy >= d || !floor.seen[gx + gy * w]) return null;
+  const { zone } = game;
+  const w = zone.w, d = zone.d;
+  if (gx < 0 || gy < 0 || gx >= w || gy >= d || !zone.seen[gx + gy * w]) return null;
   return findRoute(game, (x, y) => x === gx && y === gy, (x, y) => (x === gx && y === gy) || routable(game, x, y));
 }
 
 // Breadth-first search from where you stand to the nearest tile where `goal` is true.
 function findRoute(game, goal, passable) {
-  const { floor, player: p } = game;
-  const w = floor.w, d = floor.d;
+  const { zone, player: p } = game;
+  const w = zone.w, d = zone.d;
   const sx = Math.floor(p.x), sy = Math.floor(p.y);
   const prev = new Int32Array(w * d).fill(-1);
   prev[sx + sy * w] = sx + sy * w;
@@ -289,14 +285,14 @@ function findRoute(game, goal, passable) {
 // Auto-explore (X on the map): head for the nearest edge of the unknown (a tile next to one
 // you haven't seen), or an item you've spotted, and keep going until something interrupts.
 function planExplore(game) {
-  const { floor } = game;
-  const w = floor.w, d = floor.d;
-  const hasItem = (x, y) => floor.items.some((it) => Math.floor(it.x) === x && Math.floor(it.y) === y && !it.dropped);
+  const { zone } = game;
+  const w = zone.w, d = zone.d;
+  const hasItem = (x, y) => zone.items.some((it) => Math.floor(it.x) === x && Math.floor(it.y) === y && !it.dropped);
   const frontier = (x, y) => {
     for (let oy = -1; oy <= 1; oy++)
       for (let ox = -1; ox <= 1; ox++) {
         const nx = x + ox, ny = y + oy;
-        if (nx >= 0 && ny >= 0 && nx < w && ny < d && !floor.seen[nx + ny * w]) return true;
+        if (nx >= 0 && ny >= 0 && nx < w && ny < d && !zone.seen[nx + ny * w]) return true;
       }
     return false;
   };
@@ -306,7 +302,7 @@ function planExplore(game) {
 export function startExplore(game) {
   const path = planExplore(game);
   if (!path) { game.log("Nothing left to explore that you can walk to from here.", [170, 170, 170]); return false; }
-  const visible = new Set([...game.floor.sightings].filter(([, s]) => s.time === game.time).map(([id]) => id));
+  const visible = new Set([...game.zone.sightings].filter(([, s]) => s.time === game.time).map(([id]) => id));
   game.travel = { path, visible, hp: game.player.hp, timer: 0, explore: true };
   return true;
 }
@@ -314,7 +310,7 @@ export function startExplore(game) {
 export function startTravel(game, gx, gy) {
   const path = planTravel(game, gx, gy);
   if (!path) return false;
-  const visible = new Set([...game.floor.sightings].filter(([, s]) => s.time === game.time).map(([id]) => id));
+  const visible = new Set([...game.zone.sightings].filter(([, s]) => s.time === game.time).map(([id]) => id));
   game.travel = { path, visible, hp: game.player.hp, timer: 0 };
   return true;
 }
@@ -326,11 +322,11 @@ export function travelStep(game) {
   const p = game.player;
   const [x, y] = tr.path[0];
   const dx = x - Math.floor(p.x), dy = y - Math.floor(p.y);
-  const attacking = !!monsterAt(game.floor, x, y);
+  const attacking = !!monsterAt(game.zone, x, y);
   if (Math.abs(dx) > 1 || Math.abs(dy) > 1 || !mapStep(game, dx, dy) || attacking) { game.travel = null; return; }
   if (game.mode !== "map") { game.travel = null; return; }
   if (Math.floor(p.x) === x && Math.floor(p.y) === y) tr.path.shift();   // (opening a door doesn't move you)
-  const newcomer = [...game.floor.sightings].some(([id, s]) => s.time === game.time && !tr.visible.has(id));
+  const newcomer = [...game.zone.sightings].some(([id, s]) => s.time === game.time && !tr.visible.has(id));
   if (p.hp < tr.hp || newcomer) { game.travel = null; return; }
   if (!tr.path.length) {
     if (!tr.explore) { game.travel = null; return; }

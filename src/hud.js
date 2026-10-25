@@ -5,7 +5,6 @@ import { armourValue } from "./player.js";
 import { WEAPONS, WEAPON_PALETTE, ELEMENTS, itemName, itemGlyph } from "./items.js";
 import { readyStack } from "./throwing.js";
 import { PERKS, xpToNext, perkLabel } from "./leveling.js";
-import { FINAL_DEPTH } from "./world.js";
 
 export function drawHud(game) {
   const p = game.player;
@@ -43,7 +42,7 @@ export function drawHud(game) {
     overlay([
       ["YOU DIED", [255, 80, 80]],
       ["", null],
-      [`Killed by ${game.deathCause} on depth ${game.depth}.`, [220, 220, 220]],
+      [`Killed by ${game.deathCause} ${game.zone.type === "dungeon" ? `on depth ${game.zone.dungeonIndex}` : `in ${game.zone.name}`}.`, [220, 220, 220]],
       [`Seed ${game.seed}`, [140, 140, 140]],
       ["", null],
       ["Press R to start a new run", [255, 255, 255]],
@@ -61,9 +60,9 @@ export function drawHud(game) {
     ]);
   } else if (game.mode === "descend") {
     S.clear();
-    const t = game.depth === 0 ? "THE TEMPLE OF ANGLES" : `DEPTH ${game.depth}`;
+    const t = game.zone.type === "dungeon" ? `DEPTH ${game.zone.dungeonIndex}` : game.zone.name.toUpperCase();
     S.text((S.cols - t.length) >> 1, S.rows >> 1, t, 255, 230, 140);
-    if (game.depth >= FINAL_DEPTH) {
+    if (game.zone.final) {
       const sub = "The last floor. Something old waits here.";
       S.text((S.cols - sub.length) >> 1, (S.rows >> 1) + 2, sub, 140, 255, 170);
     }
@@ -110,11 +109,15 @@ export function levelUpClick(game, cell) {
   return k >= 0 && k < game.perkChoices.length ? k : -1;
 }
 
+// Where you are, for the status line: "DEPTH 3/20" in a dungeon, the zone's name on the surface.
+const zoneLabel = (zone) => (zone.type === "dungeon" ? `DEPTH ${zone.dungeonIndex}${zone.dungeonLevels ? `/${zone.dungeonLevels}` : ""}`
+  : zone.name.toUpperCase().replace(/^THE /, ""));
+
 function drawStatus(game, p, y) {
   S.blank(0, y, S.cols, 1);
   let x = 1;
   const seg = (str, c) => { S.text(x, y, str, ...c); x += str.length + 2; };
-  seg(game.depth === 0 ? "TEMPLE" : `DEPTH ${game.depth}/${FINAL_DEPTH}`, [255, 230, 140]);
+  seg(zoneLabel(game.zone), [255, 230, 140]);
   const n = 16, filled = Math.max(0, Math.min(n, Math.round((p.hp / p.maxHp) * n)));
   const hpColor = p.hp / p.maxHp > 0.5 ? [120, 230, 120] : p.hp / p.maxHp > 0.25 ? [240, 200, 80] : [255, 80, 80];
   seg(`HP [${"#".repeat(filled)}${".".repeat(n - filled)}] ${p.hp}/${p.maxHp}`, hpColor);
@@ -143,7 +146,7 @@ function drawStatus(game, p, y) {
 
 // Once the boss (or a guardian) has noticed you, its health runs across the top of the screen.
 function drawBossBar(game, y) {
-  const boss = game.floor.monsters.find((m) => (m.type === "lich" || m.guardian) && m.state === "chase");
+  const boss = game.zone.monsters.find((m) => (m.type === "lich" || m.guardian) && m.state === "chase");
   if (!boss) return;
   const n = Math.min(40, S.cols - 30), filled = Math.max(0, Math.round((boss.hp / boss.maxHp) * n));
   const label = `${boss.type === "lich" ? "THE LICH KING" : "THE " + boss.name.toUpperCase()}${boss.risen ? " (RISEN!)" : ""} [${"#".repeat(filled)}${".".repeat(n - filled)}]`;
@@ -191,12 +194,12 @@ function thrustPose(s) {
 }
 
 function drawSword(game) {
-  const p = game.player, floor = game.floor;
+  const p = game.player, zone = game.zone;
   const weapon = WEAPONS[p.weapon.id];
   const held = weapon.held;
   // Lit like the world: your torch, or whatever light is around you.
-  const lamp = sampleLight(floor, floor.lampLight, p.x, p.y, p.z + 1.2);
-  const sky = sampleLight(floor, floor.skyLight, p.x, p.y, p.z + 1.2);
+  const lamp = sampleLight(zone, zone.lampLight, p.x, p.y, p.z + 1.2);
+  const sky = sampleLight(zone, zone.skyLight, p.x, p.y, p.z + 1.2);
   const light = Math.min(1.25, 0.22 + sky * 0.6 + lamp * 1.1 + (p.torch ? 0.75 : 0));
   const pose = weapon.thrust ? thrustPose : swingPose;
   const [t0, t1] = weapon.thrust ? [0.25, 0.6] : [0.2, 0.75];   // when the motion trail shows

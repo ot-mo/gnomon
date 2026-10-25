@@ -1,5 +1,5 @@
 // The player: body (look, walk, sprint, jump, fly, collide — learn/04 §5), stats and gear.
-import { FLOOR_Z, B } from "./world.js";
+import { FLOOR_Z, B, solidFor } from "./world.js";
 import { WEAPONS, ARMOURS, itemBonuses } from "./items.js";
 import { PERKS, perkRank } from "./leveling.js";
 
@@ -88,8 +88,8 @@ export const hasFeatherFall = (p) => bonus(p, "featherFall") > 0;
 // Swimmers float on deep water instead of sinking: for them it's solid to stand on.
 export const canSwim = (p) => p.perks.has("swimmer");
 
-export function inShallowWater(p, floor) {
-  const g = floor.get(Math.floor(p.x), Math.floor(p.y), Math.round(p.z) - 1);
+export function inShallowWater(p, zone) {
+  const g = zone.get(Math.floor(p.x), Math.floor(p.y), Math.round(p.z) - 1);
   return g === B.WATER_SHALLOW || (g === B.WATER_DEEP && canSwim(p));
 }
 
@@ -103,23 +103,23 @@ export function clampPitch(p) {
   p.pitch = Math.max(-LIMIT, Math.min(LIMIT, p.pitch));
 }
 
-export function bodyCollides(p, floor) {
+export function bodyCollides(p, zone) {
   const x0 = Math.floor(p.x - RADIUS), x1 = Math.floor(p.x + RADIUS);
   const y0 = Math.floor(p.y - RADIUS), y1 = Math.floor(p.y + RADIUS);
   const z0 = Math.floor(p.z), z1 = Math.floor(p.z + HEIGHT);
-  const swim = canSwim(p);
+  const solid = solidFor(zone, p);   // swimmers float on deep water (world.js)
   for (let z = z0; z <= z1; z++)
     for (let y = y0; y <= y1; y++)
       for (let x = x0; x <= x1; x++)
-        if (floor.solid(x, y, z) || (swim && floor.get(x, y, z) === B.WATER_DEEP)) return true;
+        if (solid(x, y, z)) return true;
   return false;
 }
 
 // Move along one axis; if that ends up inside a block, back out to just touch its face.
-export function moveAxis(p, floor, axis, amount) {
+export function moveAxis(p, zone, axis, amount) {
   if (amount === 0) return;
   p[axis] += amount;
-  if (!bodyCollides(p, floor)) return;
+  if (!bodyCollides(p, zone)) return;
   const v = p[axis];
   if (axis === "z") {
     if (amount < 0) {
@@ -133,7 +133,7 @@ export function moveAxis(p, floor, axis, amount) {
   }
 }
 
-export function updatePlayer(p, floor, keys, dt) {
+export function updatePlayer(p, zone, keys, dt) {
   if (p.paralyzed > 0) keys = new Set();   // potion of paralysis: you can't do a thing
   const LOOK = 2.0 * dt;
   if (keys.has("ArrowLeft")) p.yaw -= LOOK;
@@ -151,8 +151,8 @@ export function updatePlayer(p, floor, keys, dt) {
   const len = Math.hypot(mx, my);
   const flying = p.flyTime > 0;
   p.sprinting = len > 0 && (keys.has("ShiftLeft") || keys.has("ShiftRight"));
-  const wading = p.onGround && !flying && inShallowWater(p, floor);
-  const swimming = wading && floor.get(Math.floor(p.x), Math.floor(p.y), Math.round(p.z) - 1) === B.WATER_DEEP;
+  const wading = p.onGround && !flying && inShallowWater(p, zone);
+  const swimming = wading && zone.get(Math.floor(p.x), Math.floor(p.y), Math.round(p.z) - 1) === B.WATER_DEEP;
   p.wade = (p.wade || 0) + ((wading ? (swimming ? 1.6 : 1) : 0) - (p.wade || 0)) * Math.min(1, dt * 8);   // eases the view down/up
   const speed = (p.sprinting ? SPRINT : WALK) * (wading ? (swimming ? 0.45 : WADE_SLOWDOWN) : 1) *
     (p.hasteTime > 0 ? HASTE : 1) * speedMul(p);
@@ -168,10 +168,10 @@ export function updatePlayer(p, floor, keys, dt) {
   const h = dt / steps;
   for (let s = 0; s < steps; s++) {
     if (!flying) p.vz = Math.max(p.vz - GRAVITY * h, -30);
-    moveAxis(p, floor, "x", mx * h);
-    moveAxis(p, floor, "y", my * h);
+    moveAxis(p, zone, "x", mx * h);
+    moveAxis(p, zone, "y", my * h);
     p.onGround = false;
-    moveAxis(p, floor, "z", p.vz * h);
+    moveAxis(p, zone, "z", p.vz * h);
   }
 }
 

@@ -12,7 +12,7 @@
 // they hurt everything close, smash crates, and open the thin walls of secret rooms.
 import { damageMonster, hitPlayer, touchable } from "./monsters.js";
 import { POTIONS, POTION_COLORS, FLOOR_ART, itemPalette, makeItem, awayFromWalls } from "./items.js";
-import { B, FLOOR_Z, FINAL_DEPTH } from "./world.js";
+import { B, FLOOR_Z } from "./world.js";
 import { EYE, RADIUS, HEIGHT } from "./player.js";
 import { noise2 } from "./rng.js";
 import { sfx } from "./sfx.js";
@@ -44,7 +44,7 @@ export function throwReady(game, stack = readyStack(game.player)) {
   const cp = Math.cos(p.pitch);
   const fx = cp * Math.cos(p.yaw), fy = cp * Math.sin(p.yaw), fz = Math.sin(p.pitch);
   const bomb = it.kind === "bomb", speed = bomb ? SPEED * 0.6 : SPEED;   // bombs are lobbed
-  game.floor.projectiles.push({
+  game.zone.projectiles.push({
     ...it, x: p.x + fx * 0.3, y: p.y + fy * 0.3, z: p.z + EYE - 0.2 + fz * 0.3,
     vx: fx * speed, vy: fy * speed, vz: fz * speed + (bomb ? 3 : 1.5), life: bomb ? FUSE : 2, spin: 0,
     fuse: bomb ? FUSE : undefined,
@@ -58,17 +58,17 @@ export function throwReady(game, stack = readyStack(game.player)) {
 // Map: throw at the nearest monster you can see (within 10 tiles), or set a bomb down at
 // your feet. Returns true if you did (it takes a turn).
 export function throwAtNearest(game, stack = readyStack(game.player)) {
-  const { floor, player: p } = game;
+  const { zone, player: p } = game;
   if (!stack) { game.log("You have nothing to throw. (T in the inventory throws a potion.)", [170, 170, 170]); return false; }
   if (stack.kind === "bomb") {
     p.ready = { kind: "bomb" };
     takeOne(p, stack);
-    floor.bombs.push({ x: p.x, y: p.y, z: p.z, fuse: FUSE });
+    zone.bombs.push({ x: p.x, y: p.y, z: p.z, fuse: FUSE });
     game.log("You light a bomb and set it down. Get away from it!", [255, 170, 70]);
     return true;
   }
-  const visible = floor.monsters
-    .filter((m) => floor.sightings.get(m.id)?.time === game.time && Math.hypot(m.x - p.x, m.y - p.y) <= 10)
+  const visible = zone.monsters
+    .filter((m) => zone.sightings.get(m.id)?.time === game.time && Math.hypot(m.x - p.x, m.y - p.y) <= 10)
     .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
   const m = visible[0];
   if (!m) { game.log("There's no monster in sight to throw at.", [170, 170, 170]); return false; }
@@ -83,13 +83,13 @@ export function throwAtNearest(game, stack = readyStack(game.player)) {
 // Move everything in flight. Each step: did it hit a monster (or you, for arrows and bolts
 // shot by monsters)? A block? Deep water?
 export function updateProjectiles(game, dt) {
-  const { floor, player: p } = game;
-  for (const pr of [...floor.projectiles]) {
+  const { zone, player: p } = game;
+  for (const pr of [...zone.projectiles]) {
     pr.life -= dt;
     pr.spin += dt * 20;
     if (pr.kind === "bomb" && (pr.fuse -= dt) <= 0) {   // went off in mid-air
       explode(game, pr.x, pr.y, pr.z);
-      floor.projectiles = floor.projectiles.filter((o) => o !== pr);
+      zone.projectiles = zone.projectiles.filter((o) => o !== pr);
       continue;
     }
     const steps = Math.ceil(dt / (1 / 120));
@@ -99,7 +99,7 @@ export function updateProjectiles(game, dt) {
     for (let s = 0; s < steps && !done; s++) {
       pr.vz -= (pr.g ?? GRAVITY) * h;
       const nx = pr.x + pr.vx * h, ny = pr.y + pr.vy * h, nz = pr.z + pr.vz * h;
-      const m = !pr.hostile && floor.monsters.find((mo) => touchable(game, mo) &&
+      const m = !pr.hostile && zone.monsters.find((mo) => touchable(game, mo) &&
         Math.hypot(nx - mo.x, ny - mo.y) < mo.w * 0.45 + 0.15 && nz > mo.z - 0.1 && nz < mo.z + mo.h + 0.1);
       const bx = Math.floor(nx), by = Math.floor(ny), bz = Math.floor(nz);
       if (pr.hostile && Math.abs(nx - p.x) < RADIUS + 0.1 && Math.abs(ny - p.y) < RADIUS + 0.1 && nz > p.z && nz < p.z + HEIGHT) {
@@ -107,12 +107,12 @@ export function updateProjectiles(game, dt) {
         hitPlayer(game, pr.from, pr.dmg, `the ${pr.from.name}'s ${what}`, `the ${what}`, true);
         done = true;
       } else if (m) { impact(game, pr, nx, ny, nz, m); done = true; }
-      else if (floor.solid(bx, by, bz) || floor.get(bx, by, bz) === B.WATER_DEEP || nz < -1) {
+      else if (zone.solid(bx, by, bz) || zone.get(bx, by, bz) === B.WATER_DEEP || nz < -1) {
         impact(game, pr, pr.x, pr.y, pr.z, null);   // stop just before the surface it hit
         done = true;
       } else { pr.x = nx; pr.y = ny; pr.z = nz; }
     }
-    if (done) floor.projectiles = floor.projectiles.filter((o) => o !== pr);
+    if (done) zone.projectiles = zone.projectiles.filter((o) => o !== pr);
   }
 }
 
@@ -120,12 +120,12 @@ export function updateProjectiles(game, dt) {
 function impact(game, it, x, y, z, m) {
   if (it.hostile) return;   // a monster's arrow or bolt hit a wall: gone
   if (it.kind === "potion") { shatter(game, it.effect, x, y, z); return; }
-  const { floor } = game;
+  const { zone } = game;
   if (it.kind === "bomb") {   // it drops where it stopped and fizzes until it goes off
-    const ground = floor.stand[Math.floor(x) + Math.floor(y) * floor.w];
+    const ground = zone.stand[Math.floor(x) + Math.floor(y) * zone.w];
     if (ground < 0) { game.log("The bomb tumbles into the dark. A dull boom echoes from far below.", [170, 170, 170]); return; }
-    const [bx, by] = awayFromWalls(floor, x, y, ground);
-    floor.bombs.push({ x: bx, y: by, z: ground, fuse: it.fuse ?? FUSE });
+    const [bx, by] = awayFromWalls(zone, x, y, ground);
+    zone.bombs.push({ x: bx, y: by, z: ground, fuse: it.fuse ?? FUSE });
     return;
   }
   if (m) {
@@ -138,27 +138,27 @@ function impact(game, it, x, y, z, m) {
   // Where does it come to rest? On the ground under where it stopped — unless that's a
   // chasm or deep water, or it snapped (1 in 5).
   const tx = Math.floor(x), ty = Math.floor(y);
-  const ground = floor.stand[tx + ty * floor.w];
+  const ground = zone.stand[tx + ty * zone.w];
   if (ground < 0 || Math.random() < 0.2) return;
-  floor.items.push(makeItem({ kind: "knife", count: 1 }, tx + 0.5, ty + 0.5, ground));
+  zone.items.push(makeItem({ kind: "knife", count: 1 }, tx + 0.5, ty + 0.5, ground));
 }
 
 // A potion smashes at (x, y, z) and splashes everything within SPLASH blocks.
 function shatter(game, effect, x, y, z) {
-  const { floor, player: p } = game;
+  const { zone, player: p } = game;
   const color = POTION_COLORS[game.potionColor[effect]];
   const known = game.knownPotions.has(effect);
   game.knownPotions.add(effect);
   game.log(known ? `The potion of ${POTIONS[effect].name} shatters!`
                  : `The ${color.name} potion shatters. It was a potion of ${POTIONS[effect].name}!`, color.rgb);
   game.effects.push({ kind: "burst", x, y, z, color: color.rgb, time: game.time });
-  const near = floor.monsters.filter((m) => touchable(game, m) && Math.hypot(m.x - x, m.y - y) <= SPLASH && Math.abs(m.z - z) < 2.5);
+  const near = zone.monsters.filter((m) => touchable(game, m) && Math.hypot(m.x - x, m.y - y) <= SPLASH && Math.abs(m.z - z) < 2.5);
   const youToo = Math.hypot(p.x - x, p.y - y) <= SPLASH && Math.abs(p.z + 1 - z) < 2.5;
   const names = () => near.map((m) => m.name).join(", ");
 
   switch (effect) {
     case "poison":
-      floor.clouds.push({ x, y, z, r: SPLASH, time: 6, kind: "poison" });
+      zone.clouds.push({ x, y, z, r: SPLASH, time: 6, kind: "poison" });
       game.log("A cloud of poison gas billows out!", [150, 210, 80]);
       break;
     case "paralysis":
@@ -173,18 +173,18 @@ function shatter(game, effect, x, y, z) {
     case "descent": {
       // The floor melts away: a 3×3 pit (never under stairs). Whatever stands there falls.
       // Not on the last floor: there's nothing below it.
-      if (game.depth >= FINAL_DEPTH) { game.log("The floor shimmers, but holds. Something wards it.", [180, 170, 140]); break; }
+      if (!zone.hasBelow) { game.log("The floor shimmers, but holds. Something wards it.", [180, 170, 140]); break; }
       const cx = Math.floor(x), cy = Math.floor(y);
       for (let ty = cy - 1; ty <= cy + 1; ty++)
         for (let tx = cx - 1; tx <= cx + 1; tx++) {
-          const g = floor.get(tx, ty, FLOOR_Z - 1);
-          if (tx < 1 || ty < 1 || tx >= floor.w - 1 || ty >= floor.d - 1) continue;
-          if (g === B.STAIRS || g === B.STAIRS_UP || floor.get(tx, ty, FLOOR_Z)) continue;   // stairs, or a wall here
-          floor.set(tx, ty, 0, B.AIR);
-          floor.set(tx, ty, FLOOR_Z - 1, B.AIR);
-          floor.holeSeen[tx + ty * floor.w] = 1;
+          const g = zone.get(tx, ty, FLOOR_Z - 1);
+          if (tx < 1 || ty < 1 || tx >= zone.w - 1 || ty >= zone.d - 1) continue;
+          if (g === B.STAIRS || g === B.STAIRS_UP || zone.get(tx, ty, FLOOR_Z)) continue;   // stairs, or a wall here
+          zone.set(tx, ty, 0, B.AIR);
+          zone.set(tx, ty, FLOOR_Z - 1, B.AIR);
+          zone.holeSeen[tx + ty * zone.w] = 1;
         }
-      floor.refresh();
+      zone.refresh();
       game.log("The floor melts away into a pit!", [180, 170, 140]);
       break;
     }
@@ -204,11 +204,11 @@ function shatter(game, effect, x, y, z) {
 
 // Lit bombs on the ground count down; when one goes off, any close by go off with it.
 export function updateBombs(game, dt) {
-  const { floor } = game;
-  for (const b of [...floor.bombs]) {
+  const { zone } = game;
+  for (const b of [...zone.bombs]) {
     b.fuse -= dt;
     if (b.fuse > 0) continue;
-    floor.bombs = floor.bombs.filter((o) => o !== b);
+    zone.bombs = zone.bombs.filter((o) => o !== b);
     explode(game, b.x, b.y, b.z + 0.3);
   }
 }
@@ -216,58 +216,58 @@ export function updateBombs(game, dt) {
 // BOOM. Hurts everything within BLAST blocks (you too), smashes crates, and opens any
 // secret-room wall it's next to. Ordinary walls just shake.
 function explode(game, x, y, z) {
-  const { floor, player: p } = game;
-  const W = floor.w;
+  const { zone, player: p } = game;
+  const W = zone.w;
   game.effects.push({ kind: "burst", x, y, z, color: [255, 160, 60], time: game.time, big: true });
   game.effects.push({ kind: "boom", x, y, z, time: game.time });
   game.log("BOOM!", [255, 170, 60]);
   sfx("boom", { at: { x, y } });
   const demo = p.perks.has("demolitionist"), blast = demo ? BLAST * 1.4 : BLAST;   // the Demolitionist perk
-  for (const o of floor.bombs) if (Math.hypot(o.x - x, o.y - y) < blast) o.fuse = Math.min(o.fuse, 0.15);
-  for (const m of [...floor.monsters])
+  for (const o of zone.bombs) if (Math.hypot(o.x - x, o.y - y) < blast) o.fuse = Math.min(o.fuse, 0.15);
+  for (const m of [...zone.monsters])
     if (Math.hypot(m.x - x, m.y - y) <= blast && Math.abs(m.z + m.h / 2 - z) < 2.5)
       damageMonster(game, m, 10 + Math.floor(Math.random() * 7), [255, 160, 60], `The ${m.name} is blown apart.`);
   if (Math.hypot(p.x - x, p.y - y) <= blast && Math.abs(p.z + 0.8 - z) < 2.5)
     game.hurtPlayer(Math.ceil((8 + Math.floor(Math.random() * 5)) / (demo ? 2 : 1)), "your own bomb");
 
   let opened = false, changed = false, wallNear = false;
-  for (const c of [...floor.secretWalls]) {
+  for (const c of [...zone.secretWalls]) {
     const wx = c % W, wy = (c - wx) / W;
     if (Math.hypot(wx + 0.5 - x, wy + 0.5 - y) > 1.9 || z > FLOOR_Z + 3) continue;
-    floor.set(wx, wy, FLOOR_Z, B.AIR);
-    floor.set(wx, wy, FLOOR_Z + 1, B.AIR);
-    floor.secretWalls.delete(c);
+    zone.set(wx, wy, FLOOR_Z, B.AIR);
+    zone.set(wx, wy, FLOOR_Z + 1, B.AIR);
+    zone.secretWalls.delete(c);
     opened = true;
   }
   for (let ty = Math.floor(y) - 2; ty <= Math.floor(y) + 2; ty++)
     for (let tx = Math.floor(x) - 2; tx <= Math.floor(x) + 2; tx++) {
       const d = Math.hypot(tx + 0.5 - x, ty + 0.5 - y);
       for (let tz = FLOOR_Z; tz <= FLOOR_Z + 2; tz++) {
-        const b = floor.get(tx, ty, tz);
-        if (b === B.CRATE && d < 1.7) { floor.set(tx, ty, tz, B.AIR); changed = true; }
+        const b = zone.get(tx, ty, tz);
+        if (b === B.CRATE && d < 1.7) { zone.set(tx, ty, tz, B.AIR); changed = true; }
         else if (b && b !== B.CRATE && d < 1.3) wallNear = true;
       }
     }
   if (opened) {
-    if (floor.secret) floor.secret.found = true;
+    if (zone.secret) zone.secret.found = true;
     game.log("The wall crumbles away. There's a hidden room behind it!", [255, 230, 140]);
   } else if (wallNear) game.log("The walls shake, but hold.", [170, 170, 170]);
-  if (opened || changed) floor.refresh();
+  if (opened || changed) zone.refresh();
 }
 
 // Poison gas lingers: anything inside it (you included) keeps getting poisoned.
 export function updateClouds(game, dt) {
-  const { floor, player: p } = game;
-  for (const c of floor.clouds) {
+  const { zone, player: p } = game;
+  for (const c of zone.clouds) {
     c.time -= dt;
-    for (const m of floor.monsters)
+    for (const m of zone.monsters)
       if (touchable(game, m) && Math.hypot(m.x - c.x, m.y - c.y) <= c.r && Math.abs(m.z - c.z) < 2.5) m.poison = Math.max(m.poison, 2);
     if (Math.hypot(p.x - c.x, p.y - c.y) <= c.r && Math.abs(p.z + 1 - c.z) < 2.5) {
       if (!(p.poisonTime > 0)) game.log("You're in the poison cloud!", [150, 210, 80]);
       p.poisonTime = Math.max(p.poisonTime, 2);
     }
   }
-  floor.clouds = floor.clouds.filter((c) => c.time > 0);
+  zone.clouds = zone.clouds.filter((c) => c.time > 0);
 }
 
 // --- How it all looks in 3D ---------------------------------------------------------------
@@ -299,8 +299,8 @@ function bombSprite(x, y, z, time) {
 
 export function projectileSprites(game) {
   const out = [];
-  for (const b of game.floor.bombs) out.push(bombSprite(b.x, b.y, b.z, game.time));
-  for (const pr of game.floor.projectiles) {
+  for (const b of game.zone.bombs) out.push(bombSprite(b.x, b.y, b.z, game.time));
+  for (const pr of game.zone.projectiles) {
     if (pr.kind === "bomb") {
       out.push(bombSprite(pr.x, pr.y, pr.z - 0.2, game.time));
     } else if (pr.kind === "arrow") {
@@ -318,10 +318,10 @@ export function projectileSprites(game) {
                  palette: { c: [[140, 95, 55], 0.1], g: [[180, 200, 220], 0.2], r: [c, 0.6] } });
     }
   }
-  const { floor } = game;
-  for (const c of floor.clouds) {
+  const { zone } = game;
+  for (const c of zone.clouds) {
     const f = Math.min(1, c.time / 2);   // fades out over its last 2 seconds
-    const ground = floor.stand[Math.floor(c.x) + Math.floor(c.y) * floor.w];
+    const ground = zone.stand[Math.floor(c.x) + Math.floor(c.y) * zone.w];
     out.push({ x: c.x, y: c.y, z: ground >= 0 ? ground : c.z - 1, w: c.r * 2, h: 1.6, art: cloudArt(c, game.time),
                palette: { a: [[60 * f, 120 * f, 40 * f], 0.2 * f], b: [[90 * f, 170 * f, 60 * f], 0.35 * f], c: [[130 * f, 220 * f, 90 * f], 0.5 * f] } });
   }

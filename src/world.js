@@ -1,120 +1,107 @@
-// One dungeon floor: a 3D grid of blocks plus everything derived from it
-// (light, where creatures can stand, what the map shows) and everything living on it.
+// A zone: one voxel grid you walk around in (a dungeon level, or later a world tile's surface),
+// plus everything derived from it (light, where creatures can stand, what the map shows) and
+// everything living in it. The same Zone feeds the map (turns.js, renderMap.js) and the 3D view
+// (render3d.js, player.js). zones.js keeps track of which zones exist and moves you between them.
 import { computeLight } from "./light.js";
+import { BLOCKS, B, KIND } from "./blocks.js";
+export { BLOCKS, B, KIND };
 
-export const W = 48, D = 48, H = 10;  // x, y (map), z (up); tall rooms reach up to z = 8
-export const FLOOR_Z = 2;      // feet height on ordinary floor: z = 0..1 is solid ground
+export const FLOOR_Z = 2;      // the datum: feet height on ordinary floor, z = 0..1 is solid ground
 export const ROOM_TOP = 6;     // rooms are open from z = 2 to 5; z = 6 is the ceiling
 export const CORRIDOR_TOP = 4; // corridors are two blocks tall
-export const FINAL_DEPTH = 20;  // the last floor: the Lich King's throne room, no stairs down
+export const SURFACE = { w: 80, d: 48, h: 16 };   // a world tile's surface zone (0A2 on)
+export const DUNGEON = { w: 48, d: 48, h: 10 };   // a dungeon level; tall rooms reach up to z = 8
+export const APRON = 16;                          // tiles of the neighbour kept beyond an open edge (0A2)
 
-// Block types. Index in this list = block id stored in the grid (0 = air).
-//   door/locked/gate/lever/brazier: interactive · emissive: glows on its own
-//   ghost: solid, but only visible with your torch out (raycast.js skips it otherwise)
-//   numeral: a rune that reads as a number (1–4), for the brazier puzzle
-//   mural: a carved panel showing a lever, the Rune Lever room's record (lit: "pull this one")
-export const BLOCKS = [
-  { key: "AIR",      name: "air" },
-  { key: "ROCK",     name: "rough rock",    color: [112, 104, 96] },
-  { key: "STONE",    name: "stone wall",    color: [150, 150, 165] },
-  { key: "BRICK",    name: "brick wall",    color: [175, 82, 55] },
-  { key: "MOSS",     name: "mossy stone",   color: [85, 150, 90] },
-  { key: "TILE",     name: "tiled floor",   color: [170, 158, 135] },
-  { key: "PLANK",    name: "wooden boards", color: [140, 95, 55] },
-  { key: "GRASS",    name: "grass",         color: [90, 150, 60] },
-  { key: "COLUMN",   name: "marble column", color: [215, 210, 200] },
-  { key: "CRATE",    name: "crate",         color: [165, 112, 60] },
-  { key: "LAMP",     name: "lamp",          color: [255, 210, 130], emissive: true },
-  { key: "DOOR",     name: "wooden door",   color: [150, 95, 50], door: true },
-  { key: "LOCKED",   name: "locked door",   color: [120, 125, 140], door: true, locked: true },
-  { key: "GATE",     name: "iron gate",     color: [95, 100, 110], gate: true },
-  { key: "RUNE",     name: "carved stone",  color: [150, 150, 165] },
-  { key: "LEVER",    name: "lever",         color: [150, 150, 165], lever: true },
-  { key: "LEVER_ON", name: "lever",         color: [150, 150, 165], lever: true, on: true },
-  { key: "STAIRS",   name: "stairs down",   color: [125, 125, 135] },
-  { key: "WATER_SHALLOW", name: "shallow water", color: [80, 165, 185] },
-  { key: "WATER_DEEP",    name: "deep water",    color: [35, 75, 160] },
-  { key: "STAIRS_UP",     name: "stairs up",     color: [150, 165, 190] },
-  { key: "GHOST",         name: "ghostly planks", color: [150, 210, 255], ghost: true },
-  { key: "BRAZIER",       name: "cold brazier",  color: [85, 80, 78], brazier: true },
-  { key: "BRAZIER_LIT",   name: "brazier",       color: [255, 170, 70], brazier: true, on: true, emissive: true },
-  { key: "RUNE_1",        name: "carved stone",  color: [150, 150, 165], numeral: 1 },
-  { key: "RUNE_2",        name: "carved stone",  color: [150, 150, 165], numeral: 2 },
-  { key: "RUNE_3",        name: "carved stone",  color: [150, 150, 165], numeral: 3 },
-  { key: "RUNE_4",        name: "carved stone",  color: [150, 150, 165], numeral: 4 },
-  // Floor mosaics: vivid seen from above (the map), faded and hard to read at eye level.
-  { key: "MOSAIC_RED",    name: "mosaic tiles",  color: [215, 65, 55], mosaic: true },
-  { key: "MOSAIC_BLUE",   name: "mosaic tiles",  color: [70, 120, 235], mosaic: true },
-  { key: "MOSAIC_GOLD",   name: "mosaic tiles",  color: [240, 195, 60], mosaic: true },
-  { key: "MOSAIC_WHITE",  name: "mosaic tiles",  color: [230, 230, 235], mosaic: true },
-  { key: "SPIKES",        name: "spike trap",    color: [125, 118, 112], spikes: true },   // traps.js
-  { key: "ALTAR",         name: "altar",         color: [220, 210, 190] },
-  { key: "MURAL",         name: "carved panel",  color: [150, 150, 165], mural: true },
-  { key: "MURAL_LIT",     name: "carved panel",  color: [150, 150, 165], mural: true, on: true },
-];
-export const B = {};
-BLOCKS.forEach((b, i) => (B[b.key] = i));
+// Which blocks count as air for standing, per door rule (see standHeight).
+const AIR_FOR = {};
+for (const mode of ["solid", "open", "all"]) {
+  const t = new Uint8Array(256);
+  BLOCKS.forEach((b, id) => { t[id] = id === 0 || (mode !== "solid" && b.door && (mode === "all" || !b.locked)) ? 1 : 0; });
+  AIR_FOR[mode] = t;
+}
 
-// What a column looks like on the top-down map. Deliberately says nothing about height:
-// ledges and crates are FLOOR. HOLE (a pit or chasm) is only drawn once you've looked into it in 3D.
-export const KIND = {
-  UNKNOWN: 0, FLOOR: 1, WALL: 2, DOOR: 3, LOCKED: 4, GATE: 5, LEVER: 6, STAIRS: 7,
-  HOLE: 8, SHALLOW: 9, DEEP: 10, BRIDGE: 11, STAIRS_UP: 12, MOSAIC: 13, SPIKES: 14,
-};
-
-export class Floor {
-  constructor(depth, seed) {
-    this.w = W; this.d = D; this.h = H;
-    this.depth = depth;
-    this.seed = seed;
-    this.blocks = new Uint8Array(W * D * H);
-    this.seen = new Uint8Array(W * D);    // auto-map: 1 once your eyes have passed over a column
-    this.holeSeen = new Uint8Array(W * D);  // 1 once you've looked down into a pit or chasm in 3D
-    this.kind = new Uint8Array(W * D);    // KIND per column
-    this.stand = new Int8Array(W * D);    // standing height per column, -1 = nowhere to stand
+export class Zone {
+  // key "wx,wy,z" (z = 0: a tile's surface, 1..n: its dungeon levels); type "surface" | "dungeon".
+  // level: the difficulty number every balance curve reads (it used to be the depth).
+  constructor({ key, wx = 0, wy = 0, z = 0, type = z > 0 ? "dungeon" : "surface", level = 0, tier = 1, seed = 0,
+                w, d, h, name = "", genVersion = 1 } = {}) {
+    const size = type === "surface" ? SURFACE : DUNGEON;
+    w ??= size.w; d ??= size.d; h ??= size.h;
+    // identity
+    this.key = key ?? `${wx},${wy},${z}`;
+    this.wx = wx; this.wy = wy; this.z = z;
+    this.type = type;
+    this.level = level; this.tier = tier; this.seed = seed; this.genVersion = genVersion;
+    this.name = name; this.siteId = null; this.landmarkId = null;
+    this.w = w; this.d = d; this.h = h;
+    // persistent grids
+    this.blocks = new Uint8Array(w * d * h);
+    this.seen = new Uint8Array(w * d);      // auto-map: 1 once your eyes have passed over a column
+    this.holeSeen = new Uint8Array(w * d);  // 1 once you've looked down into a pit or chasm in 3D
+    // derived (refresh() rebuilds them; dropDerived() frees them while the zone is dormant)
+    this.kind = new Uint8Array(w * d);      // KIND per column
+    this.stand = new Int8Array(w * d);      // standing height per column, -1 = nowhere to stand
+    this.look = new Uint8Array(w * d);      // the block that sets the column's map glyph (TECH_DESIGN §6.5)
     this.skyLight = this.lampLight = this.litMask = null;
-    this.navVersion = 0;                  // bumps whenever the blocks change
-
+    this.navVersion = 0;                    // bumps whenever the blocks change
+    // outdoors (0A2 and WS2/WS3 fill these in)
+    this.hasSky = false;                    // sun and sky dome in the 3D view
+    this.outdoor = false;                   // apron, horizon, haze, daylight
+    this.edges = { n: false, e: false, s: false, w: false };   // true: you can walk off that side
+    this.apron = null;                      // { n, e, s, w, ne, nw, se, sw }: neighbour voxel bands (0A2)
+    this.liquid = "water";                  // what water blocks hold; liquids[column] overrides
+    this.liquids = {};
+    this.hasBelow = false;                  // a level exists below: holes and deep water drop you into it
+    this.dungeonRect = null;                // surface only: where the 48×48 levels below sit (§5.5)
+    // contents
     this.links = new Map();       // lever voxel index → { action, cells: [[x,y,z]…], group? } (interact.js)
     this.groups = new Map();      // lever group id → { need, pulled, cells }: gates that need several levers
-    this.braziers = null;         // the brazier puzzle, if this floor has one (interact.js)
+    this.braziers = null;         // the brazier puzzle, if this zone has one (interact.js)
     this.bombs = [];              // lit bombs lying on the ground (throwing.js)
     this.secret = null;           // the secret room: { x0, y0, x1, y1, found }
-    this.secretWalls = new Set(); // columns (x + y·W) of the thin walls a bomb can open into it
-    this.vaultHinted = false;
+    this.secretWalls = new Set(); // columns (x + y·w) of the thin walls a bomb can open into it
     this.monsters = [];
     this.items = [];
     this.npcs = [];               // people (and flat beings, and one talking door) you can speak to: npcs.js
-    this.spikes = new Map();      // column (x + y·W) → { phase, period, up }: spike traps (traps.js)
-    this.projectiles = [];   // thrown knives and potions in flight (3D)
-    this.clouds = [];        // lingering poison gas
+    this.props = [];              // non-blocking sprites (shrubs, bones): WS2
+    this.spikes = new Map();      // column (x + y·w) → { phase, period, up }: spike traps (traps.js)
+    this.projectiles = [];        // thrown knives and potions in flight (3D)
+    this.clouds = [];             // lingering poison gas
     this.markers = [];            // [{ x, y }] placed on the map
     this.sightings = new Map();   // monster id → { x, y, glyph, color, time } where you last saw it
     this.rooms = [];
-    this.spawn = { x: 0, y: 0, z: FLOOR_Z, yaw: 0 };
-    this.stairs = null;     // { x, y } of the stairs down
-    this.upStairs = null;   // { x, y } of the stairs up (none on the first floor)
-    this.hasSky = false;
+    this.spawn = { x: 0, y: 0, z: FLOOR_Z, yaw: 0 };   // the zone's anchor: where you appear by default
+    this.stairs = null;           // { x, y } of the stairs down
+    this.upStairs = null;         // { x, y } of the stairs up
+    this.entrance = null;         // surface only: the way down into the dungeon (0A2)
+    this.flags = {};              // zone facts: { vaultHinted, waterHint, … }
+    this.appliedPatches = {};     // zone patch ids already applied here (zones.js)
+    // bookkeeping
+    this.sealed = false;          // generation finished: from now on set() marks the zone dirty
+    this.dirty = false;
+    this.lastTime = 0;            // game time when you last left it
   }
 
-  index(x, y, z) { return x + y * W + z * W * D; }
+  index(x, y, z) { return x + y * this.w + z * this.w * this.d; }
 
   get(x, y, z) {
-    if (x < 0 || y < 0 || z < 0 || x >= W || y >= D || z >= H) return 0;
-    return this.blocks[x + y * W + z * W * D];
+    if (x < 0 || y < 0 || z < 0 || x >= this.w || y >= this.d || z >= this.h) return 0;
+    return this.blocks[x + y * this.w + z * this.w * this.d];
   }
 
   set(x, y, z, id) {
-    if (x < 0 || y < 0 || z < 0 || x >= W || y >= D || z >= H) return;
-    this.blocks[x + y * W + z * W * D] = id;
+    if (x < 0 || y < 0 || z < 0 || x >= this.w || y >= this.d || z >= this.h) return;
+    this.blocks[x + y * this.w + z * this.w * this.d] = id;
+    if (this.sealed) this.dirty = true;
   }
 
-  // For collision: the world's sides and top are solid, but below it is open
-  // (that's how you fall through a pit, or sink through deep water, to the next floor).
+  // For collision: the sides and top are solid, but below is open (that's how you fall through a
+  // pit, or sink through deep water, to the level below). (0A2: beyond an open side, the apron.)
   solid(x, y, z) {
     if (z < 0) return false;
-    if (z >= H || x < 0 || y < 0 || x >= W || y >= D) return true;
-    const b = this.blocks[x + y * W + z * W * D];
+    if (z >= this.h || x < 0 || y < 0 || x >= this.w || y >= this.d) return true;
+    const b = this.blocks[x + y * this.w + z * this.w * this.d];
     return b !== 0 && b !== B.WATER_DEEP;   // deep water: you sink right through it, like a chasm
   }
 
@@ -122,32 +109,40 @@ export class Floor {
   // doors: "solid" (closed doors block), "open" (wooden doors count as passable),
   //        "all" (locked doors too — for checking a level can be finished).
   standHeight(x, y, doors = "solid") {
-    if (this.get(x, y, FLOOR_Z - 1) === B.WATER_DEEP) return -1;   // too deep to stand in
-    const isAir = (z) => {
-      const b = this.get(x, y, z);
-      if (b === 0) return true;
-      if (doors === "solid") return false;
-      const info = BLOCKS[b];
-      return !!info.door && (doors === "all" || !info.locked);
-    };
-    for (let z = 1; z < H - 1; z++) {
-      if (!isAir(z - 1) && isAir(z) && isAir(z + 1)) return z;
-    }
+    const { w, d, h, blocks } = this;
+    if (x < 0 || y < 0 || x >= w || y >= d) return -1;
+    const col = x + y * w, wd = w * d;
+    if (blocks[col + (FLOOR_Z - 1) * wd] === B.WATER_DEEP) return -1;   // too deep to stand in
+    const air = doors === "solid" ? AIR_FOR.solid : doors === "all" ? AIR_FOR.all : AIR_FOR.open;
+    for (let z = 1; z < h - 1; z++)
+      if (!air[blocks[col + (z - 1) * wd]] && air[blocks[col + z * wd]] && air[blocks[col + (z + 1) * wd]]) return z;
     return -1;
   }
 
   // Recompute everything derived from the blocks. Call after any block changes.
   refresh() {
+    const { w, d } = this;
+    if (!this.stand) { this.stand = new Int8Array(w * d); this.kind = new Uint8Array(w * d); this.look = new Uint8Array(w * d); }
     computeLight(this, B.LAMP, B.BRAZIER_LIT);
-    for (let y = 0; y < D; y++)
-      for (let x = 0; x < W; x++) this.stand[x + y * W] = this.standHeight(x, y);
+    for (let y = 0; y < d; y++)
+      for (let x = 0; x < w; x++) this.stand[x + y * w] = this.standHeight(x, y);
     this.computeKinds();
     this.navVersion++;
   }
 
+  get hasDerived() { return !!(this.stand && this.skyLight); }
+  ensureDerived() { if (!this.hasDerived) this.refresh(); }
+  // A dormant zone keeps its blocks, map memory and contents; light, stand, kind and look are
+  // rebuilt by one refresh() when you come back (zones.keepDerived decides when).
+  dropDerived() { this.skyLight = this.lampLight = this.litMask = this.sunlit = null; this.stand = this.kind = this.look = null; }
+
+  // End of generation: from here on, any set() marks the zone as changed.
+  seal() { this.sealed = true; this.dirty = false; return this; }
+
   computeKinds() {
-    for (let y = 0; y < D; y++) {
-      for (let x = 0; x < W; x++) {
+    const { w, d } = this;
+    for (let y = 0; y < d; y++) {
+      for (let x = 0; x < w; x++) {
         let special = 0, allSolid = true;
         for (let z = FLOOR_Z; z < ROOM_TOP; z++) {
           const b = this.get(x, y, z);
@@ -170,8 +165,32 @@ export class Floor {
         else if (BLOCKS[ground].mosaic) k = KIND.MOSAIC;
         else if (ground === B.SPIKES) k = KIND.SPIKES;
         else k = KIND.FLOOR;   // floors, ledges, crates: the map can't tell them apart
-        this.kind[x + y * W] = k;
+        const i = x + y * w;
+        this.kind[i] = k;
+        // The block the map shows: a wall's face at body height; otherwise the ground under
+        // where you'd stand (a hill shows its grass, not the subsoil at the datum).
+        const s = this.stand[i];
+        this.look[i] = k === KIND.WALL ? this.get(x, y, FLOOR_Z + 1) : s > 0 ? this.get(x, y, s - 1) : ground;
       }
     }
   }
+}
+
+// Every column's standing height under one door rule (a fresh array; zone.stand is "solid").
+export function standWith(zone, doors) {
+  const { w, d } = zone, stand = new Int8Array(w * d);
+  for (let y = 0; y < d; y++) for (let x = 0; x < w; x++) stand[x + y * w] = zone.standHeight(x, y, doors);
+  return stand;
+}
+
+// Whether a body floats on deep water instead of sinking: swimmers (the Swimmer perk; 0B reads
+// bonus(e, "swim") instead), and on the surface every body (surface water has a rock bottom and
+// never drops you a level, TECH_DESIGN §5.3; non-swimmers drown there from 0B).
+export const floatsOn = (zone, e) => zone.type === "surface" || !!e?.perks?.has?.("swimmer");
+
+// What's solid for this body: the zone's blocks, plus deep water if it floats there.
+// One rule for both views (player.js collision, turns.js standing heights).
+export function solidFor(zone, e) {
+  if (!floatsOn(zone, e)) return (x, y, z) => zone.solid(x, y, z);
+  return (x, y, z) => zone.solid(x, y, z) || zone.get(x, y, z) === B.WATER_DEEP;
 }
