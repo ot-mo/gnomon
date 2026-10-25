@@ -257,7 +257,8 @@ registerUpdate("prefetchNeighbours", (game) => { prefetchNeighbours(game); }, { 
 
 // --- Where you appear ---------------------------------------------------------------------------
 //   "down"     came down the stairs: beside this level's stairs up
-//   "up"       came up the stairs: beside this zone's stairs down (or its entrance)
+//   "up"       came up the stairs: beside this zone's stairs down (or its entrance); the temple's
+//              returnPoint (in front of Maren) where it has one
 //   "fall"     fell through a pit or deep water at (fx, fy) above: the nearest spot to that, out of
 //              the places reachable from the zone's anchor (never sealed in a locked room)
 //   "teleport" like a fall, at (fx, fy) or, if not given, a random point drawn from opts.rng
@@ -269,6 +270,7 @@ registerUpdate("prefetchNeighbours", (game) => { prefetchNeighbours(game); }, { 
 export function arrivalPoint(zone, how, opts = {}) {
   if (opts.at) return { ...opts.at };
   if (how === "down" && zone.upStairs) return beside(zone, zone.upStairs);
+  if (how === "up" && zone.returnPoint) return { ...zone.returnPoint };   // the temple: by Maren
   if (how === "up" && (zone.stairs || zone.entrance)) return beside(zone, zone.stairs || zone.entrance);
   if (how === "fall") return landing(zone, opts.fx ?? zone.spawn.x, opts.fy ?? zone.spawn.y, opts);
   if (how === "teleport") {

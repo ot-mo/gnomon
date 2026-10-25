@@ -6,7 +6,7 @@
 // 0A1: the stairs walk. Starting on level 1 of the legacy site under tile (0, 0), go down three
 // levels and back up, and check that every arrival is in the right zone, on standable ground,
 // beside the right stairs (down: beside the stairs up; up: beside the stairs down; out of level 1:
-// beside the surface's entrance, zone.entrance). On the map the
+// in front of Maren, the temple's returnPoint). On the map the
 // bot walks the whole route with key presses (game.debug.mapKey: doors open by bumping); in 3D it
 // stands next to the stairs, faces them and holds W, frame by frame (game.debug.step), so the real
 // physics carries it onto them. Monsters are cleared on arrival and the bot can't die: this
@@ -155,14 +155,16 @@ export function runStairs({ seed = 1234, view = "map", levels = 3 } = {}) {
   };
   for (let k = 0; k < levels; k++) if (!go("down")) return { ok: false, steps, problems };
   for (let k = 0; k < levels; k++) if (!go("up")) return { ok: false, steps, problems };
-  // And up out of the dungeon: level 1's stairs lead to the temple above, beside its entrance (the
-  // stairs at the bottom of the shaft; since 0A2 there is no special return point by Maren).
+  // And up out of the dungeon: level 1's stairs lead to the temple above, in front of Maren (its
+  // returnPoint, as in the parent game), not down in the shaft's bottom room.
   const zone = game.zone;
   const err = view === "3d" ? walk3d(zone.upStairs) : walkMap(zone.upStairs);
   settle();
-  const bad = err || besideStairs("0,0,0", "entrance");
+  const rp = game.zone.returnPoint, p = game.player;
+  const bad = err || (game.zone.key !== "0,0,0" ? `in ${game.zone.key}, expected 0,0,0`
+    : !rp ? "the temple has no returnPoint" : Math.hypot(p.x - rp.x, p.y - rp.y) > 1e-6 ? `at (${p.x}, ${p.y}), not in front of Maren (${rp.x}, ${rp.y})` : null);
   if (bad) problems.push(`${view} up to the surface: ${bad}`);
-  else steps.push(`${zone.key} → ${game.zone.key} (up to the surface, beside the entrance)`);
+  else steps.push(`${zone.key} → ${game.zone.key} (up to the surface, in front of Maren)`);
   return { ok: problems.length === 0, steps, problems };
 }
 

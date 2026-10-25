@@ -84,7 +84,13 @@ registerLegend("altar", (c) => {
   c.zone.set(c.x, c.y, c.z0, B.ALTAR);
   c.zone.items.push(makeItem({ kind: "cube" }, c.x + 0.5, c.y + 0.5, c.z0 + 1));
 });
-registerLegend("maren", (c) => { floorCol(c); c.zone.npcs.push(spawnNpc("maren", c.x, c.y, c.z0, 0)); });
+registerLegend("maren", (c) => {
+  floorCol(c);
+  c.zone.npcs.push(spawnNpc("maren", c.x, c.y, c.z0, 0));
+  // Coming back up the legacy stack's stairs: in front of Maren, as in the parent game (her rest loop:
+  // "come back if you need rest"), not down in the shaft's bottom room (zones.js arrivalPoint "up").
+  c.zone.returnPoint = { x: c.x + 0.5, y: c.y + 2.5, z: c.z0, yaw: -Math.PI / 2 };
+});
 registerLegend("mosaicWhite", (c) => { floorCol(c); c.zone.set(c.x, c.y, c.z0 - 1, B.MOSAIC_WHITE); });
 registerLegend("mosaicBlue", (c) => { floorCol(c); c.zone.set(c.x, c.y, c.z0 - 1, B.MOSAIC_BLUE); });
 

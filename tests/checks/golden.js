@@ -12,7 +12,7 @@ import { recordMechanics, recordFrames, recordDungeons, recordVaults, recordTemp
 // dungeon comparison covers depths 2-20 and only reports what changed on depth 1.
 export const DUNGEON_GATE_FROM = 2;
 // The temple fixture's field that 0A2 dropped (the temple's returnPoint); every other field is compared.
-export const TEMPLE_DROPPED = "returnPoint";
+export const TEMPLE_DROPPED = null;   // nothing: returnPoint (coming up by Maren) was dropped in 0A2 and restored in its verification
 
 // The paths at which two plain values differ (at most `limit`).
 function diffPaths(a, b, path = "", out = [], limit = 8) {
@@ -73,14 +73,14 @@ export function checkGolden(api, fixtures, { only = null } = {}) {
   }
 
   if (want("temple")) {
-    // The temple is a plan since 0A2 (content/world/temple.js), stamped here the parent's way. Its
-    // returnPoint (coming up by Maren) is gone on purpose: coming up lands beside the entrance stairs.
+    // The temple is a plan since 0A2 (content/world/temple.js), stamped here the parent's way; every
+    // recorded field is compared, returnPoint (coming up in front of Maren) included.
     const got = recordTemple(api).temples, exp = fixtures.temple.temples;
-    const without = (t) => { const { [TEMPLE_DROPPED]: _, ...rest } = t || {}; return rest; };
+    const without = (t) => { if (!TEMPLE_DROPPED) return t || {}; const { [TEMPLE_DROPPED]: _, ...rest } = t || {}; return rest; };
     const bad = Object.keys(exp).filter((k) => !same(without(got[k]), without(exp[k])));
     for (const k of bad) problems.push(`temple seed ${k}: ${diffPaths(exp[k], norm(got[k])).join("; ")}`);
     stats.temple = { seeds: Object.keys(exp).length, mismatched: bad.length };
-    if (Object.keys(exp).some((k) => got[k]?.[TEMPLE_DROPPED] === undefined)) notes.push(`temple: ${TEMPLE_DROPPED} dropped as intended (0A2)`);
+    if (TEMPLE_DROPPED && Object.keys(exp).some((k) => got[k]?.[TEMPLE_DROPPED] === undefined)) notes.push(`temple: ${TEMPLE_DROPPED} dropped as intended (0A2)`);
   }
 
   stats.ms = Date.now() - t0;
