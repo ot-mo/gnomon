@@ -104,7 +104,9 @@ export function readScroll(game, effect) {
       let n = 0;
       for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
         if (n >= 2 + Math.floor(Math.random() * 2)) break;
-        const x = Math.floor(p.x) + ox, y = Math.floor(p.y) + oy, z = f.stand[x + y * f.w];
+        const x = Math.floor(p.x) + ox, y = Math.floor(p.y) + oy;
+        if (x < 0 || y < 0 || x >= f.w || y >= f.d) continue;   // creatures never leave their zone (§6.1)
+        const z = f.stand[x + y * f.w];
         if (z < 0 || f.monsters.some((m) => m.tx === x && m.ty === y)) continue;
         f.monsters.push(spawnMonster(pickMonsterType(Math.random, game.zone.level), x, y, z, "chase", game.zone.level));
         n++;

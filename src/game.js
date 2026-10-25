@@ -438,6 +438,15 @@ function toggleMap() {
   foldPowers();
   if (game.mode === "explore") {
     sfx("rotate", { up: false });
+    // In 3D you may stand up to half a tile past an open edge, over the apron; the map works in the
+    // zone's own tiles, so step back onto the border tile you came from.
+    const p = game.player, z = game.zone;
+    if (p.x < 0 || p.y < 0 || p.x >= z.w || p.y >= z.d) {
+      const tx = Math.max(0, Math.min(z.w - 1, Math.floor(p.x))), ty = Math.max(0, Math.min(z.d - 1, Math.floor(p.y)));
+      p.x = tx + 0.5; p.y = ty + 0.5;
+      const s = z.stand[tx + ty * z.w];
+      if (s >= 0) p.z = s;
+    }
     game.mode = "map";
     game.view = "map";
     unlockPointer();
