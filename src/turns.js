@@ -20,6 +20,7 @@ import { PLAYER_STEP_UP } from "./pathing.js";
 import { updateSpikes, nearSpikes, TICK } from "./traps.js";
 import { npcAt, NPC_TYPES } from "./npcs.js";
 import { sfx } from "./sfx.js";
+import { tryWalkOff } from "./zones.js";
 
 export const STEP_TIME = 1 / WALK;   // ≈ 0.24 s per tile
 const USE_TIME = 0.5;                // pulling a lever, opening a door
@@ -136,7 +137,7 @@ export function mapStep(game, dx, dy) {
   const climb = PLAYER_STEP_UP + (jumpBonus(p) >= 1 ? 1 : 0);
   const tx = Math.floor(p.x), ty = Math.floor(p.y);
   const nx = tx + dx, ny = ty + dy;
-  if (nx < 0 || ny < 0 || nx >= zone.w || ny >= zone.d) return false;
+  if (nx < 0 || ny < 0 || nx >= zone.w || ny >= zone.d) return stepOffEdge(game, dx, dy, nx, ny);
   p.yaw = Math.atan2(dy, dx);   // face where you're going, so the 3D view matches
 
   // Walking into someone talks to them (it takes no time). A ghost you haven't met is just a
@@ -216,6 +217,22 @@ export function mapStep(game, dx, dy) {
   return true;
 }
 
+// A step off the map's edge (TECH_DESIGN §5.1): on a surface zone, into the next span's zone at the
+// matching point of the edge (zones.js tryWalkOff: within a block of your height); it takes a step's
+// time there. A solid edge says why, once. Not off a corner: one side at a time.
+function stepOffEdge(game, dx, dy, nx, ny) {
+  const { zone, player: p } = game;
+  if (zone.type !== "surface" || p.flyTime > 0) return false;
+  const outX = nx < 0 || nx >= zone.w, outY = ny < 0 || ny >= zone.d;
+  if (outX && outY) return false;
+  const side = outX ? (nx < 0 ? "w" : "e") : ny < 0 ? "n" : "s";
+  p.yaw = Math.atan2(dy, dx);
+  if (!tryWalkOff(game, side, outX ? Math.floor(p.y) : Math.floor(p.x), { fromStand: Math.round(p.z), keepMotion: false })) return false;
+  game.confirmJump = -1;
+  passTime(game, ((dx && dy ? Math.SQRT2 : 1) * STEP_TIME) / haste(p) / fleet(p));
+  return true;
+}
+
 // Waiting lasts half a second, or near spike traps until the instant before their next beat:
 // then the map shows what's about to happen (^ rises, ▲ drops) and your next step lands right
 // on the beat.
@@ -282,6 +299,19 @@ function findRoute(game, goal, passable) {
   return path.reverse();
 }
 
+// A click-travel that ends on the border of an open edge goes one step further, into the next span
+// (TECH_DESIGN §5.1). On a corner tile, the side the last step was heading for. Auto-explore never
+// does this: it stops at edges.
+function stepOutward(game, dx, dy) {
+  const { zone, player: p } = game;
+  if (zone.type !== "surface") return;
+  const tx = Math.floor(p.x), ty = Math.floor(p.y);
+  const ways = [["e", tx === zone.w - 1, 1, 0], ["w", tx === 0, -1, 0], ["s", ty === zone.d - 1, 0, 1], ["n", ty === 0, 0, -1]]
+    .filter(([side, on]) => on && zone.edges[side]);
+  const way = ways.find(([, , ox, oy]) => (ox && ox === dx) || (oy && oy === dy)) || ways[0];
+  if (way) mapStep(game, way[2], way[3]);
+}
+
 // Auto-explore (X on the map): head for the nearest edge of the unknown (a tile next to one
 // you haven't seen), or an item you've spotted, and keep going until something interrupts.
 function planExplore(game) {
@@ -329,7 +359,7 @@ export function travelStep(game) {
   const newcomer = [...game.zone.sightings].some(([id, s]) => s.time === game.time && !tr.visible.has(id));
   if (p.hp < tr.hp || newcomer) { game.travel = null; return; }
   if (!tr.path.length) {
-    if (!tr.explore) { game.travel = null; return; }
+    if (!tr.explore) { game.travel = null; stepOutward(game, dx, dy); return; }
     const next = planExplore(game);   // auto-explore: on to the next unknown
     if (next) tr.path = next;
     else { game.travel = null; game.log("You've explored everything you can walk to from here.", [170, 170, 170]); }

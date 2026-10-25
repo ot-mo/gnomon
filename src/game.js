@@ -20,12 +20,12 @@
 // game.view says which picture is showing ("3d" or "map"); it survives descending and dying.
 import * as S from "./screen.js";
 import { keys, isLocked, lockPointer, unlockPointer } from "./input.js";
-import { changeZone, enterZone, cachedZone, makeZone, zoneBelow, zoneAbove, dungeonOffset, zoneKey } from "./zones.js";
+import { changeZone, enterZone, cachedZone, makeZone, zoneBelow, zoneAbove, dungeonOffset, zoneKey, tryWalkOff, ZONE_RULES } from "./zones.js";
 import { on, runUpdates } from "./events.js";
 import "./world/zonegen.js";   // the zone generators: surfaces, site dungeons, the legacy stack
 import { buildRun } from "./world/run.js";
 import { TEST_WORLD } from "./content/world/test-world.js";
-import { makePlayer, clampPitch, updatePlayer, takeImpact, hasFeatherFall, bonus } from "./player.js";
+import { makePlayer, clampPitch, updatePlayer, takeImpact, hasFeatherFall, bonus, bodyCollides, RADIUS } from "./player.js";
 import { updateMonsters, pushPlayerOut, playerAttack, monsterAt } from "./monsters.js";
 import { pickUpItems, POTIONS, POTION_COLORS, scrollTitles, makeItem, makeRelic, pickRelic, randomEquipment, awayFromWalls, RELICS, RELIC_COLOR } from "./items.js";
 import { render3d } from "./render3d.js";
@@ -292,6 +292,7 @@ function update(dt) {
   const { player: p } = game;
   updatePlayer(p, game.zone, keys, dt);
   pushPlayerOut(game);
+  if (walkOffEdge(game)) return;
   const zone = game.zone;
   const fall = takeImpact(p);
   if (fall) game.hurtPlayer(fall, "the fall");
@@ -317,6 +318,33 @@ function update(dt) {
   p.swing = Math.max(0, p.swing - dt);
   p.hurt = Math.max(0, p.hurt - dt);
   game.target = lookTarget(game);
+}
+
+// Walking off a surface zone's edge in 3D (TECH_DESIGN §5.1). The apron lets your body go past the
+// border onto the next span's ground; once your centre is half a tile past an open edge you are in
+// that span's zone, at the same point of the world, facing and falling as before (no transition
+// screen). Against a solid edge (the sea, the world's border) you hear why, once.
+function walkOffEdge(game) {
+  const zone = game.zone, p = game.player;
+  if (zone.type !== "surface") return false;
+  const past = ZONE_RULES.walkOffPast, { w, d } = zone;
+  const side = p.x >= w + past ? "e" : p.x < -past ? "w" : p.y >= d + past ? "s" : p.y < -past ? "n" : null;
+  if (side) {
+    const dx = side === "e" ? 1 : side === "w" ? -1 : 0, dy = side === "s" ? 1 : side === "n" ? -1 : 0;
+    const exact = { x: p.x - dx * w, y: p.y - dy * d, z: p.z };
+    if (!tryWalkOff(game, side, dx ? p.y : p.x, { exact })) return false;
+    const nz = game.zone, tx = Math.floor(p.x), ty = Math.floor(p.y);
+    if (bodyCollides(p, nz)) {   // the apron wasn't the zone's real ground (it was built before the zone was): stand up
+      const s = nz.stand[tx + ty * nz.w];
+      p.x = tx + 0.5; p.y = ty + 0.5;
+      if (s >= 0) p.z = s;
+    }
+    return true;
+  }
+  const near = RADIUS + 0.02;
+  for (const [sd, close, along] of [["e", p.x > w - near, p.y], ["w", p.x < near, p.y], ["s", p.y > d - near, p.x], ["n", p.y < near, p.x]])
+    if (close && !zone.edges[sd]) tryWalkOff(game, sd, along);   // shut: it only says why (once)
+  return false;
 }
 
 // The first time you step into a puzzle room, a line about what you notice.
