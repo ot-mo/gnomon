@@ -150,6 +150,18 @@ function checkBible(problems) {
       problems.push(`bible: ${L.id}'s dungeon floors ${JSON.stringify(got)}`);
   }
   if (JSON.stringify(M.landmarks.get("square").dungeon.up) !== "[22,23]") problems.push("bible: the Square's two floors up");
+  // §15.3's gimmick key and beats columns, read out of the bible's table.
+  const table = bibleText.split("### 15.3 Landmarks")[1]?.split("**Other fixed points:**")[0] || "";
+  let rows = 0;
+  for (const line of table.split("\n")) {
+    const c = line.split("|").slice(1, -1).map((v) => v.trim());
+    if (c.length !== 11 || !/^[A-P]$/.test(c[0])) continue;
+    rows++;
+    const L = LANDMARK_INDEX.find((l) => l.letter === c[0]), want = c[9].split("+").map((v) => v.trim());
+    if (!L || JSON.stringify(L.gimmicks) !== JSON.stringify(want) || L.beats !== c[10])
+      problems.push(`bible: landmark ${c[0]}'s gimmicks/beats ${JSON.stringify([L?.gimmicks, L?.beats])}, the bible's ${JSON.stringify([want, c[10]])}`);
+  }
+  if (rows !== 16) problems.push(`bible: read ${rows} rows of §15.3, not 16`);
   return {};
 }
 

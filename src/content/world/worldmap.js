@@ -53,36 +53,53 @@ export const TIER_ROWS = [
 
 // The landmarks (§15.3): letter, id, name, tier, kind, and the terrain they stand in (§5's headings);
 // dungeon: the floors' levels, in order, from the top (§15.3's "Dungeon" column; `up` for floors
-// above ground). Only where they are and how deep: their plans and people come in C1.
+// above ground); gimmicks and beats: §15.3's "Gimmick key" and "Beats" columns, as data (C1 builds the
+// gimmicks and decides which belong to the dungeon's DungeonSpec.gimmicks). Their plans and people come in C1.
 const floors = (lo, hi) => Array.from({ length: hi - lo + 1 }, (_, k) => lo + k);
 export const LANDMARK_INDEX = [
   { letter: "A", id: "hollowmere", name: "Hollowmere", at: [[5, 16]], tier: 1, terrain: "flats", kind: "startVillage",
+    gimmicks: ["flatTemple"], beats: "prologue, S1-S3, beat 1",
     dungeon: { id: "keepersStair", floors: floors(2, 21), optional: true, legacy: true } },
-  { letter: "B", id: "dialFloor", name: "The Dial Floor", at: [[5, 15]], tier: 1, terrain: "flats", kind: "stele" },
+  { letter: "B", id: "dialFloor", name: "The Dial Floor", at: [[5, 15]], tier: 1, terrain: "flats", kind: "stele",
+    gimmicks: ["threeAccounts"], beats: "S4" },
   { letter: "C", id: "kettleMesa", name: "Kettle Mesa", at: [[6, 14]], tier: 1, terrain: "steps", kind: "dungeon",
+    gimmicks: ["shaftDrop"], beats: "S1, beat 1",
     dungeon: { id: "kettleMesa", floors: floors(2, 4) } },
   { letter: "D", id: "benchmark", name: "Benchmark", at: [[11, 12]], tier: 2, terrain: "downs", kind: "hub",
+    gimmicks: ["trueLevel"], beats: "2, 9",
     dungeon: { id: "datum", floors: floors(5, 8) } },
-  { letter: "E", id: "tallTable", name: "The Tall Table", at: [[8, 9]], tier: 2, terrain: "steps", kind: "aerie" },
+  { letter: "E", id: "tallTable", name: "The Tall Table", at: [[8, 9]], tier: 2, terrain: "steps", kind: "aerie",
+    gimmicks: ["climbUp"], beats: "optional" },
   { letter: "F", id: "molar", name: "Molar", at: [[20, 9]], tier: 3, terrain: "teeth", kind: "passTown",
+    gimmicks: ["borrowedDark", "darkMapping"], beats: "3",
     dungeon: { id: "rootCanals", floors: floors(8, 9) } },
-  { letter: "G", id: "folio", name: "Folio", at: [[24, 15]], tier: 4, terrain: "tessellate", kind: "flatTown" },
-  { letter: "H", id: "halfnight", name: "Halfnight", at: [[24, 11], [25, 11], [26, 11]], tier: 4, terrain: "tessellate", kind: "holyCity" },
+  { letter: "G", id: "folio", name: "Folio", at: [[24, 15]], tier: 4, terrain: "tessellate", kind: "flatTown",
+    gimmicks: ["mapOnlyTown"], beats: "4" },
+  { letter: "H", id: "halfnight", name: "Halfnight", at: [[24, 11], [25, 11], [26, 11]], tier: 4, terrain: "tessellate", kind: "holyCity",
+    gimmicks: ["lightIsLaw", "mystery"], beats: "6" },
   { letter: "I", id: "pressyard", name: "The Pressyard", at: [[23, 7]], tier: 4, terrain: "tessellate", kind: "dungeon",
+    gimmicks: ["pressing", "loweringCeiling"], beats: "5",
     dungeon: { id: "press", floors: floors(11, 15) } },
   { letter: "J", id: "unlitChoir", name: "The Unlit Choir", at: [[31, 6]], tier: 6, terrain: "shade", kind: "dungeon",
+    gimmicks: ["theDark", "darkMapping"], beats: "7",
     dungeon: { id: "unlitChoir", floors: floors(15, 20) } },
   { letter: "K", id: "metronome", name: "The Metronome", at: [[37, 13]], tier: 6, terrain: "stacks", kind: "dungeon",
+    gimmicks: ["oneBeat"], beats: "8",
     dungeon: { id: "metronome", floors: floors(17, 22) } },
   { letter: "L", id: "drownedLantern", name: "The Drowned Lantern", at: [[31, 16]], tier: 7, terrain: "sea", kind: "dungeon",
+    gimmicks: ["tideOfHours"], beats: "optional (ending 3)",
     dungeon: { id: "drownedLantern", floors: floors(20, 24), optional: true } },
   { letter: "M", id: "square", name: "The Square", at: [[27, 2]], tier: 6, terrain: "deepPleat", kind: "citadel",
+    gimmicks: ["identicalRooms", "ruleBanners"], beats: "10",
     dungeon: { id: "square", floors: floors(19, 21), up: floors(22, 23) } },
   { letter: "N", id: "gnomon", name: "The Gnomon", at: [[37, 3]], tier: 8, terrain: "lattice", kind: "needle",
+    gimmicks: ["sweepingHand"], beats: "11",
     dungeon: { id: "dialWorks", floors: floors(23, 30) } },
   { letter: "O", id: "saltpage", name: "Saltpage", at: [[2, 4]], tier: 3, terrain: "waste", kind: "monastery",
+    gimmicks: ["answerInFloor"], beats: "optional (ending 4)",
     dungeon: { id: "underPage", floors: floors(8, 10), optional: true } },
   { letter: "P", id: "foldmother", name: "Foldmother", at: [[12, 4]], tier: 3, terrain: "pleatwood", kind: "treeVillage",
+    gimmicks: ["twoLayouts"], beats: "optional",
     dungeon: { id: "rootfold", floors: floors(8, 10), optional: true } },
 ];
 
