@@ -64,7 +64,7 @@ export const game = {
   // Potion of descent: sink straight through to the level below, unhurt.
   fallThrough() {
     const below = zoneBelow(this, this.zone);
-    if (below) changeFloor(below, "fall", "", this.player.x, this.player.y);
+    if (below) fallTo(below, this.zone, this.player.x, this.player.y, "");
   },
 
   // The Lich King falls: the run is won (after the epilogue).
@@ -164,13 +164,12 @@ export const game = {
         enterZone(this, zone, { how: "fall", fx: x, fy: y, rng: Math.random });
         return true;
       }
-      const { ox, oy } = zone.type === "surface" ? dungeonOffset(this, zone) : { ox: 0, oy: 0 };
       if (zone.get(Math.floor(x), Math.floor(y), FLOOR_Z - 1) === B.WATER_DEEP) {
-        changeFloor(below, "fall", "You sink beneath the dark water and are swept down to the floor below.", x - ox, y - oy);
+        fallTo(below, zone, x, y, "You sink beneath the dark water and are swept down to the floor below.");
       } else if (hasFeatherFall(p)) {
-        changeFloor(below, "fall", "You fall through the dark... and drift down gently.", x - ox, y - oy);
+        fallTo(below, zone, x, y, "You fall through the dark... and drift down gently.");
       } else {
-        changeFloor(below, "fall", "You fall through the dark and land hard.", x - ox, y - oy);
+        fallTo(below, zone, x, y, "You fall through the dark and land hard.");
         this.hurtPlayer(2 + Math.floor(Math.random() * 3), "the fall");
       }
       return true;
@@ -258,6 +257,14 @@ function resolveRelics(zone) {
     Object.assign(it, key ? makeRelic(key) : randomEquipment(Math.random, zone.level + 2, 0.4), { x, y, z });
     if (key) game.relicsFound.add(key);
   }
+}
+
+// Drop from (x, y) in `zone` to the level below (a hole, deep water, a potion of descent). Under a
+// surface zone the levels sit at its dungeonRect (TECH_DESIGN §5.5), so the point moves by that
+// offset; dungeon levels line up 1:1 (their offset is 0).
+function fallTo(below, zone, x, y, message) {
+  const { ox, oy } = dungeonOffset(game, zone);
+  changeFloor(below, "fall", message, x - ox, y - oy);
 }
 
 // Go to another zone (stairs, a hole, a potion of descent), then show its name for a moment.

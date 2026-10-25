@@ -201,6 +201,30 @@ export function checkZones({ game, startRun }) {
   expect(!old.hasDerived, "an older zone drops its derived arrays");
   changeZone(game, "0,0,2", { how: "up" }); changeZone(game, "0,0,1", { how: "up" });
   expect(old.hasDerived && old.stand.every((v, i) => v === standWith(old, "solid")[i]), "re-entering rebuilds them");
+
+  // --- Falls move by the surface's dungeonRect: a hole, deep water and the potion of descent alike ----
+  const asked = [];
+  const offFall = on("zone:prepare", (g, e) => asked.push({ key: e.zone.key, fx: e.arrival.fx, fy: e.arrival.fy }));
+  const mode0 = game.mode;
+  changeZone(game, "0,0,0", { how: "up" });
+  const temple = game.zone;
+  temple.dungeonRect = { ox: 6, oy: 4 };
+  const fallFrom = (how) => {
+    changeZone(game, "0,0,0", { how: "up" });
+    p.x = 30.5; p.y = 20.5;
+    if (how === "potion") game.fallThrough(); else { p.z = -2; game.checkFloorEvents(); }
+    return asked[asked.length - 1];
+  };
+  for (const how of ["potion", "hole"]) {
+    const a = fallFrom(how);
+    expect(a?.key === "0,0,1" && a.fx === 24.5 && a.fy === 16.5, `${how} from the surface at (30.5, 20.5) with dungeonRect (6, 4) asked for ${JSON.stringify(a)} (want 0,0,1 at 24.5, 16.5)`);
+  }
+  p.x = 30.5; p.y = 20.5; game.fallThrough();
+  const a2 = asked[asked.length - 1];
+  expect(a2?.key === "0,0,2" && a2.fx === 30.5 && a2.fy === 20.5, `a fall between dungeon levels keeps (x, y) (asked for ${JSON.stringify(a2)})`);
+  temple.dungeonRect = null;
+  game.mode = mode0;
+  offFall();
   stats.zones = { visited: game.zones.size, events: log.length };
   for (const off of offs) off();
   return { name: "zones", ok: problems.length === 0, problems, stats };

@@ -75,9 +75,10 @@ export function zoneAbove(game, zone) {
   return zone.z > 0 ? { wx: zone.wx, wy: zone.wy, z: zone.z - 1, key: zoneKey(zone.wx, zone.wy, zone.z - 1) } : null;
 }
 // Where the 48×48 dungeon levels sit under a surface zone (§5.5): a fall at (fx, fy) on the
-// surface lands at (fx − ox, fy − oy) on level 1. Zero while the surface is the same size.
+// surface lands at (fx − ox, fy − oy) on level 1. Zero for a surface without a dungeonRect, and
+// for a dungeon level (the levels line up 1:1), so every fall can ask (game.js fallTo).
 export function dungeonOffset(game, surfaceZone) {
-  const r = surfaceZone?.dungeonRect;
+  const r = surfaceZone?.type === "surface" ? surfaceZone.dungeonRect : null;
   return r ? { ox: r.ox, oy: r.oy } : { ox: 0, oy: 0 };
 }
 
