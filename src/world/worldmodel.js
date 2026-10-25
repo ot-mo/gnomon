@@ -139,7 +139,7 @@ function defProblems(def) {
         out.push(`landmark ${l.id}: span (${s}) doesn't touch the ones before it`);
     });
     if (l.tier !== undefined && !(Number.isInteger(l.tier) && l.tier >= 1 && l.tier <= MAX_TIER)) out.push(`landmark ${l.id}: tier ${l.tier}`);
-    if (l.plan && def.plans && !def.plans[l.plan]) out.push(`landmark ${l.id}: unknown plan "${l.plan}"`);
+    if (l.plan && !(def.plans && l.plan in def.plans)) out.push(`landmark ${l.id}: unknown plan "${l.plan}"`);
     const r = footprint(l, def.plans);
     if (r && (r.x < 0 || r.y < 0 || r.w < 1 || r.d < 1 || r.x + r.w > SURFACE.w || r.y + r.d > SURFACE.d))
       out.push(`landmark ${l.id}: footprint ${JSON.stringify(r)} is outside its ${SURFACE.w}×${SURFACE.d} zone`);
