@@ -67,6 +67,8 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   f.dungeonLevels = p.count ?? null;   // and how many levels the dungeon has
   f.final = final;
   f.hasBelow = !final;
+  f.hasUp = p.hasUp !== false;
+  f.bottom = p.bottom || null;         // { kind, id }: the hall on the last level (validation reads it)
   f.blocks.fill(B.ROCK);
   const roomAt = new Int16Array(W * D).fill(-1);   // room interiors
   const ringAt = new Int16Array(W * D).fill(-1);   // room walls
@@ -835,8 +837,11 @@ class MinHeap {
 
 // ---------------------------------------------------------------------------
 // Can this level be finished? Returns a list of problems (empty = fine).
+// The last-level rules (final, bottom) and the stairs up (hasUp) come from p when given, else from
+// the zone itself, which records them, so validateDungeonLevel(zone) alone judges a level fairly.
 export function validateDungeonLevel(f, p = {}) {
   const problems = [];
+  const final = p.final ?? f.final, hasUp = p.hasUp ?? f.hasUp ?? true, bottom = p.bottom ?? f.bottom;
   const w = f.w, d = f.d;
   const sx = Math.floor(f.spawn.x), sy = Math.floor(f.spawn.y);
   if (f.stand[sx + sy * w] !== FLOOR_Z) problems.push("spawn is not on open floor");
@@ -844,8 +849,8 @@ export function validateDungeonLevel(f, p = {}) {
   const all = reachable(standWith(f, "all"), w, d, sx, sy, PLAYER_STEP_UP, PLAYER_DROP);
   const at = (dist, x, y) => dist[Math.floor(x) + Math.floor(y) * w] >= 0;
 
-  if (p.final) {
-    if (p.bottom?.kind === "boss") {
+  if (final) {
+    if (bottom?.kind === "boss") {
       const boss = f.monsters.find((m) => MONSTER_TYPES[m.type].boss);
       if (!boss || !at(all, boss.x, boss.y)) problems.push("boss missing or unreachable");
     }
@@ -866,7 +871,7 @@ export function validateDungeonLevel(f, p = {}) {
         if (g === B.WATER_SHALLOW || g === B.WATER_DEEP || !g) problems.push("stairs in or next to water or a drop");
       }
   }
-  if (p.hasUp !== false && (!f.upStairs || !at(noLocked, f.upStairs.x, f.upStairs.y))) problems.push("no reachable stairs up");
+  if (hasUp !== false && (!f.upStairs || !at(noLocked, f.upStairs.x, f.upStairs.y))) problems.push("no reachable stairs up");
   if (f.blocks.includes(B.LOCKED) && !f.items.some((i) => i.kind === "key" && at(noLocked, i.x, i.y)))
     problems.push("no reachable key for the locked door");
   for (const r of f.rooms)

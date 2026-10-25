@@ -60,6 +60,20 @@ export function checkDungeonParams() {
   const test = (cond, msg) => { cases++; expect(cond, msg); };
   test(throws(() => legacyParams(7)), "legacyParams(depth) without the run seed must throw (it planned the people of seed 0)");
   test(!throws(() => legacyParams(7, 42)) && legacyParams(7, 42).z === 7, "legacyParams(depth, runSeed) works");
+  // A level validated without its p is judged by what the zone records (final, bottom, hasUp).
+  for (const [seed, depth] of [[5, LEGACY_LEVELS], [7, LEGACY_LEVELS], [5, 10], [42, 3]]) {
+    const p = legacyParams(depth, seed), f = generateDungeonLevel(seed, p);
+    const alone = validateDungeonLevel(f).join(", "), withP = validateDungeonLevel(f, p).join(", ");
+    test(alone === withP, `seed ${seed} level ${depth}: validateDungeonLevel(zone) says "${alone}", with p "${withP}"`);
+  }
+  const last = generateDungeonLevel(5, legacyParams(LEGACY_LEVELS, 5));
+  last.stairs = { x: Math.floor(last.spawn.x), y: Math.floor(last.spawn.y) };
+  test(validateDungeonLevel(last).includes("stairs down on the last floor"), "the zone's own final flag keeps the last-level rules");
+  const lich = last.monsters.findIndex((m) => m.type === "lich");
+  if (lich >= 0) last.monsters.splice(lich, 1);
+  test(lich >= 0 && validateDungeonLevel(last).includes("boss missing or unreachable"), "the zone's own bottom keeps the boss rule");
+  const noUp = generateDungeonLevel(42, { ...legacyParams(3, 42), hasUp: false });
+  test(!noUp.upStairs && validateDungeonLevel(noUp).length === 0, `a level made without stairs up validates alone (${validateDungeonLevel(noUp).join(", ")})`);
   return { name: "dungeon params", ok: problems.length === 0, problems, stats: { cases } };
 }
 
