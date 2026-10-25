@@ -87,16 +87,20 @@ export function dungeonOffset(game, surfaceZone) {
 // and this returns true; false if there's nothing there. A zone that has to be read back from
 // storage returns a promise instead (WS9; the transition screen covers the wait from 0D1).
 // arrival: { how, fx, fy, side, along, fromStand, at, rng, yaw } (see arrivalPoint).
+// The message ("You descend the stairs...") is logged only once the zone is there to go to.
 export function changeZone(game, addr, arrival = {}, message = "") {
   const key = keyOf(addr);
-  if (message) game.log(message, [255, 220, 140]);
+  const go = (zone) => {
+    if (message) game.log(message, [255, 220, 140]);
+    enterZone(game, zone, arrival);
+  };
   const now = cachedZone(game, key) || (ZONE_LOADER.load ? null : makeZone(game, key));
-  if (now) { enterZone(game, now, arrival); return true; }
+  if (now) { go(now); return true; }
   if (!ZONE_LOADER.load) return false;
   game.zoneLoading = key;
   return getZone(game, key).then((zone) => {
     game.zoneLoading = null;
-    if (zone) enterZone(game, zone, arrival);
+    if (zone) go(zone);
     return !!zone;
   });
 }
@@ -131,15 +135,15 @@ export function enterZone(game, zone, arrival = {}) {
 }
 
 // Only the most recent zones keep their light/stand/kind/look arrays (about 0.2 MB each for a
-// dungeon level, 0.6 MB for a surface zone); older ones drop them and rebuild on re-entry.
+// dungeon level, 0.6 MB for a surface zone); older ones drop them and rebuild on re-entry. That
+// includes zones made without being entered (debug.zone, 0A2's prefetch): they keep their arrays
+// until the next zone change, then drop them unless they are in the LRU by then.
 export function keepDerived(game, n = 2) {
   const lru = (game.zoneLru ||= []);
   const cur = game.zone?.key;
   if (cur) { const k = lru.indexOf(cur); if (k >= 0) lru.splice(k, 1); lru.unshift(cur); }
-  for (const key of lru.splice(Math.max(1, n))) {
-    const z = game.zones.get(key);
-    if (z && z !== game.zone) z.dropDerived();
-  }
+  lru.splice(Math.max(1, n));
+  for (const [key, z] of game.zones || []) if (z !== game.zone && z.hasDerived && !lru.includes(key)) z.dropDerived();
 }
 
 // --- Where you appear ---------------------------------------------------------------------------

@@ -161,7 +161,9 @@ export function checkZones({ game, startRun }) {
   expect(back[1] === "0,0,1" && back[2] === "up" && back[4] === false && Math.abs(back[3] - 3) < 1e-9, `re-entry reports away = 3 s (got ${JSON.stringify(back)})`);
   expect(leaves[1][1] === "0,0,1" && leaves[1][3] === "0,0,2" && leaves[1][2] === "down", "zone:leave names the zone, the way and the destination");
   expect(log.findIndex((e) => e[0] === "prepare" && e[1] === "0,0,2") < log.findIndex((e) => e[0] === "enter" && e[1] === "0,0,2"), "zone:prepare comes before zone:enter");
-  expect(parseKey("3,-2,5").wy === -2 && changeZone(game, "5,5,1", { how: "down" }) === false && game.zone === lvl1, "nothing at 5,5,1: no change");
+  const logged = game.messages.length;
+  expect(parseKey("3,-2,5").wy === -2 && changeZone(game, "5,5,1", { how: "down" }, "You descend the stairs...") === false && game.zone === lvl1, "nothing at 5,5,1: no change");
+  expect(game.messages.length === logged, "a change that fails logs no message");
 
   // --- Patches and uids ---------------------------------------------------------------------------
   PATCH_OPS.testMark = (g, zone, patch, { at }) => { zone.monsters.push({ id: -1, type: "rat", uid: patch.uid, tx: at.x, ty: at.y, testMark: true }); };
@@ -201,6 +203,11 @@ export function checkZones({ game, startRun }) {
   expect(!old.hasDerived, "an older zone drops its derived arrays");
   changeZone(game, "0,0,2", { how: "up" }); changeZone(game, "0,0,1", { how: "up" });
   expect(old.hasDerived && old.stand.every((v, i) => v === standWith(old, "solid")[i]), "re-entering rebuilds them");
+  const made = game.debug.zone("0,0,9");   // made, never entered (as 0A2's prefetch will)
+  expect(made?.hasDerived, "a zone made without entering it has its derived arrays");
+  changeZone(game, "0,0,2", { how: "down" });
+  expect(!made.hasDerived && game.zones.get("0,0,1").hasDerived, "after the next zone change it drops them like any zone outside the LRU");
+  expect([...game.zones.values()].filter((z) => z.hasDerived).length === 2, "only two zones keep derived arrays");
 
   // --- Falls move by the surface's dungeonRect: a hole, deep water and the potion of descent alike ----
   const asked = [];
