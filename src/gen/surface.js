@@ -220,6 +220,10 @@ export function dungeonRectFor(entrance) {
 
 // --- Generating a surface zone ------------------------------------------------------------------
 const NEXT4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+// Offsets within 14 tiles (ground is never higher than that), nearest first: [dx, dy, distance].
+const NEAR = [];
+for (let dy = -14; dy <= 14; dy++) for (let dx = -14; dx <= 14; dx++) if (dx || dy) NEAR.push([dx, dy, distance(dx, dy)]);
+NEAR.sort((a, b) => a[2] - b[2] || a[1] - b[1] || a[0] - b[0]);
 
 // The sites on a span: its landmark site first, then the per-run ones.
 function sitesOf(run, wx, wy) {
@@ -358,9 +362,11 @@ function buildSurface(run, W, base, wx, wy, seed, rng) {
           const i = x + y * ZW;
           if (water[i]) { H[i] = 0; continue; }
           if (H[i] === 0) continue;
-          let d = Infinity;
-          for (const [qx, qy] of zoneWater) if (Math.abs(qx - x) <= H[i] && Math.abs(qy - y) <= H[i]) d = Math.min(d, distance(qx - x, qy - y));
-          if (d < H[i]) H[i] = Math.floor(d);
+          for (const [dx, dy, d] of NEAR) {   // nearest first: the first water found sets the bank's height
+            if (d >= H[i]) break;
+            const qx = x + dx, qy = y + dy;
+            if (qx >= 0 && qy >= 0 && qx < ZW && qy < ZD && water[qx + qy * ZW]) { H[i] = Math.floor(d); break; }
+          }
         }
   }
 
