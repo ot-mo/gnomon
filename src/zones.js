@@ -323,7 +323,7 @@ function landing(zone, fx, fy, opts = {}) {
 // Walking in over an edge: you left the neighbour by opts.side ("n" | "e" | "s" | "w") at
 // opts.along, standing at opts.fromStand. The mirrored tile on this side, or the nearest tile
 // within 3 of the edge and ±4 along whose height is within 1 of where you were, reachable from
-// the anchor; else the nearest reachable spot at all (shifted: true). With opts.exact (your point in
+// the anchor (the mirrored tile need not be); else the nearest reachable spot at all (shifted: true). With opts.exact (your point in
 // this zone's coordinates, from the 3D view) and the mirrored tile within the rules, that point
 // itself, so the camera doesn't move.
 function edgeArrival(zone, { side, along = 0, fromStand = FLOOR_Z, yaw, exact } = {}) {
@@ -334,19 +334,21 @@ function edgeArrival(zone, { side, along = 0, fromStand = FLOOR_Z, yaw, exact } 
   const ty = side === "s" ? 0 : side === "n" ? d - 1 : Math.max(0, Math.min(d - 1, a));
   const inBand = (x, y) => (side === "e" ? x <= 2 : side === "w" ? x >= w - 3 : side === "s" ? y <= 2 : y >= d - 3) &&
     Math.abs((side === "e" || side === "w" ? y : x) - a) <= 4;
+  // The mirrored tile counts even when the anchor can't reach it: you can always step back the way you came.
+  const mirror = tx + ty * w;
   let best = -1, bestD = Infinity, any = -1, anyD = Infinity;
   for (let i = 0; i < w * d; i++) {
-    if (dist[i] < 0 || stand[i] < 0) continue;
+    if ((dist[i] < 0 && i !== mirror) || stand[i] < 0) continue;
     const x = i % w, y = (i - x) / w;
     if (isStairs(zone, x, y)) continue;
     const dd = distance(x - tx, y - ty);
-    if (dd < anyD) { anyD = dd; any = i; }
+    if (dd < anyD && dist[i] >= 0) { anyD = dd; any = i; }
     if (inBand(x, y) && Math.abs(stand[i] - fromStand) <= 1 && dd < bestD) { bestD = dd; best = i; }
   }
   const i = best >= 0 ? best : any;
   if (i < 0) return { ...zone.spawn, shifted: true };
   const x = i % w, y = (i - x) / w;
-  if (exact && best === tx + ty * w) {
+  if (exact && best === mirror) {
     const ex = Math.min(w - 1e-3, Math.max(0, exact.x)), ey = Math.min(d - 1e-3, Math.max(0, exact.y));
     if (Math.floor(ex) === tx && Math.floor(ey) === ty) return { x: ex, y: ey, z: exact.z, yaw: yaw ?? zone.spawn.yaw, shifted: false, exact: true };
   }
