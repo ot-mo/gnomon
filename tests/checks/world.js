@@ -20,6 +20,7 @@ import { REAL_WORLD, WORLD_ROWS, TIER_ROWS, LANDMARK_INDEX, ROADS, RIVERS, TERRA
 import { TERRAINS } from "../../src/content/world/terrains.js";
 import { CURRENCY } from "../../src/content/currency.js";
 import { distance } from "../../src/rng.js";
+import { readFileSync } from "node:fs";
 import { SURFACE } from "../../src/world.js";
 
 // Deep equality that understands Maps (by entries, in order) and plain data.
@@ -80,7 +81,17 @@ function checkBible(problems) {
   for (const l of LANDMARK_INDEX)
     for (const [x, y] of l.at) { letterAt.set(`${x},${y}`, l); if (R[y][x] !== l.letter) problems.push(`bible: ${l.id} at (${x}, ${y}) is "${R[y][x]}", not ${l.letter}`); }
   const counts = {}, M = compileWorld(REAL_WORLD);
-  let tierExceptions = 0;
+  // The rows themselves, character for character against the text of WORLD_BIBLE §15.1, so a copy error
+  // in worldmap.js can't hide behind a check that only compares the file with itself.
+  const bibleText = readFileSync(new URL("../../docs/design/WORLD_BIBLE.md", import.meta.url), "utf8");
+  for (const [name, rows] of [["WORLD_ROWS", R], ["TIER_ROWS", T]]) {
+    const block = bibleText.split(`export const ${name} = [`)[1]?.split("];")[0];
+    const want = block ? [...block.matchAll(/^\s*'(.*)',/gm)].map((m) => m[1]) : [];
+    if (want.length !== 21) { problems.push(`bible: can't read ${name} out of WORLD_BIBLE.md`); continue; }
+    for (let y = 0; y < 21; y++)
+      for (let x = 0; x < 42; x++)
+        if (rows[y]?.[x] !== want[y][x]) problems.push(`bible: ${name} at (${x}, ${y}) is "${rows[y]?.[x]}", the bible's "${want[y][x]}"`);
+  }
   for (let y = 0; y < 21; y++)
     for (let x = 0; x < 42; x++) {
       const c = R[y][x], t = M.tileAt(x, y);
@@ -95,11 +106,7 @@ function checkBible(problems) {
       // §4.5: tier = 1 + floor(distance from Hollowmere / 5.6), +1 in the Shade, the Lattice, the Teeth and on water.
       const mod = TERRAINS[t.terrain].tierMod;
       const tier = Math.max(1, Math.min(8, 1 + Math.floor(distance(x - 5, y - 16) / 5.6) + mod));
-      if (tier !== Number(T[y][x])) {
-        // The grid (binding, §15.1) has one span the formula puts a tier lower: (19, 15), Downs beside the Teeth.
-        if (x === 19 && y === 15) tierExceptions++;
-        else problems.push(`bible: tier at (${x}, ${y}) is ${T[y][x]}, the formula says ${tier}`);
-      }
+      if (tier !== Number(T[y][x])) problems.push(`bible: tier at (${x}, ${y}) is ${T[y][x]}, the formula says ${tier}`);
       if (t.tier !== Number(T[y][x])) problems.push(`real world: tile (${x}, ${y}) has tier ${t.tier}, the grid ${T[y][x]}`);
     }
   for (const [k, n] of Object.entries(TERRAIN_COUNTS)) if (counts[k] !== n) problems.push(`bible: ${k} has ${counts[k]} spans, the legend ${n}`);
@@ -142,7 +149,7 @@ function checkBible(problems) {
       problems.push(`bible: ${L.id}'s dungeon floors ${JSON.stringify(got)}`);
   }
   if (JSON.stringify(M.landmarks.get("square").dungeon.up) !== "[22,23]") problems.push("bible: the Square's two floors up");
-  return { tierExceptions };
+  return {};
 }
 
 // What compiling makes of the two worlds.
