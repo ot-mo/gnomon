@@ -42,7 +42,7 @@ export const ZONE_RULES = {
   walkOffPast: 0.5,     // 3D: you cross once the body's centre is this far past the edge
 };
 // What a solid edge says when you try it (once per visit and side); the world's own border has no terrain.
-export const EDGE_RULES = { border: "Nothing lies past this edge of the world." };
+export const EDGE_RULES = { border: "Nothing lies past this edge of the world.", shifted: "The ground shifts underfoot." };
 const SIDE_STEP = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0], ne: [1, -1], nw: [-1, -1], se: [1, 1], sw: [-1, 1] };
 const MIRROR = { n: "s", s: "n", e: "w", w: "e" };
 
@@ -144,6 +144,7 @@ export function enterZone(game, zone, arrival = {}) {
   game.zone = zone;
   emit(game, "zone:prepare", { zone, arrival, from });
   const at = arrivalPoint(zone, how, arrival);
+  game.arrival = at;   // where (and how) you were placed last
   const p = game.player;
   p.x = at.x; p.y = at.y; p.z = at.z;
   if (!arrival.keepMotion) p.vz = 0;   // over an edge in 3D you keep falling or jumping as you were
@@ -225,7 +226,10 @@ export function tryWalkOff(game, side, along, opts = {}) {
   const fromStand = opts.fromStand ?? Math.round(p.z);
   const ok = changeZone(game, addr.key, { how: "edge", side, along, fromStand, exact: opts.exact || null,
                                           keepFacing: true, keepMotion: opts.keepMotion !== false });
-  if (ok === true) game.log(target.name, [200, 220, 200]);
+  if (ok === true) {
+    game.log(target.name, [200, 220, 200]);
+    if (game.arrival?.shifted) game.log(EDGE_RULES.shifted, [170, 170, 170]);   // §5.1: no tile within the rules
+  }
   return ok === true;
 }
 

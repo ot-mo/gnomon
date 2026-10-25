@@ -6,7 +6,7 @@
 // game/startRun: the real game (game.js), so zone changes run exactly as in play.
 import { Zone, B, FLOOR_Z, BLOCKS, standWith, solidFor } from "../../src/world.js";
 import { changeZone, enterZone, arrivalPoint, addZonePatch, claimUid, uidWhere, killUid, zoneBelow, zoneAbove,
-         cachedZone, PATCH_OPS, parseKey, zoneKey } from "../../src/zones.js";
+         cachedZone, PATCH_OPS, parseKey, zoneKey, tryWalkOff, EDGE_RULES } from "../../src/zones.js";
 import { on, emit, registerUpdate, unregisterUpdate, runUpdates } from "../../src/events.js";
 import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../../src/pathing.js";
 import { generateDungeonLevel, legacyParams } from "../../src/gen/dungeon.js";
@@ -164,6 +164,13 @@ export function checkZones({ game, startRun }) {
   const logged = game.messages.length;
   expect(parseKey("3,-2,5").wy === -2 && changeZone(game, "0,0,21", { how: "down" }, "You descend the stairs...") === false && game.zone === lvl1, "nothing at 0,0,21 (below the legacy stack's last level): no change");
   expect(game.messages.length === logged, "a change that fails logs no message");
+  // §5.1: walking off an edge with no tile within the rules shifts you, and says so.
+  changeZone(game, "0,0,0", { how: "travel" });
+  game.player.x = game.zone.w - 0.5; game.player.y = 26.5;
+  const before = game.messages.length;
+  expect(tryWalkOff(game, "e", 26, { fromStand: 14, keepMotion: false }) && game.arrival?.shifted &&
+         game.messages.slice(before).some((m) => (m.text ?? m) === EDGE_RULES.shifted), "a shifted edge arrival logs \"The ground shifts underfoot.\"");
+  changeZone(game, "0,0,1", { how: "down" });
 
   // --- Patches and uids ---------------------------------------------------------------------------
   PATCH_OPS.testMark = (g, zone, patch, { at }) => { zone.monsters.push({ id: -1, type: "rat", uid: patch.uid, tx: at.x, ty: at.y, testMark: true }); };
