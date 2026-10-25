@@ -12,7 +12,8 @@
 //   final   the last level: no way down, no holes, the bottom's hall (a boss's throne)
 //   hasUp   stairs up in the start room (level 1's lead to the surface entrance)
 //   theme   a DUNGEON_THEMES id: room materials, how many rooms are dark, how many monsters
-//   bottom  { kind: "guardian" | "boss", id }: the hall the last level gets (pickVault)
+//   bottom  { kind: "guardian" | "boss", id }: the hall the last level gets (pickVault); a guardian's hall
+//           there has no stairs behind its gate (a site's dungeon that ends in a guardian, 0A2)
 //   not yet used (WS10): creatureTable, holesIn and bottom.uid (the named creature's claimUid).
 //           A value other than null/undefined throws (NOT_YET below), so nothing is silently dropped.
 import { Zone, B, FLOOR_Z, ROOM_TOP, CORRIDOR_TOP, standWith } from "../world.js";
@@ -90,6 +91,12 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
     const vx = rng.int(2, W - vault.w - 2), vy = rng.int(2, D - vault.d - 4);
     vaultRect = { x0: vx, y0: vy, x1: vx + vault.w - 1, y1: vy + vault.d - 1 };
     entrance = stampVault(f, vault, vx, vy, rng, { cosmetic });
+  }
+  // A guardian's hall at the bottom of a dungeon (a site's last level, 0A2): its gate opens onto
+  // the end of the dungeon, not onto stairs. (The legacy guardians are never on the last level.)
+  if (final && f.stairs) {
+    f.set(f.stairs.x, f.stairs.y, FLOOR_Z - 1, vault.floorBlock);
+    f.stairs = null;
   }
   for (let y = vaultRect.y0 - 1; y <= vaultRect.y1 + 1; y++)
     for (let x = vaultRect.x0 - 1; x <= vaultRect.x1 + 1; x++) blocked[x + y * W] = 1;
@@ -860,6 +867,10 @@ export function validateDungeonLevel(f, p = {}) {
     if (bottom?.kind === "boss") {
       const boss = f.monsters.find((m) => MONSTER_TYPES[m.type].boss);
       if (!boss || !at(all, boss.x, boss.y)) problems.push("boss missing or unreachable");
+    }
+    if (f.guardianHall) {   // a guardian at the bottom (a site's last level): it must be reachable
+      const g = f.monsters.find((m) => m.guardian);
+      if (!g || !at(all, g.x, g.y)) problems.push("guardian missing or unreachable");
     }
     if (f.stairs) problems.push("stairs down on the last floor");
     const hole = (x, y) => !f.get(x, y, 0) || f.get(x, y, 0) === B.WATER_DEEP || f.get(x, y, FLOOR_Z - 1) === B.WATER_DEEP;
