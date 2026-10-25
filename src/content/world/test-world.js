@@ -35,9 +35,9 @@ export const TEST_TERRAINS = {
 // Fixture regions: a tier each, and the chance per eligible span of each kind of per-run site
 // (world/sites.js placeSites).
 export const TEST_REGIONS = {
-  westreach: { name: "the Westreach", tier: 1, music: null, encounterRate: 0.05, sites: { village: 0.04, ruin: 0.03, lair: 0.02 } },
-  midwood: { name: "the Midwood", tier: 2, music: null, encounterRate: 0.08, sites: { village: 0.03, ruin: 0.04, lair: 0.03 } },
-  eastfells: { name: "the Eastfells", tier: 3, music: null, encounterRate: 0.1, sites: { village: 0.03, ruin: 0.04, lair: 0.04 } },
+  westreach: { name: "the Westreach", tier: 1, music: null, encounterRate: 0.05, sites: { village: 0.015, ruin: 0.01, lair: 0.008 } },
+  midwood: { name: "the Midwood", tier: 2, music: null, encounterRate: 0.08, sites: { village: 0.012, ruin: 0.015, lair: 0.012 } },
+  eastfells: { name: "the Eastfells", tier: 3, music: null, encounterRate: 0.1, sites: { village: 0.012, ruin: 0.015, lair: 0.015 } },
 };
 
 // A 4-connected path through waypoints that share a row or a column.
