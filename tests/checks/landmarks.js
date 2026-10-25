@@ -49,9 +49,10 @@ export function checkLandmarks({ seeds = [1, 7, 42, 1234, 31337], tiles = 500 } 
       const holes = holesOf(z);
       // Every wall cell ('#') of a plan stamped by stampVault is a wall on the map, however high it is.
       const planDef = world.plans?.[L.plan], pa = z.gen?.planAt;
-      if (planDef?.rows && !planDef.stamp && pa) {
+      if (planDef?.rows && !planDef.stamp) {
+        expect(pa, `${at}: a stamped plan with no gen.planAt, so its walls can't be checked`);
         let notWall = 0;
-        planDef.rows.forEach((row, y) => [...row].forEach((c, x) => { if (c === "#" && z.kind[pa.x + x + (pa.y + y) * z.w] !== KIND.WALL) notWall++; }));
+        if (pa) planDef.rows.forEach((row, y) => [...row].forEach((c, x) => { if (c === "#" && z.kind[pa.x + x + (pa.y + y) * z.w] !== KIND.WALL) notWall++; }));
         expect(notWall === 0, `${at}: ${notWall} of the plan's wall cells are not walls on the map`);
       }
       if (L.id === "temple") {
