@@ -52,7 +52,8 @@ export const BLOCKS = [
   { key: "MURAL_LIT",     name: "carved panel",  color: [150, 150, 165], mural: true, on: true },
 
   // --- Reserved generic ids (0A1). Names, colours and map looks are placeholders: WS2 owns them
-  // for terrain, other workstreams for the rest. Ids 36..59 never move.
+  // for terrain, other workstreams for the rest. Ids 36..59 never move. A map glyph must not be one
+  // the bible's glyph registry (§15.7) gives to items, features or creatures (check-blocks).
   { key: "SAND",      name: "sand",        color: [214, 196, 140], reserved: true, map: { glyph: ".", color: [214, 196, 140] } },
   { key: "DIRT",      name: "dirt",        color: [120, 92, 64],   reserved: true, map: { glyph: ".", color: [140, 110, 80] } },
   { key: "ROAD",      name: "road",        color: [172, 162, 142], reserved: true, map: { glyph: "·", color: [172, 162, 142] } },
@@ -60,8 +61,8 @@ export const BLOCKS = [
   { key: "SNOW",      name: "snow",        color: [235, 240, 248], reserved: true, map: { glyph: ".", color: [235, 240, 248] } },
   { key: "ASH",       name: "ash",         color: [96, 92, 90],    reserved: true, map: { glyph: ".", color: [110, 106, 104] } },
   { key: "CLAY",      name: "clay",        color: [168, 98, 70],   reserved: true, map: { glyph: ".", color: [168, 98, 70] } },
-  { key: "SHALE",     name: "shale",       color: [90, 92, 102],   reserved: true, map: { glyph: "^", color: [120, 120, 132] } },
-  { key: "TRUNK",     name: "tree trunk",  color: [96, 70, 46],    reserved: true, map: { glyph: "♣", color: [52, 110, 60] } },
+  { key: "SHALE",     name: "shale",       color: [90, 92, 102],   reserved: true },   // no map look yet: "^" is spikes (bible §15.7)
+  { key: "TRUNK",     name: "tree trunk",  color: [96, 70, 46],    reserved: true },   // no map look yet: "♣" is the speaking trees
   { key: "LEAVES",    name: "leaves",      color: [70, 130, 66],   reserved: true },
   { key: "REED",      name: "reeds",       color: [150, 160, 90],  reserved: true },
   { key: "MUD_BRICK", name: "mud brick",   color: [160, 120, 84],  reserved: true },
