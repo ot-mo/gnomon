@@ -93,11 +93,6 @@ export function inShallowWater(p, zone) {
   return g === B.WATER_SHALLOW || (g === B.WATER_DEEP && canSwim(p));
 }
 
-export function placePlayer(p, spawn) {
-  p.x = spawn.x; p.y = spawn.y; p.z = spawn.z; p.vz = 0;
-  p.yaw = spawn.yaw; p.pitch = 0;
-}
-
 export function clampPitch(p) {
   const LIMIT = 89 * Math.PI / 180;
   p.pitch = Math.max(-LIMIT, Math.min(LIMIT, p.pitch));
