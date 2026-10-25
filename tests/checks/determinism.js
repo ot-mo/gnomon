@@ -8,7 +8,7 @@
 //    The uid part has nothing to compare until 0C: legacy creatures and people carry no uid yet
 //    (undefined on both sides). The stats count how many do, and a note says so while it is 0.
 // 2. A static scan (comments stripped). In the generation code (sources: { path: text }; 0A1 scans
-//    src/gen/, src/world/ and story.js, WS7 adds story/history.js and story/villages.js): no
+//    src/gen/, src/world/, src/story/, src/content/world/ and content/currency.js): no
 //    Math.random, and no Math.hypot (its last bits differ between engines and even between
 //    Chrome's JIT tiers: use rng.js distance). In the generation code and the helpers it calls
 //    (helpers: { path: text }): no sort with a comparator that draws random numbers (engines sort
@@ -16,7 +16,7 @@
 //    Chrome 152 generated about a third of the legacy levels differently from Node 20. Also no
 //    Math.sin, cos, tan, exp, pow or atan2 in the generation code (0A2): engines don't promise the
 //    same last bits for them, and world functions must agree to the bit across zones and engines.
-//    story.js is exempt (its temple mosaic uses atan2) until 0A2 turns the temple into a plan.
+//    (story.js was exempt for its temple mosaic's atan2 until 0A2 turned the temple into a plan.)
 import { canon } from "../lib/hash.js";
 import { generateDungeonLevel, legacyParams, LEGACY_LEVELS } from "../../src/gen/dungeon.js";
 
@@ -44,7 +44,7 @@ const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|
 const RANDOM_SORT = /\.sort\(.*\b(rand|rng|random)\w*\(/;   // a sort call with a random draw later on its line
 
 const TRANSCENDENTAL = /Math\.(sin|cos|tan|exp|pow|atan2)\b/;
-export const TRANSCENDENTAL_EXEMPT = ["story.js"];
+export const TRANSCENDENTAL_EXEMPT = [];
 
 export function checkDeterminism({ seeds = [3, 77, 2024], depths = LEGACY_LEVELS, sources = {}, helpers = {} } = {}) {
   const problems = [], notes = [];

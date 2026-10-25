@@ -16,7 +16,7 @@ export async function currentApi(env, seedRandom) {
   const leveling = await env.load("leveling.js");
   const { render3d } = await env.load("render3d.js");
   const { renderMap } = await env.load("renderMap.js");
-  const story = await env.load("story.js");
+  const temple = await env.load("content/world/temple.js");
   const zones = await env.load("zones.js");
   const game = G.game;
   const STACKS = ["potion", "scroll", "knife", "bomb"];
@@ -88,6 +88,7 @@ export async function currentApi(env, seedRandom) {
       return f;
     },
     stampVault: (f, built, x, y, rng) => vaults.stampVault(f, built, x, y, rng),
-    buildTemple: (seed) => story.buildTemple(seed),
+    // The temple is a plan since 0A2: stamped the parent's way (48×48×10, rock roof, no front door).
+    buildTemple: (seed) => temple.templeFixture(seed),
   };
 }

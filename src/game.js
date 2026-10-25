@@ -39,7 +39,8 @@ import { toggleMusic, updateMusic, playCubeTheme } from "./music.js";
 import { unlockAudio, audioFrame } from "./audio.js";
 import { sfx, toggleSounds, setListener } from "./sfx.js";
 import { questEvent } from "./npcs.js";
-import { INTRO, CUBE_PAGES, TAUNTS, FINAL_PAGES, EPILOGUE, LICH_COLOR, openCubeWall } from "./story.js";
+import { INTRO, CUBE_PAGES, TAUNTS, FINAL_PAGES, EPILOGUE, LICH_COLOR } from "./story/legacy.js";
+import { openCubeWall } from "./content/world/temple.js";
 import { openTalk, talkKey, talkClick, talkHover, drawTalk, shopKey, drawShop, openJournal, journalKey, drawJournal,
          openStory, storyKey, nextPage, drawStory, updateTalk } from "./dialogue.js";
 

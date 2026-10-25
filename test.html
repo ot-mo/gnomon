@@ -16,7 +16,7 @@
 // the size. The levels are the legacy stack's (the fixture site under world tile 0, 0):
 // generateDungeonLevel(seed, legacyParams(depth, seed)). tools/check-dungeons.mjs does the same in Node.
 import { generateDungeonLevel, validateDungeonLevel, legacyParams, LEGACY_GUARDIANS } from "./src/gen/dungeon.js";
-import { buildTemple } from "./src/story.js";
+import { templeFixture as buildTemple } from "./src/content/world/temple.js";
 import { MONSTER_TYPES } from "./src/monsters.js";
 import { NPC_TYPES } from "./src/npcs.js";
 import { FLOOR_ART, WEAPONS, WEAPON_PALETTE, itemPalette, POTIONS, POTION_COLORS, RINGS, AMULETS, RELICS, makeRelic, itemName, itemInfo } from "./src/items.js";

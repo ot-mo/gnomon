@@ -11,6 +11,8 @@ import { recordMechanics, recordFrames, recordDungeons, recordVaults, recordTemp
 // Legacy level 1 differs on purpose since 0A1 (no sky well; stairs up to the temple), so the
 // dungeon comparison covers depths 2-20 and only reports what changed on depth 1.
 export const DUNGEON_GATE_FROM = 2;
+// The temple fixture's field that 0A2 dropped (the temple's returnPoint); every other field is compared.
+export const TEMPLE_DROPPED = "returnPoint";
 
 // The paths at which two plain values differ (at most `limit`).
 function diffPaths(a, b, path = "", out = [], limit = 8) {
@@ -71,10 +73,14 @@ export function checkGolden(api, fixtures, { only = null } = {}) {
   }
 
   if (want("temple")) {
+    // The temple is a plan since 0A2 (content/world/temple.js), stamped here the parent's way. Its
+    // returnPoint (coming up by Maren) is gone on purpose: coming up lands beside the entrance stairs.
     const got = recordTemple(api).temples, exp = fixtures.temple.temples;
-    const bad = Object.keys(exp).filter((k) => !same(got[k], exp[k]));
+    const without = (t) => { const { [TEMPLE_DROPPED]: _, ...rest } = t || {}; return rest; };
+    const bad = Object.keys(exp).filter((k) => !same(without(got[k]), without(exp[k])));
     for (const k of bad) problems.push(`temple seed ${k}: ${diffPaths(exp[k], norm(got[k])).join("; ")}`);
     stats.temple = { seeds: Object.keys(exp).length, mismatched: bad.length };
+    if (Object.keys(exp).some((k) => got[k]?.[TEMPLE_DROPPED] === undefined)) notes.push(`temple: ${TEMPLE_DROPPED} dropped as intended (0A2)`);
   }
 
   stats.ms = Date.now() - t0;

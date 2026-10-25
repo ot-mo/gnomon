@@ -158,7 +158,6 @@ export function keepDerived(game, n = 2) {
 // generation never needs Math.random.
 export function arrivalPoint(zone, how, opts = {}) {
   if (opts.at) return { ...opts.at };
-  if (how === "up" && zone.returnPoint) return { ...zone.returnPoint };   // the legacy temple: by Maren
   if (how === "down" && zone.upStairs) return beside(zone, zone.upStairs);
   if (how === "up" && (zone.stairs || zone.entrance)) return beside(zone, zone.stairs || zone.entrance);
   if (how === "fall") return landing(zone, opts.fx ?? zone.spawn.x, opts.fy ?? zone.spawn.y, opts);
