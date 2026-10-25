@@ -17,30 +17,9 @@ import { generateSurface, buildApronBand } from "../gen/surface.js";
 import { generateDungeonLevel } from "../gen/dungeon.js";
 import { legacyZone } from "./legacy.js";
 import { zoneSeed } from "./run.js";
-import { dungeonLevelOf } from "./sites.js";
-import { tierOfLevel } from "./worldmodel.js";
+import { siteWithDungeon, dungeonParams } from "./sites.js";
 
-export function siteWithDungeon(run, wx, wy) {
-  for (const id of run.sitesAt.get(`${wx},${wy}`) || []) {
-    const s = run.sites.get(id);
-    if (s?.dungeon) return s;
-  }
-  return null;
-}
-
-// Level z of a site's dungeon (1-based): its level from the spec (DECISIONS.md: listed floors for a
-// landmark, else the surface level + z), its theme, gimmicks and vaults, and on the last level its
-// bottom (a guardian's hall, a boss's throne; "none" and the parts WS10 adds get an ordinary level).
-export function dungeonParams(run, site, z) {
-  const spec = site.dungeon, level = dungeonLevelOf(spec, z), final = z >= spec.levels;
-  const bottom = final && (spec.bottom?.kind === "guardian" || spec.bottom?.kind === "boss") ? { kind: spec.bottom.kind, id: spec.bottom.id } : null;
-  return {
-    key: `${site.at.wx},${site.at.wy},${z}`, wx: site.at.wx, wy: site.at.wy, z, level, tier: tierOfLevel(level),
-    index: z, count: spec.levels, final, theme: spec.theme || "legacy", hasUp: true, forcedVault: null,
-    vaultPool: spec.vaultPool || null, gimmicks: [...(spec.gimmicks || [])], bottom, encounters: [],
-    name: spec.named?.[z - 1] || `${site.name}, level ${z}`,
-  };
-}
+export { siteWithDungeon, dungeonParams };   // they live in sites.js (gen/surface.js needs them too)
 
 function surfaceZone(game, { wx, wy }) {
   const run = game.run, t = run?.world.tileAt(wx, wy);

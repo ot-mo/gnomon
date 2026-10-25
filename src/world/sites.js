@@ -3,6 +3,8 @@
 //
 //   placeSites(run) → run                 fills run.sites and run.sitesAt; draws only from runRng(run, "sites")
 //   dungeonLevelOf(spec, z) → level       the level of dungeon floor z (1-based)
+//   siteWithDungeon(run, wx, wy) → Site | null    the span's site that has a dungeon below it
+//   dungeonParams(run, site, z) → p       generateDungeonLevel's parameters for its level z
 //   SITE_BUILDERS[kind](ctx, site)        how a site is stamped into its surface zone (WS7: village; WS10:
 //   registerSiteBuilder(kind, fn)         dungeon, lair, ruin, historic, station); a second builder for a kind throws
 //
@@ -22,7 +24,7 @@
 //      span between it and any other site (bible §4.10).
 //   3. A site's footprint keeps SITE_MARGIN (6) tiles from every zone edge; only landmarks may touch one.
 import { runRng } from "./run.js";
-import { levelOfTier, SIDES, SITE_MARGIN } from "./worldmodel.js";
+import { levelOfTier, tierOfLevel, SIDES, SITE_MARGIN } from "./worldmodel.js";
 import { SURFACE } from "../world.js";
 
 export const SITE_BUILDERS = {};
@@ -74,6 +76,28 @@ function addSite(run, site) {
   const k = `${site.at.wx},${site.at.wy}`;
   if (!run.sitesAt.has(k)) run.sitesAt.set(k, []);
   run.sitesAt.get(k).push(site.id);
+}
+
+export function siteWithDungeon(run, wx, wy) {
+  for (const id of run.sitesAt.get(`${wx},${wy}`) || []) {
+    const s = run.sites.get(id);
+    if (s?.dungeon) return s;
+  }
+  return null;
+}
+
+// Level z of a site's dungeon (1-based): its level from the spec (DECISIONS.md: listed floors for a
+// landmark, else the surface level + z), its theme, gimmicks and vaults, and on the last level its
+// bottom (a guardian's hall, a boss's throne; "none" and the parts WS10 adds get an ordinary level).
+export function dungeonParams(run, site, z) {
+  const spec = site.dungeon, level = dungeonLevelOf(spec, z), final = z >= spec.levels;
+  const bottom = final && (spec.bottom?.kind === "guardian" || spec.bottom?.kind === "boss") ? { kind: spec.bottom.kind, id: spec.bottom.id } : null;
+  return {
+    key: `${site.at.wx},${site.at.wy},${z}`, wx: site.at.wx, wy: site.at.wy, z, level, tier: tierOfLevel(level),
+    index: z, count: spec.levels, final, theme: spec.theme || "legacy", hasUp: true, forcedVault: null,
+    vaultPool: spec.vaultPool || null, gimmicks: [...(spec.gimmicks || [])], bottom, encounters: [],
+    name: spec.named?.[z - 1] || `${site.name}, level ${z}`,
+  };
 }
 
 export function placeSites(run) {

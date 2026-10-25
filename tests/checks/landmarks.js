@@ -7,7 +7,7 @@
 //    the temple: Maren, the cube on the altar, the spike hall, the cube wall, the stairs at the bottom of
 //    the shaft, the front door, and the legacy levels 1:1 under the parent's 48×48 frame (dungeonRect at
 //    the rect's corner) with no sinkholes; the ruin: its stairs as zone.entrance, a dungeonRect centred
-//    under them (§5.5) and sinkholes only inside it; the tower: no dungeon, its yard on the open east edge.
+//    under them (§5.5) and sinkholes only inside it, each over level 1's floor (a fall lands right under it); the tower: no dungeon, its yard on the open east edge.
 //    The ruin's 5 levels validate, the last one the Flat Queen's hall with no way down.
 // 2. Navigability: 500 random spans you can be in (spread over the seeds) all validate, and each has at
 //    least 90% of its ground in one piece reachable from the anchor under the map's step rules. The
@@ -66,6 +66,13 @@ export function checkLandmarks({ seeds = [1, 7, 42, 1234, 31337], tiles = 500 } 
         for (let lz = 1; lz <= site.dungeon.levels; lz++) {
           const p = dungeonParams(run, site, lz), lvl = generateDungeonLevel(zoneSeed(run, L.wx, L.wy, lz), p);
           levels++;
+          if (lz === 1) {   // a fall lands right under its sinkhole: floor there, not stairs
+            if (!lvl.hasDerived) lvl.refresh();
+            for (const [x, y] of holes) {
+              const lx = x - r.ox, ly = y - r.oy, g = lvl.get(lx, ly, FLOOR_Z - 1);
+              expect(lvl.stand[lx + ly * lvl.w] >= 0 && g !== B.STAIRS && g !== B.STAIRS_UP, `${at}: no floor on level 1 under the sinkhole at (${x}, ${y})`);
+            }
+          }
           for (const q of validateDungeonLevel(lvl, p)) problems.push(`${at} level ${lz}: ${q}`);
           if (lz === site.dungeon.levels)
             expect(lvl.final && !lvl.stairs && lvl.guardianHall?.type === "flatqueen", `${at}: the last level is not the Flat Queen's hall without a way down`);
