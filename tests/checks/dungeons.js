@@ -50,6 +50,19 @@ export function checkVaultOptions() {
   return { name: "vault options", ok: problems.length === 0, problems, stats: { cases: 14 } };
 }
 
+// The parameter contract's edges: what generateDungeonLevel, validateDungeonLevel and legacyParams
+// do with a missing or not-yet-supported argument (each case was a silent trap once).
+export function checkDungeonParams() {
+  const problems = [];
+  const expect = (cond, msg) => { if (!cond) problems.push(msg); };
+  const throws = (fn) => { try { fn(); return false; } catch { return true; } };
+  let cases = 0;
+  const test = (cond, msg) => { cases++; expect(cond, msg); };
+  test(throws(() => legacyParams(7)), "legacyParams(depth) without the run seed must throw (it planned the people of seed 0)");
+  test(!throws(() => legacyParams(7, 42)) && legacyParams(7, 42).z === 7, "legacyParams(depth, runSeed) works");
+  return { name: "dungeon params", ok: problems.length === 0, problems, stats: { cases } };
+}
+
 export function checkDungeons({ seeds = 50, depths = LEGACY_LEVELS, p95Budget = 40 } = {}) {
   const problems = [], times = [];
   let retries = 0, worstAttempts = 0, guardianLevels = 0;

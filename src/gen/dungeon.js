@@ -4,7 +4,7 @@
 //
 //   generateDungeonLevel(seed, p) → Zone      p: the level's parameters (below)
 //   validateDungeonLevel(zone, p) → problems  (empty: the level can be finished)
-//   legacyParams(depth, runSeed) → p          the old 20-level stack, level for level
+//   legacyParams(depth, runSeed) → p          the old 20-level stack, level for level (runSeed required)
 //
 // p = { key, wx, wy, z, level, tier, index, count, final, theme, hasUp = true, forcedVault, vaultPool,
 //       gimmicks: [id], bottom: { kind, id, uid }, encounters: [...], creatureTable, holesIn, simpleAfter = 25, name }
@@ -897,9 +897,15 @@ export function validateDungeonLevel(f, p = {}) {
 // generateFloor(seed, n) made at 75edbd3, for n = 2..20 (tests/fixtures/golden/dungeons.json).
 // Level 1 now has stairs up (to the temple above it) and no sky well, so it differs on purpose.
 // It runs as the fixture site under world tile (0, 0) (world/legacy.js).
+//
+// runSeed is required: the parent planned who you meet on each level from the run's seed
+// (planEncounters), and those people decide blocks too (Lio's cell, the bars). Pass the same seed
+// you give generateDungeonLevel. (TECH_DESIGN §1.4 writes legacyParams(depth); a default seed
+// silently built other levels, so there is none.)
 export const LEGACY_LEVELS = 20;
 export const LEGACY_GUARDIANS = { 5: "flatqueen", 10: "warden", 15: "colossus" };
-export function legacyParams(depth, runSeed = 0) {
+export function legacyParams(depth, runSeed) {
+  if (!Number.isInteger(runSeed)) throw new Error(`legacyParams(${depth}, runSeed): runSeed must be the run's seed (an integer), got ${runSeed}`);
   const final = depth >= LEGACY_LEVELS;
   // Levels 1-9 each get a different vault so you meet all of them (level 5 has a guardian
   // instead); after that, random. The last level always gets the Lich's throne room.
