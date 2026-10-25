@@ -1,4 +1,4 @@
-// Same seed → same zone (dungeon part), and no Math.random in the generation code (R6).
+// Same seed → same zone (dungeons, surfaces, aprons and the run), and no Math.random in the generation code (R6).
 //   node tools/check-determinism.mjs
 import fs from "node:fs";
 import path from "node:path";

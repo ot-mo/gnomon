@@ -17,8 +17,23 @@
 //    Math.sin, cos, tan, exp, pow or atan2 in the generation code (0A2): engines don't promise the
 //    same last bits for them, and world functions must agree to the bit across zones and engines.
 //    (story.js was exempt for its temple mosaic's atan2 until 0A2 turned the temple into a plan.)
+// 3. The run (0A2): buildRun twice on each seed and both worlds, the second time on a world compiled
+//    afresh (a shallow copy of the definition, so no cache is shared), and the two serialized runs equal.
+// 4. Surfaces (0A2): every landmark span of both worlds and `spans` random spans of the test world are
+//    generated on each run and compared as in 1, plus the entrance, dungeonRect, edges, landmark and
+//    what generation knew (zone.gen); every apron band built from the world functions is equal on both
+//    runs; the world functions agree with their uncached forms (heightAt, treeAt, portsOf) on sample
+//    points; and the site dungeons' levels (the ruin's 5) are generated twice the same.
 import { canon } from "../lib/hash.js";
 import { generateDungeonLevel, legacyParams, LEGACY_LEVELS } from "../../src/gen/dungeon.js";
+import { buildRun, serializeRun, zoneSeed } from "../../src/world/run.js";
+import { compileWorld } from "../../src/world/worldmodel.js";
+import { generateSurface, buildApronBand, worldFns, heightAt, treeAt, portsOf } from "../../src/gen/surface.js";
+import { siteWithDungeon, dungeonParams } from "../../src/world/zonegen.js";
+import { APRON_SIDES } from "../../src/world.js";
+import { TEST_WORLD } from "../../src/content/world/test-world.js";
+import { REAL_WORLD } from "../../src/content/world/worldmap.js";
+import { makeRng } from "../../src/rng.js";
 
 const creatureFacts = (m) => ({ type: m.type, tx: m.tx, ty: m.ty, z: m.z, elite: m.elite, uid: m.uid,
   hp: m.hp, state: m.state, anim: m.anim, think: m.think, pause: m.pause, shot: m.shot });
@@ -46,7 +61,65 @@ const RANDOM_SORT = /\.sort\(.*\b(rand|rng|random)\w*\(/;   // a sort call with 
 const TRANSCENDENTAL = /Math\.(sin|cos|tan|exp|pow|atan2)\b/;
 export const TRANSCENDENTAL_EXEMPT = [];
 
-export function checkDeterminism({ seeds = [3, 77, 2024], depths = LEGACY_LEVELS, sources = {}, helpers = {} } = {}) {
+const surfaceFacts = (z) => ({ entrance: z.entrance, dungeonRect: z.dungeonRect, edges: z.edges, landmarkId: z.landmarkId,
+  siteId: z.siteId, name: z.name, hasBelow: z.hasBelow, attempts: z.attempts, navigability: z.navigability, gen: z.gen });
+
+// The run and surface parts (3 and 4 above). Pushes into problems; returns its counts.
+function checkWorldParts(seeds, spans, problems) {
+  const stats = { runsTwice: 0, surfacesTwice: 0, apronBands: 0, worldFnPoints: 0, siteLevelsTwice: 0 };
+  for (const def of [TEST_WORLD, REAL_WORLD]) {
+    const fresh = { ...def };   // compiled on its own: no compile or world-function cache shared with def
+    for (const seed of seeds) {
+      const at = `${def.world.id} seed ${seed}`;
+      const runA = buildRun(seed, def), runB = buildRun(seed, compileWorld(fresh));
+      stats.runsTwice++;
+      if (canon(serializeRun(runA)) !== canon(serializeRun(runB))) problems.push(`${at}: two buildRun calls differ`);
+      const world = runA.world, picks = [...world.landmarks.values()].map((L) => [L.wx, L.wy]);
+      if (def === TEST_WORLD) {
+        const open = world.tiles.filter((t) => t.edges === "open"), rng = makeRng(seed ^ 0x3c3c);
+        for (let k = 0; k < spans; k++) { const t = open[Math.floor(rng() * open.length)]; picks.push([t.wx, t.wy]); }
+      }
+      for (const [wx, wy] of picks) {
+        const a = generateSurface(runA, wx, wy), b = generateSurface(runB, wx, wy);
+        stats.surfacesTwice++;
+        const diff = compareZones(a, b);
+        if (canon(surfaceFacts(a)) !== canon(surfaceFacts(b))) diff.push("entrance/edges/gen");
+        if (diff.length) problems.push(`${at} span (${wx}, ${wy}): two generations differ in ${diff.join(", ")}`);
+        for (const side of APRON_SIDES) {
+          if (side.length === 1 ? !a.edges?.[side] : !(a.edges?.[side[0]] && a.edges?.[side[1]])) continue;
+          stats.apronBands++;
+          const ba = buildApronBand(runA, a, side), bb = buildApronBand(runB, b, side);
+          if (ba.blocks.some((v, i) => v !== bb.blocks[i])) problems.push(`${at} span (${wx}, ${wy}): apron band ${side} differs`);
+        }
+      }
+      // World functions: the cached instance and a fresh one for every call agree, at points across the map.
+      const W = worldFns(world, seed), rng = makeRng(seed ^ 0x7e7e);
+      for (let k = 0; k < 60; k++) {
+        const gx = Math.floor(rng() * world.w * 80), gy = Math.floor(rng() * world.h * 48);
+        const cx = gx >> 3, cy = gy >> 3, wx = Math.floor(gx / 80), wy = Math.floor(gy / 48);
+        stats.worldFnPoints++;
+        if (W.heightAt(gx, gy) !== heightAt(world, seed, gx, gy) || canon(W.treeAt(cx, cy)) !== canon(treeAt(world, seed, cx, cy))
+            || canon(W.portsOf(wx, wy)) !== canon(portsOf(world, seed, wx, wy)))
+          problems.push(`${at}: the world functions at (${gx}, ${gy}) differ between the cached and a fresh instance`);
+      }
+      // Site dungeons (not the legacy stack, which part 1 covers).
+      if (def === TEST_WORLD)
+        for (const L of world.landmarks.values()) {
+          const site = siteWithDungeon(runA, L.wx, L.wy);
+          if (!site?.dungeon || site.dungeon.legacy || L.id === "temple") continue;
+          for (let z = 1; z <= site.dungeon.levels; z++) {
+            const p = dungeonParams(runA, site, z), s1 = zoneSeed(runA, L.wx, L.wy, z);
+            const diff = compareZones(generateDungeonLevel(s1, p), generateDungeonLevel(zoneSeed(runB, L.wx, L.wy, z), dungeonParams(runB, siteWithDungeon(runB, L.wx, L.wy), z)));
+            stats.siteLevelsTwice++;
+            if (diff.length) problems.push(`${at} ${L.id} level ${z}: two generations differ in ${diff.join(", ")}`);
+          }
+        }
+    }
+  }
+  return stats;
+}
+
+export function checkDeterminism({ seeds = [3, 77, 2024], depths = LEGACY_LEVELS, sources = {}, helpers = {}, spans = 12 } = {}) {
   const problems = [], notes = [];
   let levels = 0, bodies = 0, withUid = 0;
   for (const seed of seeds)
@@ -72,7 +145,8 @@ export function checkDeterminism({ seeds = [3, 77, 2024], depths = LEGACY_LEVELS
                       [/Math\.hypot/, "uses Math.hypot in generation code (engine-dependent bits: use rng.js distance)"], sortRule,
                       ...(TRANSCENDENTAL_EXEMPT.includes(file) ? [] : [trigRule])]);
   for (const [file, text] of Object.entries(helpers)) scan(file, text, [sortRule]);
+  const world = checkWorldParts(seeds, spans, problems);
   if (withUid === 0) notes.push(`uid comparison not exercised: none of ${bodies} creatures and people has a uid yet (0C adds them)`);
   return { name: "determinism", ok: problems.length === 0, problems, notes,
-           stats: { levelsTwice: levels, filesScanned: scanned, bodies, withUid } };
+           stats: { levelsTwice: levels, filesScanned: scanned, bodies, withUid, ...world } };
 }
