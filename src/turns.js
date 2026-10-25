@@ -227,7 +227,9 @@ function stepOffEdge(game, dx, dy, nx, ny) {
   if (outX && outY) return false;
   const side = outX ? (nx < 0 ? "w" : "e") : ny < 0 ? "n" : "s";
   p.yaw = Math.atan2(dy, dx);
-  if (!tryWalkOff(game, side, outX ? Math.floor(p.y) : Math.floor(p.x), { fromStand: Math.round(p.z), keepMotion: false })) return false;
+  // A diagonal step lands on the diagonal row (column) across the edge, not the one you were on.
+  const along = outX ? Math.max(0, Math.min(zone.d - 1, ny)) : Math.max(0, Math.min(zone.w - 1, nx));
+  if (!tryWalkOff(game, side, along, { fromStand: Math.round(p.z), keepMotion: false })) return false;
   game.confirmJump = -1;
   passTime(game, ((dx && dy ? Math.SQRT2 : 1) * STEP_TIME) / haste(p) / fleet(p));
   return true;

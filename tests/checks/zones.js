@@ -11,6 +11,7 @@ import { on, emit, registerUpdate, unregisterUpdate, runUpdates } from "../../sr
 import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../../src/pathing.js";
 import { generateDungeonLevel, legacyParams } from "../../src/gen/dungeon.js";
 import { makeRng, noise2 } from "../../src/rng.js";
+import { mapStep } from "../../src/turns.js";
 
 // A rolling outdoor zone: grass hills 0-3 blocks over the datum, a pond of deep water (rock bottom),
 // a 4-block cliff plateau you can't walk onto, a ruined wall, and a few bottomless pits.
@@ -170,6 +171,13 @@ export function checkZones({ game, startRun }) {
   const before = game.messages.length;
   expect(tryWalkOff(game, "e", 26, { fromStand: 14, keepMotion: false }) && game.arrival?.shifted &&
          game.messages.slice(before).some((m) => (m.text ?? m) === EDGE_RULES.shifted), "a shifted edge arrival logs \"The ground shifts underfoot.\"");
+  // A diagonal map step off an edge goes on to the diagonal row across it.
+  changeZone(game, "0,0,0", { how: "travel" });
+  { const z0 = game.zone, y = 26, s0 = z0.stand[z0.w - 1 + y * z0.w];
+    game.player.x = z0.w - 0.5; game.player.y = y + 0.5; game.player.z = s0;
+    const want = arrivalPoint(cachedZone(game, "1,0,0"), "edge", { side: "e", along: y - 1, fromStand: s0 });
+    expect(mapStep(game, 1, -1) && game.zone.key === "1,0,0" && game.player.x === want.x && game.player.y === want.y,
+           `a diagonal step off the east edge lands at (${game.player.x}, ${game.player.y}), want (${want.x}, ${want.y})`); }
   changeZone(game, "0,0,1", { how: "down" });
 
   // --- Patches and uids ---------------------------------------------------------------------------
