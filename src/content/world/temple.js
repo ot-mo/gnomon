@@ -100,7 +100,12 @@ export const TEMPLE_PLAN = {
   roof: "slab",          // over everything but the sanctum, on the surface
   spawn: "@",            // the zone's anchor: your little room
   keys: ["@", "M", "H"], // must be reachable from the anchor (the stairs wait behind the puzzle, on purpose)
-  dungeonAt: [-2, -2],   // where the 48×48 legacy levels sit, from the plan's corner: the parent's frame
+  entranceGated: true,   // so the entrance isn't one of them
+  at: [2, 2],            // the plan's corner in the landmark's 48×48 rect: where the parent put it in its zone
+  dungeonAt: [0, 0],     // where the 48×48 legacy levels sit, from the rect's corner: 1:1 under the parent's frame
+  hub: [44, 12],         // where the road arrives: just outside the front door's porch
+  sinkholes: false,      // nobody falls into the legacy stack before finding the cube
+  rng: (runSeed) => makeRng((runSeed ^ 0x7e3a1e) >>> 0),   // the parent's puzzle for the same seed
   stamp: (zone, ox, oy, rng, opts) => stampTemple(zone, ox, oy, rng, opts),
 };
 

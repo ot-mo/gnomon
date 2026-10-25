@@ -229,7 +229,7 @@ export function compileWorld(def) {
 
   const startL = landmarks.get(W.start);
   const model = {
-    id: W.id, name: W.name || W.id, version: W.version, w, h, tiles, terrains: def.terrains, regions,
+    id: W.id, name: W.name || W.id, version: W.version, w, h, tiles, terrains: def.terrains, regions, plans: def.plans || {},
     tileAt, inBounds,
     // World-map movement onto (wx, wy): viaRoad when the move follows a road or river edge.
     canTravel(wx, wy, viaRoad = false) {

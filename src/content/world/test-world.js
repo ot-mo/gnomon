@@ -13,7 +13,10 @@
 //                    at (0, 0), so this stands in for TECH_DESIGN's "fixture temple with a 3-level dungeon".
 //   ruin    (20, 8)  a ruin in the Midwood with a 5-level dungeon that ends in the Flat Queen's hall.
 //   tower   (35, 4)  a roofless tower whose footprint touches its zone's open east edge.
-// Their plans (PLANS) are placeholders until the surface stub stamps them; their footprints are given as rect.
+// Their plans are TEST_PLANS below (the temple's is content/world/temple.js); their footprints are given as rect.
+
+import { B } from "../../blocks.js";
+import { TEMPLE_PLAN } from "./temple.js";
 
 // Fixture terrains, in the schema of content/world/terrains.js (enter, travelHours, lostChance, and the
 // world-function parameters ground, relief, cliffs and trees).
@@ -95,8 +98,56 @@ export const TEST_LANDMARKS = [
     rect: { x: 68, y: 18, w: 12, d: 12 }, visibleFrom: 3 },   // x 68..79: it touches the open east edge
 ];
 
-// Placeholders: the surface stub fills in the plans (vault format, gen/vaults.js).
-export const TEST_PLANS = { temple: null, ruin: null, tower: null };
+// The plans, in the vault letter format (gen/vaults.js; gen/surface.js stamps them). Beyond the vault fields:
+//   rows, roof ("none" | "rock" | "slab"), wallHeight, at ([x, y] of the plan's corner in the landmark's rect;
+//   default centred), hub ([x, y] in plan coordinates: where the road arrives), spawn (the anchor's letter),
+//   keys (letters that must be reachable), entranceGated (the stairs wait behind a puzzle), dungeonAt
+//   ([x, y] of the dungeon levels' corner in the rect, instead of centred under the entrance), sinkholes
+//   (false: none), rng (runSeed → the plan's rng), stamp (a function of its own instead of stampVault).
+// The ruin: a roofless hall with gaps in its walls, the way down in a little room in the middle.
+const RUIN_PLAN = {
+  id: "ruin", name: "The Leaning Hall", height: 4, wallHeight: 3, roof: "none", wall: B.MOSS, floorBlock: B.ROCK,
+  rows: [
+    "###.######..####.###",
+    "#..................#",
+    "#.##............##.#",
+    "#.##............##..",
+    "...................#",
+    "#.......#####......#",
+    "#.......#...#.......",
+    "#.......#.>.D......#",
+    "#.......#...#......#",
+    "#.......#####......#",
+    "#..................#",
+    "#.##............##.#",
+    "..##............##.#",
+    "#..................#",
+    "#..................#",
+    "#####.######...#####",
+  ],
+  hub: [13, 16], keys: [">"],
+};
+// The tower: tall and roofless, its door to the west where the road comes in; its yard reaches the
+// span's east edge (x 79), which is open.
+const TOWER_PLAN = {
+  id: "tower", name: "The Roofless Tower", height: 4, wallHeight: 8, roof: "none", wall: B.STONE, floorBlock: B.TILE,
+  rows: [
+    "............",
+    "............",
+    "...######...",
+    "...#....#...",
+    "..##....##..",
+    "..D......#..",
+    "..#......#..",
+    "..##....##..",
+    "...#....#...",
+    "...######...",
+    "............",
+    "............",
+  ],
+  hub: [1, 5], keys: ["D"],
+};
+export const TEST_PLANS = { temple: TEMPLE_PLAN, ruin: RUIN_PLAN, tower: TOWER_PLAN };
 
 export const TEST_WORLD = { world: TEST_WORLD_MAP, terrains: TEST_TERRAINS, regions: TEST_REGIONS,
                             landmarks: TEST_LANDMARKS, plans: TEST_PLANS };
