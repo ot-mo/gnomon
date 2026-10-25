@@ -99,9 +99,10 @@ export function checkLandmarks({ seeds = [1, 7, 42, 1234, 31337], tiles = 500 } 
   const per = Math.ceil(tiles / seeds.length);
   for (const seed of seeds) {
     const run = buildRun(seed, TEST_WORLD), rng = makeRng(seed ^ 0x5a5a);
-    const open = run.world.tiles.filter((t) => t.edges === "open" || t.landmark);
-    for (let k = 0; k < per && navs.length < tiles; k++) {
-      const t = open[Math.floor(rng() * open.length)];
+    // Drawn without replacement: every sample of a seed is a different span.
+    const open = rng.shuffle(run.world.tiles.filter((t) => t.edges === "open" || t.landmark));
+    for (let k = 0; k < per && k < open.length && navs.length < tiles; k++) {
+      const t = open[k];
       const t0 = performance.now();
       const z = generateSurface(run, t.wx, t.wy);
       ms.push(performance.now() - t0);
@@ -117,7 +118,7 @@ export function checkLandmarks({ seeds = [1, 7, 42, 1234, 31337], tiles = 500 } 
   }
   navs.sort((a, b) => a - b); ms.sort((a, b) => a - b);
   stats.landmarkZones = `${zones} (${retried} needed a retry), ruin levels ${levels}`;
-  stats.spans = navs.length;
+  stats.spans = `${navs.length} (each a different span of its seed)`;
   stats.failed = failed;
   stats.navigability = { min: +(100 * navs[0]).toFixed(1), p5: +(100 * pct(navs, 0.05)).toFixed(1),
                          mean: +((100 * navs.reduce((s, v) => s + v, 0)) / navs.length).toFixed(1) };
