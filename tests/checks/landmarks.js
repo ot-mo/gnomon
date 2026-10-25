@@ -19,6 +19,7 @@ import { siteWithDungeon, dungeonParams } from "../../src/world/zonegen.js";
 import { generateDungeonLevel, validateDungeonLevel } from "../../src/gen/dungeon.js";
 import { zoneSeed } from "../../src/world/run.js";
 import { B, FLOOR_Z } from "../../src/world.js";
+import { KIND } from "../../src/blocks.js";
 import { makeRng } from "../../src/rng.js";
 
 const pct = (sorted, q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))];
@@ -46,6 +47,13 @@ export function checkLandmarks({ seeds = [1, 7, 42, 1234, 31337], tiles = 500 } 
       expect(sameZone(z, generateSurface(run, L.wx, L.wy)), `${at}: two generations differ`);
       expect(z.landmarkId === L.id && z.name === L.name, `${at}: the zone doesn't say it is ${L.name}`);
       const holes = holesOf(z);
+      // Every wall cell ('#') of a plan stamped by stampVault is a wall on the map, however high it is.
+      const planDef = world.plans?.[L.plan], pa = z.gen?.planAt;
+      if (planDef?.rows && !planDef.stamp && pa) {
+        let notWall = 0;
+        planDef.rows.forEach((row, y) => [...row].forEach((c, x) => { if (c === "#" && z.kind[pa.x + x + (pa.y + y) * z.w] !== KIND.WALL) notWall++; }));
+        expect(notWall === 0, `${at}: ${notWall} of the plan's wall cells are not walls on the map`);
+      }
       if (L.id === "temple") {
         expect(z.npcs.some((n) => n.type === "maren"), `${at}: no Maren`);
         expect(z.items.some((i) => i.kind === "cube") && z.blocks.includes(B.ALTAR), `${at}: no cube on the altar`);

@@ -450,11 +450,14 @@ function buildSurface(run, W, base, wx, wy, seed, rng) {
     else stubSite(ctx, site);
   }
   if (zone.stairs) { zone.entrance = { ...zone.stairs }; if (!entranceGated) keyPoints.push({ ...zone.stairs }); }
-  // Plan walls and roofs are scenery: the map draws them as walls, and nobody walks on them.
+  // Plan walls and roofs are scenery: nobody walks on them, and the map draws them as walls
+  // (zone.planWalls: also a wall lower than a dungeon room's, which computeKinds alone would call floor).
   if (planAt) {
     zone.refresh();
+    zone.planWalls = new Uint8Array(n);
     for (let y = planAt.y; y < planAt.y + planAt.d; y++)
-      for (let x = planAt.x; x < planAt.x + planAt.w; x++) { const i = x + y * ZW; if (zone.stand[i] > FLOOR_Z + 1) scenery[i] = 1; }
+      for (let x = planAt.x; x < planAt.x + planAt.w; x++) { const i = x + y * ZW; if (zone.stand[i] > FLOOR_Z + 1) scenery[i] = zone.planWalls[i] = 1; }
+    zone.computeKinds();
   }
 
   // 8. The dungeon below: where its levels sit, and sinkholes into it.
@@ -486,7 +489,7 @@ function buildSurface(run, W, base, wx, wy, seed, rng) {
   zone.refresh();
   zone.spawn = spawn || pickAnchor(zone, hub, scenery);
   zone.gen = { ports: base.ports.map((p) => ({ ...p, tiles: Array.from({ length: p.width }, (_, k) => portTile(p, k)) })),
-               keyPoints, scenery, cliff: base.cliff, worldWater: base.water, plan, hub, entranceGated };
+               keyPoints, scenery, cliff: base.cliff, worldWater: base.water, plan, planAt, hub, entranceGated };
   return zone;
 }
 

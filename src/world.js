@@ -174,7 +174,7 @@ export class Zone {
         let k;
         const ground = this.get(x, y, FLOOR_Z - 1), under = this.get(x, y, FLOOR_Z - 2);
         if (special) k = special;
-        else if (allSolid) k = KIND.WALL;
+        else if (allSolid || (this.planWalls?.[x + y * w] && this.get(x, y, FLOOR_Z))) k = KIND.WALL;   // a surface plan's wall, however high
         else if (ground === B.STAIRS) k = KIND.STAIRS;
         else if (ground === B.STAIRS_UP) k = KIND.STAIRS_UP;
         else if (ground === B.WATER_SHALLOW) k = KIND.SHALLOW;
