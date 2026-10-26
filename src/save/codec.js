@@ -182,6 +182,10 @@ registerZoneField("gen", {
   encode: (g) => (g ? Object.fromEntries(Object.entries(g).filter(([, v]) => !ArrayBuffer.isView(v))) : null),
   decode: (g) => g,
 });
+// The Colossus's slam (guardians.js): the tiles about to quake (slam) and the ones that just did (slamDone, kept
+// after the slam), each a Set of cell indices.
+for (const f of ["slam", "slamDone"])
+  registerZoneField(f, { encode: (s) => (s ? { ...s, cells: [...s.cells] } : null), decode: (j) => (j ? { ...j, cells: new Set(j.cells) } : null) });
 
 export function snapshotZone(zone, { slot = null, savedAt = 0 } = {}) {
   const rec = { slot, key: zone.key, savedAt, genVersion: zone.genVersion, type: zone.type, level: zone.level, w: zone.w, d: zone.d, h: zone.h,

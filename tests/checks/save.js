@@ -33,6 +33,8 @@
 //      a slot without the zone you were in; listSlots newest first; deleteSlot takes the zones too.
 //   7. The gate again on more seeds (seeds, default 1 and 7; 1234 is section 1's): the session, save, load in this
 //      process and in a fresh one, canonical JSON identical, buildRun never called, ids above every loaded id.
+//   8. What the session doesn't reach, saved → loaded → identical: legacy level 15 after the Colossus has slammed
+//      and while its next slam is warned (both views: zone.slam and zone.slamDone hold Sets).
 //   6. The title screen at 100×30, through the real input handlers: with nothing saved only "New quick game";
 //      with a slot "Continue" too; each by keys (Enter, ↓ Enter, 2) and by a click on its line; New starts a
 //      run at the intro, Continue loads the newest slot; M still switches the music there.
@@ -465,6 +467,56 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
     gates.push(`${seed}: ${ks.length} zones, run ${a.run.length} chars, ${problems.length === n0 ? "identical" : "DIFFERS"} (fresh process ${freshly})`);
   }
   if (seeds.length) stats.moreSeeds = gates.join("; ");
+
+  // --- 8. What the session doesn't reach --------------------------------------------------------------------
+  // Save → load → canonical JSON identical (in this process) for states the bot's 10-zone session never makes.
+  const hard = [];
+  const roundTrip = async (what) => {
+    const ks = visitedKeys(game), st = memoryAdapter(), n = problems.length;
+    let a, m;
+    try { a = await digestGame(game, ks); m = await saveGame(game, { store: st, reason: "check" }); }
+    catch (e) { fail(`${what}: the save was refused: ${String(e.message || e).slice(0, 240)}`); hard.push(`${what}: REFUSED`); return false; }
+    startRun(4321); game.pages = null;
+    await loadGame(m.id, { store: st });
+    compare(what, a, await digestGame(game, ks));
+    idsAbove(what);
+    hard.push(`${what}: ${problems.length === n ? "identical" : "DIFFERS"}`);
+    return problems.length === n;
+  };
+  const near = (zone, c) => {   // stand 2 tiles from c (as tools/bot.mjs runSmoke does), out of harm's way
+    const p = game.player;
+    const spot = [[2, 0], [-2, 0], [0, 2], [0, -2], [3, 0], [0, 3]].map(([ox, oy]) => [c.tx + ox, c.ty + oy])
+      .find(([x, y]) => x >= 0 && y >= 0 && x < zone.w && y < zone.d && zone.stand[x + y * zone.w] >= 0);
+    if (spot) Object.assign(p, { x: spot[0] + 0.5, y: spot[1] + 0.5, z: zone.stand[spot[0] + spot[1] * zone.w], vz: 0 });
+    p.maxHpGain = 1e6; p.hp = 1e6;
+  };
+  const passTime = (view, until, max = 900) => {   // frames in 3D, waits on the map, until `until()` (or max)
+    for (let k = 0; k < max && !until(); k++) {
+      if (game.mode !== (view === "map" ? "map" : "explore")) playing(game, view);
+      if (view === "map") game.debug.mapKey("Space"); else game.debug.step(1 / 60);
+      game.player.hp = 1e6;
+    }
+    playing(game, view);
+    return until();
+  };
+  // The Colossus (legacy level 15) after it slams: zone.slam and zone.slamDone hold Sets (codec.js registers them).
+  for (const view of ["map", "3d"]) {
+    startRun(1234); game.pages = null; game.story.cube = true;
+    game.debug.enterZone("0,0,15", "down");
+    playing(game, view);
+    const zone = game.zone, col = zone.creatures.find((c) => c.guardian === "colossus");
+    if (!col) { fail("legacy level 15 has no Colossus"); continue; }
+    near(zone, col);
+    col.state = "chase";
+    if (!passTime(view, () => zone.slamDone && zone.slam)) { fail(`level 15 (${view}): the Colossus never slammed (slamDone ${!!zone.slamDone}, slam ${!!zone.slam})`); continue; }
+    const cells = [...zone.slamDone.cells].sort((a, b) => a - b).join();
+    if (await roundTrip(`level 15 after the Colossus's slam, a slam warned (${view})`)) {
+      const back = game.zone.slamDone;
+      if (!(back?.cells instanceof Set) || [...back.cells].sort((a, b) => a - b).join() !== cells || !(game.zone.slam?.cells instanceof Set))
+        fail(`level 15 (${view}): the slam came back as ${JSON.stringify(back && { ...back, cells: [...back.cells || []].length })}`);
+    }
+  }
+  stats.hardCases = hard.join("; ");
 
   return { name: "save", ok: problems.length === 0, problems, stats, notes };
 }
