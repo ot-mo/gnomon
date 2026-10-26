@@ -49,6 +49,7 @@ export const CHECKS = [
   { name: "landmarks", owner: "WS2", load: () => import("./landmarks.js") },
   { name: "legacyfights", owner: "P0", load: () => import("./legacyfights.js") },
   { name: "light", owner: "P0", load: () => import("./light.js") },
+  { name: "names", owner: "P0", load: () => import("./names.js") },
   { name: "overworld", owner: "WS1", load: () => import("./overworld.js") },
   { name: "progression", owner: "WS4", load: () => import("./progression.js") },
   { name: "render", owner: "WS3", load: () => import("./render.js") },
