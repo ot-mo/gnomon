@@ -26,7 +26,7 @@ import { registerScreen, setMode, pushMode, screenFor } from "../screens.js";
 import { UI, list, listKey, listWheel, listAt, keyHelp, textInput, drawTextInput, at } from "../ui.js";
 import { FLAGS, TITLE, VERSION } from "../config.js";
 import { startRun, randomSeed } from "../game.js";
-import { listSlots, loadGame, deleteSlot, exportSlot, importSlot, RUN_MODES, openSaves, storageLeft, moveSlot, currentStore } from "../save/index.js";
+import { listSlots, loadGame, deleteSlot, exportSlot, importSlot, RUN_MODES, SESSION, openSaves, storageLeft, moveSlot, currentStore } from "../save/index.js";
 import { minutesAt } from "../clock.js";
 import { loadSettings } from "./options.js";
 
@@ -62,7 +62,9 @@ function warnings() {
   if (menu.left !== null && menu.left < LOW_STORAGE) out.push(`Less than 10 MB of storage is left for saves (${(menu.left / 1048576).toFixed(1)} MB).`);
   const s = menu.slots[0];
   if (s && s.genVersion !== undefined && s.genVersion !== VERSION.gen) out.push("This save was made by an older version: where new ground meets old, the land may not line up.");
-  if (s?.unclean) out.push(`${who(s)[0].toUpperCase() + who(s).slice(1)}'s last session ended without a save (${s.unclean === 1 ? "once" : `${s.unclean} times`}).`);
+  // (live: another session holds it, and never saved cleanly: a crash, or the game open in another tab.)
+  const other = s?.live && s.live !== SESSION, n = (s?.unclean || 0) + (other ? 1 : 0);
+  if (n) out.push(`${who(s)[0].toUpperCase() + who(s).slice(1)}'s last session ended without a save (${n === 1 ? "once" : `${n} times`})${other ? ", or is still open in another tab" : ""}.`);
   return out;
 }
 
