@@ -10,7 +10,8 @@
 import { KIND, B, FLOOR_Z, solidFor as zoneSolidFor } from "./world.js";
 import { castRay, lineOfSight } from "./raycast.js";
 import { sampleLight } from "./light.js";
-import { updateMonsters, attackMonster, monsterAt, MONSTER_TYPES } from "./monsters.js";
+import { updateMonsters, attackMonster } from "./monsters.js";
+import { creatureAt, talkerAt, hostilesTo, ghostHidden, canTalk } from "./creatures.js";
 import { pickUpItems } from "./items.js";
 import { useColumn } from "./interact.js";
 import { EYE, WALK, HEIGHT, WADE_SLOWDOWN, HASTE, attackTime, torchRange, canSwim, speedMul, jumpBonus, hasFeatherFall, bonus } from "./player.js";
@@ -19,7 +20,6 @@ import { hasStatus, statusFlag, statusSpeed, updateDrowning } from "./status.js"
 import { updateClouds, updateProjectiles, updateBombs } from "./throwing.js";
 import { PLAYER_STEP_UP } from "./pathing.js";
 import { updateSpikes, nearSpikes, TICK } from "./traps.js";
-import { npcAt, NPC_TYPES } from "./npcs.js";
 import { sfx } from "./sfx.js";
 import { tryWalkOff } from "./zones.js";
 
@@ -102,8 +102,8 @@ export function refreshView(game) {
     }
   }
   const sense = bonus(p, "sense");   // an amulet of sight: monsters close by show, seen or not
-  for (const m of zone.monsters) {
-    if (MONSTER_TYPES[m.type].ghostly && p.torch) continue;   // the Gloom Warden: not with your torch lit
+  for (const m of hostilesTo(game, p)) {
+    if (ghostHidden(game, m)) continue;   // the Gloom Warden: not with your torch lit
     const cz = m.z + m.h * 0.6;
     const dist = Math.hypot(m.x - p.x, m.y - p.y);
     if (dist < sense) { zone.sightings.set(m.id, { x: m.x, y: m.y, glyph: m.glyph, color: m.color, name: m.name, time: game.time }); continue; }
@@ -143,14 +143,12 @@ export function mapStep(game, dx, dy) {
 
   // Walking into someone talks to them (it takes no time). A ghost you haven't met is just a
   // cold spot in the way: you'd have to see it in 3D, in the dark.
-  const npc = npcAt(zone, nx, ny);
-  if (npc) {
-    if (NPC_TYPES[npc.type].ghost && !npc.met) game.log("The air here is icy, as if someone were standing in your way. Someone you can't see from up here.", [150, 210, 240]);
-    else game.onTalk(npc);
+  const m = creatureAt(zone, nx, ny);
+  if (m && canTalk(m)) {
+    if (m.vis.ghostly && !m.talk.met) game.log("The air here is icy, as if someone were standing in your way. Someone you can't see from up here.", [150, 210, 240]);
+    else game.onTalk(m);
     return false;
   }
-
-  const m = monsterAt(zone, nx, ny);
   if (m) {
     if (Math.abs(m.z - p.z) > 1.5) { game.log(`You can't reach the ${m.name} from here.`, [170, 170, 170]); return false; }
     sfx("swing");
@@ -266,7 +264,7 @@ export function mapUseTime(game, seconds) {
 function routable(game, x, y) {
   const { zone, player: p } = game;
   const i = x + y * zone.w, k = zone.kind[i];
-  if (!zone.seen[i] || npcAt(zone, x, y)) return false;
+  if (!zone.seen[i] || talkerAt(zone, x, y)) return false;
   if (k === KIND.HOLE) return !zone.holeSeen[i];
   if (k === KIND.DEEP) return canSwim(p);
   return k === KIND.FLOOR || k === KIND.DOOR || k === KIND.SHALLOW || k === KIND.BRIDGE || k === KIND.MOSAIC;
@@ -358,7 +356,7 @@ export function travelStep(game) {
   const p = game.player;
   const [x, y] = tr.path[0];
   const dx = x - Math.floor(p.x), dy = y - Math.floor(p.y);
-  const attacking = !!monsterAt(game.zone, x, y);
+  const there = creatureAt(game.zone, x, y), attacking = !!there && !canTalk(there);
   if (Math.abs(dx) > 1 || Math.abs(dy) > 1 || !mapStep(game, dx, dy) || attacking) { game.travel = null; return; }
   if (game.mode !== "map") { game.travel = null; return; }
   if (Math.floor(p.x) === x && Math.floor(p.y) === y) tr.path.shift();   // (opening a door doesn't move you)

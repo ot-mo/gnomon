@@ -15,7 +15,8 @@
 //
 // guardianThink(game, m, dt, occ) runs every update before the usual monster AI (monsters.js);
 // returning true would skip the rest of that AI for this update.
-import { MONSTER_TYPES, spawnMonster, hitPlayer } from "./monsters.js";
+import { hitPlayer } from "./monsters.js";
+import { CREATURE_TYPES, spawnCreature, addCreature, removeCreature } from "./creatures.js";
 import { B, FLOOR_Z } from "./world.js";
 import { sampleLight } from "./light.js";
 import { sfx } from "./sfx.js";
@@ -50,9 +51,9 @@ function summon(game, m, type, n, occ) {
   const made = [];
   for (let k = 0; k < n && spots.length; k++) {
     const [x, y] = spots.splice(Math.floor(Math.random() * spots.length), 1)[0];
-    const o = spawnMonster(type, x, y, stand[x + y * w], "chase", zone.level);
+    const o = spawnCreature(type, x, y, stand[x + y * w], { rng: Math.random, state: "chase", level: zone.level });
     o.xp = Math.ceil(o.xp / 2);   // summoned things are worth less
-    zone.monsters.push(o);
+    addCreature(zone, o);
     occ[x + y * w] = o.id;
     made.push(o);
   }
@@ -68,7 +69,7 @@ function queen(game, m, dt, occ) {
     m.risen = true;
     game.log("The Flat Queen peels herself up off the floor and stands, suddenly deep! (Only a blow in 3D will touch her now.)", m.color);
     sfx("rotate", { up: true, at: m });
-    for (const o of game.zone.monsters) if (o.type === "flatling") { addStatus(game, o, "blinded", { t: QUEEN_RISEN, stack: "refresh" }); o.state = "wander"; }   // her court scatters
+    for (const o of game.zone.creatures) if (o.type === "flatling") { addStatus(game, o, "blinded", { t: QUEEN_RISEN, stack: "refresh" }); o.state = "wander"; }   // her court scatters
   } else if (m.risen && g.t >= QUEEN_RISEN) {
     g.t = 0;
     m.risen = false;
@@ -77,7 +78,7 @@ function queen(game, m, dt, occ) {
   }
   if (!m.risen && (g.summon -= dt) <= 0) {
     g.summon = 10;
-    const court = game.zone.monsters.filter((o) => o.type === "flatling").length;
+    const court = game.zone.creatures.filter((o) => o.type === "flatling").length;
     if (court < 2 && summon(game, m, "flatling", 2 - court, occ).length) game.log("The Flat Queen calls her court. Flatlings slide out of the cracks in the floor!", m.color);
   }
   return false;
@@ -88,7 +89,7 @@ function warden(game, m, dt, occ) {
   const g = m.g, zone = game.zone;
   if ((g.summon -= dt) <= 0) {
     g.summon = 7;
-    const shades = zone.monsters.filter((o) => o.type === "shade").length;
+    const shades = zone.creatures.filter((o) => o.type === "shade").length;
     if (shades < 4 && summon(game, m, "shade", 2, occ).length) game.log("The Gloom Warden lifts its lantern. Shades pour out of the dark!", m.color);
   }
   if ((g.snuff -= dt) <= 0) {
@@ -115,7 +116,7 @@ export function fearLight(game, m, dt) {
     m.lightBurn -= n;
     m.hp -= n;
     if (m.hp <= 0) {
-      game.zone.monsters = game.zone.monsters.filter((o) => o !== m);
+      removeCreature(game.zone, m);
       if (Math.hypot(game.player.x - m.x, game.player.y - m.y) < 14) game.log("A shade shrivels away in the firelight.", [255, 200, 140]);
       return true;
     }
@@ -165,7 +166,7 @@ function colossus(game, m, dt) {
   if (g.windup > 0) {
     if ((g.windup -= dt) <= 0) {
       if (upClose) {
-        const t = MONSTER_TYPES[m.type];
+        const t = CREATURE_TYPES[m.type];
         const dmg = t.damage[0] + Math.floor(Math.random() * (t.damage[1] - t.damage[0] + 1)) + (m.bonus || 0);
         hitPlayer(game, m, dmg, "the Colossus's sweeping arm", "its sweeping arm");
       } else game.log("The Colossus's arm sweeps through empty air.", [200, 200, 200]);

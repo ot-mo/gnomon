@@ -7,7 +7,7 @@ import { maxHp, raiseAttr, regenEvery, canSwim } from "./stats.js";
 import { addStatus, tickStatuses, statusFlag, updateDrowning } from "./status.js";
 import { FLOOR_Z } from "./world.js";
 import { sfx } from "./sfx.js";
-import { spawnMonster, pickMonsterType } from "./monsters.js";
+import { spawnCreature, addCreature, pickCreatureType, hostilesTo, canTalk } from "./creatures.js";
 import { arrivalPoint } from "./zones.js";
 
 export function drinkPotion(game, effect) {
@@ -110,8 +110,8 @@ export function readScroll(game, effect) {
         const x = Math.floor(p.x) + ox, y = Math.floor(p.y) + oy;
         if (x < 0 || y < 0 || x >= f.w || y >= f.d) continue;   // creatures never leave their zone (§6.1)
         const z = f.stand[x + y * f.w];
-        if (z < 0 || f.monsters.some((m) => m.tx === x && m.ty === y)) continue;
-        f.monsters.push(spawnMonster(pickMonsterType(Math.random, game.zone.level), x, y, z, "chase", game.zone.level));
+        if (z < 0 || f.creatures.some((m) => !canTalk(m) && m.tx === x && m.ty === y)) continue;
+        addCreature(f, spawnCreature(pickCreatureType(Math.random, game.zone.level), x, y, z, { rng: Math.random, state: "chase", level: game.zone.level }));
         n++;
       }
       game.log(n ? "The scroll shrieks! Monsters appear around you!" : "The scroll shrieks, but nothing comes.", [255, 120, 100]);
@@ -196,7 +196,7 @@ export function revealFloor(game) {
           if (nx >= 0 && ny >= 0 && nx < w && ny < d) zone.seen[nx + ny * w] = 1;
         }
     }
-  for (const m of zone.monsters) {
+  for (const m of hostilesTo(game, game.player)) {   // (people show anyway: the whole floor is seen now)
     zone.sightings.set(m.id, { x: m.x, y: m.y, glyph: m.glyph, color: m.color, name: m.name, time: game.time });
   }
 }

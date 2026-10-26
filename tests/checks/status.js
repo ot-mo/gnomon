@@ -34,7 +34,11 @@ import { enterZone } from "../../src/zones.js";
 import { keys } from "../../src/input.js";
 import { mapStep, mapWait, passTime } from "../../src/turns.js";
 import { tickEffects } from "../../src/effects.js";
-import { spawnMonster, hitPlayer } from "../../src/monsters.js";
+import { hitPlayer } from "../../src/monsters.js";
+import { spawnCreature, canTalk } from "../../src/creatures.js";
+// The parent game's spawnMonster(type, x, y, z, state, level, elite, rand), through spawnCreature (0C).
+const spawnMonster = (type, x, y, z, state, level, elite, rng) => spawnCreature(type, x, y, z, { rng, state, level, elite });
+const clearMonsters = (zone) => { zone.creatures = zone.creatures.filter(canTalk); };
 import { skipTime } from "../../src/time.js";
 import { maxHp, invalidateStats } from "../../src/stats.js";
 import * as St from "../../src/status.js";
@@ -75,7 +79,7 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles, capture }
 
   // --- 2. skipTime(600) against 1/60 s stepping --------------------------------------------------
   startRun(4242);
-  game.zone.monsters.length = 0;
+  clearMonsters(game.zone);
   game.mode = "map"; game.view = "map";
   const base = game.player;
   const snap = (p) => ({
@@ -160,20 +164,20 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles, capture }
     for (const [what, hp] of [["creature burning and poisoned", 500], ["creature burned to death", 30]]) {
       const run = (fn) => {
         const m = mk(hp);
-        game.zone.monsters.length = 0; game.zone.monsters.push(m);
+        clearMonsters(game.zone); game.zone.creatures.push(m);
         fn(m);
         return { hp: m.hp, dead: false,
                  status: Object.fromEntries(Object.entries(m.status).map(([k, s]) => [k, s.t])), cooldowns: { ...m.cooldowns },
-                 gone: !game.zone.monsters.includes(m) };
+                 gone: !game.zone.creatures.includes(m) };
       };
       game.mode = "map";
       const a = run((m) => St.catchUpStatuses(game, m, 600));
-      const b = run((m) => { for (let k = 0; k < 36000 && game.zone.monsters.includes(m); k++) St.tickStatuses(game, m, STEP); });
+      const b = run((m) => { for (let k = 0; k < 36000 && game.zone.creatures.includes(m); k++) St.tickStatuses(game, m, STEP); });
       if (a.gone !== b.gone) fail(`${what}: killed after catch-up ${a.gone}, after stepping ${b.gone}`);
       if (hp === 30 && !a.gone) fail(`${what}: it should have burned to death`);
       cases[what] = a.gone ? { killed: true, hp: [a.hp, b.hp] } : { ...compare(what, a, b), hp: [a.hp, b.hp], killed: false };
     }
-    game.zone.monsters.length = 0;
+    clearMonsters(game.zone);
   }
   // The salamander's bite under the legacy set: the parent's poison (poisonTime = max(poisonTime, 3)), so
   // Thick blood halves it and venom shares its stream. HP lost over 6 s after one 1-damage bite.
@@ -203,18 +207,18 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles, capture }
   const p0 = game.player;
   const foe = spawnMonster("rat", Math.floor(p0.x) + 3, Math.floor(p0.y), FLOOR_Z, "chase", 1, null, () => 0.5);
   foe.x = p0.x + 3; foe.y = p0.y;
-  game.zone.monsters.push(foe);
+  game.zone.creatures.push(foe);
   const t0 = game.time, r1 = skipTime(game, 60);
   if (!(r1.interrupted && r1.why === "hostile" && r1.elapsed === 0 && game.time === t0)) fail(`skipTime with a hostile awake 3 tiles away: ${JSON.stringify(r1)}`);
   const r1b = skipTime(game, 60, { interruptible: false });
   if (r1b.elapsed !== 60) fail(`skipTime, not interruptible, with a hostile near: elapsed ${r1b.elapsed}`);
-  game.zone.monsters.length = 0;
+  clearMonsters(game.zone);
   // A creature that regenerates (a troll, 1 HP/s) knits back over a skip, except while it burns.
   {
     const troll = (status) => {
       const m = spawnMonster("troll", Math.floor(p0.x) + 30, Math.floor(p0.y), FLOOR_Z, "idle", 1, null, () => 0.5);
       m.hp = 20; m.status = status; m.regenAcc = 0;
-      game.zone.monsters.length = 0; game.zone.monsters.push(m);
+      clearMonsters(game.zone); game.zone.creatures.push(m);
       return m;
     };
     const plain = troll({});
@@ -225,7 +229,7 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles, capture }
     const want = alone.hp + 11;
     if (plain.hp !== 35 || burnt.hp !== want) fail(`a troll's regeneration over a 15 s skip: ${plain.hp} (want 35), burning 4 s: ${burnt.hp} (want ${want})`);
     stats.trollRegen = { plain: plain.hp, burning: burnt.hp, want: [35, want] };
-    game.zone.monsters.length = 0;
+    clearMonsters(game.zone);
   }
   p0.hp = 5; p0.body.equip.finger_r = ring(2); invalidateStats(p0);
   const r2 = skipTime(game, 3600, { until: (g) => g.player.hp >= maxHp(g.player) });
@@ -348,11 +352,11 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles, capture }
   game.player.perks = new Set(["foldingStrike"]);
   const rat = spawnMonster("rat", 26, 24, FLOOR_Z, "idle", 1, null, () => 0.5);
   rat.x = 26.5; rat.y = 24.5;
-  game.zone.monsters.push(rat);
+  game.zone.creatures.push(rat);
   inputHandlers.onKeyDown("Escape", false);
   const escLocked = game.mode === "map" && game.view === "map";
   const folded = St.hasStatus(rat, "stunned") || St.cooldownLeft(game.player, "foldingStrike") > 0;
-  game.zone.monsters.splice(game.zone.monsters.indexOf(rat), 1);
+  game.zone.creatures.splice(game.zone.creatures.indexOf(rat), 1);
   game.player.perks = new Set();
   for (let k = 0; k < 8; k++) mapWait(game);   // 4 s: it wears off
   const ended = !St.hasStatus(game.player, "flat");
@@ -370,12 +374,11 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles, capture }
     const p = game.player, zone = game.zone;
     const flatAt = (x, y) => { Object.assign(p, { x, y, z: FLOOR_Z }); St.addStatus(game, p, "flat", { t: 30 }); St.removeStatus(game, p, "flat"); return [Math.floor(p.x), Math.floor(p.y)]; };
     const rat = (tx, ty, nx = tx, ny = ty) => Object.assign(spawnMonster("rat", tx, ty, FLOOR_Z, "idle", 1, null, () => 0.5), { tx, ty, nx, ny });
-    zone.monsters.push(rat(29, 24), rat(28, 25, 29, 25));
-    zone.npcs ||= [];
-    const person = { type: "status-test", tx: 29, ty: 23 };
-    zone.npcs.push(person);
+    zone.creatures.push(rat(29, 24), rat(28, 25, 29, 25));
+    const person = spawnCreature("pell", 29, 23, FLOOR_Z);
+    zone.creatures.push(person);
     const near = flatAt(30.5, 24.5);
-    zone.monsters.length = 0; zone.npcs.splice(zone.npcs.indexOf(person), 1);
+    clearMonsters(zone); zone.creatures.splice(zone.creatures.indexOf(person), 1);
     const far = flatAt(40.5, 24.5);
     mapWait(game);
     const dry = (t) => zone.stand[t[0] + t[1] * zone.w] >= 0 && !(t[0] >= 30 && t[0] < 50 && t[1] >= 14 && t[1] < 34);

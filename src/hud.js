@@ -143,7 +143,7 @@ function drawStatus(game, p, y) {
 
 // Once the boss (or a guardian) has noticed you, its health runs across the top of the screen.
 function drawBossBar(game, y) {
-  const boss = game.zone.monsters.find((m) => (m.type === "lich" || m.guardian) && m.state === "chase");
+  const boss = game.zone.creatures.find((m) => (m.type === "lich" || m.guardian) && m.state === "chase");
   if (!boss) return;
   const n = Math.min(40, S.cols - 30), filled = Math.max(0, Math.round((boss.hp / boss.maxHp) * n));
   const label = `${boss.type === "lich" ? "THE LICH KING" : "THE " + boss.name.toUpperCase()}${boss.risen ? " (RISEN!)" : ""} [${"#".repeat(filled)}${".".repeat(n - filled)}]`;

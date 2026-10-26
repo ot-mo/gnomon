@@ -26,7 +26,8 @@ import "./world/zonegen.js";   // the zone generators: surfaces, site dungeons, 
 import { buildRun } from "./world/run.js";
 import { TEST_WORLD } from "./content/world/test-world.js";
 import { makePlayer, clampPitch, updatePlayer, takeImpact, hasFeatherFall, bonus, bodyCollides, RADIUS } from "./player.js";
-import { updateMonsters, pushPlayerOut, playerAttack, monsterAt } from "./monsters.js";
+import { updateMonsters, pushPlayerOut, playerAttack } from "./monsters.js";
+import { creatureAt, hostilesTo, canTalk } from "./creatures.js";
 import { pickUpItems, POTIONS, POTION_COLORS, scrollTitles, makeItem, makeRelic, pickRelic, randomEquipment, awayFromWalls, RELICS, RELIC_COLOR } from "./items.js";
 import { render3d } from "./render3d.js";
 import { renderMap, mapView, tileAtCell } from "./renderMap.js";
@@ -125,7 +126,7 @@ export const game = {
     zone.items.push(makeItem(it, ...awayFromWalls(zone, m.x, m.y, ground), ground));
     if (key) this.log(`Where it stood lies a relic: ${RELICS[key].name}.`, RELIC_COLOR);
     // Its summoned helpers fade with it.
-    zone.monsters = zone.monsters.filter((o) => !(o.type === "shade" || (m.guardian === "flatqueen" && o.type === "flatling")));
+    zone.creatures = zone.creatures.filter((o) => !(o.type === "shade" || (m.guardian === "flatqueen" && o.type === "flatling")));
   },
   questEvent(what, data) { questEvent(this, what, data); },
 
@@ -485,7 +486,7 @@ function foldPowers() {
   const guard = bonus(p, "foldGuard");
   if (guard > 0) addStatus(game, p, "guarded", { t: guard, stack: "refresh" });
   if (p.perks.has("foldingStrike") && !(cooldownLeft(p, "foldingStrike") > 0)) {
-    const near = game.zone.monsters.filter((m) => Math.hypot(m.x - p.x, m.y - p.y) < 1.9 && !m.guardian);
+    const near = hostilesTo(game, p).filter((m) => Math.hypot(m.x - p.x, m.y - p.y) < 1.9 && !m.guardian);
     if (near.length) {
       for (const m of near) addStatus(game, m, "stunned", { t: 2, stack: "max" });
       startCooldown(p, "foldingStrike", RULES.cooldown.foldingStrike);
@@ -586,7 +587,8 @@ function mapClick(button, clientX, clientY) {
   if (button !== 0 || !tile) return;
   const p = game.player;
   const dx = tile.x - Math.floor(p.x), dy = tile.y - Math.floor(p.y);
-  if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && (dx || dy) && monsterAt(game.zone, tile.x, tile.y)) mapStep(game, dx, dy);
+  const there = creatureAt(game.zone, tile.x, tile.y);   // a monster next to you: attack it
+  if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && (dx || dy) && there && !canTalk(there)) mapStep(game, dx, dy);
   else startTravel(game, tile.x, tile.y);
 }
 

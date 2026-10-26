@@ -2,8 +2,7 @@
 import { castRay, hit } from "./raycast.js";
 import { BLOCKS, B, FLOOR_Z } from "./world.js";
 import { EYE } from "./player.js";
-import { spawnMonster, pickMonsterType } from "./monsters.js";
-import { NPC_TYPES } from "./npcs.js";
+import { spawnCreature, addCreature, pickCreatureType, talkersIn, ghostHidden, canTalk } from "./creatures.js";
 import { lineOfSight } from "./raycast.js";
 
 const REACH = 2.0;   // the rune-lever puzzle relies on this: you must step onto the trap floor to reach
@@ -29,18 +28,17 @@ function lookPerson(game) {
   const p = game.player;
   const fx = Math.cos(p.yaw), fy = Math.sin(p.yaw);
   let best = null, bestD = 2.6;
-  for (const n of game.zone.npcs) {
-    const t = NPC_TYPES[n.type];
-    if (t.ghost && p.torch) continue;
+  for (const n of talkersIn(game.zone)) {
+    if (ghostHidden(game, n)) continue;
+    const flat = n.vis.flat;
     const dx = n.x - p.x, dy = n.y - p.y, d = Math.hypot(dx, dy);
-    if (d > bestD || d < 0.05 || (dx * fx + dy * fy) / d < (t.flat ? 0.7 : 0.82)) continue;
-    if (t.flat && p.pitch > -0.25) continue;   // you have to be looking down at a shadow
-    if (!lineOfSight(game.zone, p.x, p.y, p.z + EYE, n.x, n.y, n.z + (t.flat ? 0.05 : 1.2))) continue;
+    if (d > bestD || d < 0.05 || (dx * fx + dy * fy) / d < (flat ? 0.7 : 0.82)) continue;
+    if (flat && p.pitch > -0.25) continue;   // you have to be looking down at a shadow
+    if (!lineOfSight(game.zone, p.x, p.y, p.z + EYE, n.x, n.y, n.z + (flat ? 0.05 : 1.2))) continue;
     best = n; bestD = d;
   }
   if (!best) return null;
-  const t = NPC_TYPES[best.type];
-  return { npc: best, label: t.flat ? "a shadow with nobody casting it" : best.type === "shrine" ? "kneel at the shrine" : `talk to ${t.name}` };
+  return { npc: best, label: best.vis.flat ? "a shadow with nobody casting it" : best.type === "shrine" ? "kneel at the shrine" : `talk to ${best.name}` };
 }
 
 // 3D: use what the crosshair points at (or talk to who it points at).
@@ -48,7 +46,7 @@ export function interact(game) {
   const t = lookTarget(game);
   if (!t) return;
   if (t.npc) {
-    if (NPC_TYPES[t.npc.type].flat) game.log("It's a shadow with nobody casting it, and it moves on its own. Something flat? You'd have to look from above (Tab).", [190, 170, 255]);
+    if (t.npc.vis.flat) game.log("It's a shadow with nobody casting it, and it moves on its own. Something flat? You'd have to look from above (Tab).", [190, 170, 255]);
     else game.onTalk(t.npc);
   } else useBlock(game, t.x, t.y, t.z);
 }
@@ -107,8 +105,8 @@ function runLink(game, link) {
     game.log("Somewhere close, iron grinds against stone.", [160, 220, 255]);
   } else if (link.action === "free") {   // Lio's cell
     for (const [x, y, z] of link.cells) zone.set(x, y, z, B.AIR);
-    const lio = zone.npcs.find((n) => n.type === "lio");
-    if (lio) lio.state.free = true;
+    const lio = talkersIn(zone).find((n) => n.type === "lio");
+    if (lio) lio.talk.state.free = true;
     game.log("Somewhere on this floor, bars grind down into the stone. A distant voice: \"Yes! YES!\"", [160, 220, 255]);
   } else if (link.action === "dud") {
     game.log(link.msg || "The lever clanks. Nothing happens.", [170, 170, 170]);
@@ -123,10 +121,10 @@ function runLink(game, link) {
     for (const [x, y] of link.cells) for (let z = 0; z < FLOOR_Z; z++) zone.set(x, y, z, B.AIR);
     game.log("The floor gives way beneath you!", [255, 120, 100]);
   } else if (link.action === "summon") {
-    const spots = link.cells.filter(([x, y]) => zone.stand[x + y * zone.w] >= 0 && !zone.monsters.some((m) => m.tx === x && m.ty === y));
+    const spots = link.cells.filter(([x, y]) => zone.stand[x + y * zone.w] >= 0 && !zone.creatures.some((m) => !canTalk(m) && m.tx === x && m.ty === y));
     for (let k = 0; k < 3 && spots.length; k++) {
       const [x, y] = spots.splice(Math.floor(Math.random() * spots.length), 1)[0];
-      zone.monsters.push(spawnMonster(pickMonsterType(Math.random, game.zone.level), x, y, zone.stand[x + y * zone.w], "chase", game.zone.level));
+      addCreature(zone, spawnCreature(pickCreatureType(Math.random, game.zone.level), x, y, zone.stand[x + y * zone.w], { rng: Math.random, state: "chase", level: game.zone.level }));
     }
     game.log("Hidden doors slam open in the walls. Monsters pour out!", [255, 120, 100]);
   } else if (link.action === "gas") {
@@ -158,6 +156,6 @@ function brazierLit(game, x, y) {
   const spots = puzzle.list.map((o) => [o.x, o.y + 2]).filter(([sx, sy]) => zone.stand[sx + sy * zone.w] >= 0);
   if (spots.length) {
     const [sx, sy] = spots[Math.floor(Math.random() * spots.length)];
-    zone.monsters.push(spawnMonster(pickMonsterType(Math.random, game.zone.level), sx, sy, zone.stand[sx + sy * zone.w], "chase", game.zone.level));
+    addCreature(zone, spawnCreature(pickCreatureType(Math.random, game.zone.level), sx, sy, zone.stand[sx + sy * zone.w], { rng: Math.random, state: "chase", level: game.zone.level }));
   }
 }

@@ -9,7 +9,8 @@ const env = await installNodeEnv();
 const { game, startRun } = await import("../src/game.js");
 const dialogue = await import("../src/dialogue.js");
 const npcs = await import("../src/npcs.js");
+const creatures = await import("../src/creatures.js");
 const { checkCurrency } = await import("../tests/checks/currency.js");
 const srcFiles = fs.readdirSync(SRC, { recursive: true }).filter((f) => f.endsWith(".js"))
   .map((f) => ({ file: f.split(path.sep).join("/"), text: fs.readFileSync(path.join(SRC, f), "utf8") }));
-process.exit(report(checkCurrency({ game, startRun, dialogue, npcs, srcFiles, capture: env.capture })));
+process.exit(report(checkCurrency({ game, startRun, dialogue, npcs, creatures, srcFiles, capture: env.capture })));

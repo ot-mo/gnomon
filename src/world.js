@@ -62,9 +62,9 @@ export class Zone {
     this.bombs = [];              // lit bombs lying on the ground (throwing.js)
     this.secret = null;           // the secret room: { x0, y0, x1, y1, found }
     this.secretWalls = new Set(); // columns (x + y·w) of the thin walls a bomb can open into it
-    this.monsters = [];
+    this.creatures = [];          // monsters and people (and flat beings, and one talking door): creatures.js
+    this.uidSeq = 0;              // uids handed out by this zone's generation (ids.js genUid)
     this.items = [];
-    this.npcs = [];               // people (and flat beings, and one talking door) you can speak to: npcs.js
     this.props = [];              // non-blocking sprites (shrubs, bones): WS2
     this.spikes = new Map();      // column (x + y·w) → { phase, period, up }: spike traps (traps.js)
     this.projectiles = [];        // thrown knives and potions in flight (3D)

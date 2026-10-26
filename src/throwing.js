@@ -10,7 +10,8 @@
 // too close, the splash reaches you too. Throwing a potion you don't know identifies it.
 // Bombs go off 2 s after they leave your hand (on the map you set them down at your feet):
 // they hurt everything close, smash crates, and open the thin walls of secret rooms.
-import { damageMonster, hitPlayer, touchable } from "./monsters.js";
+import { damageMonster, hitPlayer } from "./monsters.js";
+import { touchable, hostilesTo } from "./creatures.js";
 import { POTIONS, POTION_COLORS, FLOOR_ART, itemPalette, makeItem, awayFromWalls, takeOne } from "./items.js";
 import { B, FLOOR_Z } from "./world.js";
 import { EYE, RADIUS, HEIGHT } from "./player.js";
@@ -63,7 +64,7 @@ export function throwAtNearest(game, stack = readyStack(game.player)) {
     game.log("You light a bomb and set it down. Get away from it!", [255, 170, 70]);
     return true;
   }
-  const visible = zone.monsters
+  const visible = hostilesTo(game, p)
     .filter((m) => zone.sightings.get(m.id)?.time === game.time && Math.hypot(m.x - p.x, m.y - p.y) <= 10)
     .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
   const m = visible[0];
@@ -95,7 +96,7 @@ export function updateProjectiles(game, dt) {
     for (let s = 0; s < steps && !done; s++) {
       pr.vz -= (pr.g ?? GRAVITY) * h;
       const nx = pr.x + pr.vx * h, ny = pr.y + pr.vy * h, nz = pr.z + pr.vz * h;
-      const m = !pr.hostile && zone.monsters.find((mo) => touchable(game, mo) &&
+      const m = !pr.hostile && hostilesTo(game, p).find((mo) => touchable(game, mo) &&
         Math.hypot(nx - mo.x, ny - mo.y) < mo.w * 0.45 + 0.15 && nz > mo.z - 0.1 && nz < mo.z + mo.h + 0.1);
       const bx = Math.floor(nx), by = Math.floor(ny), bz = Math.floor(nz);
       if (pr.hostile && Math.abs(nx - p.x) < RADIUS + 0.1 && Math.abs(ny - p.y) < RADIUS + 0.1 && nz > p.z && nz < p.z + HEIGHT) {
@@ -149,7 +150,7 @@ function shatter(game, effect, x, y, z) {
   game.log(known ? `The potion of ${POTIONS[effect].name} shatters!`
                  : `The ${color.name} potion shatters. It was a potion of ${POTIONS[effect].name}!`, color.rgb);
   game.effects.push({ kind: "burst", x, y, z, color: color.rgb, time: game.time });
-  const near = zone.monsters.filter((m) => touchable(game, m) && Math.hypot(m.x - x, m.y - y) <= SPLASH && Math.abs(m.z - z) < 2.5);
+  const near = hostilesTo(game, p).filter((m) => touchable(game, m) && Math.hypot(m.x - x, m.y - y) <= SPLASH && Math.abs(m.z - z) < 2.5);
   const youToo = Math.hypot(p.x - x, p.y - y) <= SPLASH && Math.abs(p.z + 1 - z) < 2.5;
   const names = () => near.map((m) => m.name).join(", ");
 
@@ -221,7 +222,7 @@ function explode(game, x, y, z) {
   sfx("boom", { at: { x, y } });
   const demo = p.perks.has("demolitionist"), blast = demo ? BLAST * 1.4 : BLAST;   // the Demolitionist perk
   for (const o of zone.bombs) if (Math.hypot(o.x - x, o.y - y) < blast) o.fuse = Math.min(o.fuse, 0.15);
-  for (const m of [...zone.monsters])
+  for (const m of hostilesTo(game, p))
     if (Math.hypot(m.x - x, m.y - y) <= blast && Math.abs(m.z + m.h / 2 - z) < 2.5)
       damageMonster(game, m, 10 + Math.floor(Math.random() * 7), [255, 160, 60], `The ${m.name} is blown apart.`);
   if (Math.hypot(p.x - x, p.y - y) <= blast && Math.abs(p.z + 0.8 - z) < 2.5)
@@ -257,7 +258,7 @@ export function updateClouds(game, dt) {
   const { zone, player: p } = game;
   for (const c of zone.clouds) {
     c.time -= dt;
-    for (const m of zone.monsters)
+    for (const m of hostilesTo(game, p))
       if (touchable(game, m) && Math.hypot(m.x - c.x, m.y - c.y) <= c.r && Math.abs(m.z - c.z) < 2.5) addStatus(game, m, "poisoned", { t: 2, mag: 2, stack: "max" });
     if (Math.hypot(p.x - c.x, p.y - c.y) <= c.r && Math.abs(p.z + 1 - c.z) < 2.5) {
       if (!hasStatus(p, "poisoned")) game.log("You're in the poison cloud!", [150, 210, 80]);

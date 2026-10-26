@@ -249,8 +249,8 @@ export function setDownSafely(game, e) {
     if (x < 0 || y < 0 || x >= zone.w || y >= zone.d) return false;
     const z = zone.stand[x + y * zone.w];
     if (z < 0 || zone.get(x, y, z - 1) === B.WATER_DEEP) return false;
-    if (zone.monsters?.some((m) => m !== e && ((m.tx === x && m.ty === y) || (m.nx === x && m.ny === y)))) return false;
-    return !zone.npcs?.some((n) => n.tx === x && n.ty === y);
+    // Nobody stands there or is stepping there (people hold their own tile: their nx, ny is it).
+    return !zone.creatures?.some((m) => m !== e && ((m.tx === x && m.ty === y) || (m.nx === x && m.ny === y)));
   };
   const tx = Math.floor(e.x), ty = Math.floor(e.y);
   for (let r = 0, far = Math.max(zone.w, zone.d); r <= far; r++)

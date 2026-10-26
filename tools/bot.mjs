@@ -41,7 +41,7 @@ import { checkGolden } from "../tests/checks/golden.js";
 const env = await installNodeEnv();
 export const capture = env.capture;   // the frame the screen now presents into (importing the bot replaces the caller's)
 const { game, startRun, inputHandlers } = await import("../src/game.js");
-const { MONSTER_TYPES } = await import("../src/monsters.js");
+const { CREATURE_TYPES, canTalk, talkersIn } = await import("../src/creatures.js");
 const { keys } = await import("../src/input.js");
 const { standWith, B, FLOOR_Z } = await import("../src/world.js");
 const { canWalk, PLAYER_STEP_UP, PLAYER_DROP } = await import("../src/pathing.js");
@@ -57,8 +57,10 @@ function settle() {   // let the "DEPTH n" beat (and any story page) pass
   }
 }
 
+const monstersIn = (zone) => zone.creatures.filter((c) => !canTalk(c));
+
 function arrive() {   // a fresh zone: no fights, no dying
-  game.zone.monsters.length = 0;
+  game.zone.creatures = talkersIn(game.zone);
   const p = game.player;
   p.maxHpGain = p.hp = 999;
   p.keys = 99;
@@ -70,7 +72,7 @@ function route(goal) {
   const [sx, sy] = tileOf(game.player);
   // Not through people (bumping talks), nor over other stairs (they'd take you away), as the
   // game's own click-travel plans (turns.js routable).
-  const blocked = new Set(zone.npcs.map((n) => n.tx + n.ty * w));
+  const blocked = new Set(talkersIn(zone).map((n) => n.tx + n.ty * w));
   for (let i = 0; i < w * d; i++) {
     const g = zone.blocks[i + (FLOOR_Z - 1) * w * d];
     if ((g === B.STAIRS || g === B.STAIRS_UP) && i !== goal.x + goal.y * w) blocked.add(i);
@@ -257,7 +259,7 @@ export function runSmoke({ seed = 1234, view = "map", levels = [3, 5, 10, 15, 20
       const zone = game.zone, p = game.player;
       p.maxHpGain = p.hp = 1e6;
       // Start next to the guardian or boss if there is one (so it wakes), else the nearest monster.
-      const target = zone.monsters.find((m) => m.guardian || MONSTER_TYPES[m.type].boss) || zone.monsters[0];
+      const target = monstersIn(zone).find((m) => m.guardian || CREATURE_TYPES[m.type].boss) || monstersIn(zone)[0];
       if (target) {
         const spot = [[2, 0], [-2, 0], [0, 2], [0, -2], [1, 1], [-1, -1], [3, 0], [0, 3]].map(([ox, oy]) => [target.tx + ox, target.ty + oy])
           .find(([x, y]) => x >= 0 && y >= 0 && x < zone.w && y < zone.d && zone.stand[x + y * zone.w] >= 0);
@@ -268,7 +270,7 @@ export function runSmoke({ seed = 1234, view = "map", levels = [3, 5, 10, 15, 20
         const codes = ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp", "Space", "KeyT", "KeyF"];
         for (let k = 0; k < 4000 && game.time - t0 < seconds && game.zone === zone; k++) {
           if (game.mode !== "map") { settle(); if (game.mode !== "map") break; }
-          const m = zone.monsters[0];
+          const m = monstersIn(zone)[0];
           const toward = m && k % 3 ? ARROWS[`${Math.sign(m.tx - Math.floor(p.x))},0`] || ARROWS[`0,${Math.sign(m.ty - Math.floor(p.y))}`] : null;
           game.debug.mapKey(toward || codes[k % codes.length]);
           actions++;
@@ -280,7 +282,7 @@ export function runSmoke({ seed = 1234, view = "map", levels = [3, 5, 10, 15, 20
         keys.add("KeyW");
         for (let k = 0; k < seconds * 60 && game.zone === zone; k++) {
           if (game.mode !== "explore") { settle(); if (game.mode !== "explore") break; game.paused = false; }
-          const m = zone.monsters[0];
+          const m = monstersIn(zone)[0];
           if (m) p.yaw = Math.atan2(m.y - p.y, m.x - p.x);
           if (k % 20 === 0) { inputHandlers.onKeyDown("Enter", false, "Enter"); actions++; }
           if (k % 180 === 90) { inputHandlers.onKeyDown("KeyT", false, "t"); actions++; }
@@ -291,7 +293,7 @@ export function runSmoke({ seed = 1234, view = "map", levels = [3, 5, 10, 15, 20
         }
         keys.delete("KeyW");
       }
-      steps.push(`level ${z}: ${actions} actions, ${frames} frames, ${zone.monsters.length} monsters left`);
+      steps.push(`level ${z}: ${actions} actions, ${frames} frames, ${monstersIn(zone).length} monsters left`);
     } catch (e) {
       keys.clear();
       problems.push(`${view} level ${z}: ${String(e.stack || e).split(/\r?\n/).slice(0, 4).join(" | ")}`);
@@ -334,7 +336,7 @@ export async function runGoldenA({ view = "map" } = {}) {
       if (view === "3d") { zone.items.push(api_makeItem(lying, p.x, p.y, p.z)); frame(); return; }
       const tx = Math.floor(p.x), ty = Math.floor(p.y), here = zone.stand[tx + ty * zone.w];
       const next = Object.entries(ARROWS).map(([d, code]) => [...d.split(",").map(Number), code])
-        .find(([dx, dy]) => zone.stand[tx + dx + (ty + dy) * zone.w] === here && !zone.npcs.some((n) => n.tx === tx + dx && n.ty === ty + dy)
+        .find(([dx, dy]) => zone.stand[tx + dx + (ty + dy) * zone.w] === here && !talkersIn(zone).some((n) => n.tx === tx + dx && n.ty === ty + dy)
           && zone.get(tx + dx, ty + dy, FLOOR_Z - 1) !== B.STAIRS && zone.get(tx + dx, ty + dy, FLOOR_Z - 1) !== B.STAIRS_UP);
       if (!next) throw new Error(`no free tile beside (${tx}, ${ty}) to lay the ${lying.kind} on`);
       zone.items.push(api_makeItem(lying, tx + next[0] + 0.5, ty + next[1] + 0.5, here));

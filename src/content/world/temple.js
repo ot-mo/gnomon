@@ -23,7 +23,7 @@ import { Zone, B, FLOOR_Z, ROOM_TOP } from "../../world.js";
 import { makeRng } from "../../rng.js";
 import { stampVault, registerLegend, floorCol } from "../../gen/vaults.js";
 import { makeItem } from "../../items.js";
-import { spawnNpc } from "../../npcs.js";
+import { spawnCreature, addCreature } from "../../creatures.js";
 import { layoutSpikes } from "../../traps.js";
 
 export const TEMPLE_ROWS = [
@@ -86,7 +86,7 @@ registerLegend("altar", (c) => {
 });
 registerLegend("maren", (c) => {
   floorCol(c);
-  c.zone.npcs.push(spawnNpc("maren", c.x, c.y, c.z0, 0));
+  addCreature(c.zone, spawnCreature("maren", c.x, c.y, c.z0, { level: 0 }));
   // Coming back up the legacy stack's stairs: in front of Maren, as in the parent game (her rest loop:
   // "come back if you need rest"), not down in the shaft's bottom room (zones.js arrivalPoint "up").
   c.zone.returnPoint = { x: c.x + 0.5, y: c.y + 2.5, z: c.z0, yaw: -Math.PI / 2 };

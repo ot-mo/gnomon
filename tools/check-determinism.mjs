@@ -15,10 +15,10 @@ const add = (p) => {
   else if (p.endsWith(".js")) sources[path.relative(SRC, p).replaceAll("\\", "/")] = fs.readFileSync(p, "utf8");
 };
 for (const s of SCAN) add(path.join(SRC, s));
-// Modules whose functions generation calls (loot, people, spikes, monster picks): their runtime
+// Modules whose functions generation calls (loot, people, spikes, creature picks and spawning, ids): their runtime
 // code may use Math.random, but no random-comparator sorts anywhere.
 const helpers = {};
-for (const f of ["items.js", "npcs.js", "traps.js", "monsters.js", "rng.js"]) helpers[f] = fs.readFileSync(path.join(SRC, f), "utf8");
+for (const f of ["items.js", "npcs.js", "traps.js", "monsters.js", "creatures.js", "ids.js", "content/creatures/legacy.js", "rng.js"]) helpers[f] = fs.readFileSync(path.join(SRC, f), "utf8");
 
 await installNodeEnv();
 const { checkDeterminism } = await import("../tests/checks/determinism.js");

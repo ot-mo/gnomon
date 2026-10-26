@@ -19,10 +19,10 @@
 import { Zone, B, FLOOR_Z, ROOM_TOP, CORRIDOR_TOP, standWith } from "../world.js";
 import { makeRng, noise2, distance } from "../rng.js";
 import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../pathing.js";
-import { spawnMonster, pickMonsterType, rollElite, MONSTER_TYPES } from "../monsters.js";
+import { CREATURE_TYPES, spawnCreature, addCreature, pickCreatureType, rollElite, canTalk } from "../creatures.js";
 import { makeItem, randomPotion, randomScroll, randomEquipment, randomTreasure, randomJewel } from "../items.js";
 import { pickVault, stampVault, VAULTS } from "./vaults.js";
-import { planEncounters, spawnNpc, peddlerStock, bountyTarget } from "../npcs.js";
+import { planEncounters, peddlerStock, bountyTarget } from "../npcs.js";
 import { layoutSpikes } from "../traps.js";
 
 // Room layout and corridor routing work on this fixed grid (the validated generator's home).
@@ -287,7 +287,7 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
 
   // --- 10. Monsters (never in the start room) and loot.
   f.refresh();
-  // Which kinds turn up depends on the level (see MONSTER_TYPES' depths); a few are elites.
+  // Which kinds turn up depends on the level (see the creature types' depths); a few are elites.
   const count = final ? 10 : theme.count(depth);
   const taken = new Set();
   for (let k = 0; k < count; k++) {
@@ -297,8 +297,8 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
     if (!spots.length) continue;
     const [x, y] = rng.pick(spots);
     taken.add(x + y * W);
-    f.monsters.push(spawnMonster(pickMonsterType(rng, depth), x, y, f.stand[x + y * W], rng.chance(0.5) ? "idle" : "wander",
-                                 depth, rollElite(rng, depth), cosmetic));
+    const type = pickCreatureType(rng, depth), state = rng.chance(0.5) ? "idle" : "wander";
+    addCreature(f, spawnCreature(type, x, y, f.stand[x + y * W], { rng: cosmetic, state, level: depth, elite: rollElite(rng, depth) }));
   }
   // Loot lying around: a few potions and scrolls, a piece of gear (sometimes two), usually a few
   // throwing knives, once in a while a strength crystal, and from floor 3 now and then a ring
@@ -392,7 +392,7 @@ function placeEncounters(f, rng, cosmetic, rooms, start, depth, list) {
     const g = f.get(x, y, FLOOR_Z - 1);
     return f.stand[x + y * W] === FLOOR_Z && g !== B.SPIKES && g !== B.WATER_SHALLOW && g !== B.WATER_DEEP && !isStairs(f, x, y);
   };
-  const free = (x, y) => plain(x, y) && !f.npcs.some((n) => n.tx === x && n.ty === y) &&
+  const free = (x, y) => plain(x, y) && !f.creatures.some((n) => canTalk(n) && n.tx === x && n.ty === y) &&
     !f.items.some((it) => Math.floor(it.x) === x && Math.floor(it.y) === y);
   const spotIn = (r) => {
     const spots = interior(r).filter(([x, y]) => free(x, y) && !r.doors.some((d) => Math.abs(d.x - x) + Math.abs(d.y - y) <= 2) &&
@@ -404,7 +404,7 @@ function placeEncounters(f, rng, cosmetic, rooms, start, depth, list) {
       const spot = spotIn(r);
       if (!spot) continue;
       used.add(r);
-      f.monsters = f.monsters.filter((m) => distance(m.tx - spot[0], m.ty - spot[1]) > 3);
+      f.creatures = f.creatures.filter((m) => canTalk(m) || distance(m.tx - spot[0], m.ty - spot[1]) > 3);
       return spot;
     }
     return null;
@@ -412,9 +412,7 @@ function placeEncounters(f, rng, cosmetic, rooms, start, depth, list) {
   const place = (type, state = {}) => {
     const spot = findSpot();
     if (!spot) return null;
-    const n = spawnNpc(type, spot[0], spot[1], FLOOR_Z, depth, state);
-    f.npcs.push(n);
-    return n;
+    return addCreature(f, spawnCreature(type, spot[0], spot[1], FLOOR_Z, { level: depth, talk: { state } }));
   };
 
   for (const e of list) {
@@ -426,11 +424,12 @@ function placeEncounters(f, rng, cosmetic, rooms, start, depth, list) {
       const rook = place("rook");
       if (!rook) continue;
       const b = bountyTarget(rng, depth), lair = findSpot();   // the quarry gets a room of its own
-      const m = lair ? spawnMonster(b.type, lair[0], lair[1], FLOOR_Z, "wander", depth, b.elite, cosmetic) : f.monsters[0];
-      if (!m) { f.npcs.splice(f.npcs.indexOf(rook), 1); continue; }
-      if (lair) f.monsters.push(m);
+      const m = lair ? spawnCreature(b.type, lair[0], lair[1], FLOOR_Z, { rng: cosmetic, state: "wander", level: depth, elite: b.elite })
+                     : f.creatures.find((c) => !canTalk(c));
+      if (!m) { f.creatures.splice(f.creatures.indexOf(rook), 1); continue; }
+      if (lair) addCreature(f, m);
       m.bounty = true;
-      Object.assign(rook.state, { target: m.id, targetName: m.name });
+      Object.assign(rook.talk.state, { target: m.id, targetName: m.name });
     } else if (e.npc === "lio") placePrisoner(f, rng, rooms, start, depth, used);
     else place(e.npc);
   }
@@ -451,12 +450,12 @@ function placePrisoner(f, rng, rooms, start, depth, used) {
       if (!lever) return;
       for (const [x, y] of bars) for (let z = FLOOR_Z; z <= FLOOR_Z + 2; z++) f.set(x, y, z, B.GATE);
       const inside = (x, y) => tiles.some(([tx, ty]) => tx === x && ty === y);
-      f.monsters = f.monsters.filter((m) => !inside(m.tx, m.ty));
+      f.creatures = f.creatures.filter((m) => canTalk(m) || !inside(m.tx, m.ty));
       f.items = f.items.filter((it) => !inside(Math.floor(it.x), Math.floor(it.y)));
       const gate = bars.flatMap(([x, y]) => [[x, y, FLOOR_Z], [x, y, FLOOR_Z + 1], [x, y, FLOOR_Z + 2]]);
       f.set(lever.x, lever.y, FLOOR_Z + 1, B.LEVER);
       f.links.set(f.index(lever.x, lever.y, FLOOR_Z + 1), { action: "free", cells: gate });
-      f.npcs.push(spawnNpc("lio", cx, cy, FLOOR_Z, depth, { lever: [lever.x, lever.y], leverFront: lever.front }));
+      addCreature(f, spawnCreature("lio", cx, cy, FLOOR_Z, { level: depth, talk: { state: { lever: [lever.x, lever.y], leverFront: lever.front } } }));
       used.add(r);
       f.refresh();
       return;
@@ -865,11 +864,11 @@ export function validateDungeonLevel(f, p = {}) {
 
   if (final) {
     if (bottom?.kind === "boss") {
-      const boss = f.monsters.find((m) => MONSTER_TYPES[m.type].boss);
+      const boss = f.creatures.find((m) => CREATURE_TYPES[m.type].boss);
       if (!boss || !at(all, boss.x, boss.y)) problems.push("boss missing or unreachable");
     }
     if (f.guardianHall) {   // a guardian at the bottom (a site's last level): it must be reachable
-      const g = f.monsters.find((m) => m.guardian);
+      const g = f.creatures.find((m) => m.guardian);
       if (!g || !at(all, g.x, g.y)) problems.push("guardian missing or unreachable");
     }
     if (f.stairs) problems.push("stairs down on the last floor");
@@ -877,7 +876,7 @@ export function validateDungeonLevel(f, p = {}) {
     outer: for (let y = 0; y < d; y++) for (let x = 0; x < w; x++) if (hole(x, y)) { problems.push("a hole on the last floor"); break outer; }
   } else if (!f.stairs) problems.push("no stairs");
   else if (f.guardianHall) {   // the stairs wait behind the guardian's gate: the gate must be reachable
-    const g = f.monsters.find((m) => m.guardian);
+    const g = f.creatures.find((m) => m.guardian);
     if (!g || !at(all, g.x, g.y)) problems.push("guardian missing or unreachable");
     if (!at(all, ...f.guardianHall.front)) problems.push("guardian's gate unreachable");
   } else if (!at(all, f.stairs.x, f.stairs.y)) problems.push("stairs unreachable");
@@ -897,8 +896,8 @@ export function validateDungeonLevel(f, p = {}) {
   if (!f.vault || !at(all, f.vault.entrance.x, f.vault.entrance.y)) problems.push("vault unreachable");
   for (const link of f.links.values()) if (!link.cells.length) problems.push("lever linked to nothing");
   // People must be reachable (Lio is behind bars: his lever must be).
-  for (const n of f.npcs) {
-    if (n.type === "lio") { if (!at(noLocked, ...n.state.leverFront)) problems.push("Lio's lever unreachable"); }
+  for (const n of f.creatures.filter(canTalk)) {
+    if (n.type === "lio") { if (!at(noLocked, ...n.talk.state.leverFront)) problems.push("Lio's lever unreachable"); }
     else if (!at(all, n.x, n.y)) problems.push(`${n.type} unreachable`);
   }
   // Puzzle rooms without gates: their treasure must be reachable on foot (ghost planks count).
@@ -910,7 +909,7 @@ export function validateDungeonLevel(f, p = {}) {
     const ns = f.braziers.list.map((b) => b.n).sort().join("");
     if (ns !== "1234".slice(0, f.braziers.list.length) || !f.braziers.gate.length) problems.push("brazier numerals broken");
   }
-  for (const m of f.monsters) if (f.stand[m.tx + m.ty * w] < 0) problems.push(`${m.type} stuck in a wall`);
+  for (const m of f.creatures) if (!canTalk(m) && f.stand[m.tx + m.ty * w] < 0) problems.push(`${m.type} stuck in a wall`);
   if (f.leverRecord && !f.leverRecordAt) problems.push("the Rune Lever room's record is missing");
   return problems;
 }

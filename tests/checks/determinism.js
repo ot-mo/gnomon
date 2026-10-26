@@ -4,9 +4,9 @@
 //
 // 1. Every level is generated twice and compared: blocks byte for byte, every item field, and each
 //    creature's type, position, elite, uid and looks (the cosmetic stream), and each person's type,
-//    position, uid and state. Ids are runtime handles from a counter and are left out.
-//    The uid part has nothing to compare until 0C: legacy creatures and people carry no uid yet
-//    (undefined on both sides). The stats count how many do, and a note says so while it is 0.
+//    position, uid and talk state. Ids are runtime handles from a counter and are left out.
+//    Since 0C every creature and person generation places has a uid (ids.js genUid, "<zone key>#c<n>"):
+//    one without, or two alike in a level, is a problem.
 // 2. A static scan (comments stripped). In the generation code (sources: { path: text }; 0A1 scans
 //    src/gen/, src/world/, src/story/, src/content/world/ and content/currency.js): no
 //    Math.random, and no Math.hypot (its last bits differ between engines and even between
@@ -37,8 +37,9 @@ import { makeRng } from "../../src/rng.js";
 
 const creatureFacts = (m) => ({ type: m.type, tx: m.tx, ty: m.ty, z: m.z, elite: m.elite, uid: m.uid,
   hp: m.hp, state: m.state, anim: m.anim, think: m.think, pause: m.pause, shot: m.shot });
-const npcFacts = (n, monsters) => ({ type: n.type, tx: n.tx, ty: n.ty, z: n.z, uid: n.uid,
-  state: n.state?.target !== undefined ? { ...n.state, target: monsters.findIndex((m) => m.id === n.state.target) } : n.state });
+const npcFacts = (n, monsters) => { const st = n.talk.state; return { type: n.type, tx: n.tx, ty: n.ty, z: n.z, uid: n.uid,
+  state: st?.target !== undefined ? { ...st, target: monsters.findIndex((m) => m.id === st.target) } : st }; };
+const monstersOf = (f) => f.creatures.filter((c) => !c.talk), peopleOf = (f) => f.creatures.filter((c) => c.talk);
 const layout = (f) => ({ spawn: f.spawn, stairs: f.stairs, upStairs: f.upStairs, vault: f.vault, secret: f.secret,
   secretWalls: f.secretWalls, links: f.links, groups: f.groups, spikes: f.spikes, braziers: f.braziers,
   guardianHall: f.guardianHall, attempts: f.attempts, hasBelow: f.hasBelow, level: f.level, key: f.key });
@@ -47,8 +48,8 @@ export function compareZones(a, b) {
   const out = [];
   if (a.blocks.length !== b.blocks.length || a.blocks.some((v, i) => v !== b.blocks[i])) out.push("blocks");
   if (canon(a.items) !== canon(b.items)) out.push("items");
-  if (canon(a.monsters.map(creatureFacts)) !== canon(b.monsters.map(creatureFacts))) out.push("creatures");
-  if (canon(a.npcs.map((n) => npcFacts(n, a.monsters))) !== canon(b.npcs.map((n) => npcFacts(n, b.monsters)))) out.push("people");
+  if (canon(monstersOf(a).map(creatureFacts)) !== canon(monstersOf(b).map(creatureFacts))) out.push("creatures");
+  if (canon(peopleOf(a).map((n) => npcFacts(n, monstersOf(a)))) !== canon(peopleOf(b).map((n) => npcFacts(n, monstersOf(b))))) out.push("people");
   if (canon(layout(a)) !== canon(layout(b))) out.push("layout");
   return out;
 }
@@ -128,7 +129,14 @@ export function checkDeterminism({ seeds = [3, 77, 2024], depths = LEGACY_LEVELS
       const a = generateDungeonLevel(seed, p);
       const diff = compareZones(a, generateDungeonLevel(seed, p));
       levels++;
-      for (const e of [...a.monsters, ...a.npcs]) { bodies++; if (e.uid !== undefined && e.uid !== null) withUid++; }
+      const uids = new Set();
+      for (const e of a.creatures) {
+        bodies++;
+        if (typeof e.uid === "string" && e.uid) withUid++;
+        else problems.push(`seed ${seed} level ${depth}: the ${e.type} at (${e.tx}, ${e.ty}) has no uid`);
+        if (uids.has(e.uid)) problems.push(`seed ${seed} level ${depth}: uid ${e.uid} twice`);
+        uids.add(e.uid);
+      }
       if (diff.length) problems.push(`seed ${seed} level ${depth}: two generations differ in ${diff.join(", ")}`);
     }
   let scanned = 0;
@@ -146,7 +154,7 @@ export function checkDeterminism({ seeds = [3, 77, 2024], depths = LEGACY_LEVELS
                       ...(TRANSCENDENTAL_EXEMPT.includes(file) ? [] : [trigRule])]);
   for (const [file, text] of Object.entries(helpers)) scan(file, text, [sortRule]);
   const world = checkWorldParts(seeds, spans, problems);
-  if (withUid === 0) notes.push(`uid comparison not exercised: none of ${bodies} creatures and people has a uid yet (0C adds them)`);
+  if (!bodies) problems.push("no creatures or people generated: the uid comparison compared nothing");
   return { name: "determinism", ok: problems.length === 0, problems, notes,
            stats: { levelsTwice: levels, filesScanned: scanned, bodies, withUid, ...world } };
 }

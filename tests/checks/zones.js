@@ -182,12 +182,12 @@ export function checkZones({ game, startRun }) {
   changeZone(game, "0,0,1", { how: "down" });
 
   // --- Patches and uids ---------------------------------------------------------------------------
-  PATCH_OPS.testMark = (g, zone, patch, { at }) => { zone.monsters.push({ id: -1, type: "rat", uid: patch.uid, tx: at.x, ty: at.y, testMark: true }); };
+  PATCH_OPS.testMark = (g, zone, patch, { at }) => { zone.creatures.push({ id: -1, type: "rat", uid: patch.uid, tx: at.x, ty: at.y, testMark: true }); };
   addZonePatch(game, "0,0,3", { op: "setFlag", flag: "testFlag" });
   addZonePatch(game, "0,0,3", { op: "testMark", uid: "test:one", relativeTo: "arrival", dist: [8, 12] });
   addZonePatch(game, "0,0,3", { op: "noSuchOp" });
   changeZone(game, "0,0,3", { how: "down" });
-  const z3 = game.zone, marks = () => z3.monsters.filter((m) => m.testMark);
+  const z3 = game.zone, marks = () => z3.creatures.filter((m) => m.testMark);
   const mk = marks()[0];
   expect(z3.flags.testFlag === true, "a setFlag patch applied on entry");
   expect(marks().length === 1 && uidWhere(game, "test:one") === "0,0,3", "a patch with a uid claims it in that zone");
@@ -203,7 +203,7 @@ export function checkZones({ game, startRun }) {
   addZonePatch(game, "0,0,4", { op: "testMark", uid: "test:dead" });
   killUid(game, "test:dead");
   changeZone(game, "0,0,4", { how: "down" });
-  expect(!game.zone.monsters.some((m) => m.testMark), "a uid living elsewhere, or dead, is not spawned again");
+  expect(!game.zone.creatures.some((m) => m.testMark), "a uid living elsewhere, or dead, is not spawned again");
   expect(claimUid(game, "test:two", "0,0,4") && claimUid(game, "test:two", "0,0,4") && !claimUid(game, "test:two", "0,0,3"), "claimUid: one zone per uid");
   addZonePatch(game, "0,0,3", { op: "removeUid", uid: "test:one" });
   changeZone(game, "0,0,3", { how: "up" });

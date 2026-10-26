@@ -11,7 +11,8 @@
 // (In 3D you can also jump over a row. The map can't jump.)
 import { B, FLOOR_Z } from "./world.js";
 import { distance } from "./rng.js";
-import { damageMonster, MONSTER_TYPES } from "./monsters.js";
+import { damageMonster } from "./monsters.js";
+import { CREATURE_TYPES, canTalk } from "./creatures.js";
 import { statusFlag } from "./status.js";
 
 export const TICK = 0.5;
@@ -61,9 +62,9 @@ export function updateSpikes(game) {
     p.spikeBeat = beat;
     game.hurtPlayer(2 + Math.floor(zone.level / 3) + Math.floor(Math.random() * 3), "the spikes");
   }
-  for (const m of [...zone.monsters]) {
-    const t = MONSTER_TYPES[m.type];
-    if (t.hover || t.flat || t.boss || !hits(m.x, m.y, m.z, m.spikeBeat)) continue;
+  for (const m of [...zone.creatures]) {
+    const t = CREATURE_TYPES[m.type];
+    if (canTalk(m) || m.vis.statue || t.hover || t.flat || t.boss || !hits(m.x, m.y, m.z, m.spikeBeat)) continue;
     m.spikeBeat = beat;
     damageMonster(game, m, 3 + Math.floor(Math.random() * 3), [200, 200, 210], `The ${m.name} is skewered by the spikes.`);
   }

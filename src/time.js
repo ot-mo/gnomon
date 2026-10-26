@@ -21,13 +21,13 @@
 import { RULES } from "./rules.js";
 import { catchUpStatuses, statusLeft, clearCooldown, STATUS_DEFS } from "./status.js";
 import { regenerate, nextRegenEvent } from "./effects.js";
-import { MONSTER_TYPES } from "./monsters.js";
+import { CREATURE_TYPES, hostilesTo, canTalk } from "./creatures.js";
 import { emit } from "./events.js";
 
 // Something that would stop a rest: a hostile awake within the radius.
 function threat(game) {
   const p = game.player, r = RULES.time.activeRadius;
-  for (const m of game.zone?.monsters || [])
+  for (const m of game.zone ? hostilesTo(game, p) : [])
     if (m.state === "chase" && Math.hypot(m.x - p.x, m.y - p.y) <= r) return "hostile";
   return null;
 }
@@ -77,10 +77,11 @@ export function skipTime(game, seconds, { interruptible = true, reason = "wait",
 
   const zone = game.zone;
   if (zone && elapsed > 0) {
-    for (const m of [...zone.monsters]) {
-      const t = MONSTER_TYPES[m.type], quiet = noRegenLeft(m);
+    for (const m of [...zone.creatures]) {
+      if (canTalk(m)) continue;   // people: no health, nothing to catch up
+      const t = CREATURE_TYPES[m.type], quiet = noRegenLeft(m);
       catchUpStatuses(game, m, elapsed);
-      if (!zone.monsters.includes(m)) continue;   // burned or choked to death
+      if (!zone.creatures.includes(m)) continue;   // burned or choked to death
       m.cd = Math.max(0, (m.cd || 0) - elapsed);
       m.hurt = 0;
       if (t?.regen && m.hp < m.maxHp) {

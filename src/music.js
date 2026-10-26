@@ -59,7 +59,7 @@ export function toggleMusic() {
 export function updateMusic(game) {
   const f = game.zone, p = game.player;
   let chasing = 0, bossAwake = false;
-  for (const m of f?.monsters || []) {
+  for (const m of f?.creatures || []) {
     if (m.state !== "chase" || Math.hypot(m.x - p.x, m.y - p.y) > 14) continue;
     chasing++;
     if (m.type === "lich" || m.guardian) bossAwake = true;   // the Lich King, or a guardian

@@ -4,9 +4,8 @@ import { castRay, hit, setGhostVisible } from "./raycast.js";
 import { sampleLight } from "./light.js";
 import { material, albedo, setMaterialTime, setDarkSight } from "./materials.js";
 import { noise2 } from "./rng.js";
-import { monsterSprite, MONSTER_TYPES, isFlat } from "./monsters.js";
+import { creatureSprite, hostilesTo, talkersIn, isFlat } from "./creatures.js";
 import { guardianSprites } from "./guardians.js";
-import { npcSprite, NPC_TYPES } from "./npcs.js";
 import { spikeSprites } from "./traps.js";
 import { itemSprite } from "./items.js";
 import { projectileSprites } from "./throwing.js";
@@ -165,8 +164,7 @@ export function render3d(game) {
   const { zone, player } = game;
   setCamera(player, game.fov, game.cam);
   shadows = [];
-  for (const m of zone.monsters) if (isFlat(m) && Math.hypot(m.x - player.x, m.y - player.y) < 20) shadows.push(m);
-  for (const n of zone.npcs) if (NPC_TYPES[n.type].flat && Math.hypot(n.x - player.x, n.y - player.y) < 20) shadows.push(n);
+  for (const c of [...hostilesTo(game, player), ...talkersIn(zone)]) if (isFlat(c) && Math.hypot(c.x - player.x, c.y - player.y) < 20) shadows.push(c);
   setMaterialTime(game.time);   // water ripples move
   if (depth.length !== S.cols * S.rows) depth = new Float32Array(S.cols * S.rows);
   torch.power = torchPower(player);
@@ -258,9 +256,10 @@ function drawSprites(game) {
     });
   }
   // (Flat beings only cast a shadow; a ghostly guardian is only there with your torch out.)
-  for (const m of zone.monsters) if (!isFlat(m) && !(MONSTER_TYPES[m.type].ghostly && game.player.torch)) drawSprite(game, monsterSprite(m, zone));
+  // Monsters, then the guardians' extras, then people (the order the parent game drew them in).
+  for (const m of hostilesTo(game, game.player)) { const sp = creatureSprite(game, m); if (sp) drawSprite(game, sp); }
   for (const sp of guardianSprites(game)) drawSprite(game, sp);
-  for (const n of zone.npcs) { const sp = npcSprite(game, n); if (sp) drawSprite(game, sp); }
+  for (const n of talkersIn(zone)) { const sp = creatureSprite(game, n); if (sp) drawSprite(game, sp); }
   for (const sp of spikeSprites(game)) drawSprite(game, sp);
   for (const item of zone.items) drawSprite(game, itemSprite(game, item, game.time));
   for (const s of projectileSprites(game)) drawSprite(game, s);   // knives and potions in flight, gas clouds

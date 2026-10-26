@@ -1,4 +1,6 @@
-// People you meet: who they are, how they look, what they say, and the quests they give.
+// People you meet: what they say, and the quests they give. They are creatures that talk
+// (creatures.js; who they are and how they look: content/creatures/legacy.js). A person's
+// conversation state is n.talk.state, whether you've met n.talk.met, and their floor n.level.
 //
 // Talking: E while looking at someone in 3D, or walk into them on the map. Two kinds of
 // people are picky about how you look at them:
@@ -11,7 +13,7 @@
 // "sell" } to open the shop. dialogue.js draws it all.
 import { B, FLOOR_Z, KIND } from "./world.js";
 import { makeRng } from "./rng.js";
-import { spawnMonster, pickMonsterType, ELITES, MONSTER_TYPES } from "./monsters.js";
+import { CREATURE_TYPES, ELITES, spawnCreature, addCreature, pickCreatureType, canTalk } from "./creatures.js";
 import { randomPotion, randomScroll, randomEquipment, randomJewel, addToInventory, itemName, itemPrice, makeItem, awayFromWalls, isGear,
          RINGS, AMULETS, POTIONS, POTION_COLORS } from "./items.js";
 import { revealFloor, liftCurses } from "./effects.js";
@@ -21,71 +23,6 @@ import { sfx } from "./sfx.js";
 import { maxHp, raiseAttr, raiseMaxHp } from "./stats.js";
 import { addStatus, removeStatus } from "./status.js";
 import { pay, receive, funds, formatPrice, priceLevel, CURRENCY } from "./currency.js";
-
-// --- How they look ---------------------------------------------------------------------
-const ROBE = [
-  "   hhh   ", " hhhhhhh ", " hsesesh ", " hsssssh ", " hhsmshh ", "  rrrrr  ", " rrrgrrr ", "rrrrrrrrr",
-  "s rrrrr s", "  rbbbr  ", "  rrrrr  ", " rrrrrrr ", " rrrrrrr ", " rrrrrrr ", "rrrrrrrrr", "  f   f  ",
-];
-const PEDDLER = [
-  "  hhhhh  ", "hhhhhhhhh", "  seses  ", "  sssss  ", "  dsmsd  ", " rrrrrrpp", "rrrrrrrpp", "srrrrrrpp",
-  "s rrbrrpp", "  rrrrrpp", "  rrrrrpp", " rrrrrr p", " rrrrrr  ", " rr   rr ", " rr   rr ", " ff   ff ",
-];
-const KNIGHT = [
-  "  hhhhh  ", " hhhhhhh ", " hsesesh ", " hsssssh ", "  hhhhh  ", " ccrrrcc ", "ccrrrrrcc", "crrxrrrrc",
-  "s rrrrr s", "c rbbbr c", "c rrxrr c", "c rr rr c", "  rr rr  ", "  rr rr  ", "  rr rr  ", " ff   ff ",
-];
-const GHOST = [
-  "   hhh   ", " hhhhhhh ", " hsesesh ", " hsssssh ", " hhsmshh ", "  rrrrr  ", " rrrrrrr ", "rrrrrrrrr",
-  "s rrrrr s", "  rrrrr  ", "  rrrrr  ", " rrrrrrr ", "  rrrrr  ", "  r rr r ", "   r  r  ", "         ",
-];
-const STATUE = [
-  " sssssss ", "sSSSSSSSs", "sSSSSSSSs", "sSeSSSeSs", "sSSSSSSSs", "sSSSnSSSs", "sSSSnSSSs",
-  "sSSSSSSSs", "sSmmmmmSs", "sSSSSSSSs", " sssssss ", "  sssss  ", "  sssss  ", " sssssss ",
-];
-const SHRINE = [
-  "  c   c  ", "  c   c  ", "  f   f  ", " sSSSSSs ", " sSgGgSs ", " sSSSSSs ", "  sSSSs  ", "  sSSSs  ", " sssssss ",
-];
-const SKIN = [[225, 180, 140], 0], EYES = [[40, 35, 45], 0], MOUTH = [[150, 80, 70], 0], BOOTS = [[85, 65, 50], 0];
-
-export const NPC_TYPES = {
-  maren: { name: "Maren", title: "the priestess", glyph: "@", color: [245, 230, 170], art: ROBE,
-    palette: { h: [[235, 230, 215], 0.1], s: SKIN, e: EYES, m: MOUTH, r: [[225, 220, 205], 0.1], g: [[245, 200, 80], 0.5], b: [[215, 175, 60], 0], f: BOOTS } },
-  pell: { name: "Pell", title: "the peddler", glyph: "@", color: [240, 190, 90], art: PEDDLER,
-    palette: { h: [[120, 80, 45], 0], s: SKIN, e: EYES, m: MOUTH, d: [[170, 125, 80], 0], r: [[80, 125, 75], 0], b: [[60, 45, 30], 0], p: [[150, 105, 60], 0], f: BOOTS } },
-  corwin: { name: "Sir Corwin", title: "a wounded knight", glyph: "@", color: [210, 210, 230], art: KNIGHT,
-    palette: { h: [[160, 165, 180], 0], s: SKIN, e: EYES, c: [[170, 40, 45], 0], r: [[150, 155, 172], 0], x: [[160, 20, 20], 0], b: [[90, 60, 35], 0], f: BOOTS } },
-  brann: { name: "Brann", title: "a ghost", glyph: "@", color: [150, 230, 255], art: GHOST, ghost: true,
-    palette: { h: [[130, 210, 240], 0.8], s: [[170, 230, 250], 0.8], e: [[255, 255, 255], 1.5], m: [[90, 150, 190], 0.6], r: [[110, 190, 230], 0.7], g: [[200, 240, 255], 0.9], b: [[90, 160, 200], 0.6], f: [[90, 160, 200], 0.6] } },
-  mira: { name: "Mira", title: "the cartographer", glyph: "@", color: [120, 220, 200], art: ROBE,
-    palette: { h: [[175, 85, 45], 0], s: SKIN, e: EYES, m: MOUTH, r: [[60, 135, 125], 0], g: [[230, 200, 120], 0.3], b: [[95, 70, 45], 0], f: BOOTS } },
-  rook: { name: "Rook", title: "the bounty hunter", glyph: "@", color: [200, 150, 110], art: ROBE,
-    palette: { h: [[60, 55, 52], 0], s: SKIN, e: EYES, m: MOUTH, r: [[100, 75, 52], 0], g: [[190, 190, 200], 0.2], b: [[45, 35, 28], 0], f: BOOTS } },
-  lio: { name: "Lio", title: "a prisoner", glyph: "@", color: [210, 180, 140], art: ROBE,
-    palette: { h: [[45, 38, 32], 0], s: SKIN, e: EYES, m: MOUTH, r: [[130, 115, 90], 0], g: [[110, 95, 75], 0], b: [[90, 75, 55], 0], f: [[150, 115, 90], 0] } },
-  ess: { name: "Ess", title: "a Flatlander", glyph: "@", color: [190, 170, 255], flat: true },
-  tee: { name: "Tee", title: "a young Flatlander", glyph: "@", color: [255, 170, 230], flat: true },
-  door: { name: "The Speaking Door", title: "", glyph: "Ω", color: [190, 200, 215], art: STATUE, statue: true,
-    palette: { s: [[120, 120, 132], 0], S: [[160, 160, 172], 0], e: [[120, 220, 255], 1.3], n: [[110, 110, 120], 0], m: [[60, 60, 70], 0] } },
-  shrine: { name: "Shrine of the Builders", title: "", glyph: "†", color: [255, 215, 120], art: SHRINE, statue: true, w: 0.9, h: 1.0,
-    palette: { c: [[255, 200, 90], 1.6], f: [[60, 50, 40], 0], s: [[120, 115, 110], 0], S: [[165, 160, 150], 0], g: [[200, 160, 70], 0.4], G: [[255, 220, 120], 0.8] } },
-};
-
-let nextId = 1;
-export function spawnNpc(type, tx, ty, z, depth, state = {}) {
-  return { id: nextId++, type, tx, ty, x: tx + 0.5, y: ty + 0.5, z, depth, state, met: false };
-}
-
-export const npcAt = (zone, x, y) => zone.npcs.find((n) => n.tx === x && n.ty === y) || null;
-export const npcName = (n) => NPC_TYPES[n.type].name;
-
-// The 3D picture: nothing for flat beings (render3d draws their shadow), ghosts only in the dark.
-export function npcSprite(game, n) {
-  const t = NPC_TYPES[n.type];
-  if (t.flat || (t.ghost && game.player.torch)) return null;
-  const bob = t.ghost ? 0.25 + Math.sin(game.time * 2 + n.id) * 0.08 : 0;
-  return { x: n.x, y: n.y, z: n.z + bob, w: t.w || (t.statue ? 1.0 : 0.75), h: t.h || (t.statue ? 1.6 : 1.7), art: t.art, palette: t.palette };
-}
 
 // --- Quests ------------------------------------------------------------------------------
 // game.quests: [{ id, title, text, done }], shown in the journal (J).
@@ -170,13 +107,13 @@ export function peddlerStock(rng, depth) {
 function offering(game, n, cost, bold) {
   const p = game.player;
   if (!pay(game, p, cost)) return null;
-  n.state.used = true;
+  n.talk.state.used = true;
   sfx("gold");
   if (bold && Math.random() < 0.25) {
     const made = summonAround(game, 3);
     game.log("The candles flare red. \"FIRST, A TRIAL.\" Monsters step out of the shadows!", [255, 120, 100]);
     if (made) {
-      n.state.trial = made.map((m) => m.id);
+      n.talk.state.trial = made.map((m) => m.id);
       return node("\"PROVE YOURSELF. THEN BE GIVEN TO.\" (Defeat them, then return to the shrine.)", [bye("Fine.")]);
     }
   }
@@ -184,9 +121,9 @@ function offering(game, n, cost, bold) {
 }
 
 export function shrineAfterTrial(game, n) {
-  const left = game.zone.monsters.filter((m) => n.state.trial.includes(m.id));
+  const left = game.zone.creatures.filter((m) => n.talk.state.trial.includes(m.id));
   if (left.length) return node(`"THE TRIAL IS NOT OVER." (${left.length} left.)`, [bye()]);
-  n.state.trial = null;
+  n.talk.state.trial = null;
   return node(bless(game, true), [bye("Thank you.")]);
 }
 
@@ -237,13 +174,13 @@ function summonAround(game, n) {
     for (let ox = -3; ox <= 3; ox++) {
       const x = Math.floor(p.x) + ox, y = Math.floor(p.y) + oy;
       if (Math.max(Math.abs(ox), Math.abs(oy)) < 2 || x < 1 || y < 1 || x >= zone.w - 1 || y >= zone.d - 1) continue;
-      if (zone.stand[x + y * zone.w] < 0 || zone.monsters.some((m) => m.tx === x && m.ty === y) || zone.npcs.some((o) => o.tx === x && o.ty === y)) continue;
+      if (zone.stand[x + y * zone.w] < 0 || zone.creatures.some((c) => c.tx === x && c.ty === y)) continue;
       spots.push([x, y]);
     }
   for (let k = 0; k < n && spots.length; k++) {
     const [x, y] = spots.splice(Math.floor(Math.random() * spots.length), 1)[0];
-    const m = spawnMonster(pickMonsterType(Math.random, game.zone.level), x, y, zone.stand[x + y * zone.w], "chase", game.zone.level, k === 0 ? "hulking" : null);
-    zone.monsters.push(m);
+    const m = addCreature(zone, spawnCreature(pickCreatureType(Math.random, game.zone.level), x, y, zone.stand[x + y * zone.w],
+                                              { rng: Math.random, state: "chase", level: game.zone.level, elite: k === 0 ? "hulking" : null }));
     made.push(m);
   }
   return made.length ? made : null;
@@ -293,10 +230,10 @@ const RUMOURS = [
 ];
 
 export function talkTo(game, n) {
-  const t = NPC_TYPES[n.type], p = game.player, s = n.state;
-  const first = !n.met;
-  n.met = true;
-  switch (n.type) {
+  const p = game.player, s = n.talk.state;
+  const first = !n.talk.met;
+  n.talk.met = true;
+  switch (n.talk.dialogue) {
     // --- The temple ------------------------------------------------------------------------
     case "maren": {
       if (!game.story.cube) {
@@ -304,7 +241,7 @@ export function talkTo(game, n) {
           { label: "Of course. What's down there?", go: () => node("Only the Altar of Angles, and the relic that rests on it: a little cube nobody understands. It looks... more, somehow. As if it goes on further than it should.\n\nThe way down is past the spike hall and the mosaic room, to the east.", [
             { label: "I'll go and see.", go: () => { addQuest(game, "temple", "The shaking floor", "Find out what's shaking the lower sanctum. It's east, past the spike hall and the mosaic room."); return null; } },
           ]) },
-          { label: "Why me?", go: () => { n.met = false; return node("Because you're small, and quick, and you never could sit still. And because I said so.", [{ label: "Fair enough.", go: () => talkTo(game, n) }]); } },
+          { label: "Why me?", go: () => { n.talk.met = false; return node("Because you're small, and quick, and you never could sit still. And because I said so.", [{ label: "Fair enough.", go: () => talkTo(game, n) }]); } },
         ]);
         return node("The sanctum is east, past the spike hall and the mosaic room. The old builders wrote their secrets into the floors, child: read them. And the spike floor keeps a beat. Wait for it, and never be standing where the spikes come up next. Nothing moves until you do.", [
           { label: "How do I read a floor?", go: () => node("Look at it! The picture's right there under your feet. An arrow is an arrow.", [bye("Right.")]) },
@@ -361,7 +298,7 @@ export function talkTo(game, n) {
         const bad = POTIONS[effect].aura === "bad";
         return node(bad ? "*He drinks, and turns a dreadful colour.* Was that... a joke? I feel worse. Much worse." : "*He drinks.* I feel... odd. But no better. Have you nothing that actually heals?", [bye("Sorry.")]);
       } });
-      opts.push({ label: "I'll find something.", go: () => { addQuest(game, "corwin", "A wounded knight", `Sir Corwin lies wounded on floor ${n.depth}. He needs a potion of healing.`); return null; } });
+      opts.push({ label: "I'll find something.", go: () => { addQuest(game, "corwin", "A wounded knight", `Sir Corwin lies wounded on floor ${n.level}. He needs a potion of healing.`); return null; } });
       return node(first ? "*cough* A friendly face, at last. I'm Corwin, of the Hollowmere watch. A troll did this. I've no potions left, and I can't climb those stairs like this." : "Still breathing. Barely. Did you find something?", opts);
     }
 
@@ -370,7 +307,7 @@ export function talkTo(game, n) {
       if (questDone(game, "ess")) return node("Tee's home, and she won't stop talking about the round-folk who found her. Thank you, from all of the Plane.", [bye()]);
       if (questActive(game, "ess")) return node("Any sign of Tee? Remember: she's flat, like me. You'll only see her from above.", [bye("Still looking.")]);
       return node("Oh! You can see me? Most of you round-folk walk right over us. I'm Ess, of the Plane.\n\nMy little sister Tee went chasing a shadow and slipped down a stairwell. Deeper. If you find her, tell her to come home?", [
-        { label: "I'll look for her.", go: () => { addQuest(game, "ess", "Lost on the Plane", `Ess's little sister Tee is lost a few floors below floor ${n.depth}. She's flat: she only shows on the map.`); return null; } },
+        { label: "I'll look for her.", go: () => { addQuest(game, "ess", "Lost on the Plane", `Ess's little sister Tee is lost a few floors below floor ${n.level}. She's flat: she only shows on the map.`); return null; } },
         { label: "What's it like, being flat?", go: () => node("Like being a drawing that learned to walk. We can't see up, so we don't worry about it.\n\nBut there are flat things down here that aren't kind. Flatlings. They bite at your shadow while you stand there in your three dimensions, and your sword goes right through them. Come down to the plane, look from above, and you can fight them.", [{ label: "I'll remember that.", go: () => talkTo(game, n) }]) },
       ]);
     case "tee":
@@ -381,7 +318,7 @@ export function talkTo(game, n) {
           s.done = true;
           revealFloor(game);
           game.log("Tee shows you her map of this floor. It's all there, from above.", [255, 170, 230]);
-          giveFunds(game, 25 + n.depth * 2);
+          giveFunds(game, 25 + n.level * 2);
           finishQuest(game, "ess");
           return node("...Fine. She always worries. Here: I drew this whole floor myself. Flat folk are good at maps! And take these shiny things, they're heavy.", [bye("Go home safe, Tee.")]);
         } },
@@ -404,7 +341,7 @@ export function talkTo(game, n) {
       ]);
       if (questActive(game, "brann")) return node("The floor below. Find my skull. I'd like to stop rattling.", [bye()]);
       return node("*the air goes cold* ...You see me? Most can't, with all that fire in their hands. I'm Brann. Was Brann. I fell down a shaft on the floor below, and I'm still lying there, in pieces. Bring me my skull, and I'll rest.", [
-        { label: "I'll find it.", go: () => { addQuest(game, "brann", "Bones for Brann", `Find Brann's skull on floor ${n.depth + 1} and bring it to his ghost on floor ${n.depth}. (He only shows with your torch out.)`); return null; } },
+        { label: "I'll find it.", go: () => { addQuest(game, "brann", "Bones for Brann", `Find Brann's skull on floor ${n.level + 1} and bring it to his ghost on floor ${n.level}. (He only shows with your torch out.)`); return null; } },
         { label: "Why can I only see you in the dark?", go: () => node("Light is loud. The dead are quiet. That's all.", [{ label: "I see.", go: () => talkTo(game, n) }]) },
       ]);
     }
@@ -417,7 +354,7 @@ export function talkTo(game, n) {
         if (pct >= 80) return node(`Let me see... ${pct}%! That's a proper map. Here, as promised.`, [
           { label: "Hand over a copy of your map.", go: () => {
             s.done = true;
-            giveFunds(game, 35 + n.depth * 4);
+            giveFunds(game, 35 + n.level * 4);
             game.knownPotions.add("seeing");
             give(game, { kind: "potion", effect: "seeing" });
             finishQuest(game, "mira");
@@ -427,22 +364,22 @@ export function talkTo(game, n) {
         return node(`You've only mapped about ${pct}% of this floor. Most of it, I said! Eighty parts in a hundred.`, [bye("I'll keep looking.")]);
       }
       return node("Ah, another wanderer. Mira, cartographer. I'm mapping these halls, but my lamp's burnt out and my knees are worse. Fill in the map of this floor for me — most of it, mind — and I'll pay for a copy.", [
-        { label: "Deal.", go: () => { addQuest(game, "mira", "Mira's map", `Map most (80%) of floor ${n.depth}, then show Mira. (The map view shows what you've explored.)`); return null; } },
+        { label: "Deal.", go: () => { addQuest(game, "mira", "Mira's map", `Map most (80%) of floor ${n.level}, then show Mira. (The map view shows what you've explored.)`); return null; } },
         bye("Not now."),
       ]);
     }
 
     // --- Rook, the bounty hunter -------------------------------------------------------------------------
     case "rook": {
-      const target = game.zone.monsters.find((m) => m.id === s.target);
+      const target = game.zone.creatures.find((m) => m.id === s.target);
       if (s.done) return node("Pleasure doing business.", [bye()]);
       if (questActive(game, "rook") && (s.killed || !target)) return node("Dead? Truly? Here's your cut. You earned it.", [
-        { label: "Take the bounty.", go: () => { s.done = true; giveFunds(game, 40 + n.depth * 4); finishQuest(game, "rook"); return null; } },
+        { label: "Take the bounty.", go: () => { s.done = true; giveFunds(game, 40 + n.level * 4); finishQuest(game, "rook"); return null; } },
       ]);
       if (questActive(game, "rook")) return node(`The ${s.targetName} is still out there. Get on with it.`, [bye()]);
       return node(`Name's Rook. I hunt things for coin. There's a ${s.targetName} on this floor that's eaten two of my partners. Kill it and I'll split the bounty with you.`, [
-        { label: "Consider it done.", go: () => { addQuest(game, "rook", "Bounty", `Kill the ${s.targetName} somewhere on floor ${n.depth}, then tell Rook.`); return null; } },
-        { label: "What's in it for me?", go: () => node(`${formatPrice(40 + n.depth * 4)}. More than you'll find in a skeleton's pockets.`, [{ label: "Fine.", go: () => talkTo(game, n) }]) },
+        { label: "Consider it done.", go: () => { addQuest(game, "rook", "Bounty", `Kill the ${s.targetName} somewhere on floor ${n.level}, then tell Rook.`); return null; } },
+        { label: "What's in it for me?", go: () => node(`${formatPrice(40 + n.level * 4)}. More than you'll find in a skeleton's pockets.`, [{ label: "Fine.", go: () => talkTo(game, n) }]) },
       ]);
     }
 
@@ -459,7 +396,7 @@ export function talkTo(game, n) {
         } },
       ]);
       return node("Hey! You! Over here! They locked me in here and forgot about me. The lever's somewhere on this floor, in another room's wall. Please!", [
-        { label: "I'll find it.", go: () => { addQuest(game, "lio", "The prisoner", `Find the lever that opens Lio's cell on floor ${n.depth}.`); return null; } },
+        { label: "I'll find it.", go: () => { addQuest(game, "lio", "The prisoner", `Find the lever that opens Lio's cell on floor ${n.level}.`); return null; } },
       ]);
     }
 
@@ -489,10 +426,10 @@ export function talkTo(game, n) {
             return node("\"Wise. Pass.\"", [bye()]);
           }
           const f = game.zone;
-          const spots = s.spawns.filter(([x, y]) => f.stand[x + y * f.w] >= 0 && !f.monsters.some((m) => m.tx === x && m.ty === y));
+          const spots = s.spawns.filter(([x, y]) => f.stand[x + y * f.w] >= 0 && !f.creatures.some((m) => !canTalk(m) && m.tx === x && m.ty === y));
           for (let k = 0; k < 2 && spots.length; k++) {
             const [x, y] = spots.splice(Math.floor(Math.random() * spots.length), 1)[0];
-            f.monsters.push(spawnMonster(pickMonsterType(Math.random, game.zone.level), x, y, f.stand[x + y * f.w], "chase", game.zone.level));
+            addCreature(f, spawnCreature(pickCreatureType(Math.random, game.zone.level), x, y, f.stand[x + y * f.w], { rng: Math.random, state: "chase", level: game.zone.level }));
           }
           game.log("Hidden hatches clank open in the walls!", [255, 120, 100]);
           return node("\"No.\"", [bye()]);
@@ -505,10 +442,10 @@ export function talkTo(game, n) {
 }
 
 function corwinHealed(game, n) {
-  n.state.healed = true;
+  n.talk.state.healed = true;
   game.knownPotions.add("healing");
   let w = null;
-  for (let k = 0; k < 30 && (!w || w.kind !== "weapon"); k++) w = randomEquipment(Math.random, n.depth + 2, 1);
+  for (let k = 0; k < 30 && (!w || w.kind !== "weapon"); k++) w = randomEquipment(Math.random, n.level + 2, 1);
   w.ench = Math.max(1, w.ench); w.known = true;
   give(game, w);
   finishQuest(game, "corwin", "A wounded knight");
@@ -519,10 +456,10 @@ function corwinHealed(game, n) {
 export function bountyTarget(rng, depth) {
   let type = "goblin";
   for (let k = 0; k < 20; k++) {
-    type = pickMonsterType(rng, depth);
-    const t = MONSTER_TYPES[type];
+    type = pickCreatureType(rng, depth);
+    const t = CREATURE_TYPES[type];
     if (!t.flat && !t.hover && !t.splits) break;
   }
   const elite = rng.pick(Object.keys(ELITES));
-  return { type, elite, name: `${ELITES[elite].adj} ${MONSTER_TYPES[type].name}` };
+  return { type, elite, name: `${ELITES[elite].adj} ${CREATURE_TYPES[type].name}` };
 }

@@ -27,9 +27,8 @@
 // hint: logged the first time you step inside.
 import { B, FLOOR_Z, ROOM_TOP } from "../world.js";
 import { makeRng } from "../rng.js";
-import { spawnMonster } from "../monsters.js";
+import { spawnCreature, addCreature, canTalk } from "../creatures.js";
 import { makeItem, randomPotion, randomScroll, randomEquipment, randomTreasure } from "../items.js";
-import { spawnNpc } from "../npcs.js";
 import { layoutSpikes } from "../traps.js";
 
 export const VAULTS = [
@@ -429,15 +428,15 @@ registerLegend("ghostPlanks", (c) => column(c, (z) => (z === c.z0 - 1 ? B.GHOST 
 registerLegend("brazierPuzzle", (c) => { floorCol(c); at(c, 0, B.BRAZIER); });
 registerLegend("brazier", (c) => { floorCol(c); at(c, 0, B.BRAZIER); });
 for (const n of [1, 2, 3, 4]) registerLegend(`numeral${n}`, (c) => { wallCol(c); at(c, 2, B.RUNE_1 + n - 1); });
-registerLegend("speakingDoor", (c) => { floorCol(c); c.zone.npcs.push(spawnNpc("door", c.x, c.y, c.z0, c.zone.level)); });
+registerLegend("speakingDoor", (c) => { floorCol(c); addCreature(c.zone, spawnCreature("door", c.x, c.y, c.z0, { level: c.zone.level })); });
 registerLegend("boss", (c) => {
   floorCol(c);
   at(c, 0, c.vault.wall);
-  c.zone.monsters.push(spawnMonster(c.vault.boss || "lich", c.x, c.y, c.z0 + 1, "idle", c.zone.level, null, c.cosmetic));
+  addCreature(c.zone, spawnCreature(c.vault.boss || "lich", c.x, c.y, c.z0 + 1, { rng: c.cosmetic, state: "idle", level: c.zone.level }));
 });
 registerLegend("guardian", (c) => {
   floorCol(c);
-  c.zone.monsters.push(spawnMonster(c.vault.guardian, c.x, c.y, c.z0, "idle", c.zone.level, null, c.cosmetic));
+  addCreature(c.zone, spawnCreature(c.vault.guardian, c.x, c.y, c.z0, { rng: c.cosmetic, state: "idle", level: c.zone.level }));
 });
 registerLegend("stairs", (c) => { floorCol(c); at(c, -1, B.STAIRS); c.zone.stairs = { x: c.x, y: c.y }; });
 registerLegend("entrance", (c) => {
@@ -463,7 +462,7 @@ registerLegend("weapon", lying((c) => randomEquipment(c.rng, c.zone.level + 1, 0
 registerLegend("armour", lying((c) => randomEquipment(c.rng, c.zone.level + 1, 0.15), "armour"));
 registerLegend("treasure", lying((c) => randomTreasure(c.rng, c.zone.level)));
 for (const type of ["rat", "goblin", "skeleton", "flatling"])
-  registerLegend(type, (c) => { floorCol(c); c.zone.monsters.push(spawnMonster(type, c.x, c.y, c.z0, "wander", c.zone.level, null, c.cosmetic)); });
+  registerLegend(type, (c) => { floorCol(c); addCreature(c.zone, spawnCreature(type, c.x, c.y, c.z0, { rng: c.cosmetic, state: "wander", level: c.zone.level })); });
 
 export function stampVault(zone, vault, vx, vy, rng, opts = {}) {
   const o = { ...STAMP_DEFAULTS, ...opts };
@@ -497,8 +496,8 @@ export function stampVault(zone, vault, vx, vy, rng, opts = {}) {
   for (const [x, y, b] of vault.mosaics || []) zone.set(vx + x, vy + y, z0 - 1, b);
   if (vault.spikes && cells["^"]) layoutSpikes(zone, cells["^"], rng, vault.spikes);
   if (vault.door) {
-    const face = zone.npcs.find((n) => n.type === "door" && n.tx === cells.Q[0][0] && n.ty === cells.Q[0][1]);
-    face.state = { ...vault.door, gate: (cells.G || []).flatMap(([x, y]) => [[x, y, z0], [x, y, z0 + 1]]),
+    const face = zone.creatures.find((n) => canTalk(n) && n.type === "door" && n.tx === cells.Q[0][0] && n.ty === cells.Q[0][1]);
+    face.talk.state = { ...vault.door, gate: (cells.G || []).flatMap(([x, y]) => [[x, y, z0], [x, y, z0 + 1]]),
                    spawns: (cells["."] || []).filter(([, y]) => y >= vy + 10) };
   }
 

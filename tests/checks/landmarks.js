@@ -56,7 +56,7 @@ export function checkLandmarks({ seeds = [1, 7, 42, 1234, 31337], tiles = 500 } 
         expect(notWall === 0, `${at}: ${notWall} of the plan's wall cells are not walls on the map`);
       }
       if (L.id === "temple") {
-        expect(z.npcs.some((n) => n.type === "maren"), `${at}: no Maren`);
+        expect(z.creatures.some((n) => n.talk && n.type === "maren"), `${at}: no Maren`);
         expect(z.items.some((i) => i.kind === "cube") && z.blocks.includes(B.ALTAR), `${at}: no cube on the altar`);
         expect(z.spikes.size > 0 && z.cubeWall?.length > 0, `${at}: no spike hall or no cube wall`);
         expect(z.entrance && z.get(z.entrance.x, z.entrance.y, FLOOR_Z - 1) === B.STAIRS, `${at}: the entrance is not a STAIRS block`);

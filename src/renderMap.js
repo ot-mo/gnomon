@@ -8,7 +8,7 @@ import { BLOCKS, KIND, FLOOR_Z } from "./world.js";
 import { itemGlyph, itemName, withArticle } from "./items.js";
 import { planTravel } from "./turns.js";
 import { spikeState } from "./traps.js";
-import { NPC_TYPES } from "./npcs.js";
+import { talkersIn, typeOf } from "./creatures.js";
 import { slamState } from "./guardians.js";
 import { resistText } from "./monsters.js";
 
@@ -153,11 +153,10 @@ export function renderMap(game) {
   }
 
   // People: anyone on a tile you've seen (a ghost only once you've met it in the dark).
-  for (const n of zone.npcs) {
-    const t = NPC_TYPES[n.type];
-    if (!zone.seen[n.tx + n.ty * zone.w] || !onScreen(n.tx, n.ty) || (t.ghost && !n.met)) continue;
+  for (const n of talkersIn(zone)) {
+    if (!zone.seen[n.tx + n.ty * zone.w] || !onScreen(n.tx, n.ty) || (n.vis.ghostly && !n.talk.met)) continue;
     const [sx, sy] = toScreen(n.tx, n.ty);
-    S.put(sx, sy, t.glyph, ...t.color);
+    S.put(sx, sy, n.glyph, ...n.color);
   }
 
   // Monsters: bright if you can see them right now, fading if it's an old memory.
@@ -266,16 +265,16 @@ function describeTile(game, tile) {
                     [KIND.SHALLOW]: "Shallow water. Wading is slow.", [KIND.DEEP]: "Deep water. Go in and it sweeps you down a floor.",
                     [KIND.BRIDGE]: "A wooden bridge.", [KIND.MOSAIC]: "Mosaic tiles. From up here, the picture is clear.",
                     [KIND.SPIKES]: { up: "A spike trap: the spikes are UP.", warn: "A spike trap: the spikes come up next beat!", down: "A spike trap, down for now." }[spikeState(zone, i, game.time)] }[kind]);
-  for (const n of zone.npcs)
-    if (n.tx === tile.x && n.ty === tile.y && (!NPC_TYPES[n.type].ghost || n.met)) {
-      const t = NPC_TYPES[n.type];
-      parts.push(`${t.name}${t.title ? ", " + t.title : ""}, is here.${t.flat ? " (A flat being: in 3D you'd only see a shadow.)" : ""} Walk into them to talk.`);
+  for (const n of talkersIn(zone))
+    if (n.tx === tile.x && n.ty === tile.y && (!n.vis.ghostly || n.talk.met)) {
+      const title = typeOf(n).title;
+      parts.push(`${n.name}${title ? ", " + title : ""}, is here.${n.vis.flat ? " (A flat being: in 3D you'd only see a shadow.)" : ""} Walk into them to talk.`);
     }
   for (const item of zone.items)
     if (Math.floor(item.x) === tile.x && Math.floor(item.y) === tile.y) parts.push(`There is ${withArticle(itemName(game, item))} here.`);
   for (const [id, s] of zone.sightings)
     if (Math.floor(s.x) === tile.x && Math.floor(s.y) === tile.y) {
-      const m = zone.monsters.find((o) => o.id === id), what = m && resistText(m);
+      const m = zone.creatures.find((o) => o.id === id), what = m && resistText(m);
       parts.push(`You last saw a ${s.name} here ${Math.round(game.time - s.time)} s ago.${what ? ` (${capitalize(what)}.)` : ""}`);
     }
   if (zone.markers.some((m) => m.x === tile.x && m.y === tile.y)) parts.push("Your marker.");

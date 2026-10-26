@@ -1,7 +1,7 @@
 // Money (currency.js): TECH_DESIGN §2.10 and the 0B scope, with DECISIONS.md (glim, a counter, purses of
 // 200 / 500 / 1,000).
 //
-//   checkCurrency({ game, startRun, dialogue, npcs, srcFiles, capture }) → { name, ok, problems, stats }
+//   checkCurrency({ game, startRun, dialogue, npcs, creatures, srcFiles, capture }) → { name, ok, problems, stats }
 //
 //   1. The API on a bare entity: funds, pay (all or nothing), receive (what fits; the overflow comes back),
 //      the purse sizes (setPurse refuses a size content doesn't list), formatPrice from CURRENCY, whole
@@ -35,7 +35,7 @@ const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|
 const GOLD_OK = [/sfx\("gold"\)/, /case "gold":/, /sound: "gold"/, /FLOOR_ART\.gold/, /^\s*gold:\s*\{ w:/, /registerItemKind\("gold"/,
   /\["\$", \[255, 210, 70\], "gold"\]/, /"golden"/, /gold bands/];
 
-export function checkCurrency({ game, startRun, dialogue, npcs, srcFiles, capture }) {
+export function checkCurrency({ game, startRun, dialogue, npcs, creatures, srcFiles, capture }) {
   const problems = [], stats = {}, t0 = Date.now();
   const fail = (m) => problems.push(m);
   const { CURRENCY } = C;
@@ -85,6 +85,7 @@ export function checkCurrency({ game, startRun, dialogue, npcs, srcFiles, captur
   startRun(1234);
   game.pages = null; game.pendingPages = null; game.story.cube = true;
   const p = game.player;
+  const person = (type, state) => creatures.spawnCreature(type, 1, 1, p.z, { level: 5, talk: { state } });   // someone to talk to
   // The test world starts you with its own purse (it carries the parent game's prices); a world without one, the smallest.
   const wantPurse = game.world.startPurse || CURRENCY.startPurse;
   if (C.funds(p) !== 0 || C.purseCap(p) !== wantPurse || "gold" in p) fail(`a new player: funds ${C.funds(p)}, purse ${C.purseCap(p)}${"gold" in p ? ", a gold field" : ""}`);
@@ -111,14 +112,14 @@ export function checkCurrency({ game, startRun, dialogue, npcs, srcFiles, captur
     // on the next tile on the map.
     const before = C.funds(p);
     game.view = "3d"; game.mode = "explore"; game.paused = false;
-    game.zone.monsters.length = 0;
+    game.zone.creatures = game.zone.creatures.filter(creatures.canTalk);
     game.zone.items.push(I.makeItem({ kind: "cash", amount: 3 }, p.x, p.y, p.z));
     game.debug.step(1 / 60);
     const in3d = C.funds(p) - before;
     game.view = "map"; game.mode = "map";
     const zone = game.zone, tx = Math.floor(p.x), ty = Math.floor(p.y);
     const next = [[1, 0, "ArrowRight"], [-1, 0, "ArrowLeft"], [0, 1, "ArrowDown"], [0, -1, "ArrowUp"]]
-      .find(([dx, dy]) => zone.stand[tx + dx + (ty + dy) * zone.w] === zone.stand[tx + ty * zone.w] && !zone.npcs.some((n) => n.tx === tx + dx && n.ty === ty + dy));
+      .find(([dx, dy]) => zone.stand[tx + dx + (ty + dy) * zone.w] === zone.stand[tx + ty * zone.w] && !creatures.talkerAt(zone, tx + dx, ty + dy));
     let onMap = null;
     if (next) {
       zone.items.push(I.makeItem({ kind: "cash", amount: 4 }, tx + next[0] + 0.5, ty + next[1] + 0.5, zone.stand[tx + ty * zone.w]));
@@ -132,11 +133,11 @@ export function checkCurrency({ game, startRun, dialogue, npcs, srcFiles, captur
 
   // --- 4. The shop ---------------------------------------------------------------------------------
   {
-    const pell = npcs.spawnNpc("pell", 1, 1, p.z, 5, { stock: npcs.peddlerStock(makeRng(3), 5) });
-    pell.state.stock.push({ item: { kind: "heart" }, count: 1, price: Math.round(I.itemPrice({ kind: "heart" }) * C.priceLevel(5)) });
+    const pell = person("pell", { stock: npcs.peddlerStock(makeRng(3), 5) });
+    pell.talk.state.stock.push({ item: { kind: "heart" }, count: 1, price: Math.round(I.itemPrice({ kind: "heart" }) * C.priceLevel(5)) });
     const open = (tab) => { game.talk = { npc: pell, node: null, sel: 0 }; game.shop = { npc: pell, tab, sel: 0 }; game.mode = "shop"; };
     const press = (code) => dialogue.shopKey(game, code);
-    const stock0 = pell.state.stock[0], base = stock0.price, count0 = stock0.count;
+    const stock0 = pell.talk.state.stock[0], base = stock0.price, count0 = stock0.count;
     p.funds = 0; p.purse = 1000;
     open("buy"); press("Enter");
     if (C.funds(p) !== 0 || stock0.count !== count0) fail("buying with an empty purse changed something");
@@ -148,11 +149,11 @@ export function checkCurrency({ game, startRun, dialogue, npcs, srcFiles, captur
     // The Haggler: a fifth off (stats.js priceMul, the legacy haggle).
     p.perks.add("haggler");
     St.invalidateStats(p);
-    const heartRow = pell.state.stock.length - 1, heart = pell.state.stock[heartRow];
+    const heartRow = pell.talk.state.stock.length - 1, heart = pell.talk.state.stock[heartRow];
     const want = Math.round(Math.round(heart.price * 1.5 ** (game.crystalsBought || 0)) * RULES.legacy.haggle);
     const hp0 = St.maxHp(p), f0 = C.funds(p);
     open("buy");
-    const rows = pell.state.stock.filter((s) => s.count > 0);
+    const rows = pell.talk.state.stock.filter((s) => s.count > 0);
     for (let k = 0; k < rows.indexOf(heart); k++) press("ArrowDown");
     press("Enter");
     if (f0 - C.funds(p) !== want || St.maxHp(p) !== hp0 + 5 || p.inv.some((it) => it.kind === "heart")) fail(`a heart crystal with the Haggler: paid ${f0 - C.funds(p)} (want ${want}), max HP ${hp0} → ${St.maxHp(p)}`);
@@ -184,21 +185,21 @@ export function checkCurrency({ game, startRun, dialogue, npcs, srcFiles, captur
 
   // --- 5. People -----------------------------------------------------------------------------------
   {
-    const shrine = npcs.spawnNpc("shrine", 1, 1, p.z, 5, { cost: 70 });
-    shrine.met = true;
+    const shrine = person("shrine", { cost: 70 });
+    shrine.talk.met = true;
     p.funds = 100;
     const node = npcs.talkTo(game, shrine);
     const offer = node.options.find((o) => /^Offer /.test(o.label));
     if (!offer || !offer.label.includes(C.formatPrice(70))) fail(`the shrine's offer: ${node.options.map((o) => o.label).join(" | ")}`);
     else offer.go();
     if (C.funds(p) !== 30) fail(`a 70 glim offering left ${C.funds(p)} of 100`);
-    const poor = npcs.talkTo(game, npcs.spawnNpc("shrine", 1, 1, p.z, 5, { cost: 70 }));
+    const poor = npcs.talkTo(game, person("shrine", { cost: 70 }));
     if (poor.options.some((o) => /^Offer /.test(o.label))) fail("a shrine offered a deal you can't afford");
     // Rook's bounty with a nearly full purse: the rest lies at your feet as cash.
     C.setPurse(p, 200);
     p.funds = 190;
-    const rook = npcs.spawnNpc("rook", 1, 1, p.z, 5, { target: -1, targetName: "rat" });
-    rook.met = true;
+    const rook = person("rook", { target: -1, targetName: "rat" });
+    rook.talk.met = true;
     npcs.addQuest(game, "rook", "Bounty", "test");
     const items0 = game.zone.items.length;
     const take = npcs.talkTo(game, rook).options.find((o) => /bounty/.test(o.label));

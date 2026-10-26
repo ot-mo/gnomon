@@ -7,6 +7,9 @@
 // finger, the neck and the belt. The parent's `gold` field is the purse (currency.js funds), and its
 // `gold` piles are today's `cash` piles (the same pile in glim): the adapter shows generated and stamped
 // piles under the parent's kind name, so the dungeon and vault facts compare as recorded.
+// Since 0C monsters and people are one list, zone.creatures (creatures.js): the parent's monsters are the
+// creatures that don't talk, and its people the talkers, shown in the parent's shape (depth = level,
+// met and state from talk).
 //
 // env: from tools/node-env.mjs.
 export async function currentApi(env, seedRandom) {
@@ -26,6 +29,7 @@ export async function currentApi(env, seedRandom) {
   const stats = await env.load("stats.js");
   const body = await env.load("body.js");
   const currency = await env.load("currency.js");
+  const { canTalk } = await env.load("creatures.js");
   const game = G.game;
   const STACKS = ["potion", "scroll", "knife", "bomb"];
   const parentKinds = (zone) => { for (const it of zone.items) if (it.kind === "cash") it.kind = "gold"; return zone; };
@@ -44,9 +48,9 @@ export async function currentApi(env, seedRandom) {
     enterLevel(level, depth, how) { game.zones.set(level.key, level); zones.enterZone(game, level, { how, rng: Math.random }); },
     player: () => game.player,
     level: () => game.zone,
-    creatures: (f) => f.monsters,
-    npcs: (f) => f.npcs,
-    clearCreatures() { game.zone.monsters.length = 0; },
+    creatures: (f) => f.creatures.filter((c) => !canTalk(c)),
+    npcs: (f) => f.creatures.filter(canTalk).map((n) => ({ type: n.type, tx: n.tx, ty: n.ty, z: n.z, depth: n.level, met: n.talk.met, state: n.talk.state })),
+    clearCreatures() { const z = game.zone; z.creatures = z.creatures.filter(canTalk); },
 
     prepare() {
       game.pages = null; game.pendingPages = null; game.story.cube = true;
@@ -56,8 +60,8 @@ export async function currentApi(env, seedRandom) {
       game.time = 100; game.effects = []; game.cam = null; game.fov = 75;
       const p = game.player;
       p.hurt = 0; p.wade = 0; p.swing = 0;
-      for (const m of f.monsters) m.anim = 0;
-      f.npcs.forEach((n, k) => { n.id = 1000 + k; });
+      for (const m of f.creatures) if (!canTalk(m)) m.anim = 0;
+      f.creatures.filter(canTalk).forEach((n, k) => { n.id = 1000 + k; });   // a ghost's bob reads its id
     },
     placeCamera(x, y, z, yaw, pitch) { Object.assign(game.player, { x, y, z, yaw, pitch, vz: 0 }); },
     frame3d(torch) { game.player.torch = torch; game.mode = "explore"; game.view = "3d"; render3d(game); return env.frameHash(); },

@@ -69,8 +69,8 @@ export function checkDungeonParams() {
   const last = generateDungeonLevel(5, legacyParams(LEGACY_LEVELS, 5));
   last.stairs = { x: Math.floor(last.spawn.x), y: Math.floor(last.spawn.y) };
   test(validateDungeonLevel(last).includes("stairs down on the last floor"), "the zone's own final flag keeps the last-level rules");
-  const lich = last.monsters.findIndex((m) => m.type === "lich");
-  if (lich >= 0) last.monsters.splice(lich, 1);
+  const lich = last.creatures.findIndex((m) => m.type === "lich");
+  if (lich >= 0) last.creatures.splice(lich, 1);
   test(lich >= 0 && validateDungeonLevel(last).includes("boss missing or unreachable"), "the zone's own bottom keeps the boss rule");
   const noUp = generateDungeonLevel(42, { ...legacyParams(3, 42), hasUp: false });
   test(!noUp.upStairs && validateDungeonLevel(noUp).length === 0, `a level made without stairs up validates alone (${validateDungeonLevel(noUp).join(", ")})`);
@@ -100,7 +100,7 @@ export function checkDungeons({ seeds = 50, depths = LEGACY_LEVELS, p95Budget = 
       if (f.hasBelow === !!p.final) problems.push(`seed ${seed} level ${depth}: hasBelow should be ${!p.final}`);
       if (LEGACY_GUARDIANS[depth]) {
         guardianLevels++;
-        if (!f.guardianHall || !f.monsters.some((m) => m.guardian === f.guardianHall.type) || !f.stairs)
+        if (!f.guardianHall || !f.creatures.some((m) => m.guardian === f.guardianHall.type) || !f.stairs)
           problems.push(`seed ${seed} level ${depth}: guardian hall incomplete`);
       }
     }

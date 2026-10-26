@@ -440,17 +440,18 @@ function patchSpot(zone, p, arrival) {
     if (r >= lo && r <= hi) inRange.push(i);
   }
   // The same patch always picks the same spot: a hash of its id chooses among the candidates.
-  const salt = [...String(p.id)].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 7);
+  const salt = patchSalt(p);
   const pick = inRange.length ? inRange[Math.floor(hash(salt, inRange.length, 11) * inRange.length)]
     : all.sort((a, b) => a[1] - b[1])[0]?.[0];
   if (pick === undefined) return { x: ox, y: oy, z: Math.max(0, stand[ox + oy * w]) };
   return { x: pick % w, y: Math.floor(pick / w), z: stand[pick] };
 }
 
+const patchSalt = (p) => [...String(p.id)].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 7);
+
 PATCH_OPS.setFlag = (game, zone, p) => { zone.flags[p.flag] = p.value ?? true; };
 PATCH_OPS.removeUid = (game, zone, p) => {
-  zone.monsters = zone.monsters.filter((m) => m.uid !== p.uid);
-  zone.npcs = zone.npcs.filter((n) => n.uid !== p.uid);
+  zone.creatures = zone.creatures.filter((c) => c.uid !== p.uid);
   zone.items = zone.items.filter((it) => it.uid !== p.uid);
 };
 

@@ -95,7 +95,7 @@ async function gate(browser, seed) {
     H.route = (goal, avoidHoles = true) => {
       const zone = game.zone, { w, d } = zone, stand = W.standWith(zone, "all");
       const [sx, sy] = H.tile();
-      const blocked = new Set(zone.npcs.map((n) => n.tx + n.ty * w));
+      const blocked = new Set(zone.creatures.filter((n) => n.talk).map((n) => n.tx + n.ty * w));
       for (let i = 0; i < w * d; i++) {
         const g = zone.blocks[i + (W.FLOOR_Z - 1) * w * d];
         if ((g === W.B.STAIRS || g === W.B.STAIRS_UP) && i !== goal.x + goal.y * w) blocked.add(i);
@@ -127,7 +127,7 @@ async function gate(browser, seed) {
       for (let y = 0; y < z.d; y++) for (let x = 0; x < z.w; x++) if (!z.get(x, y, 0) && !z.get(x, y, W.FLOOR_Z - 1)) out.push([x, y]);
       return out;
     };
-    H.arrive = () => { game.zone.monsters.length = 0; const p = game.player; p.maxHpGain = p.hp = 999; p.keys = 99; };
+    H.arrive = () => { game.zone.creatures = game.zone.creatures.filter((c) => c.talk); const p = game.player; p.maxHpGain = p.hp = 999; p.keys = 99; };
     H.beside = (which) => {
       const zone = game.zone, p = game.player, s = zone[which], [x, y] = H.tile();
       if (!s) return `${zone.key} has no ${which}`;

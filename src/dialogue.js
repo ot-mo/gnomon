@@ -9,7 +9,8 @@
 //   story:   Space / Enter / click turns the page
 import * as S from "./screen.js";
 import { lockPointer, unlockPointer } from "./input.js";
-import { NPC_TYPES, talkTo, mapPercent } from "./npcs.js";
+import { talkTo, mapPercent } from "./npcs.js";
+import { typeOf, talkersIn } from "./creatures.js";
 import { itemName, itemGlyph, itemInfo, itemPrice, addToInventory, isGear, ITEM_KINDS, ELEMENTS, RINGS, AMULETS, POTIONS } from "./items.js";
 import { funds, pay, receive, purseRoom, formatPrice, priceLevel, buyPrice, sellPrice, CURRENCY } from "./currency.js";
 import { worn, regear } from "./player.js";
@@ -126,7 +127,7 @@ export function talkClick(game, cell) {
 export function talkHover(game, cell) { const k = optionUnder(cell); if (k >= 0 && game.talk) game.talk.sel = k; }
 
 export function drawTalk(game) {
-  const t = game.talk, type = NPC_TYPES[t.npc.type];
+  const t = game.talk, type = typeOf(t.npc);
   if (t.width !== TEXT_WIDTH()) layOut(t);
   const w = Math.min(S.cols - 4, 86), inner = w - 6;
   const text = t.lines;
@@ -167,7 +168,7 @@ const ELEMENT_WORDS = { fire: "flames", frost: "frost", shock: "lightning", holy
 const haggle = (game, price) => buyPrice(game, game.player, price);
 
 function services(game) {
-  const p = game.player, f = priceLevel(game.shop.npc.depth), rows = [];
+  const p = game.player, f = priceLevel(game.shop.npc.level), rows = [];
   const cost = (n) => haggle(game, Math.round(n * f));
   const jewelFixed = (it) => (it.kind === "ring" || it.kind === "amulet") && (it.kind === "ring" ? RINGS : AMULETS)[it.id].fixed;
   for (const it of worn(p)) {
@@ -201,7 +202,7 @@ function services(game) {
 
 function shopRows(game) {
   const sh = game.shop, p = game.player;
-  if (sh.tab === "buy") return sh.npc.state.stock.filter((s) => s.count > 0).map((s) => {
+  if (sh.tab === "buy") return sh.npc.talk.state.stock.filter((s) => s.count > 0).map((s) => {
     let price = s.price;
     if (s.item.kind === "heart" || s.item.kind === "strength") price = Math.round(price * 1.5 ** (game.crystalsBought || 0));
     return { it: s.item, price: haggle(game, price), count: s.count, stock: s };
@@ -299,7 +300,7 @@ export function drawJournal(game) {
   for (const q of active) {
     lines.push([q.title, [255, 220, 120]]);
     for (const l of wrap(q.text, inner - 2)) lines.push(["  " + l, [200, 200, 205]]);
-    if (q.id === "mira" && game.zone.npcs.some((n) => n.type === "mira")) lines.push([`  (This floor: ${mapPercent(game.zone)}% mapped so far.)`, [120, 220, 200]]);
+    if (q.id === "mira" && talkersIn(game.zone).some((n) => n.talk.dialogue === "mira")) lines.push([`  (This floor: ${mapPercent(game.zone)}% mapped so far.)`, [120, 220, 200]]);
     lines.push(["", null]);
   }
   if (done.length) lines.push(["Done:", [120, 200, 130]]);
