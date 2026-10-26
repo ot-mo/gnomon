@@ -180,6 +180,10 @@ the target screen: as above. (T on the map opens the target screen under the d20
    `docs/sessions/ws8.md` §3 for what they say about tiers 5-8.
 10. `check-legacyfights` doesn't cover a creature hitting a creature under the legacy set: not needed for WS8 (the
     legacy set's creature-on-creature branch has no parent counterpart to compare with, and WS8 didn't change it).
+11. **`stats.js` and `abilities.js` (the integrator, WS4):** P0 gives `innate` two meanings: `stats.js` reads a creature's
+    `innate` as its own bonus table (`{ dv: 20 }` in check-combat), `abilities.js` reads it as a list of ability ids
+    (the player's `["foldStep"]`, which `stats.js` then adds up as a bonus table with a key `"0"`). One of them should
+    take another name (`c.bonuses`, or `e.abilities`). ai.js asks for abilities only when `innate` is a list.
 
 ## Handoff
 

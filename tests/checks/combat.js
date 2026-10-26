@@ -1137,6 +1137,8 @@ export function checkAiDepth(ctx) {
       const spitter = addCreature(z, spawnCreature("goblin", 8, 5, FLOOR_Z, { rng: () => 0.5, level: 3, state: "chase" }));
       spitter.innate = ["ws8Spit"]; spitter.cd = Infinity;
       spitter.status.pinned = { t: Infinity, mag: 1, src: null, acc: 0 };
+      const tough = addCreature(z, spawnCreature("goblin", 10, 8, FLOOR_Z, { rng: () => 0.5, level: 3, state: "chase" }));
+      tough.innate = { dv: 2 };   // (stats.js: a creature's own bonuses; not abilities)
       const t0 = game.time;
       for (let k = 0; k < 7 * 20; k++) { game.time += 1 / 20; updateCreatures(game, 1 / 20, Infinity); }
       const times = used.map((u) => +(u.time - t0).toFixed(2));
