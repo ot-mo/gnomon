@@ -2,9 +2,9 @@
 //
 //   checkHud({ game, startRun, inputHandlers, hud, renderMap, events, status, zones, S, capture, resize }) → { name, ok, problems, stats }
 //
-//   1. Segments: every Phase 0 segment is registered (location, HP, statuses, funds, level/XP, STR, AV/DV,
-//      keys, torch, ready throwable, fps) with the priorities §4.5 gives. With all of them showing and
-//      every status on, at 100×30 the status line takes one row, each segment drawn is whole and inside the
+//   1. Segments: every Phase 0 segment is registered (location, HP, statuses, ability cooldowns (0D2),
+//      funds, level/XP, STR, AV/DV, keys, torch, ready throwable, fps) with the priorities §4.5 gives. With
+//      all of them showing and every status on, at 100×30 the status line takes one row, each segment drawn is whole and inside the
 //      screen, what's dropped has a lower priority than location, HP and the statuses (never dropped), and
 //      dropping is by priority (nothing dropped outranks something shown, unless it alone wouldn't fit). At
 //      100×40 it takes two rows and drops nothing, and the map starts under them. At 180×56 the parent's
@@ -36,7 +36,7 @@ export function checkHud({ game, startRun, inputHandlers, hud, renderMap, events
 
   // --- 1. Segments ------------------------------------------------------------------------------------
   {
-    const want = { location: 100, hp: 100, statuses: 90, funds: 60, level: 50, strength: 50, defence: 50, keys: 45, torch: 40, ready: 40, fps: 0 };
+    const want = { location: 100, hp: 100, statuses: 90, abilities: 70, funds: 60, level: 50, strength: 50, defence: 50, keys: 45, torch: 40, ready: 40, fps: 0 };
     const ids = hud.hudSegments();
     for (const [id, pr] of Object.entries(want)) {
       const seg = hud.segmentDef(id);

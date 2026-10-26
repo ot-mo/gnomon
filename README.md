@@ -99,6 +99,7 @@ Door rumbles. Any key or click while someone's talking shows the rest of the lin
 | R | swap the weapon in your hand for the one on your belt |
 | C | sink while flying (Space rises) |
 | F | torch on/off. Off: you see less and monsters spot you later, but you see what only shows in the dark (see *The torch*) |
+| 1 | Fold Step: step through a fold in the world, up to 4 tiles where you aim (then 12 s to recover; 1-9 are the hotbar) |
 | Wheel | zoom |
 | M · N | music on/off · sounds and voices on/off (work on every screen; remembered next time) |
 | **Tab** | rotate to the map (once you have the cube) |
@@ -119,6 +120,7 @@ Door rumbles. Any key or click while someone's talking shows the rest of the lin
 | X | explore: walk to the nearest unexplored place (or item you've seen), on and on until something interrupts |
 | Space / . / numpad 5 | wait half a second; near spike traps, wait until the next beat |
 | T | throw at the nearest monster you can see, up to 10 tiles away (always hits, takes 0.5 s); a bomb is set down at your feet instead |
+| 1 | Fold Step: up to 4 tiles toward the nearest monster you can see (stopping a tile short), or the way you face (takes 0.5 s; 12 s to recover) |
 | I · J · Q · R · F | inventory (using something takes a turn) · journal · quick-heal (takes a turn) · swap weapons · torch on/off |
 | Right-click | place or remove a marker (a glowing beacon in 3D) |
 | Hover | inspect a tile |
@@ -356,6 +358,10 @@ Your torch (F) lights the way, but it also drowns out faint things. With it **ou
 - monsters take longer to notice you (wraiths and the Lich King excepted).
 
 With it **on**, you can light **braziers** (E, or walk into one on the map).
+
+It burns **glim**: 1 for every 4 hours of the world's clock (an hour is a minute of play) that it's lit in the
+dark (underground, or outside at night), and nothing by day. With an empty purse it gutters to a flicker that
+lights only the tile around you, until you find more.
 
 ## Throwing
 

@@ -301,6 +301,9 @@ registerUpdate("prefetchNeighbours", (game) => { prefetchNeighbours(game); }, { 
 //   "fall"     fell through a pit or deep water at (fx, fy) above: the nearest spot to that, out of
 //              the places reachable from the zone's anchor (never sealed in a locked room)
 //   "teleport" like a fall, at (fx, fy) or, if not given, a random point drawn from opts.rng
+//              (opts.anchor: reachable from there instead of the zone's anchor; opts.ok(x, y): a tile the
+//              caller can't use, a creature's, is skipped; opts.strict: null when no reachable tile will do,
+//              instead of any floor at all)
 //   "edge"     walked off the neighbour's `side` at `along` (tryWalkOff): the mirrored tile, or your
 //              exact point (opts.exact) when it is that tile
 //   "travel" | "start" | "load"   the anchor (spawn), or opts.at
@@ -351,13 +354,14 @@ function landing(zone, fx, fy, opts = {}) {
     for (let i = 0; i < w * d; i++) {
       if ((reachableOnly && dist[i] < 0) || stand[i] < 0) continue;
       const x = i % w, y = (i - x) / w;
-      if (isStairs(zone, x, y)) continue;
+      if (isStairs(zone, x, y) || (opts.ok && !opts.ok(x, y))) continue;
       const dd = distance(x + 0.5 - fx, y + 0.5 - fy);
       if (dd < bestD) { bestD = dd; best = i; }
     }
     return best;
   };
   let best = nearest(true);
+  if (best < 0 && opts.strict) return null;
   if (best < 0) best = nearest(false);   // an anchor walled in (never in a valid level): any floor at all
   if (best < 0) return { ...zone.spawn };
   const x = best % w, y = (best - x) / w;

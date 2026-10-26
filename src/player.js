@@ -31,6 +31,9 @@ export function makePlayer() {
     inv: [{ kind: "potion", effect: "healing", count: 1 }, { kind: "knife", count: 4 }, { kind: "bomb", count: 1 }],
     ready: { kind: "knife" },   // what T / right-click throws (see throwing.js)
     status: {}, cooldowns: {},  // timed effects (flying, haste, poison…) and cooldowns: status.js
+    // Abilities (abilities.js): born with Fold Step (the P0 sample; WS4's character creation decides), and
+    // the hotbar, keys 1-9, holding ability ids only.
+    innate: ["foldStep"], hotbar: ["foldStep"],
     attackCd: 0, throwCd: 0, swing: 0, swingTime: 0.35, hurt: 0, sprinting: false, impact: 0,
   };
   p.body.equip.hand_r = { kind: "weapon", id: "shortsword", ench: 0, known: true };

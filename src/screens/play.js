@@ -14,6 +14,7 @@
 //   onCube(game)                           you touched the Rotation Cube: the world turns
 //   forceMapView(game)                     pressed flat (status.js): the map until it passes
 //   toggleMap(game), mapKey(game, code), mapClick(game, button, cell), quickHeal(game)
+//   HOTBAR_KEYS                            1-9: player.hotbar's abilities (abilities.js useHotbar), both views
 import { keys, isLocked, lockPointer } from "../input.js";
 import { registerScreen, setMode, pushMode } from "../screens.js";
 import { bind, globalKey, dispatchKey } from "../keys.js";
@@ -28,7 +29,8 @@ import { pickUpItems } from "../items.js";
 import { render3d } from "../render3d.js";
 import { renderMap, tileAtCell, mapView, hoverInspect } from "../renderMap.js";
 import { emit } from "../events.js";
-import { drawHud, layoutHud } from "../hud.js";
+import { drawHud, layoutHud, registerHudSegment } from "../hud.js";
+import { ABILITIES, useHotbar } from "../abilities.js";
 import { interact, lookTarget } from "../interact.js";
 import { refreshView, mapStep, mapWait, mapUseTime, startTravel, startExplore, travelStep } from "../turns.js";
 import { drinkPotion, tickEffects } from "../effects.js";
@@ -295,6 +297,10 @@ function toggleMarker(game, tile) {
   else zone.markers.push({ x: tile.x, y: tile.y });
 }
 
+// The hotbar (TECH_DESIGN §2.8, §4.3): keys 1-9 use player.hotbar's abilities in both views (the number
+// row only: the numpad's digits move you on the map).
+export const HOTBAR_KEYS = ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9"];
+
 // --- Map controls: one step per key press (holding a key repeats it) ---------------------------------
 export const MAP_MOVES = {
   KeyW: [0, -1], ArrowUp: [0, -1], Numpad8: [0, -1],
@@ -317,6 +323,7 @@ export function mapKey(game, code) {
   if (code === "KeyT" && throwAtNearest(game)) mapUseTime(game, THROW_TIME);
   if (code === "KeyF") { toggleTorch(game); refreshView(game); }
   if (code === "KeyR") { const t = swapWeapons(game); if (t) mapUseTime(game, t); }
+  if (HOTBAR_KEYS.includes(code)) useHotbar(game, HOTBAR_KEYS.indexOf(code));
 }
 
 export function mapClick(game, button, cell) {
@@ -391,6 +398,7 @@ bind("map", "KeyQ", (game) => { if (quickHeal(game)) mapUseTime(game, 0.5); }, {
 bind("map", "KeyT", (game) => { if (throwAtNearest(game)) mapUseTime(game, THROW_TIME); }, { help: "throw" });
 bind("map", "KeyF", (game) => { toggleTorch(game); refreshView(game); }, { help: "torch" });
 bind("map", "KeyR", (game) => { const t = swapWeapons(game); if (t) mapUseTime(game, t); }, { help: "swap weapons" });
+bind("map", HOTBAR_KEYS, (game, code) => { useHotbar(game, HOTBAR_KEYS.indexOf(code)); }, { help: "abilities (hotbar)" });
 
 bind("explore", "Enter", (game) => { playerMelee(game); }, { when: canAct, help: "attack" });   // for when a mouse button isn't handy
 bind("explore", "KeyE", (game) => { interact(game); }, { when: canAct, help: "use / talk" });
@@ -398,6 +406,15 @@ bind("explore", "KeyQ", (game) => { quickHeal(game); }, { when: canAct, help: "q
 bind("explore", "KeyT", (game) => { throwReady(game); }, { when: canAct, help: "throw" });
 bind("explore", "KeyF", (game) => toggleTorch(game), { when: canAct, help: "torch" });
 bind("explore", "KeyR", (game) => { swapWeapons(game); }, { when: canAct, help: "swap weapons" });
+bind("explore", HOTBAR_KEYS, (game, code) => { useHotbar(game, HOTBAR_KEYS.indexOf(code)); }, { when: canAct, help: "abilities (hotbar)" });
+
+// The status line's ability cooldowns (§4.5, priority 70): each hotbar slot whose ability is cooling down,
+// "1 Fold Step 9s", each dropped on its own. A ready ability shows nothing, so the parent's status line is
+// unchanged until you use one (WS4's abilities screen, B, lists them all).
+registerHudSegment("abilities", { priority: 70, split: true, parts: (game, p) => (p.hotbar || []).map((id, k) => {
+  const left = id ? cooldownLeft(p, id) : 0;
+  return left > 0 ? { text: `${k + 1} ${ABILITIES[id]?.name || id} ${Math.ceil(left)}s`, color: [190, 170, 255] } : null;
+}).filter(Boolean) });
 
 // Mouse look (input.js calls this with the pointer locked).
 export function look(game, dx, dy) {
