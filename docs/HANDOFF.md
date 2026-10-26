@@ -2,7 +2,7 @@
 
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
-**Updated:** 2026-10-26, cloud session, 0B implemented (not yet verified or tagged).
+**Updated:** 2026-10-26, cloud session, 0B implemented, verified and fixed (not yet tagged).
 
 ## State
 
@@ -13,17 +13,20 @@ Update this file as the last act of every session (see `CLAUDE.md`, "Handing off
   Later tags are listed here as they are made.
 - **Done:** 0A1 (`p0-0a1`), 0A2 (`p0-0a2`). Notes with APIs, gate numbers and deviations: `docs/sessions/0A1.md`,
   `docs/sessions/0A2.md`.
-- **0B implemented** on `wip/p0-0a2-vgrk8n` (rules, stats, status, time, body, items registry, currency; notes in
-  `docs/sessions/0B.md`, every gate item green with its numbers). Not yet independently verified, so not tagged.
+- **0B implemented and verified** on `wip/p0-0a2-vgrk8n` (rules, stats, status, time, body, items registry, currency;
+  notes in `docs/sessions/0B.md`, every gate item green with its numbers). Three independent verifiers' findings are
+  fixed (1 major: Escape got round flat's Tab lock; 10 minor; the legacy purse cap left open), one commit each: `docs/sessions/0B.md` §7. Not tagged
+  yet (tag pushes are refused in the cloud).
 - **Checks:** `node tools/run-all.mjs`, 13 checks, about 75 s, all green (`check-stats` holds the whole 0B gate).
   `tools/browser-gate.mjs` runs the 0A2 browser gate headless (audio silenced).
 
 ## Next step
 
-Verify session **0B** (TECH_DESIGN §8.2 "0B", DECISIONS overrides): rerun the gate (`node tools/run-all.mjs`, the
-`gate` line of `check-stats`, `NODE_PATH=$(npm root -g) node tools/browser-gate.mjs`), look for regressions in the old
-game (shop, shrines, rewards, pickups in both views), try to break the claims in `docs/sessions/0B.md`; fix (one
-commit per finding), recheck, tag `p0-0b`, fast-forward `main`. The cloud session continues on branch
+Recheck session **0B** after its verification fixes (`node tools/run-all.mjs`, `NODE_PATH=$(npm root -g) node
+tools/browser-gate.mjs`), tag `p0-0b` at the branch head, fast-forward `main`. **Before fast-forwarding, note that it
+changes main's old game:** the purse caps glim at 200, so deep services and crystals (forging 210 at depth 6, heart
+crystals from level 5, the bold shrine offering) can't be bought there until a purse flask or scaled legacy prices
+exist (0B.md deviation 7, known issue 1; a design call for C2/WS6b or the user). The cloud session continues on branch
 `wip/p0-0a2-vgrk8n` (the only branch it may push, besides fast-forwarding `main` at tags). Then 0C, 0D1, 0D2 and tag
 `p0-done`.
 
