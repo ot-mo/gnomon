@@ -9,7 +9,8 @@
 //   2. skipTime(600) equals stepping 1/60 s at a time (effects.js tickEffects, as play does), within
 //      ±1 HP and ±0.1 s for every status and cooldown: poison with regeneration, poison and regeneration
 //      fighting at full health, a cursed ring that drains, the attribute formulas' natural regeneration
-//      (which poison stops), and creatures burning and poisoned (one of them to death).
+//      (which poison stops), and creatures burning and poisoned (one of them to death). The legacy
+//      salamander bite is the parent's poison (HP lost: plain 3, Thick blood 1, venomous elite 4).
 //   3. skipTime stops for a hostile awake nearby (nothing passes), stops on until(), and a rest of an
 //      hour clears the second-wind and first-block cooldowns; 8 game hours take ≤ 20 ms. A troll
 //      regenerates over a skip (1 HP/s), but not while it burns.
@@ -33,7 +34,7 @@ import { enterZone } from "../../src/zones.js";
 import { keys } from "../../src/input.js";
 import { mapStep, mapWait, passTime } from "../../src/turns.js";
 import { tickEffects } from "../../src/effects.js";
-import { spawnMonster } from "../../src/monsters.js";
+import { spawnMonster, hitPlayer } from "../../src/monsters.js";
 import { skipTime } from "../../src/time.js";
 import { maxHp, invalidateStats } from "../../src/stats.js";
 import * as St from "../../src/status.js";
@@ -173,6 +174,26 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles, capture }
       cases[what] = a.gone ? { killed: true, hp: [a.hp, b.hp] } : { ...compare(what, a, b), hp: [a.hp, b.hp], killed: false };
     }
     game.zone.monsters.length = 0;
+  }
+  // The salamander's bite under the legacy set: the parent's poison (poisonTime = max(poisonTime, 3)), so
+  // Thick blood halves it and venom shares its stream. HP lost over 6 s after one 1-damage bite.
+  {
+    const bite = (perks, venom) => {
+      game.player = structuredClone({ ...base, status: {}, cooldowns: {}, perks: new Set(perks) });
+      game.player.body.equip.finger_r = null; invalidateStats(game.player);
+      const p = game.player;
+      p.hp = maxHp(p); game.mode = "map";
+      const m = spawnMonster("salamander", Math.floor(p.x) + 1, Math.floor(p.y), FLOOR_Z, "idle", 1, null, () => 0.5);
+      m.venom = venom;
+      const rnd = Math.random; Math.random = () => 0;   // no armour roll
+      try { hitPlayer(game, m, 1, `the ${m.name}`, `the ${m.name}'s bite`); } finally { Math.random = rnd; }
+      const hp0 = p.hp;
+      for (let k = 0; k < 360; k++) { game.time += STEP; tickEffects(game, STEP); }
+      return hp0 - p.hp;
+    };
+    const got = [bite([], 0), bite(["thickBlood"], 0), bite([], 4)];
+    stats.salamanderLegacy = { hpLost: got, parent: [3, 1, 4] };
+    if (got.join() !== "3,1,4") fail(`legacy salamander bite: HP lost ${got} over 6 s (the parent: plain 3, Thick blood 1, venomous 4)`);
   }
   stats.skipTime600 = Object.fromEntries(Object.entries(cases).map(([k, v]) => [k, v]));
 

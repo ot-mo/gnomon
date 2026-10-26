@@ -515,9 +515,12 @@ export function hitPlayer(game, m, dmg, source, blocked, ranged = false) {
     hurtMonster(game, m, thorns, `${thorns}`, [150, 200, 90]);
     if (m.hp <= 0) killMonster(game, m, `The ${m.name} dies on your thorns.`);
   }
-  if (m.burns) {   // a salamander's bite sets you smouldering: 1 damage a second, as the parent's bite did
-    if (!hasStatus(p, "burning")) game.log(`The ${m.name}'s bite burns!`, [255, 140, 60]);
-    addStatus(game, p, "burning", { t: m.burns, mag: 0.5, stack: "max" });
+  if (m.burns) {   // a salamander's bite sets you smouldering: 1 damage a second
+    // The legacy set keeps the parent's bite exactly: poison, the same stream as venom (Thick blood halves
+    // it, regeneration goes on, the cause is poison). Otherwise it's burning at half rate.
+    const legacy = RULES.stats === "legacy", id = legacy ? "poisoned" : "burning";
+    if (!hasStatus(p, id)) game.log(`The ${m.name}'s bite burns!`, [255, 140, 60]);
+    addStatus(game, p, id, legacy ? { t: m.burns, stack: "max" } : { t: m.burns, mag: 0.5, stack: "max" });
   }
   if (m.venom) {
     if (!hasStatus(p, "poisoned")) game.log(`The ${m.name}'s venom burns in your veins!`, [150, 210, 80]);
