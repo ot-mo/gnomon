@@ -35,3 +35,10 @@ export function checkBlocks(BLOCKS, fixtureIds) {
   return { name: "blocks", ok: problems.length === 0, problems,
            stats: { blocks: BLOCKS.length, frozen: fixtureIds.length, reserved: BLOCKS.filter((b) => b.reserved).length } };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-blocks.mjs gives.
+export async function run(env) {
+  const { BLOCKS } = await env.src("blocks.js");
+  return checkBlocks(BLOCKS, (await env.json("tests/fixtures/block-ids.json")).ids);
+}

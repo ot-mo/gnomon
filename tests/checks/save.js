@@ -34,8 +34,6 @@
 //   6. The title screen at 100×30, through the real input handlers: with nothing saved only "New quick game";
 //      with a slot "Continue" too; each by keys (Enter, ↓ Enter, 2) and by a click on its line; New starts a
 //      run at the intro, Continue loads the newest slot; M still switches the music there.
-import fs from "node:fs";
-import path from "node:path";
 import { canonicalJson, encodeZone, decodeZone, encodePlayer, jsonProblems, snapshotZone, trimCreature, CREATURE_FIELDS,
          CODEC, DEFLATE_AVAILABLE, registerZoneField, packBytes, fromB64 } from "../../src/save/codec.js";
 import { memoryAdapter, idbAdapter } from "../../src/save/store.js";
@@ -200,6 +198,8 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
     if (fromB64(packed)[0] !== 0x78) fail("deflated blocks aren't in the zlib format");
     // "deflate-raw" nowhere in src/.
     const hits = [];
+    // (Node's fs only here, so the module also loads in the browser: tests/checks/index.js, check-imports.)
+    const { default: fs } = await import("node:fs"), { default: path } = await import("node:path");
     const scan = (dir) => { for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const f = path.join(dir, e.name);
       if (e.isDirectory()) scan(f); else if (/\.(js|mjs|html)$/.test(e.name) && fs.readFileSync(f, "utf8").includes("deflate-raw")) hits.push(path.relative(root, f));

@@ -86,3 +86,14 @@ export function checkGolden(api, fixtures, { only = null } = {}) {
   stats.ms = Date.now() - t0;
   return { name: "golden", ok: problems.length === 0, problems, stats, notes };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-golden.mjs gives.
+export async function run(env) {
+  const fixtures = {};
+  for (const k of ["mechanics", "frames", "dungeons", "vaults", "temple"]) fixtures[k] = await env.json(`tests/fixtures/golden/${k}.json`);
+  const scr = await env.screen({ cols: 180, rows: 56 });
+  const { currentApi } = await import("../golden/current-api.js");
+  const api = await currentApi({ load: env.src, capture: scr.capture, frameHash: scr.frameHash }, env.seedRandom);
+  return checkGolden(api, fixtures, { only: env.args.only ? String(env.args.only).split(",") : null });
+}

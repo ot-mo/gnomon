@@ -114,3 +114,11 @@ export function checkDungeons({ seeds = 50, depths = LEGACY_LEVELS, p95Budget = 
              ms: { mean: r(times.reduce((a, b) => a + b, 0) / times.length), p50: r(pct(sorted, 0.5)), p95: r(p95), max: r(sorted[sorted.length - 1]) } },
   };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-dungeons.mjs gives.
+export async function run(env) {
+  await env.screen();
+  return [checkVaultOptions(), checkDungeonParams(),
+    checkDungeons({ seeds: Number(env.args.seeds) || 50, p95Budget: Number(env.args.budget) || 40 })];
+}

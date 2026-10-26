@@ -180,3 +180,11 @@ export function checkAi({ game, startRun, srcFiles }) {
   }
   return { name: "ai", ok: problems.length === 0, problems, stats };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-ai.mjs gives.
+export async function run(env) {
+  await env.screen();
+  const { game, startRun } = await env.src("game.js");
+  return checkAi({ game, startRun, srcFiles: await env.srcFiles() });
+}

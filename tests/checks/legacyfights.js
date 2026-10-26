@@ -92,3 +92,15 @@ export function checkLegacyFights(steps, fixture) {
   }
   return { name: "legacyfights", ok: problems.length === 0, problems, stats };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-legacyfights.mjs gives.
+export async function run(env) {
+  const fixture = await env.json("tests/fixtures/legacy-fights.json");
+  await env.screen();
+  const { game, startRun, inputHandlers } = await env.src("game.js");
+  const { keys } = await env.src("input.js");
+  const steps = {};
+  for (const view of ["map", "3d"]) { env.seedRandom(1); steps[view] = playLegacyFights({ game, startRun, inputHandlers, keys }, view); }
+  return checkLegacyFights(steps, fixture);
+}

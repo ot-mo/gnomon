@@ -448,3 +448,13 @@ export function checkShell({ game, startRun, inputHandlers, screens, keys, ui, i
 
   return { name: "shell (screens, keys, ui)", ok: problems.length === 0, problems, stats };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-shell.mjs gives.
+export async function run(env) {
+  const { S, input, capture } = await env.screen({ cols: 100, rows: 30 });
+  const { game, startRun, inputHandlers } = await env.src("game.js");
+  return checkShell({ game, startRun, inputHandlers, screens: await env.src("screens.js"), keys: await env.src("keys.js"),
+    ui: await env.src("ui.js"), input, S, capture, srcFiles: await env.srcFiles(), creatures: await env.src("creatures.js"),
+    encounters: await env.src("content/legacy/encounters.js"), makeRng: (await env.src("rng.js")).makeRng });
+}

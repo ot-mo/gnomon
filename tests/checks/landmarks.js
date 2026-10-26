@@ -127,3 +127,10 @@ export function checkLandmarks({ seeds = [1, 7, 42, 1234, 31337], tiles = 500 } 
   stats.ms = { p50: +pct(ms, 0.5).toFixed(1), p95: +pct(ms, 0.95).toFixed(1), max: +ms[ms.length - 1].toFixed(1) };
   return { name: "landmarks", ok: problems.length === 0, problems, stats, notes };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-landmarks.mjs gives.
+export async function run(env) {
+  await env.screen();
+  return checkLandmarks({ tiles: Number(env.args.tiles) || 500 });
+}

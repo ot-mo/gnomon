@@ -1,7 +1,8 @@
 // The world model and the run: world/worldmodel.js, world/run.js, world/sites.js and the two world
 // fixtures (content/world/test-world.js and the bible's real world, content/world/worldmap.js).
 //
-//   checkWorld({ seeds }) → { name, ok, problems, stats }
+//   checkWorld({ seeds, bibleText }) → { name, ok, problems, stats }    bibleText: docs/design/WORLD_BIBLE.md's text
+//                                                                     (given, so the module also loads in the browser)
 //
 // 1. Both fixtures validate, as definitions and as compiled models; broken definitions are refused.
 // 2. The real world's data equals the bible (§15.1 rows, letters, counts and tier grid; §15.3 landmarks;
@@ -21,7 +22,6 @@ import { TERRAINS } from "../../src/content/world/terrains.js";
 import { CURRENCY } from "../../src/content/currency.js";
 import { distance } from "../../src/rng.js";
 import { GEN_CALLS } from "../../src/world/genstats.js";
-import { readFileSync } from "node:fs";
 import { SURFACE } from "../../src/world.js";
 
 // Deep equality that understands Maps (by entries, in order) and plain data.
@@ -74,7 +74,7 @@ function checkFixtures(problems) {
 }
 
 // The real world against WORLD_BIBLE §15.
-function checkBible(problems) {
+function checkBible(problems, bibleText) {
   const R = WORLD_ROWS, T = TIER_ROWS;
   if (R.length !== 21 || !R.every((r) => r.length === 42)) problems.push("bible: the map is not 21 rows of 42");
   if (T.length !== 21 || !T.every((r) => r.length === 42)) problems.push("bible: the tier grid is not 21 rows of 42");
@@ -84,7 +84,7 @@ function checkBible(problems) {
   const counts = {}, M = compileWorld(REAL_WORLD);
   // The rows themselves, character for character against the text of WORLD_BIBLE §15.1, so a copy error
   // in worldmap.js can't hide behind a check that only compares the file with itself.
-  const bibleText = readFileSync(new URL("../../docs/design/WORLD_BIBLE.md", import.meta.url), "utf8");
+  if (typeof bibleText !== "string") { problems.push("bible: no text of WORLD_BIBLE.md given (checkWorld's bibleText)"); bibleText = ""; }
   for (const [name, rows] of [["WORLD_ROWS", R], ["TIER_ROWS", T]]) {
     const block = bibleText.split(`export const ${name} = [`)[1]?.split("];")[0];
     const want = block ? [...block.matchAll(/^\s*'(.*)',/gm)].map((m) => m[1]) : [];
@@ -323,12 +323,18 @@ function siteRules(name, seed, run) {
   return out;
 }
 
-export function checkWorld({ seeds = [1, 7, 42, 1234, 31337] } = {}) {
+export function checkWorld({ seeds = [1, 7, 42, 1234, 31337], bibleText } = {}) {
   const problems = [];
   const refused = checkFixtures(problems);
-  const bible = checkBible(problems);
+  const bible = checkBible(problems, bibleText);
   const compiled = checkCompiled(problems);
   const run = checkRun(problems, seeds);
   return { name: "world", ok: problems.length === 0, problems,
            stats: { brokenWorldsRefused: refused, ...bible, ...compiled, seeds: seeds.length, ...run } };
+}
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-world.mjs gives.
+export async function run(env) {
+  return checkWorld({ bibleText: await env.text("docs/design/WORLD_BIBLE.md") });
 }

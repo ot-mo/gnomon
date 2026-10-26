@@ -268,3 +268,11 @@ export function checkBody({ game, startRun, inventory, srcFiles }) {
   stats.ms = Date.now() - t0;
   return { name: "body", ok: problems.length === 0, problems, stats };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-body.mjs gives.
+export async function run(env) {
+  await env.screen();
+  const { game, startRun } = await env.src("game.js");
+  return checkBody({ game, startRun, inventory: await env.src("inventory.js"), srcFiles: await env.srcFiles() });
+}

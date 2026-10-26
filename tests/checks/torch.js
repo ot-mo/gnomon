@@ -154,3 +154,15 @@ export function checkTorch({ game, startRun, torch, clock, time, turns, player, 
   }
   return { name: "torch", ok: problems.length === 0, problems, stats };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-torch.mjs gives.
+export async function run(env) {
+  await env.screen();
+  const { game, startRun } = await env.src("game.js");
+  const m = (p) => env.src(p);
+  return checkTorch({ game, startRun, torch: await m("torch.js"), clock: await m("clock.js"), time: await m("time.js"), turns: await m("turns.js"),
+    player: await m("player.js"), light: await m("light.js"), hud: await m("hud.js"), currency: await m("currency.js"),
+    compileWorld: (await m("world/worldmodel.js")).compileWorld, REAL_WORLD: (await m("content/world/worldmap.js")).REAL_WORLD,
+    torchSrc: await env.text("src/torch.js") });
+}

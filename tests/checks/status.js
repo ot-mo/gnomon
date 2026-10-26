@@ -418,3 +418,11 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles, capture }
   }
   return { name: "status", ok: problems.length === 0, problems, stats };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-status.mjs gives.
+export async function run(env) {
+  const { capture } = await env.screen();
+  const { game, startRun, inputHandlers } = await env.src("game.js");
+  return checkStatus({ game, startRun, inputHandlers, srcFiles: await env.srcFiles(), capture });
+}

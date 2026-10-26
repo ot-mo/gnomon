@@ -243,3 +243,11 @@ function reachOf(zone) {
   arrivalPoint(zone, "edge", { side: "e", along: 0, fromStand: FLOOR_Z });
   return zone.reach.dist;
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-edges.mjs gives.
+export async function run(env) {
+  const a = env.args;
+  return checkEdges({ pairs: a.pairs !== undefined ? Number(a.pairs) : 200, seeds: a.seeds ? String(a.seeds).split(",").map(Number) : undefined,
+    real: a.real !== "false" });
+}

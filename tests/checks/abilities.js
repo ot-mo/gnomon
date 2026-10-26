@@ -306,3 +306,14 @@ export function checkAbilities({ game, startRun, inputHandlers, abilities: A, ke
 
   return { name: "abilities", ok: problems.length === 0, problems, stats };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-abilities.mjs gives.
+export async function run(env) {
+  const { S, capture, resize } = await env.screen({ cols: 180, rows: 56 });
+  const m = (p) => env.src(p);
+  const { game, startRun, inputHandlers } = await m("game.js");
+  return checkAbilities({ game, startRun, inputHandlers, abilities: await m("abilities.js"), keys: await m("keys.js"), hud: await m("hud.js"),
+    time: await m("time.js"), turns: await m("turns.js"), status: await m("status.js"), creatures: await m("creatures.js"),
+    zones: await m("zones.js"), world: await m("world.js"), pathing: await m("pathing.js"), S, capture, resize });
+}

@@ -189,3 +189,12 @@ export function checkClock({ game, startRun, attachState, clock, events, time, t
   for (const off of offs) off();
   return { name: "clock", ok: problems.length === 0, problems, stats };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-clock.mjs gives.
+export async function run(env) {
+  await env.screen();
+  const { game, startRun, attachState } = await env.src("game.js");
+  return checkClock({ game, startRun, attachState, clock: await env.src("clock.js"), events: await env.src("events.js"),
+    time: await env.src("time.js"), turns: await env.src("turns.js"), rules: await env.src("rules.js") });
+}

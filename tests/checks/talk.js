@@ -180,3 +180,13 @@ export function checkTalk({ game, startRun, creatures, talk, quests, items, body
   }
   return { name: "talk", ok: problems.length === 0, problems, stats };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-talk.mjs gives.
+export async function run(env) {
+  await env.screen();
+  const { game, startRun } = await env.src("game.js");
+  const m = (p) => env.src(p);
+  return checkTalk({ game, startRun, creatures: await m("creatures.js"), talk: await m("talk.js"), quests: await m("story/quests.js"),
+    items: await m("items.js"), body: await m("body.js"), events: await m("events.js"), currency: await m("currency.js") });
+}

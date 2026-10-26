@@ -158,3 +158,19 @@ export function checkDeterminism({ seeds = [3, 77, 2024], depths = LEGACY_LEVELS
   return { name: "determinism", ok: problems.length === 0, problems, notes,
            stats: { levelsTwice: levels, filesScanned: scanned, bodies, withUid, ...world } };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-determinism.mjs gives.
+export const SCAN = ["gen/", "world/", "story/", "content/world/", "content/currency.js"];
+export const HELPERS = ["items.js", "talk.js", "story/quests.js", "content/legacy/encounters.js", "traps.js", "monsters.js", "creatures.js",
+  "ids.js", "content/creatures/legacy.js", "rng.js"];
+export async function run(env) {
+  const files = await env.srcFiles();
+  const sources = {}, helpers = {};
+  for (const { file, text } of files) {
+    if (SCAN.some((s) => (s.endsWith("/") ? file.startsWith(s) : file === s))) sources[file] = text;
+    if (HELPERS.includes(file)) helpers[file] = text;
+  }
+  await env.screen();
+  return checkDeterminism({ sources, helpers });
+}

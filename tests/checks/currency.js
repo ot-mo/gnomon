@@ -255,3 +255,13 @@ export function checkCurrency({ game, startRun, dialogue, npcs, creatures, srcFi
   stats.ms = Date.now() - t0;
   return { name: "currency", ok: problems.length === 0, problems, stats };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-currency.mjs gives.
+export async function run(env) {
+  const { capture } = await env.screen();
+  const { game, startRun } = await env.src("game.js");
+  const npcs = { ...await env.src("content/legacy/encounters.js"), ...await env.src("talk.js"), ...await env.src("story/quests.js") };
+  return checkCurrency({ game, startRun, dialogue: await env.src("dialogue.js"), npcs, creatures: await env.src("creatures.js"),
+    srcFiles: await env.srcFiles(), capture });
+}

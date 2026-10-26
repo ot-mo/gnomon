@@ -79,3 +79,13 @@ export function checkScreenFrames(frames, fixture) {
   return { name: `screen frames (the HUD and screens against ${fixture.against})`, ok: problems.length === 0, problems,
            stats: { frames: `${frames.length} at 180×56, ${mismatched} mismatched` } };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-screen-frames.mjs gives.
+export async function run(env) {
+  const fixture = await env.json("tests/fixtures/screen-frames.json");
+  const { frameHash } = await env.screen({ cols: 180, rows: 56 });
+  const { game, startRun, inputHandlers } = await env.src("game.js");
+  const { addStatus } = await env.src("status.js");
+  return checkScreenFrames(screenFrames({ game, startRun, inputHandlers, addStatus, frameHash, seedRandom: env.seedRandom }), fixture);
+}

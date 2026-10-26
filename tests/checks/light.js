@@ -231,3 +231,14 @@ export function checkLight({ game, startRun, render3d, frameHash, dungeonLevel }
   }
   return { name: "light", ok: problems.length === 0, problems, stats };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-light.mjs gives.
+export async function run(env) {
+  const { frameHash } = await env.screen();
+  const { game, startRun } = await env.src("game.js");
+  const { render3d } = await env.src("render3d.js");
+  const { generateDungeonLevel, legacyParams } = await env.src("gen/dungeon.js");
+  const dungeonLevel = () => generateDungeonLevel(4242, legacyParams(3, 4242)).seal();
+  return checkLight({ game, startRun, render3d, frameHash, dungeonLevel });
+}

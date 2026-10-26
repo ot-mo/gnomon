@@ -79,3 +79,11 @@ export function checkConfig({ config, audio, srcFiles, indexHtml }) {
 
   return { name: "config", ok: problems.length === 0, problems, stats };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-config.mjs gives.
+export async function run(env) {
+  await env.screen();
+  return checkConfig({ config: await env.src("config.js"), audio: await env.src("audio.js"), srcFiles: await env.srcFiles(),
+    indexHtml: await env.text("index.html") });
+}

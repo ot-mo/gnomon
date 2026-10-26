@@ -279,3 +279,12 @@ export function checkHud({ game, startRun, inputHandlers, hud, renderMap, events
 
   return { name: "hud (segments, toasts, map overlays, inspect)", ok: problems.length === 0, problems, stats };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-hud.mjs gives.
+export async function run(env) {
+  const { S, capture, resize } = await env.screen({ cols: 100, rows: 30 });
+  const { game, startRun, inputHandlers } = await env.src("game.js");
+  return checkHud({ game, startRun, inputHandlers, hud: await env.src("hud.js"), renderMap: await env.src("renderMap.js"),
+    events: await env.src("events.js"), status: await env.src("status.js"), zones: await env.src("zones.js"), S, capture, resize });
+}

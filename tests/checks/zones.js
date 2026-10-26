@@ -335,3 +335,11 @@ export function checkZones({ game, startRun }) {
          game.zone.siteId === "legacy" && changeZone(game, "5,16,20", { how: "down" }) === true, "the real world's Keeper's Stair leads down the legacy levels");
   return { name: "zones", ok: problems.length === 0, problems, stats };
 }
+
+// tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
+// inputs tools/check-zones.mjs gives.
+export async function run(env) {
+  await env.screen();
+  const { game, startRun } = await env.src("game.js");
+  return checkZones({ game, startRun });
+}
