@@ -1,6 +1,6 @@
 // Statuses (status.js) and bulk time (time.js): TECH_DESIGN §2.7 and the 0B gate.
 //
-//   checkStatus({ game, startRun, inputHandlers, srcFiles }) → { name, ok, problems, stats }
+//   checkStatus({ game, startRun, inputHandlers, srcFiles, capture }) → { name, ok, problems, stats }
 //
 //   1. Migration: no timer field of the parent game is left in src/ (the player's flyTime, hasteTime,
 //      shadowTime, poisonTime, paralyzed, darkTime, guardTime; the creatures' burn, chill, stun, blind,
@@ -18,7 +18,11 @@
 //   5. Flat: the map view is forced, Tab is locked until it ends, the HUD shows it. Escape (the map's
 //      other way of turning) is locked too, and no fold power fires (Folding strike, a rat next to you).
 //
+//   6. The HUD row (hud.js drawHud, read back from the screen) shows every active status's text in its
+//      colour, in both views, and drops it once the status is removed.
+//
 // game/startRun/inputHandlers: the real game (game.js). srcFiles: [{ file, text }] of every src/ module.
+// capture: node-env's presented frame.
 import { RULES, overrideRules } from "../../src/rules.js";
 import { Zone, B, FLOOR_Z } from "../../src/world.js";
 import { enterZone } from "../../src/zones.js";
@@ -29,6 +33,7 @@ import { spawnMonster } from "../../src/monsters.js";
 import { skipTime } from "../../src/time.js";
 import { maxHp, invalidateStats } from "../../src/stats.js";
 import * as St from "../../src/status.js";
+import { hudRow } from "../lib/hud.js";
 
 const OLD_FIELDS = /\b(flyTime|hasteTime|shadowTime|poisonTime|darkTime|guardTime|poisonTick|burnTick|foldReady|firstBlocked)\b|\.paralyzed\b|\b(m|o|t|c|e|monster)\.(burn|chill|stun|blind|poison|haste)\b|zone\.secondWind/g;
 const STEP = 1 / 60;
@@ -48,7 +53,7 @@ function pondZone() {
   return z.seal();
 }
 
-export function checkStatus({ game, startRun, inputHandlers, srcFiles }) {
+export function checkStatus({ game, startRun, inputHandlers, srcFiles, capture }) {
   const problems = [], stats = {};
   const fail = (m) => problems.push(m);
 
@@ -310,5 +315,28 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles }) {
   if (!hud.some((t) => t.startsWith("FLAT"))) fail(`flat: the HUD shows ${JSON.stringify(hud)}`);
   if (!ended || !unlocked) fail(`flat: after it ends (${ended}) Tab should work again (${unlocked})`);
   game.mode = "map"; game.view = "map";
+
+  // --- 6. The HUD row ---------------------------------------------------------------------------
+  if (!capture) fail("no frame capture passed: the HUD can't be checked");
+  else {
+    freshPlayer(); enter();
+    const p = game.player, ids = ["hasted", "poisoned", "flying", "darkened"];
+    for (const id of ids) St.addStatus(game, p, id, { t: 30 });
+    const shown = {};
+    for (const view of ["map", "3d"]) {
+      game.mode = view === "map" ? "map" : "explore"; game.view = view;
+      const line = St.statusLine(game, p), row = hudRow(game, capture);
+      shown[view] = row.text.trim().replace(/\s+/g, " ").slice(0, 200);
+      if (line.length < ids.length) fail(`${view}: statusLine has ${line.length} entries for ${ids.length} statuses`);
+      for (const { text, color } of line)
+        if (!row.find(text).some((f) => f.color?.join() === color.map(Math.round).join())) fail(`${view} HUD: "${text}" not shown in ${color}`);
+      const gone = St.statusLine(game, { status: { hasted: p.status.hasted } })[0]?.text;
+      St.removeStatus(game, p, "hasted");
+      if (!gone || hudRow(game, capture).find(gone).length) fail(`${view} HUD: "${gone}" still shown after haste was removed`);
+      St.addStatus(game, p, "hasted", { t: 30 });
+    }
+    stats.hud = shown;
+    game.mode = "map"; game.view = "map";
+  }
   return { name: "status", ok: problems.length === 0, problems, stats };
 }

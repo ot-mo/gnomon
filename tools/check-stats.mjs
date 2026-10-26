@@ -37,7 +37,7 @@ const golden = await mechanics();
 // The rest of the gate. (The frames first: importing the bot installs its own capture buffer.)
 const framesFixture = { frames: JSON.parse(fs.readFileSync(path.join(ROOT, "tests", "fixtures", "golden", "frames.json"), "utf8")) };
 const frames = checkGolden(await currentApi(env, seedRandom), framesFixture, { only: ["frames"] }).stats.frames;
-const { runGoldenA } = await import("./bot.mjs");
+const { runGoldenA, capture } = await import("./bot.mjs");
 const goldenA = {};
 for (const view of ["map", "3d"]) {
   const r = await runGoldenA({ view });
@@ -46,6 +46,6 @@ for (const view of ["map", "3d"]) {
 const { checkStatus } = await import("../tests/checks/status.js");
 const srcFiles = fs.readdirSync(SRC, { recursive: true }).filter((f) => f.endsWith(".js"))
   .map((f) => ({ file: f.split(path.sep).join("/"), text: fs.readFileSync(path.join(SRC, f), "utf8") }));
-const status = checkStatus({ game, startRun, inputHandlers: (await env.load("game.js")).inputHandlers, srcFiles });
+const status = checkStatus({ game, startRun, inputHandlers: (await env.load("game.js")).inputHandlers, srcFiles, capture });
 const gate = { goldenA, status: { ...status.stats, problems: status.problems }, frames };
 process.exit(report(checkStats({ game, startRun, inventory, mechanics: () => golden, gate })));

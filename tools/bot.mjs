@@ -39,6 +39,7 @@ import { currentApi } from "../tests/golden/current-api.js";
 import { checkGolden } from "../tests/checks/golden.js";
 
 const env = await installNodeEnv();
+export const capture = env.capture;   // the frame the screen now presents into (importing the bot replaces the caller's)
 const { game, startRun, inputHandlers } = await import("../src/game.js");
 const { MONSTER_TYPES } = await import("../src/monsters.js");
 const { keys } = await import("../src/input.js");
