@@ -24,7 +24,7 @@ import { sampleGrid, inDark, zoneIsLightless, daylight, syncLight, sunState, sun
 import { sunDir, skyColors, fogFor, spanOf, daylightAt, minutes, clockLabel, phase, gnomonOf, handAngle, inNoonWindow } from "./clock.js";
 import { material, albedo, setMaterialTime, setDarkSight, DARK_SIGHT_BLOCKS } from "./materials.js";
 import { noise2, hash } from "./rng.js";
-import { creatureSprite, hostilesTo, talkersIn, isFlat } from "./creatures.js";
+import { creatureSprite, canTalk, talkersIn, isFlat } from "./creatures.js";
 import { guardianSprites } from "./guardians.js";
 import { spikeSprites } from "./traps.js";
 import { itemSprite } from "./items.js";
@@ -466,13 +466,16 @@ let darkPerHit = false;
 
 // Flat beings near you this frame: where they stand (x, y, z), their shadows drawn onto the floor in shadeHit.
 let shadowAt = new Float64Array(24), shadowCount = 0;
+// Every creature but the people, in the zone's order: attitude decides who fights, not who is seen (a follower, a wary
+// or neutral beast are there too). Under the parent's attitudes these are exactly the ones hostile to you.
+const beastsIn = (zone, player) => zone.creatures.filter((c) => c !== player && !canTalk(c));
 let torchOn = false;   // your torch is lit (this frame)
 
 export function render3d(game) {
   const { zone, player } = game;
   setCamera(player, game.fov, game.cam);
   shadowCount = 0;
-  for (const c of [...hostilesTo(game, player), ...talkersIn(zone)])
+  for (const c of [...beastsIn(zone, player), ...talkersIn(zone)])
     if (isFlat(c) && Math.hypot(c.x - player.x, c.y - player.y) < 20) {
       if (shadowAt.length < (shadowCount + 1) * 3) { const more = new Float64Array(shadowAt.length * 2); more.set(shadowAt); shadowAt = more; }
       shadowAt[shadowCount * 3] = c.x; shadowAt[shadowCount * 3 + 1] = c.y; shadowAt[shadowCount * 3 + 2] = c.z; shadowCount++;
@@ -589,7 +592,7 @@ function drawSprites(game) {
   }
   // (Flat beings only cast a shadow; a ghostly guardian is only there with your torch out.)
   // Monsters, then the guardians' extras, then people (the order the parent game drew them in).
-  for (const m of hostilesTo(game, game.player)) { const sp = creatureSprite(game, m); if (sp) drawSprite(game, sp); }
+  for (const m of beastsIn(zone, game.player)) { const sp = creatureSprite(game, m); if (sp) drawSprite(game, sp); }
   for (const sp of guardianSprites(game)) drawSprite(game, sp);
   for (const n of talkersIn(zone)) { const sp = creatureSprite(game, n); if (sp) drawSprite(game, sp); }
   for (const sp of spikeSprites(game)) drawSprite(game, sp);

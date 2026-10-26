@@ -41,11 +41,13 @@
 //      away, none; behind a wall, none; at 23:00 nothing from the flats, a violet light from the Shade and from a Rust
 //      Steps mesa's top (not its foot), none from the Shade at noon; in its own span drawn from under its tip (cut
 //      where it passes behind you) and standing on the ground; none in the test world or underground.
+//  13. Every creature is drawn whatever its attitude: a beast 3 tiles ahead at noon draws as your follower too, and a
+//      flat one that follows you still casts its shadow (3D drew only the creatures hostile to you).
 import { checkGolden } from "./golden.js";
 
 export async function checkRender(m) {
   const { game, startRun, S, capture, frameHash, clock, light, raycast, render3d, renderMap, zones, turns, world, rules, music,
-    moods, liquids, worldmap } = m;
+    moods, liquids, worldmap, creatures } = m;
   const { Zone, B, FLOOR_Z } = world;
   const problems = [], stats = {};
   const expect = (ok, msg) => { if (!ok) problems.push(msg); return ok; };
@@ -697,6 +699,35 @@ export async function checkRender(m) {
     stats.memory = { freed: Object.keys(refs).length - kept.length, kept };
   } else stats.memory = "not checked here (no --expose-gc; tools/check-perf.mjs runs this check with it)";
 
+  // --- 13. Every creature is drawn, whatever its attitude -----------------------------------------------------------
+  {
+    fresh(4242);
+    game.time = T(12);
+    const zc = game.zone;
+    // A straight run of four tiles at one height: you on the first, the beast on the last, facing it (east).
+    let spot = null;
+    for (let y = 2; y < zc.d - 2 && !spot; y++) for (let x = 2; x < zc.w - 6 && !spot; x++) {
+      const z = zc.stand[x + y * zc.w];
+      if (z >= 0 && [1, 2, 3].every((k) => zc.stand[x + k + y * zc.w] === z)) spot = { x, y, z };
+    }
+    let seen = null;
+    if (expect(spot, "a straight run of four tiles on the start span")) {
+      const mon = creatures.spawnCreature("goblin", spot.x + 3, spot.y, spot.z, { rng: () => 0.5 }), was = { brain: mon.brain, vis: mon.vis };
+      stand(spot.x + 0.5, spot.y + 0.5, 0, -0.15); Object.assign(p(), { z: spot.z, torch: false });
+      const others = zc.creatures.filter((c) => c !== mon);
+      const shot = (who) => { zc.creatures.splice(0, zc.creatures.length, ...who); return frame3d(); };
+      const hostile = shot([...others, mon]), gone = shot(others);
+      mon.brain = { ...(was.brain || {}), leader: "player" };
+      const follower = shot([...others, mon]);
+      mon.vis = { ...was.vis, flat: true };
+      const flatFollower = shot([...others, mon]), flatGone = shot(others);
+      Object.assign(mon, was); zc.creatures.splice(0, zc.creatures.length, ...others);
+      seen = { inView: hostile !== gone, follower: follower !== gone, flatFollowerShadow: flatFollower !== flatGone };
+      expect(seen.inView && seen.follower && seen.flatFollowerShadow, `a beast drawn whatever its attitude: ${JSON.stringify(seen)}`);
+    }
+    stats.creatures = seen;
+  }
+
   // --- 9. Golden (b) --------------------------------------------------------------------------------------------
   if (m.golden) {
     const g = checkGolden(m.golden.api, m.golden.fixtures, { only: ["frames"] });
@@ -711,14 +742,14 @@ export async function checkRender(m) {
 export async function run(env) {
   const scr = await env.screen({ cols: 180, rows: 56 });
   const load = (p) => env.src(p);
-  const [g, clock, light, raycast, render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, sfx] = await Promise.all(
+  const [g, clock, light, raycast, render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, sfx, creatures] = await Promise.all(
     ["game.js", "clock.js", "light.js", "raycast.js", "render3d.js", "renderMap.js", "zones.js", "turns.js", "world.js", "rules.js", "music.js",
-     "content/moods.js", "content/liquids.js", "content/world/worldmap.js", "sfx.js"].map(load));
+     "content/moods.js", "content/liquids.js", "content/world/worldmap.js", "sfx.js", "creatures.js"].map(load));
   const fixtures = { frames: await env.json("tests/fixtures/golden/frames.json") };
   const { currentApi } = await import("../golden/current-api.js");
   const S = await load("screen.js");
   const result = await checkRender({ game: g.game, startRun: g.startRun, S, capture: scr.capture, frameHash: scr.frameHash, clock, light, raycast,
-    render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, golden: null, seedRandom: env.seedRandom, resize: scr.resize, sfx });
+    render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, creatures, golden: null, seedRandom: env.seedRandom, resize: scr.resize, sfx });
   // Golden (b) last: its api reseeds Math.random and replaces the run.
   const api = await currentApi({ load, capture: scr.capture, frameHash: scr.frameHash }, env.seedRandom);
   const gold = checkGolden(api, fixtures, { only: ["frames"] });
