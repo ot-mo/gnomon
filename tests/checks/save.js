@@ -1,11 +1,12 @@
 // Saves (0D2; TECH_DESIGN §7, §1.4 "save"; P0 skeleton → WS9): the codec, the store, snapshot-first saves,
 // write-behind, loading, and the 0D2 gate.
 //
-//   checkSave({ game, startRun, runSession, fresh, root }) → Promise<{ name, ok, problems, stats, notes }>
+//   checkSave({ game, startRun, inputHandlers, runSession, fresh, screen, root }) → Promise<{ name, ok, problems, stats, notes }>
 //   digestGame(game, keys) → Promise<{ state, player, run, ids, zones: { key: json } }>   canonical JSON (sorted keys)
 //
-// game/startRun: the real game; runSession: tools/bot.mjs's 10-zone session; fresh(dump, slotId, keys) → the
-// digest a fresh Node process makes after loading that slot from that store dump (tools/check-save.mjs).
+// game/startRun/inputHandlers: the real game; runSession: tools/bot.mjs's 10-zone session; fresh(dump, slotId,
+// keys) → the digest a fresh Node process makes after loading that slot from that store dump; screen(cols, rows)
+// → a Node screen of that size, { frameText } (tools/check-save.mjs).
 //
 //   1. The gate: after the bot's 10-zone session (both views, a dungeon level down and back, span edges), save →
 //      load → the canonical JSON of game.state, the player, the Run data, the ids and every visited zone's
@@ -30,6 +31,9 @@
 //      says "load", never a first visit; a stored neighbour and a stored level are read back over an edge and
 //      down stairs, never generated; refused: another game's slot, another save version, another map version,
 //      a slot without the zone you were in; listSlots newest first; deleteSlot takes the zones too.
+//   6. The title screen at 100×30, through the real input handlers: with nothing saved only "New quick game";
+//      with a slot "Continue" too; each by keys (Enter, ↓ Enter, 2) and by a click on its line; New starts a
+//      run at the intro, Continue loads the newest slot; M still switches the music there.
 import fs from "node:fs";
 import path from "node:path";
 import { canonicalJson, encodeZone, decodeZone, encodePlayer, jsonProblems, snapshotZone, trimCreature, CREATURE_FIELDS,
@@ -41,6 +45,8 @@ import { entityCounter, getIds } from "../../src/ids.js";
 import { serializeRun, RUN_STATS } from "../../src/world/run.js";
 import { pushMode, popMode, screenFor } from "../../src/screens.js";
 import { on } from "../../src/events.js";
+import { useStore, currentStore } from "../../src/save/store.js";
+import { openTitle } from "../../src/screens/title.js";
 import { B, FLOOR_Z } from "../../src/world.js";
 
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
@@ -57,7 +63,7 @@ export async function digestGame(game, keys) {
 const visitedKeys = (game) => [...game.zones.keys()].filter((k) => k === game.zone.key || game.state.zoneLeft[k] !== undefined).sort();
 const playing = (game, view = game.view) => { game.view = view; game.mode = view === "map" ? "map" : "explore"; game.paused = false; game.modeStack = []; };
 
-export async function checkSave({ game, startRun, runSession, fresh, root }) {
+export async function checkSave({ game, startRun, inputHandlers, runSession, fresh, screen, root }) {
   const problems = [], stats = {}, notes = [];
   const fail = (m) => problems.push(m);
   const compare = (what, a, b) => {
@@ -362,6 +368,50 @@ export async function checkSave({ game, startRun, runSession, fresh, root }) {
     if (!(await deleteSlot(meta.id, { store: s })) || (await s.list("zones", { slot: meta.id })).length || (await listSlots({ store: s })).length !== 1)
       fail("deleteSlot left the slot or its zones");
     stats.load = `stack ${wantStack.join("+")}; zone:enter how=load first=false; stored span and level read back (${gens.n} generated); 4 refusals`;
+  }
+
+  // --- 6. The title screen ----------------------------------------------------------------------------------
+  if (screen) {
+    const env = await screen(100, 30), was = currentStore(), s = useStore(memoryAdapter());
+    const text = () => { game.debug.draw(); return env.frameText(); };
+    const key = (code, k = code) => inputHandlers.onKeyDown(code, false, k);
+    const click = (label) => {   // a left click on the first cell of `label` where the frame shows it
+      const lines = text().split(/\n/), y = lines.findIndex((l) => l.includes(label));
+      if (y < 0) { fail(`the title shows no "${label}"`); return; }
+      inputHandlers.onMouseDown(0, lines[y].indexOf(label) + 1, y);
+    };
+    const settle = async () => { for (let k = 0; k < 200 && game.mode === "title"; k++) await tick(5); };
+    const saveOne = async () => {
+      game.pages = null; playing(game, "map");
+      game.debug.enterZone("0,0,1", "down"); playing(game, "map");
+      return saveGame(game, {});
+    };
+    await openTitle(game);
+    let t = text(), ways = 0;
+    if (game.mode !== "title" || !t.includes("New quick game") || t.includes("Continue")) fail(`the title with nothing saved: mode ${game.mode}, "${t.replace(/\s+/g, " ").trim().slice(0, 120)}"`);
+    const m0 = game.messages.length;
+    key("KeyM", "m");
+    if (game.messages.length !== m0 + 1 || !/Music/.test(game.messages[game.messages.length - 1]?.text)) fail("M didn't switch the music on the title screen");
+    key("KeyM", "m");
+    key("Enter");
+    if (game.mode !== "story" || !game.player || game.zone?.key !== "0,0,0") fail(`Enter on "New quick game": mode ${game.mode}, zone ${game.zone?.key}`); else ways++;
+    await openTitle(game);
+    click("New quick game");
+    if (game.mode !== "story") fail(`a click on "New quick game": mode ${game.mode}`); else ways++;
+    // Continue: by ↓ Enter, by 2, by a click; each loads the newest slot.
+    for (const how of ["keys", "digit", "click"]) {
+      const m = await saveOne();
+      startRun(11); game.pages = null;
+      await openTitle(game);
+      t = text();
+      if (!t.includes("Continue")) { fail(`the title with a slot saved shows no Continue (${how})`); continue; }
+      if (how === "keys") { key("ArrowDown"); key("Enter"); } else if (how === "digit") key("Digit2", "2"); else click("Continue");
+      await settle();
+      if (game.mode === "title" || game.saving?.slotId !== m.id || game.zone?.key !== "0,0,1") fail(`Continue by ${how}: mode ${game.mode}, slot ${game.saving?.slotId} (want ${m.id}), zone ${game.zone?.key}`);
+      else ways++;
+    }
+    stats.title = `100×30: New quick game and Continue reached ${ways} of 5 ways (Enter, click; ↓ Enter, 2, click)`;
+    useStore(was);
   }
 
   return { name: "save", ok: problems.length === 0, problems, stats, notes };

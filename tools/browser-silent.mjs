@@ -6,7 +6,7 @@
 // watches every AudioNode.connect(): a connect into an AudioDestinationNode is allowed only from a GainNode
 // whose gain is 0 and whose one input is an AnalyserNode (the game's silent sink, audio.js); anything else
 // is recorded as a violation and rerouted into the probe's own muted sink, so the probe itself can never
-// let sound out. Then:
+// let sound out. The page opens with ?quick=1 (straight into a new quick game, past the title screen). Then:
 //   1. ?silent=1: real key presses page through the intro (they unlock the audio), music and a sound
 //      effect play for a while; there must be no violation, at least one connect into the destination (the
 //      sink's zero gain), the analyser must hear the game (a peak above 0: what would have played went
@@ -68,7 +68,7 @@ async function play(browser, silent) {
   page.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") errors.push(`${m.type()}: ${m.text()}`); });
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
   await page.addInitScript(probe);
-  await page.goto(`${base}/index.html?${silent ? "silent=1&" : ""}seed=${SEED}`);
+  await page.goto(`${base}/index.html?${silent ? "silent=1&" : ""}quick=1&seed=${SEED}`);
   await page.waitForFunction(() => window.game && window.game.zone && window.game.mode);
   for (let k = 0; k < 12 && (await page.evaluate(() => window.game.mode)) === "story"; k++) { await page.keyboard.press("Space"); await page.waitForTimeout(150); }
   await page.keyboard.press("ArrowDown");   // a step on the map: the music runs

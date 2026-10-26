@@ -11,6 +11,9 @@
 //   talk      – a conversation (dialogue.js); shop – the peddler's pack; journal – your quests
 //   dead      – game over; R starts a new run
 //   won       – the Lich King is dead; R starts a new run
+//   title     – New quick game / Continue, what the page opens on (src/screens/title.js; no run yet,
+//               game.player is null until one starts)
+// A run is saved and loaded by save/ (TECH_DESIGN §7): saveGame in explore or map, loadGame(slotId).
 // The keys are bindings (keys.js): each screen's key() first, then the mode's bindings, "play" (explore and
 // map), and "*" (M, N). The parent's story on the bus lives in content/legacy/story-hooks.js.
 //
@@ -290,7 +293,7 @@ export function tick(dt) {
   if (dt > 0) game.fps += (1 / dt - game.fps) * 0.05;
   step(dt);
   audioFrame();
-  setListener(game.player.x, game.player.y, game.player.yaw, game.view === "map" || !game.story.cube);
+  if (game.player) setListener(game.player.x, game.player.y, game.player.yaw, game.view === "map" || !game.story.cube);   // (none on the title screen)
   updateMusic(game);
   const t0 = performance.now();
   draw();

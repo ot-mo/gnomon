@@ -4,7 +4,7 @@
 //
 // Before any page script, every audio node bound for the speakers is routed through an AnalyserNode and a
 // zero-gain node (silent), and since 0D2 the page is opened with ?silent=1 (audio.js's own sink, proven by
-// browser-silent.mjs), so the init script is the second guard. Per seed, on legacy level 3 with the cube in hand: fights in both views and both
+// browser-silent.mjs), so the init script is the second guard; and with ?quick=1, straight into a new quick game past the title screen. Per seed, on legacy level 3 with the cube in hand: fights in both views and both
 // rule sets, counted on the bus ("attack" events from combat.js): on the map, arrow keys into a monster
 // (legacy, then d20); in 3D, facing a monster and pressing Enter (the swing), legacy then d20. Then talk: walk into
 // Pell on the map, read his news with a digit key, open his shop and its services tab, Esc back, leave.
@@ -41,7 +41,7 @@ try {
         return orig.call(this, dest, ...rest);
       };
     });
-    await page.goto(`http://127.0.0.1:${port}/index.html?silent=1&seed=${seed}`);
+    await page.goto(`http://127.0.0.1:${port}/index.html?silent=1&quick=1&seed=${seed}`);
     await page.waitForFunction(() => window.game && window.game.zone && window.game.mode);
     for (let k = 0; k < 20 && await page.evaluate(() => window.game.mode === "story"); k++) await page.keyboard.press("Space");
     await page.evaluate(async () => {

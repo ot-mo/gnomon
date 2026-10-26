@@ -50,6 +50,7 @@ function fresh(dump, slotId, keys) {
 }
 
 const { runSession } = await import("./bot.mjs");   // (installs the Node environment)
-const { game, startRun } = await import("../src/game.js");
+const { game, startRun, inputHandlers } = await import("../src/game.js");
 const { checkSave } = await import("../tests/checks/save.js");
-process.exit(report(await checkSave({ game, startRun, runSession, fresh, root: ROOT })));
+const screen = (cols, rows) => installNodeEnv({ cols, rows });   // (the title screen at 100×30, last)
+process.exit(report(await checkSave({ game, startRun, inputHandlers, runSession, fresh, screen, root: ROOT })));

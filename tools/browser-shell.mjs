@@ -5,7 +5,7 @@
 //
 // Before any page script, every audio node bound for the speakers is routed through an AnalyserNode and a
 // zero-gain node (silent), and since 0D2 the page is opened with ?silent=1 (audio.js's own sink, proven by
-// browser-silent.mjs), so the init script is the second guard. At each window size (600×300 is 100×30 cells): the intro paged by Space,
+// browser-silent.mjs), so the init script is the second guard; and with ?quick=1, straight into a new quick game past the title screen. At each window size (600×300 is 100×30 cells): the intro paged by Space,
 // then by clicks; on the map I and J by keys and by clicks on their words in the header, closed by Esc / J
 // and by "I close" / a click; the cube (game.onCube) and its pages; the pause card under them, closed by a
 // click (which takes the pointer lock); losing the lock (document.exitPointerLock) opens pause, and I, J
@@ -47,7 +47,7 @@ try {
         return orig.call(this, dest, ...rest);
       };
     });
-    await page.goto(`http://127.0.0.1:${port}/index.html?silent=1&seed=${seed}`);
+    await page.goto(`http://127.0.0.1:${port}/index.html?silent=1&quick=1&seed=${seed}`);
     await page.waitForFunction(() => window.game && window.game.zone && window.game.mode === "story");
     // Keep the last presented frame's characters, to find words to click.
     await page.evaluate(async () => {

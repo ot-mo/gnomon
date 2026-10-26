@@ -8,3 +8,4 @@ import "./story.js";
 import "./levelup.js";
 import "./pause.js";
 import "./dead.js";
+import "./title.js";

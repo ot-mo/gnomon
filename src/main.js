@@ -6,6 +6,8 @@ import { setInputBackend, initInput } from "./input.js";
 import { browserInput } from "./input-browser.js";
 import { game, inputHandlers, startRun, randomSeed, tick } from "./game.js";
 import { FLAGS, TITLE } from "./config.js";
+import { useStore, memoryAdapter } from "./save/index.js";
+import { openTitle } from "./screens/title.js";
 
 S.setBackend(canvasBackend);
 setInputBackend(browserInput);
@@ -15,7 +17,10 @@ addEventListener("resize", S.resize);
 
 document.title = TITLE;
 window.game = game;   // poke at it from the browser console (game.debug has handy functions)
-startRun(FLAGS.seed ?? randomSeed());   // ?seed=N (config.js)
+useStore(memoryAdapter());   // saves stay in memory (this page only) until WS9's IndexedDB
+// The title screen (New quick game / Continue), or with ?quick=1 straight into a new quick game (?seed=N).
+if (FLAGS.quick) startRun(FLAGS.seed ?? randomSeed());
+else openTitle(game);
 
 let lastTime = performance.now();
 function frame(now) {
