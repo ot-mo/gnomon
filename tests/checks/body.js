@@ -15,7 +15,8 @@
 //      the derived numbers come back exactly when it's taken off (unequip), cursed pieces refuse to come
 //      off and refuse to be covered. Two rings count twice (both fingers); an implant counts; a
 //      two-handed weapon takes both hands, is listed once and survives structuredClone as one object;
-//      an extra limb (addPart) holds an off-hand weapon (offhands) and gives it back on removePart.
+//      an extra limb (addPart) holds an off-hand weapon (offhands) and gives it back on removePart; one
+//      item already worn can't go on a second part as well (reason "worn").
 //   5. swapBelt: empty belt, a cursed weapon in hand, too weak; a good swap takes RULES.body.beltSwap s.
 //   6. Migration: no `.weapon`, `.armour`, `.ring`, `.amulet` or `.sidearm` gear field is read or written
 //      on the player in src/ (the five parent fields live on the body now).
@@ -220,6 +221,10 @@ export function checkBody({ game, startRun, inventory, srcFiles }) {
     Bd.addPart(one, { id: "hand_x", type: "hand", holds: true });
     const extra = { kind: "weapon", id: "dagger", ench: 1, known: true };
     if (!Bd.slotsFor(one, extra).includes("hand_x") || !Bd.equip(game, one, extra, "hand_x").ok || Bd.offhands(one)[0] !== extra) fail("an extra hand can't hold an off-hand weapon");
+    const ring = { kind: "ring", id: "regeneration", ench: 2, known: true };
+    const r1 = Bd.equip(game, one, ring, "finger_r"), r2 = Bd.equip(game, one, ring, "finger_l");
+    if (!r1.ok || r2.ok || r2.reason !== "worn" || Bd.worn(one).filter((x) => x === ring).length !== 1 || St.bonus(one, "regen") !== 2)
+      fail(`one ring on two fingers: ${r2.ok ? "accepted" : r2.reason}, worn ${Bd.worn(one).filter((x) => x === ring).length}×, regen ${St.bonus(one, "regen")}`);
     const back = Bd.removePart(one, "hand_x");
     if (back[0] !== extra || Bd.worn(one).includes(extra)) fail("removePart didn't give back what the limb held");
   }

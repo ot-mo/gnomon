@@ -132,6 +132,7 @@ export function canEquip(game, e, it, partId = defaultPart(e, it)) {
   const part = partOf(e, partId);
   if (!part) return { ok: false, reason: "part" };
   if (slotType(it) !== part.type) return { ok: false, reason: "slot" };
+  if (held(e, partId) !== it && worn(e).includes(it)) return { ok: false, reason: "worn" };   // one item, one place (else its bonuses count twice)
   const ids = partsTaken(e, it, partId);
   if (!ids) return { ok: false, reason: "slot" };   // two-handed, one hand
   const need = ITEM_KINDS[it.kind]?.req?.(it)?.str;
