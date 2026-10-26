@@ -157,7 +157,8 @@ function savingFor(game, store, slotId) {
   const sv = game.saving;
   if (sv && sv.store === store && (!slotId || sv.slotId === slotId)) return sv;
   // A new slot (or store) for this run carries its checkpoint and its unclean count.
-  return (game.saving = newSaving(slotId || newSlotId(game), Date.now(), store, sv ? { cp: sv.cp, cpRecord: sv.cpRecord, unclean: sv.unclean } : {}));
+  const id = slotId || newSlotId(game);
+  return (game.saving = newSaving(id, Date.now(), store, sv ? { cp: sv.cp, cpRecord: sv.cpRecord && { ...sv.cpRecord, id }, unclean: sv.unclean } : {}));
 }
 
 const pend = (sv, key, savedAt) => { sv.pending.set(key, (sv.pending.get(key) || 0) + 1); sv.stored.set(key, savedAt); };
@@ -212,6 +213,7 @@ function submit(game, sv, job) {
   sv.jobs.push(job);
   for (const r of job.rows) if (r.zone) pend(sv, r.zone, r.savedAt);
   const standDown = async () => { if (!job.absorbed) return false; try { await job.absorbed; return true; } catch { return false; } };
+  // The job's own bookkeeping (job.after) runs inside the queue, so whenWritten settles after it.
   const done = sv.queue.then(async () => {
     if (job.before) await job.before.catch(() => {});   // (another slot's writes, before its records are copied)
     if (await standDown()) return;
@@ -220,9 +222,11 @@ function submit(game, sv, job) {
     if (await standDown()) return;   // (the unload save took it while it was compressed)
     job.issued = true;
     await sv.store.writeNow(ops);
-  }).finally(() => { const k = sv.jobs.indexOf(job); if (k >= 0) sv.jobs.splice(k, 1); });
+  }).finally(() => { const k = sv.jobs.indexOf(job); if (k >= 0) sv.jobs.splice(k, 1); })
+    .then(() => { landed(game, sv, job); job.after?.(null); },
+          (e) => { for (const r of job.rows) if (r.zone) unpend(sv, r.zone); job.after?.(e); throw e; });
   sv.queue = done.catch(() => {});
-  return done.then(() => landed(game, sv, job), (e) => { for (const r of job.rows) if (r.zone) unpend(sv, r.zone); throw e; });
+  return done;
 }
 
 // --- Saving --------------------------------------------------------------------------------------------
@@ -243,7 +247,7 @@ registerUpdate("save:waiting", (game) => {
 }, { modes: ["*"] });
 
 function writeSave(game, { reason = "manual", store, slotId, clean = false, checkpoint: cpSave = false } = {}) {
-  const st = storeFor(store), old = game.saving, sv = savingFor(game, st, slotId), now = Date.now();
+  const old = game.saving, st = store || old?.store || storeFor(), sv = savingFor(game, st, slotId), now = Date.now();
   if (sv.dead) throw new Error("saveGame: this run has ended");
   const moved = old && old !== sv;
   // The snapshot: everything live is read in these lines, and nothing after them. A checkpoint's rows are its
@@ -283,21 +287,18 @@ function writeSave(game, { reason = "manual", store, slotId, clean = false, chec
   sv.live = clean ? null : SESSION;
   const job = { rows: [...(cpSave ? [{ op: { op: "clear", store: "checkpointZones", slot: sv.slotId } }] : []), ...carry, ...rows, { slot: json }],
                 checkpoint: cpSave ? n : 0, before: moved ? old.queue : null };
-  for (const r of rows) if (r.keep && !sv.kept?.has(r.zone)) (sv.kept ||= new Set()).add(r.zone);   // (rows a restore may find copies of)
-  const done = submit(game, sv, job);
-  for (const c of carry) if (c.carry.into === "zones") done.then(() => { unpend(sv, c.carry.key); sv.committed.add(c.carry.key); }, () => unpend(sv, c.carry.key));
-  for (const r of rows) sv.stored.set(r.zone, now);
-  return done.then(() => {
+  job.after = (e) => {
+    for (const c of carry) if (c.carry.into === "zones") { unpend(sv, c.carry.key); if (!e) sv.committed.add(c.carry.key); }
+    sv.last = { reason, at: Date.now(), ok: !e };
+    if (e) { failed(game, sv, `saving slot ${sv.slotId}`, e); return; }
     SAVE_STATS.saves++;
     if (cpSave) SAVE_STATS.checkpoints++;
-    sv.last = { reason, at: Date.now(), ok: true };
     autoFor(game).play = 0;
-    return { id: sv.slotId, updated: now, zones: keys.size, reason, ...(cpSave ? { checkpoint: n } : {}) };
-  }, (e) => {
-    sv.last = { reason, at: Date.now(), ok: false };
-    failed(game, sv, `saving slot ${sv.slotId}`, e);
-    throw e;
-  });
+  };
+  for (const r of rows) if (r.keep && !sv.kept?.has(r.zone)) (sv.kept ||= new Set()).add(r.zone);   // (rows a restore may find copies of)
+  const done = submit(game, sv, job);
+  for (const r of rows) sv.stored.set(r.zone, now);
+  return done.then(() => ({ id: sv.slotId, updated: now, zones: keys.size, reason, ...(cpSave ? { checkpoint: n } : {}) }));
 }
 
 // Write-behind: the zone you leave, after every other zone:leave handler (the clock catches up first).
@@ -332,8 +333,10 @@ function settlement(game, key) {
 }
 on("zone:enter", (game, { zone, how, from }) => {
   if (how === "load") return;
-  const cp = checkpoints(game) && (how === "start" || settlement(game, zone.key) || settlement(game, from));
-  requestSave(game, cp ? "checkpoint" : "zone", { delay: SAVE_RULES.afterChange, checkpoint: cp });
+  // (Whether it is a checkpoint depends on the run's mode as it is when the save happens: a new game's is set
+  // just after startRun.)
+  const cp = how === "start" || settlement(game, zone.key) || settlement(game, from);
+  requestSave(game, "zone", { delay: SAVE_RULES.afterChange, checkpoint: cp });
 }, { priority: -100 });
 const PLAY = new Set(["explore", "map"]);
 registerUpdate("save:auto", (game, dt) => {
@@ -345,7 +348,8 @@ registerUpdate("save:auto", (game, dt) => {
   const w = a.want;
   a.want = null; a.play = 0; a.travel = 0;
   try {
-    writeSave(game, { reason: w.reason, checkpoint: w.checkpoint && checkpoints(game) }).catch(() => {});
+    const cp = w.checkpoint && checkpoints(game);
+    writeSave(game, { reason: cp ? w.reason.replace(/zone/, "checkpoint") : w.reason, checkpoint: cp }).catch(() => {});
   } catch (e) { if (game.saving) failed(game, game.saving, `the ${w.reason} save`, e); else console.error(`save: the ${w.reason} save failed:`, e); }
 }, { modes: ["*"] });
 
@@ -389,9 +393,10 @@ export function unloadSave(game) {
   sv.live = null;
   autoFor(game).hidden = true;
   SAVE_STATS.unloads++;
+  own.after = (e) => { sv.last = { reason: "unload", at: Date.now(), ok: !e }; if (e) failed(game, sv, "the unload save", e); };
   const done = submit(game, sv, own);
   own.absorbed = p;   // (submit cleared it: this job is the transaction above)
-  return done.then(() => { sv.last = { reason: "unload", at: Date.now(), ok: true }; }, (e) => { failed(game, sv, "the unload save", e); throw e; });
+  return done;
 }
 export function pageShown(game) {
   const a = game.run && AUTO.get(game.run);
@@ -448,8 +453,10 @@ async function writeRestore(st, slotId, cpRecord, unclean) {
     for (const r of cps) await t.put("zones", r);
     for (const r of zs) if (!kept.has(r.key) && (r.cp ?? 0) >= cpRecord.n) await t.del("zones", [slotId, r.key]);
     for (const r of cps) await t.del("checkpointZones", [slotId, r.key]);
-    const { n, ...rec } = cpRecord;
-    await t.put("slots", { ...rec, checkpoint: cpRecord, live: null, unclean, updated: Date.now() });
+    // (A copy of its own: a structured clone keeps two references to one object as one, and the slot's state
+    // becoming the game's would then change the checkpoint kept inside it.)
+    const { n, ...rec } = JSON.parse(JSON.stringify(cpRecord));
+    await t.put("slots", { ...rec, id: slotId, checkpoint: { ...cpRecord, id: slotId }, live: null, unclean, updated: Date.now() });
   });
 }
 export async function restoreCheckpoint(slotId, { store } = {}) {
@@ -506,7 +513,8 @@ export async function loadGame(slotId, { game = theGame, store, version = VERSIO
   // The id counter, before any zone is read (§7.4), above every id in every record of the slot: write-behind
   // goes on writing the zones you leave after a save, and the ones made since then hold ids past the slot's counter.
   setIds({ ...slot.ids, entity: Math.max(slot.ids.entity, ...zones.map((r) => r.ids?.entity || 0)) });
-  const sv = game.saving = newSaving(slotId, slot.created, st, { cp: slot.checkpoint?.n || 0, cpRecord: slot.checkpoint || null, unclean });
+  const sv = game.saving = newSaving(slotId, slot.created, st, { cp: slot.checkpoint?.n || 0, unclean,
+    cpRecord: slot.checkpoint ? JSON.parse(JSON.stringify(slot.checkpoint)) : null });   // (never the objects the game plays with)
   sv.version = version; sv.migrations = migrations;
   for (const r of zones) { sv.committed.add(r.key); sv.stored.set(r.key, r.savedAt); }
   if (sv.cp) sv.kept = new Set((await st.list("checkpointZones", { slot: slotId })).map((r) => r.key));
