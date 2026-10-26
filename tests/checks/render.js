@@ -24,7 +24,8 @@
 //   6. The map outdoors: a column shows its ground's look (a road "·", grass "." in its colour), the legend is
 //      the terrain one and says glim; a pit not looked into, ghost planks and an unseen bridge draw as the ground
 //      around them; underground the map is the parent's (golden (b), part 9). Water holding
-//      another liquid takes its colour on the map and in 3D.
+//      another liquid takes its colour on the map and in 3D, under the sky and underground; beyond an edge the
+//      neighbour's water is the neighbour's liquid.
 //   7. Music: the temple keeps the temple mood, a flats span plays open by day and night at night, the Shade
 //      plays shade all night; every mood content/moods.js names is one music.js plays. Voices: speakLetter's voice
 //      is a voice object, a parent's person's id, or else the neutral voice (not Maren's).
@@ -336,24 +337,36 @@ export async function checkRender(m) {
       `outdoor map looks: road ${JSON.stringify(rc)}, grass ${JSON.stringify(gc)} (want "·" and "." ${want})`);
     const text = Array.from({ length: capture.rows }, (_, y) => capture.chars.slice(y * capture.cols, (y + 1) * capture.cols).join("")).join("\n");
     expect(/LEGEND/.test(text) && /\$ +glim/.test(text) && !/\$ +gold/.test(text), "the outdoor legend doesn't show (or doesn't say glim)");
-    // Another liquid: a pool on a field, the zone's liquid named; the map and the 3D frame take its colour.
-    const pool = field("render-pool", true, (z) => { for (let y = 8; y <= 14; y++) for (let x = 12; x <= 18; x++) z.set(x, y, FLOOR_Z - 1, B.WATER_SHALLOW); });
-    zones.enterZone(game, pool, { how: "start" });
-    pool.seen.fill(1);
+    // Another liquid: a pool on a field, the zone's liquid named; the map and the 3D frame take its colour, under the
+    // sky and underground alike; and beyond an edge (the apron) the water is the neighbour's.
     const KEY = "renderCheckBrine";
     const mapCell = () => { game.view = "map"; game.mode = "map"; renderMap.renderMap(game); S.present(); return cellOf(15, 11).rgb.join(); };
-    const plain = mapCell();
-    stand(10.5, 11.5, 0, -0.35); p().torch = true;
-    const plain3d = frame3d();
+    stats.liquid = {};
     liquids.LIQUIDS[KEY] = { name: "test brine", color: [210, 60, 50] };
-    pool.liquid = KEY;
     try {
-      const red = mapCell();
-      stand(10.5, 11.5, 0, -0.35);
-      const red3d = frame3d();
-      expect(plain !== red && red.split(",").map(Number)[0] > 150 && plain3d !== red3d, `another liquid: map ${plain} → ${red}, 3D changed ${plain3d !== red3d}`);
-      stats.liquid = { map: [plain, red] };
-    } finally { delete liquids.LIQUIDS[KEY]; pool.liquid = "water"; }
+      for (const sky of [true, false]) {
+        const pool = field(`render-pool-${sky}`, sky, (z) => { for (let y = 8; y <= 14; y++) for (let x = 12; x <= 18; x++) z.set(x, y, FLOOR_Z - 1, B.WATER_SHALLOW); });
+        zones.enterZone(game, pool, { how: "start" });
+        pool.seen.fill(1);
+        const plain = mapCell();
+        stand(10.5, 11.5, 0, -0.35); p().torch = true;
+        const plain3d = frame3d();
+        pool.liquid = KEY;
+        const red = mapCell();
+        stand(10.5, 11.5, 0, -0.35);
+        const red3d = frame3d();
+        expect(plain !== red && red.split(",").map(Number)[0] > 150 && plain3d !== red3d, `another liquid ${sky ? "under the sky" : "underground"}: map ${plain} → ${red}, 3D changed ${plain3d !== red3d}`);
+        stats.liquid[sky ? "sky" : "underground"] = [plain, red];
+      }
+      fresh(4242);
+      const here = game.zone, a = zones.neighbourAddr(game, here, "e"), east = zones.cachedZone(game, a.key) || zones.makeZone(game, a.key);
+      const before = render3d.liquidTintAt(game, here, here.w + 3, 10);
+      east.liquid = KEY;
+      const after = render3d.liquidTintAt(game, here, here.w + 3, 10), inside = render3d.liquidTintAt(game, here, here.w - 3, 10);
+      east.liquid = "water";
+      expect(before === null && after?.join() === "210,60,50" && inside === null, `the apron's water: ${JSON.stringify({ before, after, inside })}`);
+      stats.liquid.apron = after;
+    } finally { delete liquids.LIQUIDS[KEY]; }
     // What the map shows as floor but isn't gives nothing away by its colour: a pit not yet looked into, ghost planks
     // over a pit, planks over a pit (a bridge whose crossing isn't seen) all draw as the grass around them; a pit
     // you've looked into is a pit.

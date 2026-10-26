@@ -5,8 +5,8 @@
 // Row 0: controls · row 1: status bar (hud.js) · then the map · last row: tile inspector.
 //
 // Outdoors (a zone with sky; TECH_DESIGN §6.5, WS3) a floor shows its ground: the block under where you'd
-// stand (zone.look) by its `map` look (blocks.js), else a "." in that block's colour; water takes the
-// colour of the liquid it holds; and the legend is the terrain one (the looks you have seen here, then the
+// stand (zone.look) by its `map` look (blocks.js), else a "." in that block's colour; water holding another
+// liquid takes its colour (in any zone); and the legend is the terrain one (the looks you have seen here, then the
 // things that matter outdoors), narrow enough to sit beside an 80-wide zone at 180 columns. Underground the
 // map is the parent game's, legend and all (golden (b)).
 //   toggleMapLegend() → bool         show or hide the legend (for a key to bind; shown where it doesn't fit,
@@ -103,11 +103,13 @@ function groundLook(zone, i, kind) {
     }
     return lookOf(commonLook(zone));
   }
-  if (kind === KIND.SHALLOW || kind === KIND.DEEP) {
-    const c = liquidColor(zone, i % zone.w, Math.floor(i / zone.w));
-    if (c) return ["~", kind === KIND.DEEP ? dim(c, 0.6) : c];
-  }
-  return null;
+  return waterLook(zone, i, kind);
+}
+// Water holding another liquid, in any zone (underground too): "~" in the liquid's colour. null: the parent's.
+function waterLook(zone, i, kind) {
+  if (kind !== KIND.SHALLOW && kind !== KIND.DEEP) return null;
+  const c = liquidColor(zone, i % zone.w, Math.floor(i / zone.w));
+  return c ? ["~", kind === KIND.DEEP ? dim(c, 0.6) : c] : null;
 }
 export function liquidColor(zone, x, y) {
   if ((zone.liquid || "water") === "water" && !Object.keys(zone.liquids || {}).length) return null;
@@ -156,7 +158,7 @@ export function renderMap(game) {
         else if (st === "warn") S.put(sx, sy, "^", 255, 170, 60);
         else S.put(sx, sy, ",", 130, 110, 100);
       } else {
-        const [ch, c] = (zone.hasSky && groundLook(zone, i, kind)) || GLYPHS[kind] || GLYPHS[KIND.FLOOR];
+        const [ch, c] = (zone.hasSky ? groundLook(zone, i, kind) : waterLook(zone, i, kind)) || GLYPHS[kind] || GLYPHS[KIND.FLOOR];
         S.put(sx, sy, ch, ...c);
       }
     }

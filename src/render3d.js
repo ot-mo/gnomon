@@ -30,8 +30,8 @@ import { itemSprite } from "./items.js";
 import { projectileSprites } from "./throwing.js";
 import { EYE, torchRange, torchPower } from "./player.js";
 import { FLOOR_Z, B, BLOCKS } from "./world.js";
-import { liquidAt } from "./social/liquids.js";
-import { LIQUIDS } from "./content/liquids.js";
+import { liquidColor } from "./renderMap.js";
+import { neighbourAddr, cachedZone } from "./zones.js";
 
 const AMBIENT = [0.045, 0.045, 0.06];
 const SKY_COLOR = [0.55, 0.65, 0.85];
@@ -111,7 +111,15 @@ let ZW = 0, ZD = 0, ZH = 0, zBlocks = null, zSky = null, zLamp = null, zSun = nu
 function frameZone(zone) {
   ZW = zone.w; ZD = zone.d; ZH = zone.h; zBlocks = zone.blocks; zSky = zone.skyLight; zLamp = zone.lampLight;
   zSun = zone.sunlit; zSecret = zone.secretWalls;
-  zPlainWater = (zone.liquid || "water") === "water" && !Object.keys(zone.liquids || {}).length;
+  zPlainWater = plainWater(zone);
+}
+function frameNeighbours(game, zone) {
+  frameLiquids = null;
+  if (!zone.apron) return;
+  ["nw", "n", "ne", "w", "", "e", "sw", "s", "se"].forEach((side, k) => {
+    const addr = side && zone.apron[side] && neighbourAddr(game, zone, side), n = addr && cachedZone(game, addr.key);
+    if (n && !plainWater(n)) (frameLiquids ||= [])[k] = true;
+  });
 }
 
 function frameLook(game, zone) {
@@ -188,12 +196,22 @@ function torchAt(dx, dy, dz, t, facing) {
   lightR += TORCH_COLOR[0] * k; lightG += TORCH_COLOR[1] * k; lightB += TORCH_COLOR[2] * k;
 }
 
-// What water holds, when it isn't water (the zone's liquid, or its column's: social/liquids.js liquidAt):
-// the liquid's colour, or null.
-function liquidTint(zone, x, y) {
-  if (zPlainWater) return null;
-  const id = liquidAt(zone, x, y);
-  return id !== "water" ? LIQUIDS[id]?.color || null : null;
+// What water holds at (x, y), when it isn't water: the liquid's colour (renderMap.js liquidColor: the zone's
+// liquid or its column's), else null. Beyond the zone's edge (the apron) it is the neighbour's water, when that
+// zone is in memory. liquidTintAt(game, zone, x, y) answers it from anywhere; shadeHit reads frameLiquids.
+export function liquidTintAt(game, zone, x, y) {
+  const sx = x < 0 ? -1 : x >= zone.w ? 1 : 0, sy = y < 0 ? -1 : y >= zone.d ? 1 : 0;
+  if (!sx && !sy) return liquidColor(zone, x, y);
+  const side = (sy < 0 ? "n" : sy > 0 ? "s" : "") + (sx < 0 ? "w" : sx > 0 ? "e" : "");
+  const addr = neighbourAddr(game, zone, side), n = addr && cachedZone(game, addr.key);
+  return n ? liquidColor(n, x - sx * zone.w, y - sy * zone.d) : null;
+}
+// This frame: whether the zone's water is all plain, and the neighbours (3 × 3, by band) whose isn't.
+const plainWater = (z) => (z.liquid || "water") === "water" && !Object.keys(z.liquids || {}).length;
+let frameLiquids = null;
+function waterTint(game, zone, x, y) {
+  if (x >= 0 && y >= 0 && x < ZW && y < ZD) return zPlainWater ? null : liquidColor(zone, x, y);
+  return frameLiquids?.[(y < 0 ? 0 : y >= ZD ? 6 : 3) + (x < 0 ? 0 : x >= ZW ? 2 : 1)] ? liquidTintAt(game, zone, x, y) : null;
 }
 
 function shadeHit(game, zone, dx, dy, dz) {
@@ -203,8 +221,8 @@ function shadeHit(game, zone, dx, dy, dz) {
   if (darkPerHit && DARK_SIGHT_BLOCKS.has(block)) setDarkSight(inDark(game, zone, px + nx * 0.5, py + ny * 0.5, pz + nz * 0.5));
   material(block, nx !== 0 ? py : px, nz !== 0 ? py : pz, nz > 0);
   const water = block === B.WATER_SHALLOW || block === B.WATER_DEEP;
-  if (water && outdoor && !hit.apron) {
-    const tint = liquidTint(zone, hit.x, hit.y);
+  if (water) {
+    const tint = waterTint(game, zone, hit.x, hit.y);
     if (tint) { const k = (albedo.r + albedo.g + albedo.b) / 3 / 160; albedo.r = tint[0] * k; albedo.g = tint[1] * k; albedo.b = tint[2] * k; }
   }
   // A flat being here? On the floor there's a shadow with nobody casting it.
@@ -444,6 +462,7 @@ export function render3d(game) {
   setGhostVisible(!darkPerHit ? !player.torch : (x, y, z) => inDark(game, zone, x, y, z));
 
   frameZone(zone);
+  frameNeighbours(game, zone);
   const t0 = performance.now();
   castFrame(game, zone, rayInfo(zone), zone.seen, zone.holeSeen, seeRange, game.time, dyn.half && outdoor);
   judgeFrame(performance.now() - t0, performance.now());
