@@ -13,7 +13,8 @@ function ghostShows(x, y, z, axis, sx, sy, sz) {
 }
 
 // The last hit, and how the last miss left: out = OUT.FAR (it went maxT), OUT.SIDE (out of the grid and
-// its apron sideways), OUT.BOTTOM (down out of the zone: a pit) or OUT.TOP (up, above everything);
+// its apron sideways, or down beyond the grid), OUT.BOTTOM (down out of the zone inside its grid: a pit) or
+// OUT.TOP (up, above everything);
 // missT is how far it had gone (render3d's horizon plane starts there).
 export const OUT = { FAR: 0, SIDE: 1, BOTTOM: 2, TOP: 3 };
 export const hit = { t: 0, block: 0, nx: 0, ny: 0, nz: 0, x: 0, y: 0, z: 0, apron: false, out: 0, missT: 0 };
@@ -118,7 +119,9 @@ export function castRay(zone, ox, oy, oz, dx, dy, dz, maxT, seen = null, torchRa
     }
     if ((x < X0 && stepX < 0) || (x >= X1 && stepX > 0) ||
         (y < Y0 && stepY < 0) || (y >= Y1 && stepY > 0)) { hit.out = 1; hit.missT = t; return false; }
-    if (z < 0 && stepZ < 0) { hit.out = 2; hit.missT = t; return false; }
+    // Down out of the zone: a pit when it is inside the grid; beyond it (a shut corner between two open sides, no
+    // band there) it is the world beyond, like a ray leaving by a side.
+    if (z < 0 && stepZ < 0) { hit.out = x >= 0 && y >= 0 && x < W && y < D ? 2 : 1; hit.missT = t; return false; }
     if (z >= TOP && stepZ > 0) break;
     lastLit = false;
     if (z < 0 || z >= H || x < X0 || y < Y0 || x >= X1 || y >= Y1) continue;
