@@ -43,7 +43,9 @@
 //       already has gets a new one.
 //   moveSlot(game, store) → Promise<bool>              the run's whole slot copied into `store`, which it saves to
 //                                                      from then on (the title moving a game from memory to IndexedDB)
-//   graveyard() → [{ name, seed, mode, level, cause, where, day, time, unclean, at }]   newest last (localStorage)
+//   graveyard({ store }) → Promise<[{ name, seed, mode, level, cause, where, time, unclean, at }]>   newest last: the store's
+//                                                      meta record "graveyard" (the last SAVE_RULES.graveyard), not localStorage,
+//                                                      which only audio.js touches (check-config)
 //   migrate(slot, zones, { to, migrations }) → { slot, zones }   MIGRATIONS[n] = { slot(rec), zone(rec) } takes n → n + 1
 //   registerWorld(id, def | () => def | Promise<def>)  the worlds a load can choose by state.world.id
 //   requestSave(game, reason, { delay, checkpoint }) the automatic saves' request (below), for other modules
@@ -76,7 +78,7 @@
 // game.saving (runtime, reset by every new run): { slotId, created, store, committed: Set<key>, pending: Map<key, n>,
 // stored: Map<key, savedAt>, queue: Promise, jobs: [job not yet written], failed: [], cp, cpRecord, unclean, dead,
 // live, last: { reason, at, ok } }.
-import { GAME_ID, VERSION, storageKey } from "../config.js";
+import { GAME_ID, VERSION } from "../config.js";
 import { game as theGame, resumeRun } from "../game.js";
 import { screenFor, setMode, pushMode } from "../screens.js";
 import { playMode } from "../screens/play.js";
@@ -407,20 +409,22 @@ export function listenPage(doc, win, game = null) {
 }
 
 // --- Death, checkpoints restored, graves -------------------------------------------------------------------
-export function graveyard() {
-  try { const g = JSON.parse(localStorage.getItem(storageKey("graveyard")) || "[]"); return Array.isArray(g) ? g : []; } catch { return []; }
+export async function graveyard({ store } = {}) {
+  const st = store || currentStore() || fallback;
+  return (st && (await st.get("meta", "graveyard"))?.graves) || [];
 }
-function grave(rec) {
-  try {
-    const g = [...graveyard(), rec].slice(-SAVE_RULES.graveyard);
-    localStorage.setItem(storageKey("graveyard"), JSON.stringify(g));
-  } catch { /* storage refused: no grave */ }
-  return rec;
+// A grave and the end of a slot, in one transaction: the slot, its zones and its checkpoint's copies go.
+async function bury(st, slotId, rec) {
+  await st.tx(async (t) => {
+    const graves = (await t.get("meta", "graveyard"))?.graves || [];
+    await t.put("meta", { id: "graveyard", graves: [...graves, rec].slice(-SAVE_RULES.graveyard) });
+    for (const name of ["zones", "checkpointZones"]) for (const r of await t.list(name, { slot: slotId })) await t.del(name, [slotId, r.key]);
+    await t.del("slots", slotId);
+  });
 }
 const graveOf = (game, cause, unclean) => ({ name: game.player?.name ?? null, seed: game.seed, mode: modeOf(game), level: game.player?.level ?? 1,
   cause, where: game.zone?.name ?? game.zone?.key ?? null, time: game.time, unclean, at: Date.now() });
 
-const clearSlot = (slot) => [{ op: { op: "clear", store: "zones", slot } }, { op: { op: "clear", store: "checkpointZones", slot } }, { op: { op: "del", store: "slots", key: slot } }];
 
 export function endRun(game, { cause = game.deathCause } = {}) {
   const sv = game.saving;
@@ -432,8 +436,8 @@ export function endRun(game, { cause = game.deathCause } = {}) {
       .then(() => { SAVE_STATS.restores++; return sv.cpRecord; });
     return sv.restoring;
   }
-  grave(graveOf(game, cause, sv.unclean));
-  return submit(game, sv, { rows: clearSlot(sv.slotId) }).then(() => null);
+  const rec = graveOf(game, cause, sv.unclean);
+  return submit(game, sv, { rows: [], run: (st) => bury(st, sv.slotId, rec) }).then(() => null);
 }
 
 // The checkpoint's copies back in zones, the rows first written after it gone, its slot record back (§7.5).
@@ -490,9 +494,8 @@ export async function loadGame(slotId, { game = theGame, store, version = VERSIO
   // A session that ended without a clean save (a crash, the tab closed mid-fight): counted; One Wick may call it a death.
   const unclean = (slot.unclean || 0) + (slot.live ? 1 : 0);
   if (slot.live && (slot.mode ?? "oneWick") === "oneWick" && SAVE_RULES.oneWick.unclean === "death") {
-    grave({ name: slot.character?.name ?? null, seed: slot.seed, mode: "oneWick", level: slot.character?.level ?? 1,
-            cause: "the last session ended without a save", where: where, time: slot.time, unclean, at: Date.now() });
-    await deleteSlot(slotId, { store: st });
+    await bury(st, slotId, { name: slot.character?.name ?? null, seed: slot.seed, mode: "oneWick", level: slot.character?.level ?? 1,
+                             cause: "the last session ended without a save", where, time: slot.time, unclean, at: Date.now() });
     const e = new Error("This life's last session ended without a save, and One Wick counts that as a death.");
     e.code = "unclean";
     throw e;

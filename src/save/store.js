@@ -4,7 +4,8 @@
 //   Adapter = { kind, get(store, key) → Promise<value | undefined>, put(store, value) → Promise, del(store, key) → Promise,
 //               list(store, { slot } = {}) → Promise<[value]>, tx(fn) → Promise<fn's result>, writeNow(ops) → Promise }
 //     stores: "slots" (key: the record's id) and "zones", "checkpointZones" (key: [slot, key], from the record's
-//     slot and key fields), as IndexedDB's object stores with those key paths. put stores a copy (IndexedDB's
+//     slot and key fields), as IndexedDB's object stores with those key paths; and "meta" (key: id), the game's own
+//     records beside the slots (save.js: the graveyard; screens/options.js: the view settings). put stores a copy (IndexedDB's
 //     structured clone), get and list hand out copies, so nothing stored is ever a live object. list("zones",
 //     { slot }) lists one slot's zones.
 //     tx(fn): fn(t) gets an adapter of the same shape whose writes land together when fn's promise settles, and
@@ -38,7 +39,7 @@
 //   useStore(adapter) · currentStore() → adapter | null   the store saves go to (main.js sets the memory one)
 import { GAME_ID } from "../config.js";
 
-export const STORES = { slots: "id", zones: ["slot", "key"], checkpointZones: ["slot", "key"] };
+export const STORES = { slots: "id", zones: ["slot", "key"], checkpointZones: ["slot", "key"], meta: "id" };
 
 const keyOf = (store, value) => {
   const path = STORES[store];
@@ -53,7 +54,7 @@ const keepsOld = (old, epoch) => !!old && (old.cp ?? 0) < epoch;
 export function memoryAdapter({ latency = 0, from = null } = {}) {
   const data = Object.fromEntries(Object.keys(STORES).map((s) => [s, new Map()]));
   if (from) for (const [s, rows] of Object.entries(from)) for (const v of rows) data[s].set(flat(keyOf(s, v)), copy(v));
-  const stats = { commits: 0, puts: 0, dels: 0, byStore: { slots: 0, zones: 0, checkpointZones: 0 } };
+  const stats = { commits: 0, puts: 0, dels: 0, byStore: { slots: 0, zones: 0, checkpointZones: 0, meta: 0 } };
   const read = (staged) => ({
     async get(store, key) {
       const k = flat(key);
