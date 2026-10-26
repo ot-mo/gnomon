@@ -9,7 +9,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { ROOT, parseArgs } from "./node-env.mjs";
 
-const TIMED = new Set(["check-dungeons.mjs", "check-status.mjs"]);   // p95 generation budget; skipTime budget
+const TIMED = new Set(["check-dungeons.mjs", "check-status.mjs", "check-perf.mjs"]);   // p95 generation budget; skipTime budget; §6.7's budgets
 const SLOW = ["check-edges.mjs", "check-bot.mjs", "check-landmarks.mjs", "check-determinism.mjs", "check-hud.mjs"];   // started first
 
 const args = parseArgs();

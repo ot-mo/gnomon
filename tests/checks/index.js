@@ -52,6 +52,7 @@ export const CHECKS = [
   { name: "light", owner: "P0", load: () => import("./light.js") },
   { name: "names", owner: "P0", load: () => import("./names.js") },
   { name: "overworld", owner: "WS1", load: () => import("./overworld.js") },
+  { name: "perf", owner: "WS3", load: () => import("./perf.js"), node: "§6.7's time budgets: tools/check-perf.mjs measures in fresh Node processes, and p0-0d1 alongside to tell the machine from the tree" },
   { name: "progression", owner: "WS4", load: () => import("./progression.js") },
   { name: "render", owner: "WS3", load: () => import("./render.js") },
   { name: "save", owner: "WS9", load: () => import("./save.js"), node: "a fresh Node process loads the save, after tools/bot.mjs's 10-zone session" },
