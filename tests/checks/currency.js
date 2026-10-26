@@ -1,7 +1,7 @@
 // Money (currency.js): TECH_DESIGN §2.10 and the 0B scope, with DECISIONS.md (glim, a counter, purses of
 // 200 / 500 / 1,000).
 //
-//   checkCurrency({ game, startRun, dialogue, npcs, srcFiles }) → { name, ok, problems, stats }
+//   checkCurrency({ game, startRun, dialogue, npcs, srcFiles, capture }) → { name, ok, problems, stats }
 //
 //   1. The API on a bare entity: funds, pay (all or nothing), receive (what fits; the overflow comes back),
 //      the purse sizes (setPurse refuses a size content doesn't list), formatPrice from CURRENCY, whole
@@ -18,12 +18,16 @@
 //      the ground as cash (Rook's bounty).
 //   6. Migration: no `gold` field, `gold` pile or gold price text is left in src/ (the parent's touch
 //      points all go through currency.js); generated levels lay cash, never gold.
+//   7. The parent's literal values, pinned: `$` in the old gold colour (255, 210, 70), a sale pays
+//      floor(price × 0.3) (36 for a mace +2); the HUD row shows formatFunds in that colour, in both views.
+//      capture: node-env's presented frame.
 import { RULES } from "../../src/rules.js";
 import * as C from "../../src/currency.js";
 import * as I from "../../src/items.js";
 import * as St from "../../src/stats.js";
 import { generateDungeonLevel, legacyParams } from "../../src/gen/dungeon.js";
 import { makeRng } from "../../src/rng.js";
+import { hudRow } from "../lib/hud.js";
 
 const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/.*$/gm, "$1");
 // Uses of the word that are not money: the sound's name, the floor art's key, the parent's pile kind kept
@@ -31,7 +35,7 @@ const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|
 const GOLD_OK = [/sfx\("gold"\)/, /case "gold":/, /sound: "gold"/, /FLOOR_ART\.gold/, /^\s*gold:\s*\{ w:/, /registerItemKind\("gold"/,
   /\["\$", \[255, 210, 70\], "gold"\]/, /"golden"/, /gold bands/];
 
-export function checkCurrency({ game, startRun, dialogue, npcs, srcFiles }) {
+export function checkCurrency({ game, startRun, dialogue, npcs, srcFiles, capture }) {
   const problems = [], stats = {}, t0 = Date.now();
   const fail = (m) => problems.push(m);
   const { CURRENCY } = C;
@@ -214,6 +218,28 @@ export function checkCurrency({ game, startRun, dialogue, npcs, srcFiles }) {
     }
   if (!piles || gold) fail(`legacy levels lay ${piles} cash piles and ${gold} gold piles`);
   stats.levelPiles = { cash: piles, gold };
+
+  // --- 7. Literal values and the HUD -----------------------------------------------------------------
+  const GOLD = [255, 210, 70];
+  if (CURRENCY.glyph !== "$" || CURRENCY.color.join() !== GOLD.join()) fail(`the counter shows ${CURRENCY.glyph} in ${CURRENCY.color} (want $ in ${GOLD})`);
+  if (RULES.legacy.sellShare !== 0.3) fail(`legacy sell share ${RULES.legacy.sellShare} (the parent's 0.3)`);
+  const mace = Math.floor(I.itemPrice({ kind: "weapon", id: "mace", ench: 2, known: true }) * 0.3);
+  if (mace !== 36) fail(`a mace +2 sells for ${mace} (the parent: 36)`);
+  if (!capture) fail("no frame capture passed: the HUD can't be checked");
+  else {
+    startRun(4242);
+    const p = game.player;
+    p.funds = 137;
+    const hud = {};
+    for (const view of ["map", "3d"]) {
+      game.mode = view === "map" ? "map" : "explore"; game.view = view;
+      const seen = hudRow(game, capture).find(C.formatFunds(p));
+      hud[view] = seen.map((s) => s.color);
+      if (seen.length !== 1 || seen[0].color?.join() !== GOLD.join()) fail(`${view} HUD: ${C.formatFunds(p)} in ${JSON.stringify(hud[view])} (want once, in ${GOLD})`);
+    }
+    stats.hud = { funds: C.formatFunds(p), ...hud };
+    game.mode = "map"; game.view = "map";
+  }
 
   stats.ms = Date.now() - t0;
   return { name: "currency", ok: problems.length === 0, problems, stats };
