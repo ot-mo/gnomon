@@ -14,7 +14,8 @@
 //   4. Drowning: a non-swimmer stepping into surface deep water on the map and walking into it in 3D
 //      gets the same timer (RULES.drown.air s of breath), the same damage at the same moments, and
 //      the status ends when the feet leave the water, in both views. A swimmer doesn't drown.
-//   5. Flat: the map view is forced, Tab is locked until it ends, the HUD shows it.
+//   5. Flat: the map view is forced, Tab is locked until it ends, the HUD shows it. Escape (the map's
+//      other way of turning) is locked too, and no fold power fires (Folding strike, a rat next to you).
 //
 // game/startRun/inputHandlers: the real game (game.js). srcFiles: [{ file, text }] of every src/ module.
 import { RULES, overrideRules } from "../../src/rules.js";
@@ -273,11 +274,22 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles }) {
   inputHandlers.onKeyDown("Tab", false);
   const locked = game.mode === "map";
   const hud = St.statusLine(game, game.player).map((s) => s.text);
+  game.player.perks = new Set(["foldingStrike"]);
+  const rat = spawnMonster("rat", 26, 24, FLOOR_Z, "idle", 1, null, () => 0.5);
+  rat.x = 26.5; rat.y = 24.5;
+  game.zone.monsters.push(rat);
+  inputHandlers.onKeyDown("Escape", false);
+  const escLocked = game.mode === "map" && game.view === "map";
+  const folded = St.hasStatus(rat, "stunned") || St.cooldownLeft(game.player, "foldingStrike") > 0;
+  game.zone.monsters.splice(game.zone.monsters.indexOf(rat), 1);
+  game.player.perks = new Set();
   for (let k = 0; k < 8; k++) mapWait(game);   // 4 s: it wears off
   const ended = !St.hasStatus(game.player, "flat");
   inputHandlers.onKeyDown("Tab", false);
   const unlocked = game.mode === "explore";
-  stats.flat = { forcedMap: forced, tabLocked: locked, hud, ended, tabAfter: unlocked };
+  stats.flat = { forcedMap: forced, tabLocked: locked, escapeLocked: escLocked, foldPowers: folded, hud, ended, tabAfter: unlocked };
+  if (!escLocked) fail("flat: Escape on the map turned the world");
+  if (folded) fail("flat: Escape fired the fold powers (Folding strike)");
   if (!forced) fail(`flat in 3D: the view should switch to the map (mode ${game.mode})`);
   if (!locked) fail("flat: Tab turned the world");
   if (!hud.some((t) => t.startsWith("FLAT"))) fail(`flat: the HUD shows ${JSON.stringify(hud)}`);

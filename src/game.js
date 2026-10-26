@@ -443,6 +443,8 @@ function toggleMap() {
     game.log("You've only ever seen the world one way: flat, from above. Is there any other way?", [170, 170, 170]);
     return;
   }
+  // Pressed flat: no way of turning works (Tab, or Escape on the map), and no fold power fires.
+  if (statusFlag(game.player, "flat")) { game.log("You're flat: you can't turn until it passes.", [220, 220, 230]); return; }   // bible §10.2
   foldPowers();
   if (game.mode === "explore") toMapView();
   else if (game.mode === "map") {
@@ -610,9 +612,7 @@ export const inputHandlers = {
     }
     if (game.mode === "inventory") { inventoryAction(inventoryKey(game, code)); return; }
     if (code === "Tab") {
-      if (repeat) return;
-      if (statusFlag(game.player, "flat")) game.log("You're flat: you can't turn until it passes.", [220, 220, 230]);   // bible §10.2
-      else toggleMap();
+      if (!repeat) toggleMap();   // (refused while flat)
       return;
     }
     if (game.mode === "map") { if (!repeat || MAP_MOVES[code]) mapKey(code); return; }
