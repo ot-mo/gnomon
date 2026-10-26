@@ -27,6 +27,9 @@
 //   8. Dynamic resolution: casts over 17 ms for 2 s halve the columns, a halved frame repeats every even
 //      column in the odd one, and casts whose full cost is under 12 ms for 2 s bring it back; never underground.
 //   9. Golden (b) unchanged: the legacy levels' 27 frames (tests/checks/golden.js, its frames part).
+//  10. The victory card over the surface map (tests/checks/screen-frames.js no longer compares that frame with
+//      p0-0c's, since the map behind it is WS3's): in the same state, every line of the card centred in its box,
+//      its borders whole, its title in its colour, and every cell outside the box what the map draws without it.
 import { checkGolden } from "./golden.js";
 
 export async function checkRender(m) {
@@ -317,6 +320,56 @@ export async function checkRender(m) {
     } finally { render3d.setDynamicResolution(false); }
   }
 
+  // --- 10. The victory card over the surface map ---------------------------------------------------------------
+  {
+    m.seedRandom?.(7);   // screen-frames.js's state for the card
+    startRun(7);
+    game.pages = null; game.pendingPages = null; game.story.cube = true;
+    const shot = (mode) => { game.fps = 60; game.frameMs = 1.5; game.mode = mode; game.debug.draw(); return { chars: capture.chars.slice(), colors: capture.colors.slice() }; };
+    const map = shot("map"), won = shot("won"), W = capture.cols, H = capture.rows;
+    const rowText = (y) => won.chars.slice(y * W, (y + 1) * W).join("");
+    const bad = [];
+    const yV = [...Array(H).keys()].find((y) => /(^| )VICTORY( |$)/.test(rowText(y)));
+    if (yV === undefined) bad.push("no VICTORY line");
+    else {
+      const xV = rowText(yV).indexOf("VICTORY"), y0 = yV - 2;
+      let x0 = xV + 3, x1 = xV + 3;
+      while (x0 > 0 && won.chars[y0 * W + x0 - 1] === "-") x0--;
+      while (x1 < W - 1 && won.chars[y0 * W + x1 + 1] === "-") x1++;
+      const w = x1 - x0 + 1;
+      const lines = ["VICTORY", "", "Vorlath is dust, and Hollowmere is safe: flat, and happy about it.", null, "Seed 7", "", "Press R to start a new run"];
+      const level = rowText(y0 + 5).trim();
+      if (!/^Level \d+ · \d+ max HP · \d+ STR · \d+:\d\d of game time$/.test(level)) bad.push(`the level line reads "${level}"`);
+      lines[3] = level;
+      const h = lines.length + 4, y1 = y0 + h - 1;
+      if (w !== Math.max(...lines.map((t) => t.length)) + 6) bad.push(`the box is ${w} wide`);
+      for (let x = x0; x <= x1; x++) if (won.chars[y0 * W + x] !== "-" || won.chars[y1 * W + x] !== "-") { bad.push(`a border is broken at column ${x}`); break; }
+      const inBox = new Set();
+      lines.forEach((t, k) => {
+        const y = y0 + 2 + k, x = x0 + ((w - t.length) >> 1);
+        if (won.chars.slice(y * W + x, y * W + x + t.length).join("") !== t) bad.push(`line ${k} "${t}" is not centred at ${x},${y}`);
+      });
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) inBox.add(y * W + x);
+      for (let y = y0 + 1; y < y1; y++) for (let x = x0; x <= x1; x++) {
+        const k = y - y0 - 2, t = lines[k] ?? "", tx = x0 + ((w - t.length) >> 1);
+        if ((x < tx || x >= tx + t.length) && won.chars[y * W + x] !== " ") { bad.push(`stray "${won.chars[y * W + x]}" in the box at ${x},${y}`); break; }
+      }
+      const ti = yV * W + xV;
+      if ([0, 1, 2].map((c) => won.colors[ti * 3 + c]).join() !== "255,230,120") bad.push("VICTORY isn't in its gold");
+      let outside = 0, differ = 0;
+      for (let i = 0; i < W * H; i++) {
+        if (inBox.has(i)) continue;
+        outside++;
+        if (won.chars[i] !== map.chars[i] || won.colors[i * 3] !== map.colors[i * 3] || won.colors[i * 3 + 1] !== map.colors[i * 3 + 1] || won.colors[i * 3 + 2] !== map.colors[i * 3 + 2]) differ++;
+      }
+      if (differ) bad.push(`${differ} of ${outside} cells outside the box differ from the map without the card`);
+      const mapText = map.chars.join("");
+      if (!/\$ +glim/.test(mapText)) bad.push("the map behind the card isn't the outdoor one (no glim in its legend)");
+      stats.victory = { box: { x0, y0, w, h }, outsideCells: outside, outsideDiffer: differ };
+    }
+    expect(!bad.length, `the victory card: ${bad.slice(0, 4).join("; ")}`);
+  }
+
   // --- 9. Golden (b) --------------------------------------------------------------------------------------------
   if (m.golden) {
     const g = checkGolden(m.golden.api, m.golden.fixtures, { only: ["frames"] });
@@ -338,7 +391,7 @@ export async function run(env) {
   const { currentApi } = await import("../golden/current-api.js");
   const S = await load("screen.js");
   const result = await checkRender({ game: g.game, startRun: g.startRun, S, capture: scr.capture, frameHash: scr.frameHash, clock, light, raycast,
-    render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, golden: null });
+    render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, golden: null, seedRandom: env.seedRandom });
   // Golden (b) last: its api reseeds Math.random and replaces the run.
   const api = await currentApi({ load, capture: scr.capture, frameHash: scr.frameHash }, env.seedRandom);
   const gold = checkGolden(api, fixtures, { only: ["frames"] });

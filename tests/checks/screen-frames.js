@@ -68,16 +68,24 @@ export function screenFrames({ game, startRun, inputHandlers, addStatus, frameHa
   return out;
 }
 
+// Frames still drawn but not compared with the fixture, each with its reason (WS3, applied on ws/ws3 for the
+// integrator to confirm at merge; tests/checks/render.js checks the victory card itself over the new map).
+export const NOT_COMPARED = new Map([
+  ["victory card", "drawn over the temple span's surface map, which WS3's outdoor looks change; the underground frames and golden (b) stay held"],
+]);
+
 export function checkScreenFrames(frames, fixture) {
   const problems = [], want = new Map(fixture.frames.map((f) => [f.name, f.hash]));
-  let mismatched = 0;
+  let mismatched = 0, skipped = 0;
   for (const f of frames) {
     if (!want.has(f.name)) { problems.push(`no recorded frame "${f.name}"`); continue; }
+    if (NOT_COMPARED.has(f.name)) { skipped++; continue; }
     if (want.get(f.name) !== f.hash) { mismatched++; problems.push(`"${f.name}" differs from ${fixture.against}`); }
   }
   for (const name of want.keys()) if (!frames.some((f) => f.name === name)) problems.push(`recorded frame "${name}" not drawn`);
   return { name: `screen frames (the HUD and screens against ${fixture.against})`, ok: problems.length === 0, problems,
-           stats: { frames: `${frames.length} at 180×56, ${mismatched} mismatched` } };
+           stats: { frames: `${frames.length} at 180×56, ${frames.length - skipped} compared, ${mismatched} mismatched`,
+                    notCompared: [...NOT_COMPARED].map(([name, why]) => `${name}: ${why}`) } };
 }
 
 // tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
