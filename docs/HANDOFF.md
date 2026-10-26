@@ -11,7 +11,7 @@ Update this file as the last act of every session (see `CLAUDE.md`, "Handing off
 - **Tags not on GitHub yet:** the cloud session's git proxy refuses tag pushes (HTTP 403). Create them from a local
   checkout after `git fetch origin`:
   - `git tag -a p0-0a2 47505d2 -m "Phase 0 session 0A2" && git push origin p0-0a2`
-  - `git tag -a p0-0b TAG0B -m "Phase 0 session 0B" && git push origin p0-0b`
+  - `git tag -a p0-0b 2e53dd6 -m "Phase 0 session 0B" && git push origin p0-0b`
 - **Done:** 0A1, 0A2, 0B. Notes with APIs, gate numbers, deviations and verification fixes: `docs/sessions/0A1.md`,
   `0A2.md`, `0B.md`.
 - **Checks:** `node tools/run-all.mjs`, 13 checks, about 75 s, all green. `tools/browser-gate.mjs` runs the 0A2 browser
