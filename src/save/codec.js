@@ -6,7 +6,7 @@
 //                  state, player, ids, run, zones: [{ key, savedAt }], live?: sessionId, unclean: 0,
 //                  checkpoint?: SlotRecord, dead?: bool }
 //                where = { zoneKey, world: null, view: "3d" | "map" }   (state.where of §2.17, plus the view)
-//   ZoneRecord = { slot, key, savedAt, ids, genVersion, type, level, w, d, h,
+//   ZoneRecord = { slot, key, savedAt, ids, cp, genVersion, type, level, w, d, h,
 //                  blocks: "b64(deflate)" | { raw: "b64" }, seen: (the same), holeSeen: (the same),
 //                  creatures: [trimmed], items, props, bombs, clouds, markers, sightings: [[id, s]], links: [[i, link]],
 //                  groups: [[id, g]], spikes: [[col, s]], secretWalls: [col], braziers, secret, vault, guardianHall,
@@ -26,18 +26,21 @@
 //                                         and decode gets the Uint8Array back
 //   CREATURE_FIELDS, registerCreatureField(name)   what a trimmed creature keeps (§7.2's whitelist, below)
 //   trimCreature(c) → record · rebuildCreature(record, zone) → creature
-//   snapshotZone(zone, { slot, savedAt }) → snap      synchronous: every live object is read here, once (the JSON
-//                                         of the record, and copies of its byte grids). The record keeps the id
+//   snapshotZone(zone, { slot, savedAt, cp = 0 }) → snap      synchronous: every live object is read here, once (the
+//                                         JSON of the record, and copies of its byte grids). The record keeps the id
 //                                         counter as it was then (ids: getIds()), above every id in the zone: a
-//                                         load sets the counter above every record's (save.js loadGame, §7.4)
+//                                         load sets the counter above every record's (save.js loadGame, §7.4); and
+//                                         cp, the checkpoint it was written under (§7.5; save.js, copy on write)
 //   finishZone(snap, { deflate = CODEC.deflate }) → Promise<ZoneRecord>   compression; reads nothing live
+//   finishZoneNow(snap) → ZoneRecord       the same at once, uncompressed ({ raw }): the unload save (§7.3)
 //   encodeZone(zone, meta, { deflate }) → Promise<ZoneRecord>     both
 //   decodeZone(record) → Promise<Zone>     a sealed zone, its derived arrays dropped (refresh() rebuilds them);
 //                                         creatures rebuilt with spawnCreature and the saved fields assigned over
 //                                         them, without moving the id counter (unless it is not above a rebuilt
 //                                         creature's id: then it goes just past it, so no id is handed out twice)
 //   encodePlayer(p) → JSON · decodePlayer(json) → player     the transient fields (§2.4) left out, then defaulted
-//   snapshotSlot(game, { id, created, updated, zones }) → { id, json }   synchronous, like snapshotZone
+//   snapshotSlot(game, { id, created, updated, zones, live = null, unclean = 0, checkpoint }) → { id, json }
+//                                         synchronous, like snapshotZone; live, unclean and checkpoint (§7.5) as given
 //   jsonProblems(value, path, { shared }) → [problem]   R5's walker: anything JSON can't carry (a Set, a Map, a
 //                                         typed array, a function, a class instance, undefined in an array,
 //                                         NaN or ±Infinity, a cycle) and, unless shared is allowed, one object
@@ -159,7 +162,7 @@ export function rebuildCreature(rec, zone) {
 }
 
 // --- Zones ------------------------------------------------------------------------------------------------
-const IDENTITY = ["key", "genVersion", "type", "level", "w", "d", "h", "ids"];
+const IDENTITY = ["key", "genVersion", "type", "level", "w", "d", "h", "ids", "cp"];
 // The byte grids are packed alike (blocks, and the map memory: §7.2 writes seen and holeSeen as plain "b64",
 // but deflated they take 36-40 bytes where plain they take 3-5 KB each, most of a zone's record).
 const GRIDS = ["blocks", "seen", "holeSeen"];
@@ -192,8 +195,8 @@ registerZoneField("gen", {
 for (const f of ["slam", "slamDone"])
   registerZoneField(f, { encode: (s) => (s ? { ...s, cells: [...s.cells] } : null), decode: (j) => (j ? { ...j, cells: new Set(j.cells) } : null) });
 
-export function snapshotZone(zone, { slot = null, savedAt = 0 } = {}) {
-  const rec = { slot, key: zone.key, savedAt, ids: getIds(), genVersion: zone.genVersion, type: zone.type, level: zone.level, w: zone.w, d: zone.d, h: zone.h,
+export function snapshotZone(zone, { slot = null, savedAt = 0, cp = 0 } = {}) {
+  const rec = { slot, key: zone.key, savedAt, ids: getIds(), cp, genVersion: zone.genVersion, type: zone.type, level: zone.level, w: zone.w, d: zone.d, h: zone.h,
     blocks: null, seen: null, holeSeen: null, creatures: zone.creatures.map(trimCreature) };
   const bytes = { blocks: zone.blocks.slice(), seen: zone.seen.slice(), holeSeen: zone.holeSeen.slice() };
   for (const f of PLAIN) rec[f] = zone[f] ?? [];
@@ -218,6 +221,11 @@ export function snapshotZone(zone, { slot = null, savedAt = 0 } = {}) {
 export async function finishZone(snap, { deflate = CODEC.deflate } = {}) {
   const rec = JSON.parse(snap.json);
   for (const [f, b] of Object.entries(snap.bytes)) rec[f] = await packBytes(b, { deflate });
+  return rec;
+}
+export function finishZoneNow(snap) {
+  const rec = JSON.parse(snap.json);
+  for (const [f, b] of Object.entries(snap.bytes)) rec[f] = { raw: toB64(b) };
   return rec;
 }
 export const encodeZone = (zone, meta, opts) => finishZone(snapshotZone(zone, meta), opts);
@@ -264,7 +272,7 @@ export function decodePlayer(data) {
 }
 
 // --- The slot ---------------------------------------------------------------------------------------------
-export function snapshotSlot(game, { id, created, updated, zones = [] }) {
+export function snapshotSlot(game, { id, created, updated, zones = [], live = null, unclean = 0, checkpoint }) {
   const p = game.player;
   const slot = {
     id, game: GAME_ID, version: VERSION.save, genVersion: VERSION.gen, worldVersion: VERSION.world, created, updated,
@@ -272,7 +280,7 @@ export function snapshotSlot(game, { id, created, updated, zones = [] }) {
     character: { name: p.name ?? null, genotype: p.genotype ?? null, background: p.background ?? null, level: p.level },
     where: { zoneKey: game.zone?.key ?? null, world: null, view: game.view },
     time: game.time, state: game.state, player: encodePlayer(p), ids: getIds(), run: serializeRun(game.run),
-    zones, unclean: 0,
+    zones, live, unclean, ...(checkpoint ? { checkpoint } : {}),
   };
   const problems = [...jsonProblems(slot.state, "state"), ...jsonProblems(slot.player, "player"), ...jsonProblems(slot.run, "run", { shared: true })];
   if (problems.length) throw new Error(`snapshotSlot: not plain JSON (R5): ${problems.slice(0, 5).join("; ")}`);
