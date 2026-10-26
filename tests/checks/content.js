@@ -18,6 +18,7 @@
 //      - screens: draw(), handlers that are functions, pausesTime/saveable booleans, pointer unlock | lock | keep,
 //        over view | none, filed under its own mode.
 //      - HUD segments: unique ids, parts(), a priority, row 0 | 1, align left | right.
+//      - block uses (interact.js registerUse): keyed by a block that exists or a flag some block has.
 //      - legend handlers: unique ids, and every letter of the default legend and of every plan (vaults, guardian and
 //        boss halls, the worlds' landmark plans, the temple's three) names a registered handler.
 //   2. Bonus keys (Appendix A): every bonus content gives (gear properties, rings and amulets at −2..+2, relics,
@@ -196,6 +197,12 @@ export function checkContent(m) {
     for (const [ch, h] of Object.entries(p.legend || {})) { letters++; need(handlers.includes(h), `${what}: "${ch}" names legend handler "${h}", which isn't registered`); }
   stats.legend = `${handlers.length} handlers; ${letters} letters over ${plans.length} legends`;
 
+  // Block uses (interact.js registerUse): each keyed by a block that exists or a flag some block has.
+  const uses = m.interact.useIds();
+  for (const k of uses)
+    need(typeof k === "number" ? !!m.blocks[k] : m.blocks.some((b) => b?.[k]), `block use ${k}: no such block${typeof k === "number" ? "" : " flag"}`);
+  stats.uses = uses.map(String).join(", ");
+
   // --- 2. Bonus keys ----------------------------------------------------------------------------------------
   const KEYS = new Set([...m.stats.BONUS_KEYS, ...m.stats.ATTRS]);
   let tables = 0;
@@ -328,17 +335,17 @@ export function checkMutations(m) {
 
 // The modules checkContent reads, after env.screen() has loaded the game as main.js does, and a run started.
 export async function contentModules(src) {
-  const [creatures, items, status, abilities, screens, hud, vaults, stats, leveling, run, sites, worldmodel, testWorld, worldmap, temple, game] =
+  const [creatures, items, status, abilities, screens, hud, vaults, stats, leveling, run, sites, worldmodel, testWorld, worldmap, temple, game, interact, world] =
     await Promise.all(["creatures.js", "items.js", "status.js", "abilities.js", "screens.js", "hud.js", "gen/vaults.js", "stats.js", "leveling.js",
       "world/run.js", "world/sites.js", "world/worldmodel.js", "content/world/test-world.js", "content/world/worldmap.js", "content/world/temple.js",
-      "game.js"].map((p) => src(p)));
+      "game.js", "interact.js", "world.js"].map((p) => src(p)));
   game.startRun(4242);
   game.game.pages = null;
   return {
     creatures, items, status, abilities, screens, hud, vaults, stats, leveling, game: game.game,
     buildRun: run.buildRun, dungeonLevelOf: sites.dungeonLevelOf, compileWorld: worldmodel.compileWorld, contentLevel: stats.contentLevel,
     worlds: [{ id: "test", def: testWorld.TEST_WORLD }, { id: "real", def: worldmap.REAL_WORLD }],
-    templeLegends: temple.TEMPLE_LEGENDS,
+    templeLegends: temple.TEMPLE_LEGENDS, interact, blocks: world.BLOCKS,
   };
 }
 
