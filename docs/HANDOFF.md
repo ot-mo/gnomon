@@ -35,9 +35,10 @@ workstream ends the same way as a Phase 0 session: implement → independent ver
 - **Timing on this laptop:** when the user's ML training job runs, timed checks read 2-3x slow. Before calling a timed
   failure a regression, check the CPU and compare against an older tag in a worktree, run alternately
   (`check-perf --against <ref>` does this itself). Never loosen a budget.
-- **Serving the repository:** use `node tools/serve.mjs <port>`. Python's `http.server` (DECISIONS' `gnomon` preview)
-  drops part of a boot's ~150 module requests on Windows. The local `.claude/launch.json` (untracked) also has a
-  `gnomon-node` preview on port 8131 that runs `serve.mjs`.
+- **Serving the repository:** `node tools/serve.mjs <port>` (DECISIONS "Browser checks"; the `gnomon` preview in the
+  local, untracked `.claude/launch.json` runs it on 8130). Python's `http.server` drops part of a boot's ~150 module
+  requests on Windows. Worktrees made from `p0-done` carry the older DECISIONS text that still names Python: the main
+  checkout's DECISIONS is the one that holds.
 - **Frame times on the GPU:** the browser tools' default Chromium renders on SwiftShader (the CPU). Playwright's
   headless shell renders on the Intel UHD when launched with `--use-angle=d3d11 --ignore-gpu-blocklist`
   (`0D2.md` §8 has the launch shim). Playwright's full Chromium doesn't start on this machine; Google Chrome

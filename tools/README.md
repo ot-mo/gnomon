@@ -48,9 +48,8 @@ sends anything connected to the speakers into an `AnalyserNode` followed by a ze
 the speakers**. They close the browser when they finish.
 
 **Playing it, or poking at it, by hand:** serve the repository's root (`node tools/serve.mjs`, port 8130; the `gnomon`
-preview configuration in the local `.claude/launch.json` runs `python -m http.server 8130`, which on Windows sometimes
-stalls a boot, see above: reload, or point it at `node tools/serve.mjs`) and open `http://127.0.0.1:8130/index.html`
-with any of these flags (`src/config.js` `FLAGS`):
+preview configuration in the local `.claude/launch.json` runs the same, as DECISIONS says) and open
+`http://127.0.0.1:8130/index.html` with any of these flags (`src/config.js` `FLAGS`):
 
 | Flag | What it does |
 |---|---|
