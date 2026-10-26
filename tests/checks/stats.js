@@ -1,0 +1,211 @@
+// The stat bus (stats.js) and RULES (rules.js): TECH_DESIGN §2.6 and the 0B gate.
+//
+//   checkStats({ game, startRun, inventory, mechanics }) → { name, ok, problems, stats }
+//
+//   1. RULES is frozen; extendRules adds a namespace once; overrideRules undoes.
+//   2. In both formula sets: putting on and taking off every piece of gear (every weapon, armour, ring,
+//      amulet and property, enchantments −2, 0, +2, and every relic) leaves every derived number
+//      consistent: the cached bonus table equals a fresh sum over the sources, STR / max HP / armour
+//      equal the formulas worked out here from the raw tables, and taking it off restores the numbers
+//      before. Statuses (a stub status bonus) and every perk the same.
+//   3. No base-field writes: the real inventory code (equip, swap) runs on a player behind
+//      guardBaseFields; any write to attrs, maxHpGain or level is a problem.
+//   4. The attribute formulas at their reference points (TOU 16 gives the parent's 20 + 3 per level…).
+//   5. `mechanics`: a function that replays golden (a) and returns { mismatched, writes } with
+//      STATS_DEBUG.verify on (every bonus() checks the cache) and the player guarded; the only base
+//      writes allowed are the permanent ones (potions and crystals of strength, heart crystals, perks).
+//
+// game/startRun/inventory: the real modules, so equipping runs exactly as in play.
+import { RULES, extendRules, overrideRules } from "../../src/rules.js";
+import * as St from "../../src/stats.js";
+import { WEAPONS, ARMOURS, RINGS, AMULETS, RELICS, PROPERTIES, itemBonuses, makeRelic } from "../../src/items.js";
+import { PERKS, perkRank, takePerk } from "../../src/leveling.js";
+
+const SETS = ["legacy", "attributes"];
+
+// Every derived number of an entity, as plain data.
+export function derived(game, e) {
+  return {
+    attrs: Object.fromEntries(St.ATTRS.map((k) => [k, St.attr(e, k)])),
+    mods: Object.fromEntries(St.ATTRS.map((k) => [k, St.mod(e, k)])),
+    maxHp: St.maxHp(e), av: St.av(e), dv: St.dv(e), ma: St.ma(e), speed: St.speedMul(e), cooldown: St.cooldownMul(e),
+    carry: St.carryCap(e), price: St.priceMul(game, e), regen: St.regenEvery(e), mental: St.mentalLevel(e),
+    examine: St.examineScore(e), swim: St.canSwim(e),
+    bonus: Object.fromEntries(St.BONUS_KEYS.map((k) => [k, St.bonus(e, k)])),
+  };
+}
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const diff = (a, b) => Object.keys(a).filter((k) => !same(a[k], b[k])).join(", ");
+
+// The bonuses worked out by hand from the raw tables (not through stats.js).
+function expectedBonus(e, statusBonus) {
+  const out = {};
+  const add = (b) => { for (const k in b) out[k] = (out[k] || 0) + b[k]; };
+  for (const it of [e.weapon, e.armour, e.ring, e.amulet]) if (it) add(itemBonuses(it));
+  for (const k of e.perks || []) if (PERKS[k].bonus) add(PERKS[k].bonus(perkRank(e, k)));
+  for (const id in e.status || {}) add(statusBonus(id, e.status[id]) || {});
+  return out;
+}
+function expectedCore(e, b) {
+  const g = (k) => b[k] || 0, legacy = RULES.stats === "legacy";
+  const str = (legacy ? e.attrs.str - 16 + 10 : e.attrs.str) + g("str");
+  const tou = e.attrs.tou + g("tou"), touMod = Math.floor((tou - 16) / 2);
+  const maxHp = legacy ? Math.max(1, 20 + 3 * (e.level - 1) + e.maxHpGain + g("maxHp"))
+                       : Math.max(1, tou + 4 + (e.level - 1) * Math.max(1, 3 + touMod) + e.maxHpGain + g("maxHp"));
+  const body = ARMOURS[e.armour.id].armour + e.armour.ench;
+  const av = legacy ? body + g("armour") : body + g("armour") + g("av");
+  return { str, maxHp, av };
+}
+
+// Every piece of gear there is (a shared list, so each test makes fresh copies).
+export function gearCatalog() {
+  const out = [];
+  for (const ench of [-2, 0, 2]) {
+    for (const id in WEAPONS) out.push({ kind: "weapon", id, ench, known: true });
+    for (const id in ARMOURS) out.push({ kind: "armour", id, ench, known: true });
+    for (const id in RINGS) out.push({ kind: "ring", id, ench: RINGS[id].fixed ? 1 : ench, known: true });
+    for (const id in AMULETS) out.push({ kind: "amulet", id, ench: AMULETS[id].fixed ? 1 : ench, known: true });
+  }
+  for (const k in PROPERTIES) {
+    const slot = PROPERTIES[k].slot;
+    out.push({ kind: slot, id: slot === "weapon" ? "longsword" : "chain", ench: 1, known: true, props: [k] });
+  }
+  for (const key in RELICS) out.push(makeRelic(key));
+  return out;
+}
+
+export function checkStats({ game, startRun, inventory, mechanics }) {
+  const problems = [], stats = {};
+  const t0 = Date.now();
+
+  // --- 1. RULES ---------------------------------------------------------------------------
+  const throws = (fn) => { try { fn(); return false; } catch { return true; } };
+  if (!throws(() => { RULES.stats = "attributes"; })) problems.push("RULES.stats can be assigned");
+  if (!throws(() => { RULES.attr.base = 10; })) problems.push("RULES.attr.base can be assigned");
+  if (!throws(() => { delete RULES.legacy; })) problems.push("RULES.legacy can be deleted");
+  const ns = `checkStats${Date.now()}`;
+  extendRules(ns, { a: { b: 1 } });
+  if (RULES[ns]?.a?.b !== 1) problems.push("extendRules did not add its namespace");
+  if (!throws(() => { RULES[ns].a.b = 2; })) problems.push("an extended namespace is not frozen");
+  if (!throws(() => extendRules(ns, {}))) problems.push("extendRules replaced an existing namespace");
+  if (!throws(() => extendRules("stats", {}))) problems.push("extendRules replaced a core namespace");
+  const undo = overrideRules("stats", "attributes");
+  if (RULES.stats !== "attributes") problems.push("overrideRules did not switch RULES.stats");
+  undo();
+  if (RULES.stats !== "legacy") problems.push(`RULES.stats is ${RULES.stats} after undo, not legacy`);
+  if (St.contentLevel(25) !== 20 || St.contentLevel(7) !== 7) problems.push(`contentLevel: 25 → ${St.contentLevel(25)}, 7 → ${St.contentLevel(7)}`);
+
+  // --- 2. Gear, statuses and perks in both formula sets -----------------------------------------
+  const statusBonus = (id, s) => (id === "checkMight" ? { str: s.mag, maxHp: 4 * s.mag, av: 1, dv: 2 } : null);
+  St.setStatusBonus(statusBonus);
+  const gear = gearCatalog();
+  let changes = 0;
+  for (const set of SETS) {
+    const undoSet = overrideRules("stats", set);
+    startRun(1234);
+    const p = game.player;
+    const consistent = (what) => {
+      const b = expectedBonus(p, statusBonus), table = St.bonusTable(p), fresh = St.bonusTableUncached(p);
+      if (!same(Object.entries(table).sort(), Object.entries(fresh).sort()))
+        problems.push(`${set}, ${what}: the cached bonuses differ from the sources`);
+      for (const k of new Set([...Object.keys(b), ...Object.keys(table)]))
+        if (Math.abs((b[k] || 0) - (table[k] || 0)) > 1e-9) { problems.push(`${set}, ${what}: bonus(${k}) is ${table[k] || 0}, expected ${b[k] || 0}`); break; }
+      const want = expectedCore(p, b), got = { str: St.attr(p, "str"), maxHp: St.maxHp(p), av: St.av(p) };
+      if (!same(want, got)) problems.push(`${set}, ${what}: ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`);
+    };
+    const before0 = derived(game, p);
+    if (set === "legacy" && (before0.attrs.str !== 10 || before0.maxHp !== 20)) problems.push(`legacy start: STR ${before0.attrs.str}, max HP ${before0.maxHp} (want 10, 20)`);
+    if (set === "attributes" && (before0.attrs.str !== 16 || before0.maxHp !== 20)) problems.push(`attribute start: STR ${before0.attrs.str}, max HP ${before0.maxHp} (want 16, 20)`);
+    for (const proto of gear) {
+      const it = { ...proto, props: proto.props && [...proto.props] }, slot = it.kind;
+      const before = derived(game, p), old = p[slot];
+      p[slot] = it; St.invalidateStats(p); changes++;
+      consistent(`wearing ${slot} ${it.relic || it.id} ${it.ench}${it.props ? " " + it.props : ""}`);
+      p[slot] = old; St.invalidateStats(p);
+      const after = derived(game, p);
+      if (!same(before, after)) problems.push(`${set}: taking off ${slot} ${it.relic || it.id} ${it.ench} changed ${diff(before, after)}`);
+    }
+    // Statuses through the "statuses" source.
+    const before = derived(game, p);
+    p.status = { checkMight: { t: 10, mag: 2 } }; St.invalidateStats(p);
+    consistent("with a status");
+    if (St.attr(p, "str") !== before.attrs.str + 2) problems.push(`${set}: a +2 STR status gives STR ${St.attr(p, "str")}`);
+    delete p.status.checkMight; St.invalidateStats(p);
+    if (!same(before, derived(game, p))) problems.push(`${set}: removing the status changed ${diff(before, derived(game, p))}`);
+    // Every perk, every rank, through takePerk.
+    for (const k in PERKS) for (let r = 0; r < (PERKS[k].max || 1); r++) { takePerk(game, k); consistent(`perk ${k} ${r + 1}`); }
+    // A stale cache is caught (the check itself works).
+    St.STATS_DEBUG.verify = true;
+    p.ring = { kind: "ring", id: "strength", ench: 3, known: true };   // no invalidateStats on purpose
+    if (!throws(() => St.bonus(p, "str"))) problems.push(`${set}: STATS_DEBUG.verify missed a stale cache`);
+    St.STATS_DEBUG.verify = false;
+    St.invalidateStats(p);
+    undoSet();
+  }
+  St.setStatusBonus(null);
+  stats.gear = { items: gear.length, changes, sets: SETS.length };
+
+  // --- 3. No base-field writes from the inventory code ---------------------------------------
+  {
+    startRun(1234);
+    const writes = [];
+    St.raiseAttr(game.player, "str", 20);   // strong enough for everything (a permanent change, before the guard)
+    const real = game.player;
+    game.player = St.guardBaseFields(real, (path) => writes.push(path));
+    const p = game.player;
+    let equips = 0;
+    for (const proto of gear) {
+      if (proto.ench < 0) continue;   // cursed gear sticks: it would block the next item
+      const it = { ...proto, props: proto.props && [...proto.props] };
+      p.inv.push(it);
+      const ok = inventory.equip(game, it, p.inv.length - 1);
+      if (!ok) { problems.push(`inventory.equip refused ${it.kind} ${it.relic || it.id}`); continue; }
+      equips++;
+      if (St.maxHp(p) < p.hp) problems.push(`after equipping ${it.id}, HP ${p.hp} is above max HP ${St.maxHp(p)}`);
+      if (it.kind === "weapon" && p.sidearm) { inventory.swapWeapons(game); inventory.swapWeapons(game); equips += 2; }
+    }
+    game.player = real;
+    stats.inventory = { equips, baseWrites: writes.length };
+    if (writes.length) problems.push(`the inventory code wrote base fields: ${[...new Set(writes)].join(", ")}`);
+  }
+
+  // --- 4. Attribute formulas at their reference points ---------------------------------------
+  {
+    const undoSet = overrideRules("stats", "attributes");
+    const e = { attrs: St.makeAttrs(), level: 1, maxHpGain: 0, perks: new Set() };
+    const at = (fn) => fn(e);
+    const expect = (what, got, want) => { if (Math.abs(got - want) > 1e-9) problems.push(`attributes: ${what} is ${got}, expected ${want}`); };
+    expect("max HP at TOU 16, level 1", at(St.maxHp), 20);
+    e.level = 5; expect("max HP at TOU 16, level 5", at(St.maxHp), 32);
+    e.attrs.tou = 20; expect("max HP at TOU 20, level 5", at(St.maxHp), 24 + 4 * 5);
+    e.attrs.tou = 6; expect("max HP at TOU 6, level 5", at(St.maxHp), 10 + 4 * 1);
+    e.attrs.tou = 16; e.level = 1;
+    expect("DV at AGI 16", at(St.dv), 6); expect("MA at WIL 16", at(St.ma), 4);
+    expect("DV while unable to act", St.dv(e, { unable: true }), 0);
+    e.attrs.agi = 19; expect("DV at AGI 19", at(St.dv), 7);
+    e.attrs.wil = 20; expect("cooldown at WIL 20", at(St.cooldownMul), 0.8); expect("MA at WIL 20", at(St.ma), 6);
+    e.attrs.wil = 40; expect("cooldown at WIL 40 (floor)", at(St.cooldownMul), 0.2);
+    expect("buy at EGO 16", St.priceMul(game, e).buy, 1.5); expect("sell at EGO 16", St.priceMul(game, e).sell, 0.3);
+    e.attrs.ego = 20; expect("buy at EGO 20", St.priceMul(game, e).buy, 1.3); expect("sell at EGO 20", St.priceMul(game, e).sell, 0.4);
+    expect("mental level at EGO 20, level 1", at(St.mentalLevel), 3);
+    expect("carry at STR 16", at(St.carryCap), 240);
+    undoSet();
+  }
+
+  // --- 5. Golden (a) with the cache verified and base writes watched -------------------------
+  if (mechanics) {
+    const r = mechanics();
+    stats.goldenA = { steps: r.steps, mismatched: r.mismatched, baseWrites: r.writes.length };
+    if (r.mismatched) problems.push(`golden (a) with the stat cache verified: ${r.mismatched} steps differ`);
+    // The permanent changes in the scenario: 2 potions of strength, 1 strength crystal and Mighty (STR);
+    // 2 heart crystals and Tough twice (max HP). Nothing else may touch a base field.
+    const count = (path) => r.writes.filter((w) => w === path).length;
+    if (count("attrs.str") !== 4) problems.push(`golden (a): ${count("attrs.str")} STR writes, expected 4`);
+    if (count("maxHpGain") !== 4) problems.push(`golden (a): ${count("maxHpGain")} max HP writes, expected 4`);
+    const other = r.writes.filter((w) => w !== "attrs.str" && w !== "maxHpGain");
+    if (other.length) problems.push(`golden (a) wrote other base fields: ${[...new Set(other)].join(", ")}`);
+  }
+
+  stats.ms = Date.now() - t0;
+  return { name: "stats", ok: problems.length === 0, problems, stats };
+}
