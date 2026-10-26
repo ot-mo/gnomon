@@ -355,9 +355,13 @@ export function horizonOf(game, zone) {
 }
 
 // A ray that left the voxels going down (dz < 0) without hitting: the plane at its side's height, from
-// where the ray left (tExit) at the nearest; lit as open ground, a noise texture for its characters, hazed.
+// where the ray left (tExit) at the nearest; lit as open ground, a noise texture for its characters, hazed. Its
+// side is the one it left by (beyond a corner, or still inside at its reach: the way it was going), so sides that
+// differ meet where their aprons meet, not on a diagonal.
 function shadeHorizon(dx, dy, dz, tExit, time) {
-  const side = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? horizon.e : horizon.w) : (dy > 0 ? horizon.s : horizon.n);
+  const outX = hit.out === 1 && (hit.mx < 0 || hit.mx >= ZW), outY = hit.out === 1 && (hit.my < 0 || hit.my >= ZD);
+  const side = outX && !outY ? (hit.mx < 0 ? horizon.w : horizon.e) : outY && !outX ? (hit.my < 0 ? horizon.n : horizon.s)
+    : Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? horizon.e : horizon.w) : (dy > 0 ? horizon.s : horizon.n);
   let t = (side.z - cam.ez) / dz;
   if (!(t > tExit)) t = tExit;
   const px = cam.ex + dx * t, py = cam.ey + dy * t;

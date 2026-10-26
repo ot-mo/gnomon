@@ -17,7 +17,8 @@ function ghostShows(x, y, z, axis, sx, sy, sz) {
 // OUT.TOP (up, above everything);
 // missT is how far it had gone (render3d's horizon plane starts there).
 export const OUT = { FAR: 0, SIDE: 1, BOTTOM: 2, TOP: 3 };
-export const hit = { t: 0, block: 0, nx: 0, ny: 0, nz: 0, x: 0, y: 0, z: 0, apron: false, out: 0, missT: 0 };
+// mx, my: the voxel it left from, for OUT.SIDE.
+export const hit = { t: 0, block: 0, nx: 0, ny: 0, nz: 0, x: 0, y: 0, z: 0, apron: false, out: 0, missT: 0, mx: 0, my: 0 };
 
 // --- What a ray needs to know about a zone's apron and height -------------------------------------
 // The apron's bands in a 3 × 3 grid (rows n, middle, s; columns w, middle, e; world.js apronRect), so a ray
@@ -118,10 +119,10 @@ export function castRay(zone, ox, oy, oz, dx, dy, dz, maxT, seen = null, torchRa
       continue;
     }
     if ((x < X0 && stepX < 0) || (x >= X1 && stepX > 0) ||
-        (y < Y0 && stepY < 0) || (y >= Y1 && stepY > 0)) { hit.out = 1; hit.missT = t; return false; }
+        (y < Y0 && stepY < 0) || (y >= Y1 && stepY > 0)) { hit.out = 1; hit.missT = t; hit.mx = x; hit.my = y; return false; }
     // Down out of the zone: a pit when it is inside the grid; beyond it (a shut corner between two open sides, no
     // band there) it is the world beyond, like a ray leaving by a side.
-    if (z < 0 && stepZ < 0) { hit.out = x >= 0 && y >= 0 && x < W && y < D ? 2 : 1; hit.missT = t; return false; }
+    if (z < 0 && stepZ < 0) { hit.out = x >= 0 && y >= 0 && x < W && y < D ? 2 : 1; hit.missT = t; hit.mx = x; hit.my = y; return false; }
     if (z >= TOP && stepZ > 0) break;
     lastLit = false;
     if (z < 0 || z >= H || x < X0 || y < Y0 || x >= X1 || y >= Y1) continue;
