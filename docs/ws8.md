@@ -75,7 +75,8 @@ AI_RULES = RULES.ai = { foeRange 8, foeForget 3, lose 8, outdoorRadius 32,
 - **Abilities**: a creature with abilities (`c.innate`, or its gear's) tries each ready one every 0.5 s when
   `def.ai.when(game, c, target)` is true; `use(game, c, lvl, target)` gets `{ creature, point, tile, dir }` with
   `creature` what it fights, **you included** (WS4: an ability's `use` must expect the player as a target).
-- **Zone changes**: `zone:leave` takes along your followers within 8 tiles (over an edge or by the stairs) and, over
+- **Zone changes**: `zone:leave` takes along your followers within 8 tiles (over an edge, by the stairs, or on WS1's
+  world-map travel, `how: "travel"`) and, over
   an edge, whatever hunts you within 6 tiles (not guardians, bosses, statues or the rooted), out of the zone you leave
   before write-behind snapshots it; `zone:enter` puts them in at the border you crossed (the stairs: beside you),
   `arriving` for as long as their way to you took (at most 4 s). A zone you come back to (`away` s later, not a load)

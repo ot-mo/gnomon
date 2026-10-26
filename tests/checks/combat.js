@@ -800,6 +800,10 @@ export function checkAiDepth(ctx) {
       changeZone(game, "0,0,2", { how: "down" });
       expect(game.zone.creatures.includes(f) && !game.zone.creatures.includes(h), `down the stairs: the follower came ${game.zone.creatures.includes(f)}, the hunter came ${game.zone.creatures.includes(h)} (want only the follower)`);
       stats.stairs = { follower: game.zone.creatures.includes(f), hunter: game.zone.creatures.includes(h) };
+      // World travel (WS1: arrival "travel") takes your followers along too.
+      changeZone(game, "0,0,0", { how: "travel" });
+      expect(game.zone.key === "0,0,0" && game.zone.creatures.includes(f), `world travel: the follower came ${game.zone.creatures.includes(f)}`);
+      stats.travel = { follower: game.zone.creatures.includes(f) };
       run.restore(); run = null;
     }
 

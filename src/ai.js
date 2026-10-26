@@ -43,8 +43,8 @@
 // RULES.ai.ability.every seconds, when def.ai.when(game, c, target) says so; target is what it fights (you
 // or a creature), passed to use() as { creature, point, tile, dir } like aimTarget's (creature may be you).
 //
-// Zone changes (zones.js events): on zone:leave the followers within reach, and over an edge the hunters
-// within RULES.ai.chaseEdge tiles, leave the zone you leave (before write-behind snapshots it); on
+// Zone changes (zones.js events): on zone:leave the followers within reach (over an edge, by the stairs, on
+// the world map), and over an edge the hunters within RULES.ai.chaseEdge tiles, leave the zone you leave (before write-behind snapshots it); on
 // zone:enter they come in at the border you crossed (the stairs: beside you), each `arriving` for as long
 // as its way to you took. On zone:enter, a zone you come back to catches up on the time you were away:
 // statuses run out (status.js catchUpStatuses), creatures heal (fully after RULES.ai.heal.fullAfter s),
@@ -535,10 +535,10 @@ on("zone:leave", (game, { zone, how }) => {
   transit = [];
   const p = game.player;
   if (!zone?.creatures || !p) return;
-  const edge = how === "edge", stairs = how === "down" || how === "up";
+  const edge = how === "edge", stairs = how === "down" || how === "up" || how === "travel";   // (travel: WS1's world map)
   if (!edge && !stairs) return;
   for (const c of [...zone.creatures]) {
-    if (canTalk(c) || c.hp <= 0 || c.brain?.arriving > 0) continue;
+    if (canTalk(c) || c.hp <= 0) continue;   // (one still arriving comes along again, from where it was put)
     const t = CREATURE_TYPES[c.type];
     if (t.guardian || t.boss || t.statue || !(t.speed > 0) || statusFlag(c, "noAct") || statusFlag(c, "noMove")) continue;
     const d = distance(c.x - p.x, c.y - p.y);
