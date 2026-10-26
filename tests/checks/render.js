@@ -270,7 +270,25 @@ export async function checkRender(m) {
     expect(bake > 0 && (mid.baking ? walled.sunlit === old && mid.bucket === b0 : mid.bucket === clock.lightBucketAt(minute(12))), `a new bucket: ${JSON.stringify({ b0, mid })}`);
     for (let k = 0; k < 50 && light.sunState(walled).baking; k++) light.syncLight(game, walled);
     expect(light.sunState(walled).bucket === clock.lightBucketAt(minute(12)) && walled.sunlit !== old, "the new bucket's bake never finished");
-    stats.sun = { ...Object.fromEntries(Object.entries(m).map(([k, v]) => [k, +v.toFixed(2)])), floorShadow: shadowL, floorSun: sunL };
+    // A zone baked without its apron (as a neighbour is, ahead) is baked again once it has one: within a few frames
+    // its shadows are a fresh bake's with the apron (the test world's 1,0,0 at 07:00: the sun low over its east edge).
+    fresh(4242);
+    game.debug.enterZone("1,0,0", "start");
+    const nz = game.zone;
+    for (const side of ["n", "e", "s", "w", "ne", "nw", "se", "sw"]) { const a = zones.neighbourAddr(game, nz, side); if (a && !zones.cachedZone(game, a.key)) zones.makeZone(game, a.key); }
+    zones.fillApron(game, nz);
+    game.time = T(7);
+    const bucket7 = clock.lightBucketAt(minute(7)), withApron = nz.apron;
+    nz.apron = null; light.bakeSun(nz, bucket7); const bare = nz.sunlit.slice();
+    nz.apron = withApron;
+    let frames = 0;
+    do { light.syncLight(game, nz); frames++; } while (light.sunState(nz).baking && frames < 50);
+    const rebaked = nz.sunlit.slice();
+    nz.apron = { ...withApron }; light.bakeSun(nz, bucket7);   // a fresh bake with the same bands
+    const differ = (a, b) => { let n = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++; return n; };
+    const apronBake = { bareVsApron: differ(bare, nz.sunlit), rebakedVsApron: differ(rebaked, nz.sunlit), frames };
+    expect(apronBake.bareVsApron > 0 && apronBake.rebakedVsApron === 0 && frames < 10, `the bake once the apron is there: ${JSON.stringify(apronBake)}`);
+    stats.sun = { ...Object.fromEntries(Object.entries(m).map(([k, v]) => [k, +v.toFixed(2)])), floorShadow: shadowL, floorSun: sunL, apronBake };
   }
 
   // --- 6. The map outdoors, the legend, liquids --------------------------------------------------------------

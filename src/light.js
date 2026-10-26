@@ -3,7 +3,7 @@
 import { RULES } from "./rules.js";
 import { daylight as clockDaylight, lightBucket, bucketSun } from "./clock.js";
 import { registerUpdate } from "./events.js";
-import { castRay } from "./raycast.js";
+import { castRay, rayInfo } from "./raycast.js";
 
 const SKY_FALLOFF = 0.13;
 const LAMP_FALLOFF = 0.07;
@@ -202,16 +202,18 @@ export function sunState(zone) {
   return { bucket: st.sunBucket, sun: st.sunDir, baking: !!st.bake };
 }
 
-// Bake for `bucket` (clock.js lightBucket). budgetMs: stop after about that long and go on next time.
-// → true when zone.sunlit is the bucket's.
+// Bake for `bucket` (clock.js lightBucket) with the zone's apron as it is now (rayInfo: a zone baked ahead as a
+// neighbour has none; once it has one, or a band of it is rebuilt, the sun is baked again: shadows from beyond the
+// edge). budgetMs: stop after about that long and go on next time. → true when zone.sunlit is the bucket's.
+export const sunCurrent = (zone, bucket, st = stateOf(zone)) => st.sunBucket === bucket && st.sunInfo === rayInfo(zone) && !st.bake;
 export function bakeSun(zone, bucket, { budgetMs = Infinity } = {}) {
   if (!zone.hasSky || !zone.skyLight) return false;
-  const st = stateOf(zone);
-  if (st.sunBucket === bucket && !st.bake) return true;
+  const st = stateOf(zone), info = rayInfo(zone);
+  if (st.sunBucket === bucket && st.sunInfo === info && !st.bake) return true;
   const sun = bucketSun(bucket);
-  if (!(sun[2] > 0)) { zone.sunlit = null; st.sunBucket = bucket; st.sunDir = sun; st.bake = null; return true; }
+  if (!(sun[2] > 0)) { zone.sunlit = null; st.sunBucket = bucket; st.sunDir = sun; st.sunInfo = info; st.bake = null; return true; }
   let job = st.bake;
-  if (!job || job.bucket !== bucket) job = st.bake = { bucket, sun, grid: new Uint8Array(zone.w * zone.d * zone.h), next: 0 };
+  if (!job || job.bucket !== bucket || job.info !== info) job = st.bake = { bucket, sun, info, grid: new Uint8Array(zone.w * zone.d * zone.h), next: 0 };
   const cells = cellsOf(zone, st), { w, d } = zone, wd = w * d, [sx, sy, sz] = sun, grid = job.grid;
   const t0 = budgetMs === Infinity ? 0 : performance.now();
   let k = job.next;
@@ -219,13 +221,13 @@ export function bakeSun(zone, bucket, { budgetMs = Infinity } = {}) {
     const end = Math.min(cells.length, k + 256);
     for (; k < end; k++) {
       const i = cells[k], z = Math.floor(i / wd), r = i - z * wd, y = Math.floor(r / w), x = r - y * w;
-      grid[i] = castRay(zone, x + 0.5, y + 0.5, z + 0.5, sx, sy, sz, SUN_STEPS) ? 1 : 2;
+      grid[i] = castRay(zone, x + 0.5, y + 0.5, z + 0.5, sx, sy, sz, SUN_STEPS, null, 0, null, info) ? 1 : 2;
     }
     if (budgetMs !== Infinity && performance.now() - t0 > budgetMs) break;
   }
   job.next = k;
   if (k < cells.length) return false;
-  zone.sunlit = grid; st.sunBucket = bucket; st.sunDir = sun; st.bake = null;
+  zone.sunlit = grid; st.sunBucket = bucket; st.sunDir = sun; st.sunInfo = info; st.bake = null;
   return true;
 }
 
@@ -259,7 +261,7 @@ export function sunlitGrid(g, w, d, h, hx, hy, hz, nx, ny, nz, px, py, pz) {
 }
 
 // --- Keeping a zone up with the clock ------------------------------------------------------------------
-// The lit mask follows daylight (32 steps); the sun follows the light bucket. The zone you are in comes
+// The lit mask follows daylight (32 steps); the sun follows the light bucket and the apron. The zone you are in comes
 // first: with no shadows to draw yet it is baked at once, a new bucket a slice per frame (BAKE_MS). Then
 // one neighbour in memory with its derived arrays (the next zone you may walk into) is baked ahead, a slice
 // per frame, so the frame that crosses an edge doesn't bake.
@@ -271,19 +273,18 @@ export function syncLight(game, zone) {
   const key = maskKey(zone, dl);
   if (st.litKey !== key) { zone.litMask = litMaskOf(zone, zone.skyLight, zone.lampLight, dl); st.litKey = key; }
   const bucket = lightBucket(game);
-  if (st.sunBucket === bucket && !st.bake) return;
+  if (sunCurrent(zone, bucket, st)) return;
   bakeSun(zone, bucket, { budgetMs: zone.sunlit ? BAKE_MS : Infinity });
 }
 
 function bakeAhead(game) {
   const cur = game.zone;
   if (!cur?.hasSky || !game.zones) return;
-  const bucket = lightBucket(game), cs = stateOf(cur);
-  if (cs.sunBucket !== bucket || cs.bake) return;
+  const bucket = lightBucket(game);
+  if (!sunCurrent(cur, bucket)) return;
   for (const z of game.zones.values()) {
     if (z === cur || !z.hasSky || !z.skyLight || z.z !== cur.z || Math.abs(z.wx - cur.wx) > 1 || Math.abs(z.wy - cur.wy) > 1) continue;
-    const st = stateOf(z);
-    if (st.sunBucket === bucket && !st.bake) continue;
+    if (sunCurrent(z, bucket)) continue;
     bakeSun(z, bucket, { budgetMs: BAKE_MS });
     return;
   }
