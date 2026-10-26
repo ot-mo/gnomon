@@ -1,17 +1,16 @@
-// Monsters: how they think and fight. What they are (the types, spawning, sprites, who can touch whom)
-// is creatures.js; the parent game's types are content/creatures/legacy.js.
-// They live on the tile grid: each one stands on a tile or is stepping to a neighbour.
+// Monsters: how they fight (blows, damage, death). What they are (the types, spawning, sprites, who can
+// touch whom) is creatures.js, with the parent game's types in content/creatures/legacy.js; how they
+// think and move is ai.js.
 import { lineOfSight } from "./raycast.js";
-import { flowField, canWalk, DIRS8, UNREACHABLE, MONSTER_STEP_UP, MONSTER_DROP } from "./pathing.js";
+import { DIRS8 } from "./pathing.js";
 import { makeItem, randomPotion, randomScroll, randomEquipment, randomJewel, awayFromWalls, strNeeded, WEAPONS, ELEMENTS } from "./items.js";
-import { guardianThink, colossusCore, fearLight } from "./guardians.js";
-import { B, FLOOR_Z } from "./world.js";
+import { colossusCore } from "./guardians.js";
 import { EYE, HEIGHT, RADIUS, moveAxis, attackTime, armourValue, bonus, weaponReach } from "./player.js";
 import { gainXp } from "./leveling.js";
 import { sfx } from "./sfx.js";
 import { attr, maxHp } from "./stats.js";
 import { wielded } from "./body.js";
-import { addStatus, removeStatus, capStatus, hasStatus, statusFlag, tickStatuses, cooldownLeft, startCooldown, setStatusHarm, STATUS_DEFS } from "./status.js";
+import { addStatus, hasStatus, statusFlag, cooldownLeft, startCooldown, setStatusHarm, STATUS_DEFS } from "./status.js";
 import { RULES } from "./rules.js";
 import { uidWhere, killUid } from "./zones.js";
 import { CREATURE_TYPES, spawnCreature, addCreature, removeCreature, touchable, isFlat, ghostHidden, canTalk } from "./creatures.js";
@@ -32,107 +31,6 @@ export function resistText(m) {
   else if (t.resist?.length) parts.push(`resists ${t.resist.join(" and ")}`);
   if (t.brittle) parts.push("brittle");
   return parts.join(", ");
-}
-
-// ---------------------------------------------------------------------------
-// Advance every monster by dt seconds. On the map only monsters within `radius`
-// tiles (or already hunting you) act; the rest wait until you come closer.
-export function updateMonsters(game, dt, radius = Infinity) {
-  const { zone, player } = game;
-  const { w, stand } = zone;
-  const ptx = Math.floor(player.x), pty = Math.floor(player.y);
-
-  // Re-plan routes when the player reaches a new tile we can stand on, or the level changed.
-  const pTileOk = ptx >= 0 && pty >= 0 && ptx < w && pty < zone.d && stand[ptx + pty * w] >= 0;
-  if (!game.flow || game.flowVersion !== zone.navVersion ||
-      (pTileOk && (ptx !== game.flowX || pty !== game.flowY))) {
-    game.flow = flowField(zone, ptx, pty);
-    game.flowX = ptx; game.flowY = pty; game.flowVersion = zone.navVersion;
-  }
-
-  // Who holds which tile: a monster its tile and the one it steps to, a person (who stands their
-  // ground) their own tile, each with its own id.
-  const occ = new Int32Array(w * zone.d);
-  for (const c of zone.creatures) { occ[c.tx + c.ty * w] = c.id; occ[c.nx + c.ny * w] = c.id; }
-
-  for (const m of [...zone.creatures]) {
-    if (canTalk(m)) continue;                     // people stand still (their brains come with ai.js)
-    if (!zone.creatures.includes(m)) continue;   // killed earlier this update (lightning, a split…)
-    const t = CREATURE_TYPES[m.type];
-    if (m.state !== "chase" && Math.hypot(m.x - player.x, m.y - player.y) > radius) continue;
-    const pace = (hasStatus(m, "chilled") ? 0.5 : 1) * (hasStatus(m, "hasted") ? RULES.haste : 1);
-    m.anim += dt;
-    m.hurt = Math.max(0, m.hurt - dt);
-    m.cd = Math.max(0, m.cd - dt * pace);   // chilled: half as often; hasted: faster
-    m.shot -= dt * pace;
-
-    // The ground vanished (a trap opened): it falls to the floor below.
-    if (stand[m.tx + m.ty * w] < 0) { killMonster(game, m, `The ${m.name} falls into the dark.`, false, false); continue; }
-
-    // Its statuses: on fire or poisoned, 1 damage every half second (status.js; the kill goes through
-    // the harm handler below); chill, blindness, haste and stuns run down.
-    const regenOk = !statusFlag(m, "noRegen");   // trolls knit back together — unless they're burning
-    tickStatuses(game, m, dt);
-    if (!zone.creatures.includes(m)) continue;
-    if (regenOk && t.regen && m.hp < m.maxHp) {
-      m.regenAcc += t.regen * dt;
-      if (m.regenAcc >= 1) { m.regenAcc -= 1; m.hp++; }
-    }
-    if (t.boss) { removeStatus(game, m, "blinded"); capStatus(m, "stunned", 1.5); bossPhase(game, m, occ); }   // shrugs most of it off
-    if (t.guardian) { removeStatus(game, m, "blinded"); capStatus(m, "stunned", 1); if (guardianThink(game, m, dt, occ)) continue; }
-    if (t.fearsLight && fearLight(game, m, dt)) continue;
-    // Stunned (or paralysed): it can't do anything at all.
-    if (statusFlag(m, "noAct")) continue;
-
-    m.think -= dt;
-    if (m.think <= 0) { m.think = 0.25; perceive(game, m, t); }
-
-    const moving = m.nx !== m.tx || m.ny !== m.ty;
-    const dx = player.x - m.x, dy = player.y - m.y, dz = player.z - m.z;
-    const flat = Math.hypot(dx, dy);
-    const inReach = flat <= t.reach + RADIUS && dz > -1.2 && dz < 1.3;
-    const r = t.ranged;
-
-    if (moving) {
-      const len = m.nx !== m.tx && m.ny !== m.ty ? Math.SQRT2 : 1;
-      const wet = !t.hover && (zone.get(m.tx, m.ty, FLOOR_Z - 1) === B.WATER_SHALLOW || zone.get(m.nx, m.ny, FLOOR_Z - 1) === B.WATER_SHALLOW);
-      m.p += (t.speed * m.speedMul * (m.state === "chase" ? 1 : 0.45) * (wet ? 0.6 : 1) * pace * dt) / len;
-      if (m.p >= 1) {
-        occ[m.tx + m.ty * w] = 0;
-        m.tx = m.nx; m.ty = m.ny; m.p = 0;
-      }
-    } else if (m.state === "chase" && inReach) {
-      if (m.cd <= 0 && lineOfSight(zone, m.x, m.y, m.z + m.h * 0.7, player.x, player.y, player.z + EYE * 0.6)) {
-        m.cd = t.cooldown * m.cdMul;
-        const dmg = t.damage[0] + Math.floor(Math.random() * (t.damage[1] - t.damage[0] + 1)) + (m.bonus || 0);
-        if (isFlat(m) && game.view !== "map") {   // bitten by something you can't see
-          hitPlayer(game, m, dmg, "something flat", "a bite from below");
-          game.hint?.("flat", "Something bit you from the floor, and there's nobody there: only a moving shadow. A flat being! Look at the world from above (Tab) to fight it.");
-        } else hitPlayer(game, m, dmg, `the ${m.name}`, `the ${m.name}'s blow`);
-      }
-    } else if (m.state === "chase" && r && m.sees && flat <= r.range && flat > 1.6) {
-      // In sight and in range: shoot, and stay back once close enough.
-      if (m.shot <= 0) {
-        m.shot = r.cooldown * m.cdMul * (t.boss && m.phase >= 2 ? 0.6 : 1);
-        shoot(game, m, r);
-      }
-      if (flat > r.hold) chooseStep(game, m, t, occ, ptx, pty);
-    } else if (t.speed === 0) {
-      // Rooted to the spot (the Colossus): it only turns to face you.
-    } else if (m.state === "chase") {
-      chooseStep(game, m, t, occ, ptx, pty);
-    } else if (m.state === "wander") {
-      m.pause -= dt;
-      if (m.pause <= 0) { m.pause = 0.5 + Math.random() * 2.5; chooseStep(game, m, t, occ, ptx, pty); }
-    }
-
-    // Position: glide between tile centres; ease the height when stepping up or down.
-    const za = stand[m.tx + m.ty * w], zb = stand[m.nx + m.ny * w];
-    const s = m.p * m.p * (3 - 2 * m.p);
-    m.x = m.tx + 0.5 + (m.nx - m.tx) * m.p;
-    m.y = m.ty + 0.5 + (m.ny - m.ty) * m.p;
-    m.z = (zb < 0 ? za : za + (zb - za) * s) + (t.hover || 0);
-  }
 }
 
 // A blow (or arrow, or bolt) lands on you. Armour soaks up part of it; cursed armour
@@ -176,110 +74,6 @@ export function hitPlayer(game, m, dmg, source, blocked, ranged = false) {
   }
 }
 
-// Fire an arrow or a bolt at the player. Arrows arc (aimed to allow for the drop) and
-// scatter a little, so in 3D you can sidestep them.
-function shoot(game, m, r) {
-  const p = game.player;
-  const sx = m.x, sy = m.y, sz = m.z + m.h * 0.7;
-  const dx = p.x - sx, dy = p.y - sy, dz = p.z + 1.1 - sz;
-  const flat = Math.hypot(dx, dy), time = Math.hypot(flat, dz) / r.speed;
-  const ang = Math.atan2(dy, dx) + (Math.random() - 0.5) * 0.08;
-  game.zone.projectiles.push({
-    kind: r.kind, hostile: true, from: m,
-    dmg: r.damage[0] + Math.floor(Math.random() * (r.damage[1] - r.damage[0] + 1)) + (m.bonus || 0),
-    x: sx, y: sy, z: sz,
-    vx: (Math.cos(ang) * flat) / time, vy: (Math.sin(ang) * flat) / time, vz: dz / time + 0.5 * r.gravity * time,
-    g: r.gravity, life: 3, spin: 0,
-  });
-}
-
-// The Lich King's fight has three phases: at two thirds of its health it raises
-// skeletons, at one third wraiths, and from then on it casts faster.
-function bossPhase(game, m, occ) {
-  const next = m.phase === 0 && m.hp <= m.maxHp * 0.66 ? ["skeleton", 3] : m.phase === 1 && m.hp <= m.maxHp * 0.33 ? ["wraith", 2] : null;
-  if (!next) return;
-  m.phase++;
-  const [type, n] = next;
-  const { zone } = game, { w, stand } = zone;
-  const spots = [];
-  for (let oy = -3; oy <= 3; oy++)
-    for (let ox = -3; ox <= 3; ox++) {
-      const x = m.tx + ox, y = m.ty + oy;
-      if (Math.max(Math.abs(ox), Math.abs(oy)) < 2 || x < 0 || y < 0 || x >= w || y >= zone.d) continue;
-      if (stand[x + y * w] >= 0 && !occ[x + y * w]) spots.push([x, y]);
-    }
-  for (let k = 0; k < n && spots.length; k++) {
-    const [x, y] = spots.splice(Math.floor(Math.random() * spots.length), 1)[0];
-    const o = addCreature(zone, spawnCreature(type, x, y, stand[x + y * w], { rng: Math.random, state: "chase", level: zone.level }));
-    occ[x + y * w] = o.id;
-  }
-  game.log(m.phase === 1 ? "The Lich King raises its staff. The dead rise around it!" :
-                           "The Lich King shrieks, and wraiths pour out of the walls!", [140, 255, 170]);
-}
-
-// Can it see the player? Torchlight makes you easier to spot; sprinting is loud.
-function perceive(game, m, t) {
-  const { zone, player } = game;
-  if (hasStatus(m, "blinded")) {   // blinded (darkness or shadows splashed on it): it loses track of you
-    if (m.state === "chase") m.state = "wander";
-    m.sees = false;
-    return;
-  }
-  const dist = Math.hypot(player.x - m.x, player.y - m.y);
-  const hidden = statusFlag(player, "hidden");   // potion of shadows
-  const range = t.sight * (player.torch || t.darkSight ? 1 : 0.55) * (hidden ? 0.35 : 1) *
-    (hasStatus(player, "darkened") && !t.darkSight ? 0.7 : 1) * Math.max(0.3, 1 - bonus(player, "stealth"));
-  let sees = dist < range &&
-    lineOfSight(zone, m.x, m.y, m.z + m.h * 0.8, player.x, player.y, player.z + EYE);
-  m.sees = sees;
-  if (!sees && !hidden && player.sprinting && dist < 6) sees = true;
-  if (sees) {
-    if (m.state !== "chase" && dist < 14) {
-      if (t.boss) game.log("The Lich King rises from its throne. \"Another one comes to die.\"", t.color);
-      else if (t.guardian) { /* guardians.js announces itself */ }
-      else game.log(`A${/^[aeiou]/.test(m.name) ? "n" : ""} ${m.name} notices you!`, m.color);
-    }
-    m.state = "chase";
-    m.lost = 0;
-  } else if (m.state === "chase" && !t.boss && !t.guardian) {   // bosses never forget you
-    m.lost += 0.25;
-    if (m.lost > 8) m.state = "wander";
-  }
-}
-
-// Pick the next tile: downhill on the flow field when chasing, a random neighbour when
-// wandering (or now and then for erratic flyers like bats).
-function chooseStep(game, m, t, occ, ptx, pty) {
-  const { zone, player, flow } = game;
-  const { w, d, stand } = zone;
-  const here = m.tx + m.ty * w;
-  const chasing = m.state === "chase" && !(t.erratic && Math.random() < t.erratic);
-  const hereDist = Math.hypot(m.tx + 0.5 - player.x, m.ty + 0.5 - player.y);
-  let best = -1, bestScore = Infinity;
-  for (const [ox, oy] of DIRS8) {
-    const bx = m.tx + ox, by = m.ty + oy;
-    if (bx < 0 || by < 0 || bx >= w || by >= d) continue;
-    const bi = bx + by * w;
-    if ((bx === ptx && by === pty) || (occ[bi] && occ[bi] !== m.id)) continue;
-    if (!canWalk(stand, w, m.tx, m.ty, bx, by, MONSTER_STEP_UP, MONSTER_DROP)) continue;
-    let score;
-    if (!chasing) score = Math.random();
-    else if (flow[here] !== UNREACHABLE) {
-      if (flow[bi] >= flow[here]) continue;
-      score = flow[bi] + (ox && oy ? 0.4 : 0);
-    } else {
-      // The player is somewhere we can't walk to (a ledge?): just get as close as possible.
-      score = Math.hypot(bx + 0.5 - player.x, by + 0.5 - player.y);
-      if (score >= hereDist) continue;
-    }
-    if (score < bestScore) { bestScore = score; best = bi; }
-  }
-  if (best >= 0) {
-    m.nx = best % w; m.ny = (best - m.nx) / w; m.p = 0;
-    occ[best] = m.id;
-  }
-}
-
 // What an elite leaves behind: always something, sometimes gear, a ring or an amulet.
 function eliteLoot(depth, luck = 0) {
   const r = Math.random();
@@ -298,7 +92,7 @@ setStatusHarm((game, e, n, id) => {
   if (e.hp <= 0 && game.zone?.creatures.includes(e)) killMonster(game, e, def?.killed?.(e) || `The ${e.name} dies.`);
 });
 
-function killMonster(game, m, message, dropLoot = true, byPlayer = true) {
+export function killMonster(game, m, message, dropLoot = true, byPlayer = true) {
   const { zone } = game;
   const t = CREATURE_TYPES[m.type];
   removeCreature(zone, m);
@@ -449,6 +243,20 @@ export function attackMonster(game, m) {
       if (other.hp <= 0) killMonster(game, other, `The ${other.name} is struck down.`);
     }
   }
+}
+
+// One creature's blow on another (ai.js): no XP, no loot from you. The victim bears a grudge against
+// whoever hit it (factions.js attitude), and remembers who it was (ai.js pickTarget prefers them).
+export function creatureHits(game, m, target, dmg) {
+  if (!touchable(game, target, m)) return 0;
+  dmg = soak(target, dmg);
+  hurtMonster(game, target, dmg, `${dmg}`, [255, 150, 150]);
+  target.state = target.state === "chase" ? "chase" : "wander";   // (hurtMonster set it hunting you)
+  const brain = (target.brain ||= {});
+  brain.hurtBy = m.id;
+  (brain.grudges ||= {})[m.id] = 1;
+  if (target.hp <= 0) killMonster(game, target, `The ${m.name} kills the ${target.name}.`, true, false);
+  return dmg;
 }
 
 // Damage from something other than your weapon (a thrown knife). Kills give XP as usual.

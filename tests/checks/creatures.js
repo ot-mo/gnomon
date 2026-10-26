@@ -23,7 +23,7 @@ import { Zone, B, FLOOR_Z } from "../../src/world.js";
 import { enterZone } from "../../src/zones.js";
 import { mapStep } from "../../src/turns.js";
 import { interact } from "../../src/interact.js";
-import { updateMonsters } from "../../src/monsters.js";
+import { updateCreatures } from "../../src/ai.js";
 import { CREATURE_TYPES, spawnCreature, addCreature, creatureAt, creatureSprite, touchable, hostilesTo, talkersIn,
          canTalk } from "../../src/creatures.js";
 import { entityCounter } from "../../src/ids.js";
@@ -125,7 +125,7 @@ export function checkCreatures({ game, startRun, srcFiles }) {
     // The goblin chases you from the east, with the shrine in the way: it never steps onto the shrine.
     Object.assign(p, { x: 10.5, y: 10.5 });
     let onShrine = false;
-    for (let k = 0; k < 120; k++) { updateMonsters(game, 1 / 30); if (goblin.nx === 12 && goblin.ny === 10) onShrine = true; }
+    for (let k = 0; k < 120; k++) { updateCreatures(game, 1 / 30); if (goblin.nx === 12 && goblin.ny === 10) onShrine = true; }
     expect(!onShrine && shrine.tx === 12 && shrine.ty === 10 && shrine.x === 12.5, "a monster steps onto a person's tile, or the person moved");
     zone.creatures.length = 0;
 

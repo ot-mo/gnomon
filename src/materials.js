@@ -14,6 +14,8 @@ export function setMaterialTime(t) { time = t; }
 // them out (runes become faint scratches; ghost planks vanish). Set each frame by the renderer.
 let darkSight = false;
 export function setDarkSight(v) { darkSight = v; }
+// The blocks that read it (in a zone with sky the renderer asks light.js inDark at each hit on one).
+export const DARK_SIGHT_BLOCKS = new Set([B.RUNE, B.RUNE_1, B.RUNE_2, B.RUNE_3, B.RUNE_4, B.MURAL, B.MURAL_LIT]);
 
 // 5×5 rune bitmaps carved into RUNE blocks — they only exist in the 3D view.
 const RUNES = [

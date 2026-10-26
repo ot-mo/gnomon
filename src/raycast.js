@@ -2,9 +2,15 @@
 import { B, APRON, apronBlock } from "./world.js";
 
 // Ghost planks are solid to walk on but only visible in the dark: rays pass straight
-// through them unless the renderer turns this on (your torch is out).
+// through them unless the renderer turns this on. v: true or false for the whole frame (a zone without
+// sky: your torch is out or not), or a function (x, y, z) → bool asked at each ghost block a ray meets,
+// with the centre of the air cell the ray came from (a zone with sky: light.js inDark there).
 let ghostVisible = false;
 export function setGhostVisible(v) { ghostVisible = v; }
+function ghostShows(x, y, z, axis, sx, sy, sz) {
+  if (typeof ghostVisible !== "function") return ghostVisible;
+  return ghostVisible(x + 0.5 - (axis === 0 ? sx : 0), y + 0.5 - (axis === 1 ? sy : 0), z + 0.5 - (axis === 2 ? sz : 0));
+}
 
 export const hit = { t: 0, block: 0, nx: 0, ny: 0, nz: 0, x: 0, y: 0, z: 0, apron: false };
 
@@ -42,7 +48,7 @@ export function castRay(zone, ox, oy, oz, dx, dy, dz, maxT, seen = null, torchRa
     if (x < 0 || y < 0 || x >= W || y >= D) {   // in the apron (or a corner without a band: air)
       lastLit = false;
       const b = apronBlock(zone, x, y, z);
-      if (b > 0 && (b !== B.GHOST || ghostVisible)) {
+      if (b > 0 && (b !== B.GHOST || ghostShows(x, y, z, axis, stepX, stepY, stepZ))) {
         hit.t = t; hit.block = b; hit.x = x; hit.y = y; hit.z = z; hit.apron = true;
         hit.nx = axis === 0 ? -stepX : 0;
         hit.ny = axis === 1 ? -stepY : 0;
@@ -54,7 +60,7 @@ export function castRay(zone, ox, oy, oz, dx, dy, dz, maxT, seen = null, torchRa
 
     const i = x + y * W + z * WD;
     const b = blocks[i];
-    if (b && (b !== B.GHOST || ghostVisible)) {
+    if (b && (b !== B.GHOST || ghostShows(x, y, z, axis, stepX, stepY, stepZ))) {
       hit.t = t; hit.block = b; hit.x = x; hit.y = y; hit.z = z; hit.apron = false;
       hit.nx = axis === 0 ? -stepX : 0;
       hit.ny = axis === 1 ? -stepY : 0;

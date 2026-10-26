@@ -17,8 +17,10 @@
 //   creatureSprite(game, c)             its 3D sprite, or null where it isn't drawn (flat, a hidden ghost)
 //   touchable(game, target, attacker = game.player, { blade = false })
 //                                       can this blow reach it? (planes, ghosts; talkers never)
-//   ghostHidden(game, c)                a ghostly creature drowned out by light (the one place that asks)
-//   hostilesTo(game, e), targetsFor(game, e), talkersIn(zone), creaturesNear(zone, x, y, r)
+//   ghostHidden(game, c)                a ghostly creature drowned out by light (the one place that asks;
+//                                       light.js inDark at the creature)
+//   hostilesTo(game, e), targetsFor(game, e), talkersIn(zone)   (through factions.js attitude)
+//   creaturesNear(zone, x, y, r)        through spatial buckets during an AI update; buildBuckets, dropBuckets
 //   isFlat(c), isGhostly(c), canTalk(c)
 //   pickCreatureType(rand, level, table = null), rollElite(rand, level)
 //
@@ -33,6 +35,8 @@ import { hasStatus } from "./status.js";
 import { bonus, contentLevel } from "./stats.js";
 import { nextEntityId, genUid } from "./ids.js";
 import { distance } from "./rng.js";
+import { inDark } from "./light.js";
+import { attitude } from "./factions.js";
 import "./content/creatures/legacy.js";   // the parent game's creatures register themselves
 
 // (Kept on functions so content modules can register while this module is still loading: the
@@ -99,11 +103,13 @@ export function spawnCreature(type, tx, ty, z, opts = {}) {
 export function addCreature(zone, c) {
   if (!zone.sealed && (c.uid === null || c.uid === undefined)) c.uid = genUid(zone);
   zone.creatures.push(c);
+  if (zone.buckets) zone.buckets.cells[bucketOf(zone.buckets, c.x, c.y)].push(c);
   return c;
 }
 export function removeCreature(zone, c) {
   const k = zone.creatures.indexOf(c);
   if (k >= 0) zone.creatures.splice(k, 1);
+  if (zone.buckets) for (const cell of zone.buckets.cells) { const j = cell.indexOf(c); if (j >= 0) { cell.splice(j, 1); break; } }
 }
 
 // Who stands on (or is stepping into) tile (x, y). People stand still on their tile; a monster also
@@ -115,12 +121,13 @@ export function creatureAt(zone, x, y) {
       (Math.floor(c.x) === x && Math.floor(c.y) === y))) || null;
 }
 
-// A ghostly creature is drowned out by torchlight: not drawn, not seen, not touched, not talked to.
-// (The light seam, light.js inDark, takes this over; every ghost rule asks here.)
-export const ghostHidden = (game, c) => isGhostly(c) && !!game.player.torch;
+// A ghostly creature is drowned out by light: not drawn, not seen, not touched, not talked to. It shows
+// only where it stands in the dark (light.js inDark: your torch out, and no daylight there). Every ghost
+// rule asks here.
+export const ghostHidden = (game, c) => isGhostly(c) && !inDark(game, game.zone, c.x, c.y, c.z + c.h * 0.5);
 
 // Flat beings can only be touched while you look at the world flat, on the map (unless the Flat
-// Queen has risen out of the plane: then only in 3D). Ghostly things only with your torch out.
+// Queen has risen out of the plane: then only in 3D). Ghostly things only in the dark (your torch out).
 // blade: your own weapon (the Edge of the Plane cuts flat things in 3D too). People can't be attacked.
 // A creature's blow (attacker not the player) reaches any creature that isn't a talker.
 export function touchable(game, target, attacker = game.player, { blade = false } = {}) {
@@ -132,17 +139,47 @@ export function touchable(game, target, attacker = game.player, { blade = false 
   return blade && bonus(game.player, "cutsFlat") > 0;
 }
 
-// Factions are a stub until WS6a (factions.js): monsters are hostile to you and to nobody else,
-// talkers to nobody.
+// Who is out for whom: factions.js attitude (a stub until WS6a: monsters are hostile to you and to
+// nobody else, talkers to nobody).
+//   hostilesTo(game, e)   the creatures hostile to e
+//   targetsFor(game, e)   whom e would attack: you (if it's hostile to you) and creatures it's hostile to
 export function hostilesTo(game, e) {
-  return e === game.player ? game.zone.creatures.filter((c) => !c.talk) : [];
+  return game.zone.creatures.filter((c) => c !== e && attitude(game, c, e) === "hostile");
 }
 export function targetsFor(game, e) {
-  if (e === game.player) return hostilesTo(game, e);
-  return e.talk ? [] : [game.player];
+  const out = e !== game.player && attitude(game, e, game.player) === "hostile" ? [game.player] : [];
+  for (const c of game.zone.creatures) if (c !== e && attitude(game, e, c) === "hostile") out.push(c);
+  return out;
 }
 export const talkersIn = (zone) => zone.creatures.filter(canTalk);
-export const creaturesNear = (zone, x, y, r) => zone.creatures.filter((c) => distance(c.x - x, c.y - y) <= r);
+
+// Spatial buckets (8×8 tiles, TECH_DESIGN §3.4). ai.js builds them once per updateCreatures and drops
+// them after it: within an update creaturesNear looks only at the buckets its circle touches (with two
+// tiles to spare, for creatures that moved since), outside one at every creature. Adding or removing a
+// creature mid-update keeps them right.
+const BUCKET = 8, SPARE = 2;
+const bucketOf = (b, x, y) => Math.min(b.cols - 1, Math.max(0, Math.floor(x / BUCKET))) +
+                              Math.min(b.rows - 1, Math.max(0, Math.floor(y / BUCKET))) * b.cols;
+export function buildBuckets(zone) {
+  const b = { cols: Math.max(1, Math.ceil(zone.w / BUCKET)), rows: Math.max(1, Math.ceil(zone.d / BUCKET)), cells: [] };
+  for (let k = 0; k < b.cols * b.rows; k++) b.cells.push([]);
+  for (const c of zone.creatures) b.cells[bucketOf(b, c.x, c.y)].push(c);
+  zone.buckets = b;
+  return b;
+}
+export function dropBuckets(zone) { zone.buckets = null; }
+
+export function creaturesNear(zone, x, y, r) {
+  const b = zone.buckets;
+  if (!b) return zone.creatures.filter((c) => distance(c.x - x, c.y - y) <= r);
+  const reach = r + SPARE, out = [];
+  const x0 = Math.max(0, Math.floor((x - reach) / BUCKET)), x1 = Math.min(b.cols - 1, Math.floor((x + reach) / BUCKET));
+  const y0 = Math.max(0, Math.floor((y - reach) / BUCKET)), y1 = Math.min(b.rows - 1, Math.floor((y + reach) / BUCKET));
+  for (let by = y0; by <= y1; by++)
+    for (let bx = x0; bx <= x1; bx++)
+      for (const c of b.cells[bx + by * b.cols]) if (distance(c.x - x, c.y - y) <= r) out.push(c);
+  return out;
+}
 
 // The 3D picture. Monsters: two frames (standing / mid-step), flyers flap, the boss's orb pulses, a
 // wader sinks a little; statuses tint it and elites glow. People: one picture, a ghost bobbing.

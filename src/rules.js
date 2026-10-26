@@ -54,6 +54,10 @@ const CORE = {
   body: { equipTime: 1, drinkTime: 0.5, readTime: 1, beltSwap: 0.4, offhandChance: 0.15 },
   relics: { minLevel: 14, maxLevel: 19, chance: 0.15 },
 
+  // The dark (TECH_DESIGN §6.3, R12, light.js inDark): with your torch out, a place is dark where natural
+  // light (sky × daylight, no lamps) is below this. Underground there is none, so it's the torch alone.
+  dark: { threshold: 0.3 },
+
   // Levels (DECISIONS: surface zone level = 3 × tier − 1; legacy tables read min(level, 20) until C3).
   level: { contentMax: 20, tierMax: 8 },
 };

@@ -9,8 +9,9 @@
 // you're standing on the tile you walked to.
 import { KIND, B, FLOOR_Z, solidFor as zoneSolidFor } from "./world.js";
 import { castRay, lineOfSight } from "./raycast.js";
-import { sampleLight } from "./light.js";
-import { updateMonsters, attackMonster } from "./monsters.js";
+import { lightAt } from "./light.js";
+import { attackMonster } from "./monsters.js";
+import { updateCreatures } from "./ai.js";
 import { creatureAt, talkerAt, hostilesTo, ghostHidden, canTalk } from "./creatures.js";
 import { pickUpItems } from "./items.js";
 import { useColumn } from "./interact.js";
@@ -38,7 +39,7 @@ export function passTime(game, seconds) {
     const dt = Math.min(1 / 60, left);
     left -= dt;
     game.time += dt;
-    updateMonsters(game, dt, ACTIVE_RADIUS);
+    updateCreatures(game, dt, ACTIVE_RADIUS);
     updateSpikes(game);
     updateProjectiles(game, dt);
     updateBombs(game, dt);
@@ -103,13 +104,13 @@ export function refreshView(game) {
   }
   const sense = bonus(p, "sense");   // an amulet of sight: monsters close by show, seen or not
   for (const m of hostilesTo(game, p)) {
-    if (ghostHidden(game, m)) continue;   // the Gloom Warden: not with your torch lit
+    if (ghostHidden(game, m)) continue;   // the Gloom Warden: only in the dark (light.js inDark)
     const cz = m.z + m.h * 0.6;
     const dist = Math.hypot(m.x - p.x, m.y - p.y);
     if (dist < sense) { zone.sightings.set(m.id, { x: m.x, y: m.y, glyph: m.glyph, color: m.color, name: m.name, time: game.time }); continue; }
     if (dist > 24) continue;
-    const lamp = sampleLight(zone, zone.lampLight, m.x, m.y, cz);
-    const lit = sampleLight(zone, zone.skyLight, m.x, m.y, cz) * 0.6 + lamp * Math.sqrt(lamp) * 2 > 0.15 || dist < torch;
+    const { sky, lamp } = lightAt(game, zone, m.x, m.y, cz);   // sky × daylight (light.js)
+    const lit = sky * 0.6 + lamp * Math.sqrt(lamp) * 2 > 0.15 || dist < torch;
     if (lit && lineOfSight(zone, ex, ey, ez, m.x, m.y, cz))
       zone.sightings.set(m.id, { x: m.x, y: m.y, glyph: m.glyph, color: m.color, name: m.name, time: game.time });
   }

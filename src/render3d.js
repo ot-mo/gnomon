@@ -1,8 +1,8 @@
 // The first-person view (learn/05 §9–10) plus sprites for monsters, items and map markers.
 import * as S from "./screen.js";
 import { castRay, hit, setGhostVisible } from "./raycast.js";
-import { sampleLight } from "./light.js";
-import { material, albedo, setMaterialTime, setDarkSight } from "./materials.js";
+import { sampleLight, inDark, zoneIsLightless } from "./light.js";
+import { material, albedo, setMaterialTime, setDarkSight, DARK_SIGHT_BLOCKS } from "./materials.js";
 import { noise2 } from "./rng.js";
 import { creatureSprite, hostilesTo, talkersIn, isFlat } from "./creatures.js";
 import { guardianSprites } from "./guardians.js";
@@ -87,9 +87,11 @@ function torchAt(dx, dy, dz, t, facing) {
   lightR += TORCH_COLOR[0] * k; lightG += TORCH_COLOR[1] * k; lightB += TORCH_COLOR[2] * k;
 }
 
-function shadeHit(zone, player, dx, dy, dz) {
+function shadeHit(game, zone, player, dx, dy, dz) {
   const t = hit.t, block = hit.block, nx = hit.nx, ny = hit.ny, nz = hit.nz;
   const px = cam.ex + dx * t, py = cam.ey + dy * t, pz = cam.ez + dz * t;
+  // Under the sky, whether runes glow is asked where they are (the air in front of the face).
+  if (darkPerHit && DARK_SIGHT_BLOCKS.has(block)) setDarkSight(inDark(game, zone, px + nx * 0.5, py + ny * 0.5, pz + nz * 0.5));
   material(block, nx !== 0 ? py : px, nz !== 0 ? py : pz, nz > 0);
   // A flat being here? On the floor there's a shadow with nobody casting it.
   if (nz > 0 && shadows.length) {
@@ -103,7 +105,8 @@ function shadeHit(zone, player, dx, dy, dz) {
   }
   // A thin wall with a lit room behind it: in the dark, up close, light shows through the cracks.
   if (!player.torch && t < 4.5 && nz === 0 && hit.z >= FLOOR_Z && hit.z <= FLOOR_Z + 1 && !hit.apron &&
-      zone.secretWalls.has(hit.x + hit.y * zone.w)) crackLight(nx !== 0 ? py : px, pz - FLOOR_Z, t);
+      zone.secretWalls.has(hit.x + hit.y * zone.w) && (!darkPerHit || inDark(game, zone, px + nx * 0.5, py + ny * 0.5, pz)))
+    crackLight(nx !== 0 ? py : px, pz - FLOOR_Z, t);
   const ar = albedo.r, ag = albedo.g, ab = albedo.b, glow = albedo.glow;
 
   // The apron (the next zone's ground beyond an open edge) has no light arrays of its own: it gets the
@@ -157,6 +160,9 @@ function shadeSky(dx, dy, dz, time) {
   return density;
 }
 
+// This frame is under the sky with your torch out: the dark-only things ask light.js where they are.
+let darkPerHit = false;
+
 // Flat beings near you this frame (their shadows are drawn onto the floor in shadeHit).
 let shadows = [];
 
@@ -170,8 +176,11 @@ export function render3d(game) {
   torch.power = torchPower(player);
   torch.range = torchRange(player);
   const seeRange = torch.range;
-  setDarkSight(!player.torch);     // runes glow and ghost planks show only with your torch out
-  setGhostVisible(!player.torch);
+  // Runes glow and ghost planks show only in the dark (light.js inDark). Without sky that's your torch
+  // alone, decided once for the frame; under the sky it's asked at each ghost block or rune a ray meets.
+  darkPerHit = !zoneIsLightless(zone) && !player.torch;
+  setDarkSight(!player.torch && !darkPerHit);
+  setGhostVisible(!darkPerHit ? !player.torch : (x, y, z) => inDark(game, zone, x, y, z));
 
   for (let cy = 0; cy < S.rows; cy++) {
     const v = (1 - (2 * (cy + 0.5)) / S.rows) * cam.halfH;
@@ -186,7 +195,7 @@ export function render3d(game) {
       const i = cy * S.cols + cx;
       let density = 1;
       if (castRay(zone, cam.ex, cam.ey, cam.ez, dx, dy, dz, MAX_DIST, zone.seen, seeRange, zone.holeSeen)) {
-        shadeHit(zone, player, dx, dy, dz);
+        shadeHit(game, zone, player, dx, dy, dz);
         depth[i] = hit.t;
       } else {
         depth[i] = Infinity;

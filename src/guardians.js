@@ -13,17 +13,26 @@
 //     ground in rings; the map shows which tiles are about to shake (^), and the platforms
 //     are out of reach of the quake.
 //
-// guardianThink(game, m, dt, occ) runs every update before the usual monster AI (monsters.js);
-// returning true would skip the rest of that AI for this update.
+// Each is an AI hook (ai.js AI_HOOKS "guardian:flatqueen", "guardian:warden", "guardian:colossus"), run
+// every update before the usual AI: it shrugs off blindness and long stuns, then guardianThink(game, m,
+// dt, occ); returning true would skip the rest of that AI for this update.
 import { hitPlayer } from "./monsters.js";
+import { registerAIHook } from "./ai.js";
 import { CREATURE_TYPES, spawnCreature, addCreature, removeCreature } from "./creatures.js";
 import { B, FLOOR_Z } from "./world.js";
-import { sampleLight } from "./light.js";
+import { lightAt } from "./light.js";
 import { sfx } from "./sfx.js";
-import { addStatus, statusFlag } from "./status.js";
+import { addStatus, statusFlag, removeStatus, capStatus } from "./status.js";
 
 const QUEEN_FLAT = 4.5, QUEEN_RISEN = 3;
 const SLAM_EVERY = 4.5, SLAM_WARN = 1.5;
+
+for (const id of ["flatqueen", "warden", "colossus"])
+  registerAIHook(`guardian:${id}`, (game, m, dt, occ) => {
+    removeStatus(game, m, "blinded");
+    capStatus(m, "stunned", 1);
+    return guardianThink(game, m, dt, occ);
+  });
 
 export function guardianThink(game, m, dt, occ) {
   if (m.state !== "chase") return false;   // asleep until it notices you (or you hit it)
@@ -107,7 +116,7 @@ function warden(game, m, dt, occ) {
 
 // Shades hate firelight: standing in a lit brazier's (or lamp's) glow burns them away.
 export function fearLight(game, m, dt) {
-  const light = sampleLight(game.zone, game.zone.lampLight, m.x, m.y, m.z + 0.6);
+  const light = lightAt(game, game.zone, m.x, m.y, m.z + 0.6).lamp;
   if (light < 0.3) return false;
   m.lightBurn = (m.lightBurn || 0) + dt * 6;
   m.hurt = 0.1;

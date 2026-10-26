@@ -26,7 +26,8 @@ import "./world/zonegen.js";   // the zone generators: surfaces, site dungeons, 
 import { buildRun } from "./world/run.js";
 import { TEST_WORLD } from "./content/world/test-world.js";
 import { makePlayer, clampPitch, updatePlayer, takeImpact, hasFeatherFall, bonus, bodyCollides, RADIUS } from "./player.js";
-import { updateMonsters, pushPlayerOut, playerAttack } from "./monsters.js";
+import { pushPlayerOut, playerAttack } from "./monsters.js";
+import { updateCreatures } from "./ai.js";
 import { creatureAt, hostilesTo, canTalk } from "./creatures.js";
 import { pickUpItems, POTIONS, POTION_COLORS, scrollTitles, makeItem, makeRelic, pickRelic, randomEquipment, awayFromWalls, RELICS, RELIC_COLOR } from "./items.js";
 import { render3d } from "./render3d.js";
@@ -316,7 +317,7 @@ function update(dt) {
   pickUpItems(game);
   if (game.checkFloorEvents()) return;
 
-  updateMonsters(game, dt);
+  updateCreatures(game, dt);
   updateSpikes(game);
   updateProjectiles(game, dt);
   updateBombs(game, dt);

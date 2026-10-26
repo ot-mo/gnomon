@@ -1,5 +1,7 @@
 // Light spread through the air of a floor with a flood fill (learn/05 §7).
 // skyLight comes down light wells open to the sky; lampLight radiates from lamp blocks.
+import { RULES } from "./rules.js";
+
 const SKY_FALLOFF = 0.13;
 const LAMP_FALLOFF = 0.07;
 const NEIGHBOURS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
@@ -72,4 +74,49 @@ export function sampleLight(zone, grid, x, y, z, airOnly = false) {
     weights += wgt;
   }
   return airOnly ? (weights > 0 ? sum / weights : 0) : sum;
+}
+
+// ---------------------------------------------------------------------------------------------------
+// The light seam (TECH_DESIGN §1.4, §6.3, R12). Every rule that cares whether a place is dark asks here,
+// so WS3 can bring in the clock (daylight) without touching the rules themselves.
+//
+//   lightAt(game, zone, x, y, z, airOnly = false) → { sky, lamp }   sky light × daylight, and lamp light
+//   naturalLight(game, zone, x, y, z) → 0..1     sky × daylight only, no lamps (0 in a lightless zone)
+//   inDark(game, zone, x, y, z) → bool           !player.torch && naturalLight < RULES.dark.threshold
+//   zoneIsLightless(zone) → bool                 no sky anywhere (every dungeon level): the dark-only
+//                                                rules reduce to the torch, decided once per frame
+//   daylight(game) → 0..1                        1 until WS3's clock; setDaylight(fn) → undo swaps it in
+//
+// Underground (no sky) inDark is exactly the parent's torch test: a lamp never counts (it would wash
+// out brazier numerals and lit-room murals), nor does a light well, so every puzzle behaves as before.
+// Outdoors by day nothing is dark: ghost planks, glowing runes, ghosts and ghost people stay hidden in
+// sunshine, and show at night or in deep shade with your torch out.
+let daylightOf = () => 1;
+export const daylight = (game) => daylightOf(game);
+// WS3 (clock.js) and tests: where daylight comes from. Returns an undo.
+export function setDaylight(fn) {
+  const old = daylightOf;
+  daylightOf = typeof fn === "function" ? fn : () => fn;
+  return () => { daylightOf = old; };
+}
+
+export const zoneIsLightless = (zone) => !zone.hasSky;
+
+export function lightAt(game, zone, x, y, z, airOnly = false) {
+  if (!zone.skyLight) return { sky: 0, lamp: 0 };
+  return { sky: sampleLight(zone, zone.skyLight, x, y, z, airOnly) * daylight(game),
+           lamp: sampleLight(zone, zone.lampLight, x, y, z, airOnly) };
+}
+
+// Outside the grid (the apron beyond an open edge) it's the open sky.
+export function naturalLight(game, zone, x, y, z) {
+  if (zoneIsLightless(zone)) return 0;
+  if (x < 0 || y < 0 || x >= zone.w || y >= zone.d || z >= zone.h) return daylight(game);
+  if (!zone.skyLight) return 0;
+  return sampleLight(zone, zone.skyLight, x, y, z, true) * daylight(game);
+}
+
+export function inDark(game, zone, x, y, z) {
+  if (game.player.torch) return false;
+  return zoneIsLightless(zone) || naturalLight(game, zone, x, y, z) < RULES.dark.threshold;
 }
