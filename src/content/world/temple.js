@@ -100,6 +100,7 @@ const MAIN_LEGEND = { ",": "plankFloor", b: "bed", C: "column", M: "maren", O: "
                       P: "door", H: "floor" };
 const SANCTUM_LEGEND = { A: "altar", w: "mosaicWhite", u: "mosaicBlue" };
 const NO_DOOR = { P: "wall", H: "wall" };
+export const TEMPLE_LEGENDS = { main: MAIN_LEGEND, sanctum: SANCTUM_LEGEND, noDoor: NO_DOOR };   // (read by check-content)
 
 export const TEMPLE_PLAN = {
   id: "temple", name: "The Temple of Angles", rows: TEMPLE_ROWS, height: 4, wall: B.STONE, floorBlock: B.TILE,

@@ -37,6 +37,7 @@ export const CHECKS = [
   { name: "clock", owner: "P0", load: () => import("./clock.js") },
   { name: "combat", owner: "WS8", load: () => import("./combat.js") },
   { name: "config", owner: "P0", load: () => import("./config.js") },
+  { name: "content", owner: "P0", load: () => import("./content.js") },
   { name: "creatures", owner: "P0", load: () => import("./creatures.js") },
   { name: "currency", owner: "P0", load: () => import("./currency.js") },
   { name: "determinism", owner: "P0", load: () => import("./determinism.js") },

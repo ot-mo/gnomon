@@ -9,6 +9,7 @@
 //                                   aura?(game, it), av?(it) (worn armour value), abilities?(it), examine? }
 //   registerItemAction(name, fn)    fn(game, e, it) → seconds: a use shared by kinds ("drink", "read", "wear"),
 //                                   so content can name it without importing the modules that do it
+//   itemActions() → [names]         the registered actions (read-only; check-content)
 //   useItem(game, e, it) → seconds  0 if it has no use
 //   itemName itemGlyph itemInfo itemDetails itemPrice itemWeight itemAura itemPalette itemSprite itemBonuses
 //   stackKey(it) → key | null       items with the same key stack (null: never)
@@ -37,6 +38,7 @@ export function registerItemKind(kind, def) {
 const kindOf = (it) => kinds()[it?.kind];
 function actions() { return (actions.table ||= {}); }
 export function registerItemAction(name, fn) { actions()[name] = fn; }
+export const itemActions = () => Object.keys(actions());
 export function useItem(game, e, it) {
   const use = kindOf(it)?.use;
   const fn = typeof use === "string" ? actions()[use] : use;
