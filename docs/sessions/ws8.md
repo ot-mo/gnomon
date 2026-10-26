@@ -214,3 +214,9 @@ goes), against `p0-done` in alternation (`$TMPDIR/ws8/p0done` = `git archive p0-
 | check-dungeons, check-status, check-stats | pass alone (in the full run under three workstreams' load the timed items read up to 148 ms; alternating with `p0-done` alone: p95 33 against 37 ms) | | |
 
 The full `run-all` before the tag: §9.
+
+## 9. Before the tag
+
+`node tools/run-all.mjs` at `23c0826`: **all 37 checks passed** (157 s, 11 at a time). `tools/browser-ws8.mjs` (seed 1234),
+`tools/browser-0c.mjs` (seeds 1234, 7) and `tools/browser-shell.mjs` (1280×720, 600×300) pass against this tree with
+0 console errors and the audio rerouted (`node tools/serve.mjs 8648`; stopped afterwards, every browser closed).
