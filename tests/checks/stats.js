@@ -1,6 +1,6 @@
 // The stat bus (stats.js) and RULES (rules.js): TECH_DESIGN §2.6 and the 0B gate.
 //
-//   checkStats({ game, startRun, inventory, mechanics }) → { name, ok, problems, stats }
+//   checkStats({ game, startRun, inventory, mechanics, gate }) → { name, ok, problems, stats }
 //
 //   1. RULES is frozen; extendRules adds a namespace once; overrideRules undoes.
 //   2. In both formula sets: putting on and taking off every piece of gear (every weapon, armour, ring,
@@ -15,6 +15,13 @@
 //   5. `mechanics`: a function that replays golden (a) and returns { mismatched, writes } with
 //      STATS_DEBUG.verify on (every bonus() checks the cache) and the player guarded; the only base
 //      writes allowed are the permanent ones (potions and crystals of strength, heart crystals, perks).
+//   6. Through body.js as play does it, in both formula sets: every piece of gear equipped (body.equip) on
+//      every part it fits and taken off again (body.unequip) under STATS_DEBUG.verify; the numbers are
+//      consistent while it's on and exactly the same after (cursed pieces are uncursed to come off).
+//   7. `gate`: the rest of the 0B gate, run by tools/check-stats.mjs and only reported here: golden (a)
+//      replayed by the bot through the map's and the 3D view's controls ({ map, "3d" }: { mismatched,
+//      steps }), skipTime(600) against 1/60 s stepping and drowning on the map and in 3D (check-status's
+//      numbers), and golden (b), the frames ({ frames, mismatched }).
 //
 // game/startRun/inventory: the real modules, so equipping runs exactly as in play.
 import { RULES, extendRules, overrideRules } from "../../src/rules.js";
@@ -22,6 +29,7 @@ import * as St from "../../src/stats.js";
 import { WEAPONS, ARMOURS, RINGS, AMULETS, RELICS, PROPERTIES, itemBonuses, makeRelic } from "../../src/items.js";
 import { PERKS, perkRank, takePerk } from "../../src/leveling.js";
 import { registerStatus, addStatus, removeStatus, STATUS_DEFS } from "../../src/status.js";
+import * as Bd from "../../src/body.js";
 
 // Where the parent game's four slots are on a humanoid body (the gear catalog puts each piece there).
 const PART = { weapon: "hand_r", armour: "body", ring: "finger_r", amulet: "neck" };
@@ -81,7 +89,7 @@ export function gearCatalog() {
   return out;
 }
 
-export function checkStats({ game, startRun, inventory, mechanics }) {
+export function checkStats({ game, startRun, inventory, mechanics, gate = null }) {
   const problems = [], stats = {};
   const t0 = Date.now();
 
@@ -145,8 +153,9 @@ export function checkStats({ game, startRun, inventory, mechanics }) {
       if (!same(before, derived(game, p))) problems.push(`${set}: removing the status changed ${diff(before, derived(game, p))}`);
       // Every registered status, on and off: the derived numbers come back exactly.
       for (const id in STATUS_DEFS) {
-        if (id === "flat") continue;   // it switches the view; check-status covers it
+        const view = [game.view, game.mode];   // (flat forces the map view: put the view back after)
         addStatus(game, p, id, { t: 5 }); consistent(`status ${id}`); removeStatus(game, p, id);
+        [game.view, game.mode] = view;
         if (!same(before, derived(game, p))) problems.push(`${set}: status ${id} on and off changed ${diff(before, derived(game, p))}`);
         statusesChecked++;
       }
@@ -223,6 +232,69 @@ export function checkStats({ game, startRun, inventory, mechanics }) {
     if (count("maxHpGain") !== 4) problems.push(`golden (a): ${count("maxHpGain")} max HP writes, expected 4`);
     const other = r.writes.filter((w) => w !== "attrs.str" && w !== "maxHpGain");
     if (other.length) problems.push(`golden (a) wrote other base fields: ${[...new Set(other)].join(", ")}`);
+  }
+
+  // --- 6. Every item on every part through body.js, both formula sets -------------------------------
+  {
+    let fits = 0;
+    for (const set of SETS) {
+      const undoSet = overrideRules("stats", set);
+      startRun(1234);
+      const p = game.player;
+      St.raiseAttr(p, "str", 20);   // strong enough for everything
+      for (const part of Object.keys(p.body.equip)) if (p.body.equip[part]) Bd.unequip(game, p, part);
+      if (p.body.belt) p.body.belt = null;
+      St.invalidateStats(p);
+      const bare = derived(game, p);
+      St.STATS_DEBUG.verify = true;
+      try {
+        for (const proto of gear)
+          for (const part of Bd.slotsFor(p, proto)) {
+            const it = { ...proto, props: proto.props && [...proto.props] };
+            const on = Bd.equip(game, p, it, part);
+            if (!on.ok) { problems.push(`${set}: body.equip refused ${it.kind} ${it.relic || it.id} on ${part}: ${on.reason}`); continue; }
+            fits++;
+            const b = expectedBonus(p, statusBonus), table = St.bonusTable(p);
+            for (const k of new Set([...Object.keys(b), ...Object.keys(table)]))
+              if (Math.abs((b[k] || 0) - (table[k] || 0)) > 1e-9) { problems.push(`${set}: ${it.kind} ${it.relic || it.id} on ${part}: bonus(${k}) ${table[k] || 0}, expected ${b[k] || 0}`); break; }
+            const want = expectedCore(p, b), got = { str: St.attr(p, "str"), maxHp: St.maxHp(p), av: St.av(p) };
+            if (!same(want, got)) problems.push(`${set}: ${it.kind} ${it.relic || it.id} on ${part}: ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`);
+            if (it.ench < 0) it.ench = 0;   // a curse holds it on: lift it to take it off
+            const off = Bd.unequip(game, p, Bd.wornOn(p, part) === it ? part : Object.keys(p.body.equip).find((k) => p.body.equip[k] === it));
+            if (!off.ok) problems.push(`${set}: body.unequip of ${it.kind} ${it.relic || it.id} from ${part}: ${off.reason}`);
+            const now = derived(game, p);
+            if (!same(bare, now)) problems.push(`${set}: ${it.kind} ${it.relic || it.id} on and off ${part} changed ${diff(bare, now)}`);
+          }
+      } catch (err) { problems.push(`${set}: body.equip/unequip: ${err.message}`); }
+      St.STATS_DEBUG.verify = false;
+      undoSet();
+    }
+    stats.bodyEquips = fits;
+  }
+
+  // --- 7. The rest of the 0B gate --------------------------------------------------------------------
+  if (gate) {
+    for (const view of ["map", "3d"]) {
+      const g = gate.goldenA?.[view];
+      if (!g || g.mismatched || g.steps !== 86) problems.push(`golden (a) through the ${view} controls: ${g ? `${g.mismatched} of ${g.steps} steps differ` : "not run"}`);
+      for (const q of g?.problems || []) problems.push(`golden (a) ${view}: ${q}`);
+    }
+    const sk = gate.status?.skipTime600 || {};
+    for (const [k, v] of Object.entries(sk))
+      if (v.dHp !== undefined && (Math.abs(v.dHp) > 1 || Math.abs(v.dT) > 0.1)) problems.push(`skipTime(600), ${k}: ${v.dHp} HP, ${v.dT} s from stepping`);
+    if (!Object.keys(sk).length) problems.push("skipTime(600): not run");
+    const dr = gate.status?.drowning;
+    if (!dr || dr.map.damage !== dr["3d"].damage || dr.map.exitTile !== dr["3d"].exitTile || dr.map.hits.length !== dr["3d"].hits.length
+        || dr.map.hits.some((t, k) => Math.abs(t - dr["3d"].hits[k]) > 0.1)) problems.push(`drowning differs between the views: ${JSON.stringify(dr)}`);
+    for (const q of gate.status?.problems || []) problems.push(`check-status: ${q}`);
+    const fr = gate.frames;
+    if (!fr || fr.mismatched || fr.frames !== 27) problems.push(`golden (b): ${fr ? `${fr.mismatched} of ${fr.frames} frames differ` : "not run"}`);
+    stats.gate = {
+      goldenA: Object.fromEntries(["map", "3d"].map((v) => [v, gate.goldenA?.[v] && `${gate.goldenA[v].steps - gate.goldenA[v].mismatched}/${gate.goldenA[v].steps} (${gate.goldenA[v].keys} keys, ${gate.goldenA[v].mapSteps} map steps, ${gate.goldenA[v].frames} frames)`])),
+      skipTime600: Object.fromEntries(Object.entries(sk).map(([k, v]) => [k, v.dHp !== undefined ? `${v.dHp} HP, ${v.dT} s` : `killed ${v.killed}`])),
+      drowning: dr && { map: dr.map.hits, "3d": dr["3d"].hits, damage: [dr.map.damage, dr["3d"].damage], exitTile: [dr.map.exitTile, dr["3d"].exitTile] },
+      goldenB: fr && `${fr.frames - fr.mismatched}/${fr.frames} frames`,
+    };
   }
 
   stats.ms = Date.now() - t0;
