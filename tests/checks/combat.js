@@ -617,6 +617,11 @@ export function checkTargeting(ctx) {
     const lf = lineOfFire(game, data);
     key("Escape");
     expect(lf.end === "interposed" && lf.hit === near, `the line of fire through the orc: ${lf.end}, first hit ${lf.hit?.name}`);
+    // An orc you haven't seen (no sighting this moment) isn't shown in the way.
+    z.sightings.delete(near.id);
+    const unseen = lineOfFire(game, data);
+    expect(unseen.end === "clear" && unseen.hit !== near, `the line of fire through an orc you can't see: ${unseen.end}, ${unseen.hit?.name ?? "nothing"} in the way (want clear)`);
+    refreshView(game);
     attacks.length = 0;
     const knives = () => p.inv.find((s) => s.kind === "knife");
     let pr = throwAt(game, knives(), far);

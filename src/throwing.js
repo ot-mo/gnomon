@@ -168,28 +168,29 @@ export function finishFlight(game, pr, seconds) {
 // are flat and it isn't), a creature (yours: the first one you could strike, wherever it stands on the
 // way), STOP (a block, deep water, the bottom of the world, a border with nothing built beyond it), or null.
 const STOP = "stop";
-function collide(game, pr, nx, ny, nz) {
+function collide(game, pr, nx, ny, nz, ignore = null) {
   const { zone, player: p } = game;
   if (pr.hostile) {
     if (touchesYou(game, pr.from) && Math.abs(nx - p.x) < RADIUS + 0.1 && Math.abs(ny - p.y) < RADIUS + 0.1 && nz > p.z && nz < p.z + HEIGHT) return p;
   } else {
     for (const mo of zone.creatures)
-      if (!canTalk(mo) && touchable(game, mo) && Math.hypot(nx - mo.x, ny - mo.y) < mo.w * 0.45 + 0.15 && nz > mo.z - 0.1 && nz < mo.z + mo.h + 0.1) return mo;
+      if (!canTalk(mo) && touchable(game, mo) && !ignore?.(mo) && Math.hypot(nx - mo.x, ny - mo.y) < mo.w * 0.45 + 0.15 && nz > mo.z - 0.1 && nz < mo.z + mo.h + 0.1) return mo;
   }
   const bx = Math.floor(nx), by = Math.floor(ny), bz = Math.floor(nz);
   if (zone.solid(bx, by, bz) || zone.voxel(bx, by, bz) === B.WATER_DEEP || nz < -1) return STOP;   // (solid: beyond a border without an apron too)
   return null;
 }
 
-// Where a projectile would go from here, if nothing moved meanwhile.
-export function flightOf(game, pr, { maxT = 3 } = {}) {
+// Where a projectile would go from here, if nothing moved meanwhile. ignore(c) → true: fly through c (the target
+// screen leaves out what you can't see).
+export function flightOf(game, pr, { maxT = 3, ignore = null } = {}) {
   const q = { x: pr.x, y: pr.y, z: pr.z, vx: pr.vx, vy: pr.vy, vz: pr.vz, g: pr.g ?? GRAVITY, hostile: pr.hostile, from: pr.from };
   const h = 1 / 120, path = [{ x: q.x, y: q.y, z: q.z }];
   let t = 0, life = Math.min(maxT, pr.life ?? maxT);
   for (; t < life; t += h) {
     q.vz -= q.g * h;
     const nx = q.x + q.vx * h, ny = q.y + q.vy * h, nz = q.z + q.vz * h;
-    const hit = collide(game, q, nx, ny, nz);
+    const hit = collide(game, q, nx, ny, nz, ignore);
     if (hit === STOP) return { t, x: q.x, y: q.y, z: q.z, creature: null, stop: true, path };
     if (hit) return { t, x: nx, y: ny, z: nz, creature: hit, stop: false, path };
     q.x = nx; q.y = ny; q.z = nz;

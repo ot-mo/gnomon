@@ -239,7 +239,8 @@ export function lineOfFire(game, data) {
   const tooFar = (x, y) => distance(x + 0.5 - p.x, y + 0.5 - p.y) > data.range + 0.5;
   if (data.purpose === "look") return { tiles, end: "clear", hit: null };
   if (data.flight) {
-    const f = flightOf(game, data.flight(game, t));
+    // Only what you can see now stands in the line (a creature in the dark doesn't give itself away).
+    const f = flightOf(game, data.flight(game, t), { ignore: (c) => game.zone.sightings.get(c.id)?.time !== game.time });
     let state = "clear";
     for (const pt of f.path) {
       const x = Math.floor(pt.x), y = Math.floor(pt.y);
