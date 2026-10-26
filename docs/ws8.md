@@ -195,4 +195,25 @@ the target screen: as above. (T on the map opens the target screen under the d20
 
 ## Handoff
 
-(Filled in at the end of the workstream; see below.)
+**Updated:** 2026-10-26, local session, on `ws/ws8`. **WS8 is done**: tag `p1-ws8` on `ws/ws8` (pushed). Nothing is half
+finished.
+
+- **What is done:** everything in §8.3 "WS8" (outputs and acceptance), with numbers in `docs/sessions/ws8.md` §3, §8;
+  the independent verification (gate with mutation testing, the old game in both views, spec and code) and its 19
+  findings, each fixed in its own commit with an assertion that fails without it (`docs/sessions/ws8.md` §7).
+- **Next step (the integrator, §8.5):** merge `refs/heads/ws/ws8` (after WS9 and WS3), apply the 12 integration
+  requests above (1, 2, 3, 12 matter most for play: abilities through the target screen; monsters hostile to your
+  followers; spikes and a flat you; followers drawn in 3D), rerun `node tools/check-combat.mjs`, `tools/browser-ws8.mjs`
+  and the dependency-table items "WS4 abilities on the map", "WS5 examine from L", "WS6a witnesses", "WS7 murals".
+- **Surprising:**
+  - The TTK tables: the d20 set is close to the parent's through tier 4 and clearly harsher from tier 5 (a same-level
+    kill costs 34-60% of your health against 25-38%): creatures add floor(level / 3) to hit and nothing on your side
+    scales with level. For the flip and C4/WS4 (powers, DV gear), `docs/sessions/ws8.md` §3.
+  - render3d.js draws only creatures hostile to you: followers are invisible in 3D until request 12 lands (WS3 has
+    been told).
+  - P0 gives `innate` two meanings (stats.js: a creature's bonuses; abilities.js: ability ids): request 11.
+  - **A stray file**: `C:OTTOMR~1placeholder.txt` (6 bytes, "unused", outside every repository) was written by
+    mistake during the verification fixes, and the safety check stopped its removal (a folder at the drive's root).
+    Delete `C:OTTOMR~1` by hand.
+- **Machine notes:** timed numbers were taken alone with `p0-done` alternately (`check-combat --perf --against`,
+  `check-perf`); in a full `run-all` with three workstreams running, the timed checks read up to 4× slow.
