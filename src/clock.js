@@ -1,8 +1,9 @@
 // The clock: time of day as a view of state.time (TECH_DESIGN §1.4, R10; DECISIONS §1; bible §4.6).
 //
-// state.time is the one persistent clock, seconds of game time (game.time is the same number: game.js
-// keeps it on game.state). Everything here is derived from it through RULES.clock: one world hour is
-// 60 s of game time in both views, and the run starts on day 1 at 06:00.
+// state.time is the one persistent clock, seconds of game time; game.time is the same number (game.js
+// attachState makes state.time read and write it, so hot code keeps a plain field). Everything here is
+// derived from it through RULES.clock: one world hour is 60 s of game time in both views, and the run
+// starts on day 1 at 06:00.
 //
 //   minutes(game) → n                 world minutes since day 1, 00:00 (state.time / secondsPerMinute + startMinute)
 //   minutesAt(t) → n                  the same for any game time t
@@ -22,14 +23,14 @@
 //                                     (the torch's drain listens). Called every frame (a registered update
 //                                     in every mode), on zone:leave (so the time is the zone's you left) and
 //                                     by skipTime (time.js): a skip fires what playing the time out would.
-//                                     game.clockSeen is how far it has got (runtime; startRun sets it, a
-//                                     load may leave it unset: the first call then starts from t0 = now).
+//                                     game.clockSeen is how far it has got (runtime; game.js attachState
+//                                     sets it for a new run or a load, so nothing fires twice).
 //
 // The looks are WS3's (TECH_DESIGN §6.3) and stay at noon until then, so no frame changes:
 //   daylight(game) → 1 · sunDir(game) → render3d's sun · skyColors(game) → { zenith, horizon } (render3d's
 //   noon sky) · fogFor(game, zone) → { color, density: 0 } · lightBucket(game) → 0
 import { RULES } from "./rules.js";
-import { emit, on, registerUpdate } from "./events.js";
+import { emit, on, listening, registerUpdate } from "./events.js";
 
 const DAY = 24 * 60;
 const C = () => RULES.clock;
@@ -92,7 +93,8 @@ export function catchUp(game, t0 = game.time) {
   if (!(t1 > from)) return;
   const k0 = Math.floor(minutesAt(from) / 60 + 1e-9), k1 = Math.floor(minutesAt(t1) / 60 + 1e-9);
   const named = NAMED();
-  for (let k = k0 + 1; k <= k1; k++) {
+  const heard = ["clock:hour", ...Object.values(named)].some(listening);
+  for (let k = k0 + 1; heard && k <= k1; k++) {
     const m = k * 60, hour = ((k % 24) + 24) % 24, payload = { minutes: m, day: Math.floor(m / DAY) + 1, hour };
     emit(game, "clock:hour", payload);
     if (named[hour]) emit(game, named[hour], payload);

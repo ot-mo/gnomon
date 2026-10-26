@@ -1,9 +1,9 @@
 // The clock (0D2; TECH_DESIGN §1.4 clock.js, R10; DECISIONS §1; bible §4.6).
 //
-//   checkClock({ game, startRun, clock, events, time, turns, rules }) → { name, ok, problems, stats }
+//   checkClock({ game, startRun, attachState, clock, events, time, turns, rules }) → { name, ok, problems, stats }
 //
-//   1. The view: state.time is the clock (game.time reads and writes it; a new run starts it at 0, day 1,
-//      06:00); one world hour is 60 s of game time; every hour of two days has the right phase (dawn 05-06,
+//   1. The view: state.time is the clock (it reads and writes game.time, a plain field; a new run starts it
+//      at 0, day 1, 06:00; JSON saves it and attachState puts a saved state back without firing anything); one world hour is 60 s of game time; every hour of two days has the right phase (dawn 05-06,
 //      day 06-18, dusk 18-19, night 19-05), the noon window is 11-13; timeOfDay, dayNumber, clockLabel.
 //   2. nightSeconds: a day holds 10 night hours; intervals across dusk, dawn and midnight; any split of
 //      an interval adds up to the whole (exact, so the torch's drain is the same however time is cut).
@@ -16,7 +16,7 @@
 //   4. secondsUntil: from 06:00 to the next hour, dawn, noon, dusk and midnight; skipTime by it lands on
 //      the minute and fires that event.
 //   5. The looks stay at noon until WS3: daylight 1, the sun, the noon sky, no fog, one light bucket.
-export function checkClock({ game, startRun, clock, events, time, turns, rules }) {
+export function checkClock({ game, startRun, attachState, clock, events, time, turns, rules }) {
   const problems = [], stats = {};
   const fail = (m) => problems.push(m);
   const HOUR = 60 * rules.RULES.clock.secondsPerMinute;
@@ -40,6 +40,19 @@ export function checkClock({ game, startRun, clock, events, time, turns, rules }
     game.state.time = 7;
     if (game.time !== 7) fail("game.time doesn't read state.time");
     game.time = 0;
+    // game.time stays a plain field (an accessor there slowed every access 10-100×); state.time is its view,
+    // saved by JSON, and a loaded state put back with attachState brings the clock back without firing.
+    const desc = Object.getOwnPropertyDescriptor(game, "time");
+    if (!desc || !("value" in desc)) fail("game.time isn't a plain data property");
+    game.time = 3 * HOUR + 5;
+    const saved = JSON.parse(JSON.stringify(game.state));
+    if (saved.time !== 3 * HOUR + 5) fail(`JSON.stringify(state) saved time ${saved.time}`);
+    game.time = 0;
+    const before = log.length;
+    attachState(game, saved);
+    events.runUpdates(game, 0);
+    if (game.time !== 3 * HOUR + 5 || game.state !== saved || game.clockSeen !== game.time || log.length !== before) fail(`attachState of a saved state: time ${game.time}, clockSeen ${game.clockSeen}, ${log.length - before} events fired`);
+    game.time = 0; game.clockSeen = 0;
     if (HOUR !== 60) fail(`a world hour is ${HOUR} s of game time, DECISIONS says 60`);
     if (clock.clockLabel(game) !== "day 1, 06:00" || clock.minutes(game) !== 360) fail(`the run starts at ${clock.clockLabel(game)} (${clock.minutes(game)} min)`);
     const want = (h) => (h >= 19 || h < 5 ? "night" : h < 6 ? "dawn" : h < 18 ? "day" : "dusk");

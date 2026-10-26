@@ -2,7 +2,7 @@
 //
 //   skipTime(game, seconds, { interruptible = true, reason = "wait", until }) → { elapsed, interrupted, why }
 //
-// Advances the one clock (state.time, which game.time reads and writes) by `seconds` of game time,
+// Advances the one clock (game.time, which state.time reads and writes: game.js attachState) by `seconds` of game time,
 // and everything that runs on it catches up exactly, as if the time had been played out:
 //   - the player's statuses, cooldowns and regeneration, stepping from one HP change (a poison tick, a
 //     heal) or status end to the next (status.js catchUpStatuses and effects.js regenerate are exact for

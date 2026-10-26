@@ -3,6 +3,7 @@
 //   on(type, handler, { priority })   subscribe; returns a function that unsubscribes.
 //                                     Higher priority runs first; equal priorities in the order added.
 //   emit(game, type, payload)         call every handler now: handler(game, payload). Synchronous.
+//   listening(type) → bool            whether any handler is subscribed
 //   registerUpdate(id, fn, { modes, every })
 //                                     fn(game, dt) runs once per frame after the mode's own update,
 //                                     in the listed modes ("play" means explore and map). With
@@ -32,6 +33,10 @@ export function on(type, fn, { priority = 0 } = {}) {
     if (k >= 0) l.splice(k, 1);
   };
 }
+
+// Is anyone listening to `type`? (A caller with many events to send, the clock over a long skip, can
+// skip building payloads nobody reads.)
+export const listening = (type) => !!handlers.get(type)?.length;
 
 export function emit(game, type, payload = {}) {
   const list = handlers.get(type);

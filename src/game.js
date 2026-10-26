@@ -62,11 +62,9 @@ export const game = {
   state: null,         // persistent plain data (zones.js: uids, zonePatches, zoneLeft)
   mode: "explore", view: "3d", paused: true,
   modeStack: [],       // screens.js: [{ mode, data }], what each pushed screen returns to (game.mode is the top)
-  // time: the one clock (R10), seconds of game time, kept as state.time so it is saved with the state;
-  // clock.js reads the time of day from it. uiTime: real seconds of play, in every mode.
-  get time() { return this.state ? this.state.time : this.timeBeforeRun; },
-  set time(t) { if (this.state) this.state.time = t; else this.timeBeforeRun = t; },
-  timeBeforeRun: 0, uiTime: 0, fov: 75, sensitivity: 0.0025,
+  // time: the one clock (R10), seconds of game time; state.time is the same number (attachState), so it is
+  // saved with the state; clock.js reads the time of day from it. uiTime: real seconds of play, in every mode.
+  time: 0, uiTime: 0, fov: 75, sensitivity: 0.0025,
   messages: [], effects: [], target: null, travel: null, fps: 60, frameMs: 0,
   descendT: 0, deathCause: "",
   potionColor: {}, knownPotions: new Set(), invSel: 0,
@@ -135,12 +133,25 @@ export const game = {
 
 export const randomSeed = () => 1 + Math.floor(Math.random() * 999999);
 
+// game.state becomes `state` (a new run's, or a loaded one), and state.time is the clock (R10, §2.17):
+// the property reads and writes game.time, a plain field because hot code reads it every frame (an
+// accessor on the game object made every access to it 10-100× slower), so the two are always the same
+// number, and JSON.stringify(state) saves it. The clock's events count from that moment on.
+export function attachState(game, state) {
+  const t = Number(state.time) || 0;
+  delete state.time;
+  Object.defineProperty(state, "time", { get: () => game.time, set: (v) => { game.time = v; }, enumerable: true, configurable: true });
+  game.state = state;
+  game.time = t;
+  game.clockSeen = t;   // clock.js: its events have fired up to here
+  return state;
+}
+
 // A new game on `seed` (quick start: no character to make yet), at the world's start landmark.
 export function startRun(seed, world = game.world) {
   game.seed = seed;
   game.run = buildRun(seed, world);
-  game.state = { seed, time: 0, world: { id: game.run.world.id, version: game.run.world.version }, uids: {}, zonePatches: {}, zoneLeft: {} };
-  game.clockSeen = 0;   // clock.js: the clock's events have fired up to here (day 1, 06:00)
+  attachState(game, { seed, time: 0, world: { id: game.run.world.id, version: game.run.world.version }, uids: {}, zonePatches: {}, zoneLeft: {} });   // day 1, 06:00
   game.zone = null;
   game.zoneLru = [];
   game.player = makePlayer();
