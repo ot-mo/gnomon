@@ -25,6 +25,7 @@
 import * as S from "./screen.js";
 import { changeZone, cachedZone, makeZone, zoneKey } from "./zones.js";
 import { runUpdates } from "./events.js";
+import "./clock.js";   // the clock's events, every frame (time of day from state.time)
 import "./world/zonegen.js";   // the zone generators: surfaces, site dungeons, the legacy stack
 import { buildRun } from "./world/run.js";
 import { TEST_WORLD } from "./content/world/test-world.js";
@@ -61,7 +62,11 @@ export const game = {
   state: null,         // persistent plain data (zones.js: uids, zonePatches, zoneLeft)
   mode: "explore", view: "3d", paused: true,
   modeStack: [],       // screens.js: [{ mode, data }], what each pushed screen returns to (game.mode is the top)
-  time: 0, uiTime: 0, fov: 75, sensitivity: 0.0025,   // uiTime: real seconds of play, in every mode
+  // time: the one clock (R10), seconds of game time, kept as state.time so it is saved with the state;
+  // clock.js reads the time of day from it. uiTime: real seconds of play, in every mode.
+  get time() { return this.state ? this.state.time : this.timeBeforeRun; },
+  set time(t) { if (this.state) this.state.time = t; else this.timeBeforeRun = t; },
+  timeBeforeRun: 0, uiTime: 0, fov: 75, sensitivity: 0.0025,
   messages: [], effects: [], target: null, travel: null, fps: 60, frameMs: 0,
   descendT: 0, deathCause: "",
   potionColor: {}, knownPotions: new Set(), invSel: 0,
@@ -134,7 +139,8 @@ export const randomSeed = () => 1 + Math.floor(Math.random() * 999999);
 export function startRun(seed, world = game.world) {
   game.seed = seed;
   game.run = buildRun(seed, world);
-  game.state = { seed, world: { id: game.run.world.id, version: game.run.world.version }, uids: {}, zonePatches: {}, zoneLeft: {} };
+  game.state = { seed, time: 0, world: { id: game.run.world.id, version: game.run.world.version }, uids: {}, zonePatches: {}, zoneLeft: {} };
+  game.clockSeen = 0;   // clock.js: the clock's events have fired up to here (day 1, 06:00)
   game.zone = null;
   game.zoneLru = [];
   game.player = makePlayer();
@@ -142,7 +148,6 @@ export function startRun(seed, world = game.world) {
   game.messages = [];
   game.effects = [];
   game.travel = null;
-  game.time = 0;
   // Which colour is which potion is shuffled for every run. You start knowing healing.
   const colors = makeRng(seed ^ 0x5eed).shuffle([...POTION_COLORS.keys()]);
   game.potionColor = Object.fromEntries(Object.keys(POTIONS).map((effect, k) => [effect, colors[k]]));

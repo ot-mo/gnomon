@@ -2,27 +2,27 @@
 //
 //   skipTime(game, seconds, { interruptible = true, reason = "wait", until }) → { elapsed, interrupted, why }
 //
-// Advances the one clock (game.time; state.time once 0D2's save codec has it) by `seconds` of game time,
+// Advances the one clock (state.time, which game.time reads and writes) by `seconds` of game time,
 // and everything that runs on it catches up exactly, as if the time had been played out:
 //   - the player's statuses, cooldowns and regeneration, stepping from one HP change (a poison tick, a
 //     heal) or status end to the next (status.js catchUpStatuses and effects.js regenerate are exact for
 //     any dt in between), so poison and regeneration fighting at full health come out as when played;
 //   - the creatures' statuses (fire and poison can kill them), their regeneration and attack cooldowns,
 //     in one bulk step at the end: idle creatures stay where they are and don't act;
-//   - poison clouds thin out.
+//   - poison clouds thin out;
+//   - the clock (clock.js catchUp): every hour, dawn, noon, dusk and midnight in the skipped time fires
+//     once, and the torch burns its glim for the dark part of it (torch.js), as played-out time would.
 // It stops early when you die, when `until(game)` turns true (healed, dawn…), or, if interruptible,
 // when a hostile is awake (hunting) within RULES.time.activeRadius tiles: then nothing passes at all.
 // A rest (reason "rest") of RULES.cooldown.restClears seconds or more clears the second-wind and
-// first-block cooldowns (§2.4). Emits "time:skip" { seconds, reason, interrupted, t0 }; 0D2's clock.js
-// listens to it (clock.catchUp) so hour, dawn and dusk events fire once each.
-//
-// Torch drain (DECISIONS: 1 glim per 4 world hours lit in darkness) is time-based too, but whether it is
-// dark needs the clock (surface night), so 0D2 adds it with clock.js, from this event and per frame.
+// first-block cooldowns (§2.4). Emits "time:skip" { seconds, reason, interrupted, t0 } after the clock's
+// events.
 import { RULES } from "./rules.js";
 import { catchUpStatuses, statusLeft, clearCooldown, STATUS_DEFS } from "./status.js";
 import { regenerate, nextRegenEvent } from "./effects.js";
 import { CREATURE_TYPES, hostilesTo, canTalk } from "./creatures.js";
 import { emit } from "./events.js";
+import { catchUp } from "./clock.js";
 
 // Something that would stop a rest: a hostile awake within the radius.
 function threat(game) {
@@ -96,6 +96,7 @@ export function skipTime(game, seconds, { interruptible = true, reason = "wait",
   }
   if (reason === "rest" && elapsed >= RULES.cooldown.restClears) { clearCooldown(p, "secondWind"); clearCooldown(p, "firstBlock"); }
   const interrupted = why !== null && why !== "until";
+  catchUp(game, t0);
   emit(game, "time:skip", { seconds: elapsed, reason, interrupted, t0 });
   return { elapsed, interrupted, why };
 }

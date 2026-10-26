@@ -69,6 +69,16 @@ const CORE = {
 
   // Levels (DECISIONS: surface zone level = 3 × tier − 1; legacy tables read min(level, 20) until C3).
   level: { contentMax: 20, tierMax: 8 },
+
+  // The clock (DECISIONS §1, bible §4.6; clock.js): one world hour is 60 s of game time in both views (a
+  // world minute per second). The run starts on day 1 at 06:00. Hours of the day: dawn 05-06, day 06-18,
+  // dusk 18-19, night 19-05; the noon window 11-13.
+  clock: { secondsPerMinute: 1, startMinute: 6 * 60, dawn: 5, day: 6, dusk: 18, night: 19, noon: [11, 13] },
+
+  // The torch's glim (DECISIONS §1, bible §3.2; torch.js): 1 glim per hoursPerGlim world hours lit in
+  // darkness (underground, the Shade, surface night), nothing by day. With an empty purse it gutters to a
+  // flicker gutterRange tiles across, at gutterPower of a torch's strength, and never goes out.
+  torch: { hoursPerGlim: 4, gutterRange: 1, gutterPower: 0.35 },
 };
 
 const store = new Map(Object.entries(CORE).map(([k, v]) => [k, deepFreeze(v)]));
