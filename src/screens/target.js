@@ -145,7 +145,7 @@ function confirm(game, data) {
     return;
   }
   const far = distance(t.point.x - p.x, t.point.y - p.y);
-  if (far > data.range + 0.5) { game.log(`That's ${Math.round(far)} tiles away: you can ${data.verb || "reach"} ${data.range} at most.`, [170, 170, 170]); return; }
+  if (far > data.range + 0.5) { game.log(`That's ${Math.round(far)} tiles away: you can ${data.verb || "reach"} ${data.range} tiles at most.`, [170, 170, 170]); return; }
   if (t.creature) game.lastTargetId = t.creature.id;
   popMode(game);
   data.done?.(game, t);
@@ -224,7 +224,9 @@ function lookIn3d(game) {
 export function look(game) {
   if (game.mode === "map") return openTarget(game, { purpose: "look", verb: "look at" });
   if (game.mode !== "explore") return false;
-  tell(game, lookIn3d(game));
+  const seen = lookIn3d(game);
+  if (seen) tell(game, seen);
+  else game.log("Nothing there within sight.", [200, 210, 230]);   // (the sky, or a hall longer than you can make out)
   return true;
 }
 bind("map", "KeyL", (game) => { look(game); }, { help: "look (a cursor)" });

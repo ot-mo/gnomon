@@ -16,7 +16,7 @@ import { registerItemKind } from "../../items.js";
 export const MISSILES = {
   sling: { name: "sling", dmg: [1, 4], acc: 0, range: 10, speed: 14, gravity: 16, reload: 0.7, hands: 1, ammo: null, noun: "stone",
            tier: 1, price: 25, onHit: { status: "stunned", t: 1, chance: 0.3 },
-           info: "free stones; dazes now and then; lobs over low walls" },
+           info: "dazes now and then; lobs over low walls" },
   boltBow: { name: "bolt-bow", dmg: [3, 7], acc: 1, range: 16, speed: 26, gravity: 5, reload: 1, hands: 2, ammo: "bolt", noun: "bolt",
              tier: 2, price: 90, onHit: { status: "pinned", t: 2, chance: 1 },
              info: "long range; pins what it hits for 2 s" },

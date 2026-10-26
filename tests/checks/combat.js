@@ -567,6 +567,12 @@ export function checkTargeting(ctx) {
     expect(inspects.length === 4 && inspects[3].creature === gob && inspects[3].open === true && game.mode === "explore",
       `L in 3D: ${inspects.length - 3} inspect, creature ${inspects[3]?.creature?.name} (want the goblin in the crosshair, open)`);
     stats.look3d = run.logged[run.logged.length - 1];
+    // At the open sky (nothing within sight): no inspect, and a line that says so.
+    { const sky = arena("ws8-sky", { sky: true, w: 16, d: 10 }); enterZone(game, sky, { how: "start" }); in3d(game);
+      Object.assign(p, { x: 5.5, y: 5.5, z: FLOOR_Z, pitch: 1.2 }); const n = inspects.length, m = run.logged.length;
+      key("KeyL");
+      expect(inspects.length === n && /within sight/.test(run.logged[m] || ""), `L at the sky: ${inspects.length - n} inspects, "${run.logged[m]}"`);
+      enterZone(game, z, { how: "start" }); z.seen.fill(1); Object.assign(p, { x: 5.5, y: 5.5, z: FLOOR_Z, pitch: 0 }); aimAt(p, gob); }
     // --- 4. requestTarget ---------------------------------------------------------------------------------
     let got = "none";
     requestTarget(game, { name: "Test", range: 8 }, (t) => { got = t; });

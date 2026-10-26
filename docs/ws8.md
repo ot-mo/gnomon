@@ -59,7 +59,9 @@ touchesYou(game, attacker) → bool                   // not while you're flat a
 
 ```js
 recruit(game, c, leader = game.player) → c   // c.brain.leader = "player" | id: it follows, fights its leader's side
-dismiss(game, c) → c                         // never strikes you; WS6b's Kindling recruits through this
+                                             // (WS6b's Kindling recruits through this)
+dismiss(game, c) → c                         // it stops following: factions.js attitude decides again (the P0
+                                             // stub: a monster is out for you at once)
 leaderOf(game, c) → entity | null            fleeLevel(c) → share of health it runs below (0: never)
 AI_RULES = RULES.ai = { foeRange 8, foeForget 3, lose 8, outdoorRadius 32,
   flee: { recover 0.5, forget 6, most 10, brave 15, byType: { rat, bat, goblin, archer, spider, orc, salamander } },
