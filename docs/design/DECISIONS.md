@@ -56,8 +56,9 @@ surveys of the parent code that the tech design cites.
 - **Node.** Node 20.11 is installed, with no npm dependencies. Run scripts as ES modules (`.mjs`), or pass
   `--experimental-default-type=module` for `.js` entry points.
 - **Browser checks.** Use the built-in browser pane and the preview server `gnomon` in `.claude/launch.json`
-  (`python -m http.server 8130`, served from the repo root). A worktree serves on its own port from its own folder:
-  start `python -m http.server <port>` in the background with the Bash tool, and kill it when done.
+  (`node tools/serve.mjs 8130`, served from the repo root). A worktree serves on its own port from its own folder:
+  start `node tools/serve.mjs <port>` in the background with the Bash tool, and kill it when done. (Not
+  `python -m http.server`: on Windows it drops part of a boot's ~150 module requests.)
   - **Audio must never reach the speakers.** Until `?silent=1` exists, first patch the page so that anything connected
     to the AudioDestinationNode goes to an AnalyserNode followed by a zero-gain node.
   - **Close every tab you opened when you finish.** The pane keeps running while hidden, and the game's music would
