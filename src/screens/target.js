@@ -138,6 +138,11 @@ THROW_AIM.aim = (game, stack) => {
 function confirm(game, data) {
   const p = game.player, t = targetAt(game, data.cursor);
   if (data.purpose === "look") { popMode(game); lookAtTile(game, data.cursor); return; }
+  const mine = t.tile.x === Math.floor(p.x) && t.tile.y === Math.floor(p.y);
+  if (mine && (data.purpose === "missile" || (data.purpose === "throw" && data.item?.kind !== "bomb"))) {
+    game.log("That's where you stand: move the cursor to what you want to hit.", [170, 170, 170]);
+    return;
+  }
   const far = distance(t.point.x - p.x, t.point.y - p.y);
   if (far > data.range + 0.5) { game.log(`That's ${Math.round(far)} tiles away: you can ${data.verb || "reach"} ${data.range} at most.`, [170, 170, 170]); return; }
   if (t.creature) game.lastTargetId = t.creature.id;

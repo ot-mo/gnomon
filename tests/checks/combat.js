@@ -601,6 +601,11 @@ export function checkTargeting(ctx) {
     const n0 = run.logged.length;
     key("Enter");
     expect(game.mode === "target" && run.logged.slice(n0).some((t) => /tiles away/.test(t)), `a throw out of range: mode ${game.mode}, log ${JSON.stringify(run.logged.slice(n0))}`);
+    game.modeStack[game.modeStack.length - 1].data.cursor = { x: Math.floor(p.x), y: Math.floor(p.y) };
+    const n1 = run.logged.length, knives0 = p.inv.find((s) => s.kind === "knife")?.count;
+    key("Enter");
+    expect(game.mode === "target" && p.inv.find((s) => s.kind === "knife")?.count === knives0 && run.logged.slice(n1).some((t) => /where you stand/.test(t)),
+      `a throw at your own tile: mode ${game.mode}, knives ${knives0} → ${p.inv.find((s) => s.kind === "knife")?.count}, log ${JSON.stringify(run.logged.slice(n1))}`);
     key("Escape");
     // --- 6. The interposed creature (a follower too) -------------------------------------------------------
     const near = dummy(z, "orc", 7, 5);   // (a rat is short: a knife thrown at the goblin flies over it)
