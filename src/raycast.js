@@ -120,9 +120,13 @@ export function castRay(zone, ox, oy, oz, dx, dy, dz, maxT, seen = null, torchRa
     }
     if ((x < X0 && stepX < 0) || (x >= X1 && stepX > 0) ||
         (y < Y0 && stepY < 0) || (y >= Y1 && stepY > 0)) { hit.out = 1; hit.missT = t; hit.mx = x; hit.my = y; return false; }
-    // Down out of the zone: a pit when it is inside the grid; beyond it (a shut corner between two open sides, no
-    // band there) it is the world beyond, like a ray leaving by a side.
-    if (z < 0 && stepZ < 0) { hit.out = x >= 0 && y >= 0 && x < W && y < D ? 2 : 1; hit.missT = t; hit.mx = x; hit.my = y; return false; }
+    // Down out of the zone: a pit inside the grid, or in an apron band (the neighbour's own pit); where no band is
+    // (a shut corner between two open sides) it is the world beyond, like a ray leaving by a side.
+    if (z < 0 && stepZ < 0) {
+      const sx = (x >= W) - (x < 0), sy = (y >= D) - (y < 0), band = g ? g[(sy + 1) * 3 + sx + 1] : null;
+      const inBand = !!band && ((x - band.x0 >= 0) & (y - band.y0 >= 0) & (x - band.x0 < band.bw) & (y - band.y0 < band.bd)) === 1;
+      hit.out = (sx === 0 && sy === 0) || inBand ? 2 : 1; hit.missT = t; hit.mx = x; hit.my = y; return false;
+    }
     if (z >= TOP && stepZ > 0) break;
     lastLit = false;
     if (z < 0 || z >= H || x < X0 || y < Y0 || x >= X1 || y >= Y1) continue;

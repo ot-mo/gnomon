@@ -175,7 +175,21 @@ export async function checkRender(m) {
       }
     }
     expect(!spots.length, `black cells below the horizon at noon: ${spots.slice(0, 4).join("; ")}`);
-    stats.horizon = { views, worstBlackBelow: worst };
+    // A pit in the neighbour, seen across the edge in its apron band, is a pit (black), as it is from inside its zone.
+    fresh(4242);
+    const pz = game.zone;
+    for (const side of ["n", "e", "s", "w", "ne", "nw", "se", "sw"]) { const a = zones.neighbourAddr(game, pz, side); if (a && !zones.cachedZone(game, a.key)) zones.makeZone(game, a.key); }
+    zones.fillApron(game, pz);
+    const band = pz.apron.e, n = band.bw * band.bd;
+    for (let ly = 22; ly <= 26; ly++) for (let lx = 1; lx <= 5; lx++) for (let k = 0; k < pz.h; k++) band.blocks[lx + ly * band.bw + k * n] = 0;
+    game.time = T(12);
+    const ps = standNear(pz, pz.w - 2, 24);
+    Object.assign(p(), { x: ps.x + 0.5, y: ps.y + 0.5, z: ps.z, vz: 0, yaw: 0, pitch: -0.75, torch: true });
+    frame3d();
+    let pitBlack = 0;
+    for (let i = 0; i < capture.cols * capture.rows; i++) if (capture.chars[i] === " " || capture.colors[i * 3] + capture.colors[i * 3 + 1] + capture.colors[i * 3 + 2] < 8) pitBlack++;
+    expect(pitBlack > 20, `a pit beyond the edge (in the apron band) isn't drawn as a pit: ${pitBlack} black cells`);
+    stats.horizon = { views, worstBlackBelow: worst, apronPitBlack: pitBlack };
   }
 
   // A 24×24 grass field (hasSky or not); build(z) adds blocks before the light is computed.
@@ -432,9 +446,12 @@ export async function checkRender(m) {
     expect(!unknown.length, `content/moods.js names moods music.js doesn't play: ${[...new Set(unknown)]}`);
     // Voices (sfx.js, TECH_DESIGN §1.2): a voice object plays as given, a parent's person by id, anything else neutrally.
     const sfx = m.sfx, v = { maren: sfx.voiceOf("maren"), stranger: sfx.voiceOf("someoneNew"), object: sfx.voiceOf({ pitch: 410, wave: "square", thin: true }),
-      partial: sfx.voiceOf({ wave: "sine" }), proto: sfx.voiceOf("toString"), none: sfx.voiceOf(null) };
-    expect(v.maren.pitch === 255 && v.stranger === sfx.NEUTRAL_VOICE && v.object.pitch === 410 && v.object.thin && v.partial.pitch === sfx.NEUTRAL_VOICE.pitch &&
-           v.partial.wave === "sine" && v.proto === sfx.NEUTRAL_VOICE && v.none === sfx.NEUTRAL_VOICE, `voices: ${JSON.stringify(v)}`);
+      partial: sfx.voiceOf({ wave: "sine" }), proto: sfx.voiceOf("toString"), none: sfx.voiceOf(null),
+      noWave: sfx.voiceOf({ pitch: 300, wave: undefined }), endless: sfx.voiceOf({ pitch: Infinity }), inherited: sfx.voiceOf(Object.create({ pitch: 600 })), badWave: sfx.voiceOf({ wave: "noise" }) };
+    const N = sfx.NEUTRAL_VOICE;
+    expect(v.maren.pitch === 255 && v.stranger === N && v.object.pitch === 410 && v.object.thin === true && v.partial.pitch === N.pitch &&
+           v.partial.wave === "sine" && v.proto === N && v.none === N && v.noWave.wave === N.wave && v.noWave.pitch === 300 && v.endless.pitch === N.pitch &&
+           v.inherited.pitch === N.pitch && v.badWave.wave === N.wave, `voices: ${JSON.stringify(v)}`);
     stats.moods = got;
   }
 
