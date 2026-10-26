@@ -2,7 +2,7 @@
 // skyLight comes down light wells open to the sky; lampLight radiates from lamp blocks.
 import { RULES } from "./rules.js";
 import { daylight as clockDaylight, lightBucket, bucketSun } from "./clock.js";
-import { registerUpdate } from "./events.js";
+import { registerUpdate, on } from "./events.js";
 import { castRay, rayInfo } from "./raycast.js";
 
 const SKY_FALLOFF = 0.13;
@@ -266,12 +266,17 @@ export function sunlitGrid(g, w, d, h, hx, hy, hz, nx, ny, nz, px, py, pz) {
 // one neighbour in memory with its derived arrays (the next zone you may walk into) is baked ahead, a slice
 // per frame, so the frame that crosses an edge doesn't bake.
 export const BAKE_MS = 2;
-export function syncLight(game, zone) {
-  if (!zone?.skyLight || !zone.hasSky) return;
-  const dl = daylight(game), st = stateOf(zone);
+// The lit mask alone (for the zone you are in: daylight(game) is game.zone's).
+function syncMask(game, zone, st = stateOf(zone)) {
+  const dl = daylight(game);
   maskDaylight = dl;
   const key = maskKey(zone, dl);
   if (st.litKey !== key) { zone.litMask = litMaskOf(zone, zone.skyLight, zone.lampLight, dl); st.litKey = key; }
+}
+export function syncLight(game, zone) {
+  if (!zone?.skyLight || !zone.hasSky) return;
+  const st = stateOf(zone);
+  syncMask(game, zone, st);
   const bucket = lightBucket(game);
   if (sunCurrent(zone, bucket, st)) return;
   bakeSun(zone, bucket, { budgetMs: zone.sunlit ? BAKE_MS : Infinity });
@@ -291,3 +296,6 @@ function bakeAhead(game) {
 }
 
 registerUpdate("light", (game) => { if (game.zone) { syncLight(game, game.zone); bakeAhead(game); } }, { modes: ["*"] });
+// A zone you come into (a load, an edge, stairs) has its mask at your daylight before anything looks with it: its
+// mask was built at the last zone's daylight (or day's, before any frame), and a map step may look before a frame.
+on("zone:enter", (game, { zone }) => { if (zone?.skyLight && zone.hasSky && zone === game.zone) syncMask(game, zone); }, { priority: 50 });

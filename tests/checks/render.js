@@ -222,6 +222,17 @@ export async function checkRender(m) {
     expect(seen.night3d <= 9 && seen.nightMap <= 9 && seen.noon3d > 100 && seen.noonMap === all && seen.duskMap === all && seen.nightTorchMap > 100 &&
            seen.nightLampMap > seen.nightMap + 100, `the auto-map's night rule: seen ${JSON.stringify(seen)} (all ${all})`);
     game.time = T(12);
+    // A zone you come into at night (a load, an edge) has the night's mask before anything looks: a field made while
+    // the last frame was at noon, entered at midnight, and the map looking at once (no frame between).
+    zones.enterZone(game, lit, { how: "start" }); game.time = T(12); stand(10.5, 10.5); frame3d();   // the last frame: noon
+    const late = field("render-late", true);
+    game.time = T(24); p().torch = false; p().torchBurn = 0;
+    zones.enterZone(game, late, { how: "start" });
+    late.seen.fill(0); stand(10.5, 10.5); game.view = "map"; game.mode = "map";
+    turns.refreshView(game);
+    let lateSeen = 0; for (let i = 0; i < late.seen.length; i++) lateSeen += late.seen[i];
+    expect(lateSeen <= 9, `a zone entered at midnight, the map looking before any frame: ${lateSeen} columns seen (want the 3 × 3 around you)`);
+    seen.enteredAtNight = lateSeen;
     stats.dark = { plank: drawn, runesDifferNoonMidnight: runeNoon !== runeNight, seen };
   }
 
