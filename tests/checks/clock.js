@@ -15,7 +15,9 @@
 //      11:00 fire hour and noon once; leaving a zone catches the clock up before zone:leave's other handlers.
 //   4. secondsUntil: from 06:00 to the next hour, dawn, noon, dusk and midnight; skipTime by it lands on
 //      the minute and fires that event.
-//   5. The looks stay at noon until WS3: daylight 1, the sun, the noon sky, no fog, one light bucket.
+//   5. The looks, as a seam (WS3 built them; tests/checks/render.js §1 holds their values): pure (the same game
+//      time gives the same looks, whatever came between), daylight in 0..1, the sun a unit vector, a light bucket
+//      a whole number within the day's, fog never negative; at noon daylight 1, the sun high, the parent's noon sky.
 export function checkClock({ game, startRun, attachState, clock, events, time, turns, rules }) {
   const problems = [], stats = {};
   const fail = (m) => problems.push(m);
@@ -175,15 +177,27 @@ export function checkClock({ game, startRun, attachState, clock, events, time, t
     stats.until = clock.clockLabel(game);
   }
 
-  // --- 5. The looks (noon until WS3) ----------------------------------------------------------------------
+  // --- 5. The looks: the seam (their values: tests/checks/render.js §1) -------------------------------------
   {
     fresh();
-    for (const h of [0, 6, 12, 18]) {
+    const buckets = 1 + Math.floor(1439 / clock.BUCKET_MINUTES);
+    const looks = () => JSON.stringify([clock.daylight(game), clock.sunDir(game), clock.skyColors(game), clock.fogFor(game, game.zone), clock.lightBucket(game)]);
+    for (const h of [0, 3, 6, 9, 12, 13, 18, 21]) {
       game.time = h * HOUR;
-      if (clock.daylight(game) !== 1 || clock.lightBucket(game) !== 0 || clock.fogFor(game, game.zone).density !== 0) fail(`the looks at +${h} h aren't noon's`);
-      const s = clock.sunDir(game), sky = clock.skyColors(game);
-      if (Math.abs(Math.hypot(...s) - 1) > 1e-9 || s[2] < 0.8 || sky.zenith.join() !== "50,95,190" || sky.horizon.join() !== "170,200,240") fail(`the sun ${s} or the sky ${JSON.stringify(sky)} isn't render3d's noon`);
+      const first = looks();
+      game.time = (h + 5) * HOUR; looks();
+      game.time = h * HOUR;
+      if (looks() !== first) fail(`the looks at +${h} h changed after another hour was asked`);
+      const d = clock.daylight(game), s = clock.sunDir(game), k = clock.lightBucket(game), fog = clock.fogFor(game, game.zone);
+      if (!(d >= 0 && d <= 1)) fail(`daylight ${d} at +${h} h`);
+      if (Math.abs(Math.hypot(...s) - 1) > 1e-9) fail(`the sun ${s} at +${h} h isn't a unit vector`);
+      if (!Number.isInteger(k) || k < 0 || k > buckets) fail(`light bucket ${k} at +${h} h (want a whole number in 0..${buckets})`);
+      if (!(fog.density >= 0) || fog.color?.length !== 3) fail(`fog ${JSON.stringify(fog)} at +${h} h`);
     }
+    game.time = 6 * HOUR;   // noon
+    const s = clock.sunDir(game), sky = clock.skyColors(game);
+    if (clock.daylight(game) !== 1 || s[2] < 0.8 || sky.zenith.join() !== "50,95,190" || sky.horizon.join() !== "170,200,240")
+      fail(`noon: daylight ${clock.daylight(game)}, the sun ${s}, the sky ${JSON.stringify(sky)} (want 1, high, render3d's noon sky)`);
   }
 
   for (const off of offs) off();
