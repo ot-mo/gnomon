@@ -185,6 +185,13 @@ the target screen: as above. (T on the map opens the target screen under the d20
     `innate` as its own bonus table (`{ dv: 20 }` in check-combat), `abilities.js` reads it as a list of ability ids
     (the player's `["foldStep"]`, which `stats.js` then adds up as a bonus table with a key `"0"`). One of them should
     take another name (`c.bonuses`, or `e.abilities`). ai.js asks for abilities only when `innate` is a list.
+12. **`render3d.js` (WS3), major for the merge:** 3D draws the sprites of `hostilesTo(game, player)` and the people only
+    (render3d.js:269, and the flat shadows at :173), which in P0 was every creature; a follower, or anything wary or
+    neutral (WS6a), is never drawn in 3D though it is there (it blocks you, catches your bolts, and the first swing
+    holds back from it). Draw every creature instead: `for (const m of game.zone.creatures) if (!m.talk) { const sp =
+    creatureSprite(game, m); … }` (`creatureSprite` already returns null for a flat being, a ghost the light hides and a
+    creature still arriving), and the shadows from every flat creature. On the map they show (turns.js's sightings,
+    tinted).
 
 ## Handoff
 
