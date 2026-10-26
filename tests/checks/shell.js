@@ -405,6 +405,22 @@ export function checkShell({ game, startRun, inputHandlers, screens, keys, ui, i
     expect("transition", "taking the stairs");
     steps(60);
     expect("map", "after the beat");
+    // In 3D, the pointer lock lost during the beat (no explore under it to pause then): the beat ends on the
+    // pause card, not in a running 3D view with no mouse look. (A browser-like backend that can lock.)
+    if (input?.setInputBackend) {
+      let lockedNow = true;
+      input.setInputBackend({ canLock: true, isLocked: () => lockedNow, lock() { lockedNow = true; }, unlock() { lockedNow = false; }, init() {} });
+      screens.setMode(game, "explore"); game.view = "3d"; game.paused = false;
+      game.debug.changeFloor("0,0,2", "down", "You descend the stairs...");
+      expect("transition", "taking the stairs in 3D");
+      lockedNow = false; inputHandlers.onLockChange(false);
+      steps(60);
+      expect("pause", "after the beat, the lock lost during it");
+      if (!game.paused) fail("3D runs after a beat that lost the pointer lock");
+      inputHandlers.onLockChange(true); expect("explore", "the lock back after the beat");
+      input.setInputBackend({ canLock: false, isLocked: () => true, lock() {}, unlock() {}, init() {} });   // node-env's again
+      screens.setMode(game, "map"); game.view = "map";
+    }
 
     // Death and a new run: R, or a click on its line.
     game.hurtPlayer(99999, "a test"); seen(byKey);   // (a blow you walked into)
