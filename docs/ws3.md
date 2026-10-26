@@ -81,26 +81,38 @@ game's: golden (b) and the screen frames are unchanged.
 
 ## Integration requests
 
-1. **`tests/checks/clock.js` §5** (a P0 file) asserts the clock's looks are noon stubs "until WS3" (daylight 1 at
-   midnight, bucket 0, no fog), so it fails once the looks are built. WS3 asked the session that started it how to
-   settle this (see "Handoff"). The real looks are tested in `tests/checks/render.js` §1.
-2. **A key for the map legend** (`screens/play.js` map bindings or `keys.js`): bind one to
+1. **Applied on `ws/ws3` (`b267794`), for the integrator to confirm at merge: `tests/checks/clock.js` §5** (a P0
+   file). Its section 5 asserted the clock's looks were noon stubs "until WS3" (daylight 1 at midnight, one light
+   bucket, no fog), so it failed once the looks were built. With the approval of the session that started WS3,
+   only §5 and its line-18 header changed: §5 is now a seam check (the same game time gives the same looks whatever
+   was asked between; daylight in 0..1; the sun a unit vector; a light bucket a whole number in 0..96; fog never
+   negative; at noon daylight 1, the sun high and the parent's noon sky). The looks' values are checked in
+   `tests/checks/render.js` §1.
+2. **Applied on `ws/ws3` (`87a902c`), for the integrator to confirm at merge: `tests/checks/screen-frames.js`** (a
+   P0 file). Its "victory card" frame (`startRun(7)`, mode `won`) is drawn over the temple span's surface map, which
+   WS3's outdoor ground looks and legend change, so its hash can't match `p0-0c`'s, and the fixture is never
+   re-recorded. With the same approval: `tests/fixtures/screen-frames.json` is untouched, the frame is still drawn,
+   and exactly that name is in a named list `NOT_COMPARED` with its reason; the other 46 frames are compared and
+   match. The make-up is `tests/checks/render.js` §10: the same state drawn with and without the card, every line
+   of the card centred in its box, the box's size and borders, its title's colour, and every cell outside the box
+   what the map draws without the card (the outdoor map).
+3. **A key for the map legend** (`screens/play.js` map bindings or `keys.js`): bind one to
    `renderMap.toggleMapLegend()` and call `setLegendKeyHint("<label>")` once. At 160 columns (a 1280-wide window)
    the outdoor legend doesn't fit beside an 80-wide zone and is hidden unless toggled; at 180 it shows by itself.
-3. **Map looks for terrain blocks** (WS2, blocks.js): GRASS (id 7, not a reserved id: the integrator's) and the
+4. **Map looks for terrain blocks** (WS2, blocks.js): GRASS (id 7, not a reserved id: the integrator's) and the
    reserved TRUNK, SHALE, LEAVES, REED have no `map` look; outdoors they show as a `.` (floors) or `#` (walls) in
    the block's colour. §6.5's grass `"` would need GRASS's `map`; it is safe underground (renderMap reads `map` only
    outdoors).
-4. **The edge-swap frame's step** (zones.js / WS2's `gen/surface.js buildApronBand`): on the swap, `fillApron`
+5. **The edge-swap frame's step** (zones.js / WS2's `gen/surface.js buildApronBand`): on the swap, `fillApron`
    builds the new zone's far bands, whose neighbours aren't in memory, from the world functions in that frame
    (`buildApronBand` and `columnAt`: about half of a 10 ms step on a cold first swap in Node). Building them during
    prefetch, or a band a frame, would leave the swap frame one draw. WS3's part (the draw) is in
    `docs/sessions/ws3.md`.
-5. **`tools/README.md`**: `check-perf` now runs the render check first (`--no-render` skips it), compares with
+6. **`tools/README.md`**: `check-perf` now runs the render check first (`--no-render` skips it), compares with
    `p0-done` by default, and has `frame.dusk`, `frame.night`, `bake` and the swap frames in its report.
-6. **"gold" in the underground map legend**: golden (b)'s frames show the parent's legend, so the word stays
+7. **"gold" in the underground map legend**: golden (b)'s frames show the parent's legend, so the word stays
    underground until golden (b) is retired; the outdoor legend says glim. Change `renderMap.js`'s `$` row then.
-7. **For C1 and WS6b**: a region or terrain may carry `fog` (a number added to the haze density) and a region
+8. **For C1 and WS6b**: a region or terrain may carry `fog` (a number added to the haze density) and a region
    `music` (a mood of `music.moodNames()`); a liquid in `content/liquids.js` is drawn in its `color`.
 
 ## Handoff
