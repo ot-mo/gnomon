@@ -75,16 +75,26 @@ export function checkCurrency({ game, startRun, dialogue, npcs, srcFiles, captur
   }
 
   // --- 2. A new player -----------------------------------------------------------------------------
+  {
+    const w0 = game.world;
+    game.world = { ...w0, startPurse: undefined };
+    startRun(1234);
+    if (C.purseCap(game.player) !== CURRENCY.startPurse) fail(`a world without startPurse: purse ${C.purseCap(game.player)}, want ${CURRENCY.startPurse}`);
+    game.world = w0;
+  }
   startRun(1234);
   game.pages = null; game.pendingPages = null; game.story.cube = true;
   const p = game.player;
-  if (C.funds(p) !== 0 || C.purseCap(p) !== CURRENCY.startPurse || "gold" in p) fail(`a new player: funds ${C.funds(p)}, purse ${C.purseCap(p)}${"gold" in p ? ", a gold field" : ""}`);
+  // The test world starts you with its own purse (it carries the parent game's prices); a world without one, the smallest.
+  const wantPurse = game.world.startPurse || CURRENCY.startPurse;
+  if (C.funds(p) !== 0 || C.purseCap(p) !== wantPurse || "gold" in p) fail(`a new player: funds ${C.funds(p)}, purse ${C.purseCap(p)}${"gold" in p ? ", a gold field" : ""}`);
 
   // --- 3. Piles --------------------------------------------------------------------------------------
   {
     const logs = [];
     const log = game.log;
     game.log = (m, c) => { logs.push(m); return log.call(game, m, c); };
+    C.setPurse(p, 200);
     p.funds = 195;
     const pile = I.makeItem({ kind: "cash", amount: 12 }, p.x, p.y, p.z);
     game.zone.items.push(pile);

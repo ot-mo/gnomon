@@ -149,5 +149,7 @@ const TOWER_PLAN = {
 };
 export const TEST_PLANS = { temple: TEMPLE_PLAN, ruin: RUIN_PLAN, tower: TOWER_PLAN };
 
+// startPurse: the test world carries the parent game, whose prices were set with no purse at all, so you
+// start with the largest flask there (bible §15.6). The real world starts with the smallest.
 export const TEST_WORLD = { world: TEST_WORLD_MAP, terrains: TEST_TERRAINS, regions: TEST_REGIONS,
-                            landmarks: TEST_LANDMARKS, plans: TEST_PLANS };
+                            landmarks: TEST_LANDMARKS, plans: TEST_PLANS, startPurse: 1000 };

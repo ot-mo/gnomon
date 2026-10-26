@@ -51,6 +51,7 @@ import { openTalk, talkKey, talkClick, talkHover, drawTalk, shopKey, drawShop, o
 import { maxHp } from "./stats.js";
 import { addStatus, hasStatus, statusFlag, statusLeft, cooldownLeft, startCooldown } from "./status.js";
 import { RULES } from "./rules.js";
+import { setPurse } from "./currency.js";
 
 export const game = {
   seed: 0, zone: null, player: null,
@@ -208,6 +209,7 @@ export function startRun(seed, world = game.world) {
   game.zone = null;
   game.zoneLru = [];
   game.player = makePlayer();
+  if (world.startPurse) setPurse(game.player, world.startPurse);
   game.messages = [];
   game.effects = [];
   game.travel = null;
