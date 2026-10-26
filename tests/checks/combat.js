@@ -19,7 +19,8 @@
 //      the swing passes through); the Gloom Warden only with the torch out; the Colossus's core only from
 //      above (from the ground every landed blow does exactly 1). In both sets.
 //   5. Creatures against creatures (d20): misses happen, hits land, the victim bears a grudge, a kill gives
-//      you no XP. Creatures against you: your DV decides (a higher AGI is hit less often).
+//      you no XP. Creatures against you: your DV decides (a higher AGI is hit less often). A miss or a
+//      blow soaked to nothing still wakes its target (a hunt for you, a grudge for a creature).
 //   6. The bus: "kill" carries the killer; Rook's bounty, a guardian's gate and relic, and the win come from
 //      it; a guardian waking emits "guardian:wake"; "attack" follows every resolution.
 //
@@ -378,7 +379,26 @@ export function checkCombat({ game, startRun, srcFiles }) {
       setAgi(16);
       expect(rates[12].got > rates[24].got && Math.abs(rates[12].got - rates[12].want) < 0.04 && Math.abs(rates[24].got - rates[24].want) < 0.04,
         `an orc on you: AGI 12 hit ${rates[12].got} (want ${rates[12].want}), AGI 24 hit ${rates[24].got} (want ${rates[24].want})`);
-      stats.creatures = { orcOnGoblin: { got: rate, want }, onYou: rates };
+      // A miss or a blow soaked to nothing still wakes its target: a sleeping Colossus you swing at and
+      // miss (a natural 1) hunts you; a goblin whose hide turns your blow hunts you; a goblin an orc
+      // misses bears it a grudge.
+      const woke = {};
+      const col = addCreature(z, spawnCreature("colossus", 4, 2, FLOOR_Z, { rng: () => 0.5, level: 9, state: "idle" }));
+      col.hp = col.maxHp = 1e6; col.cd = Infinity;
+      let res0 = resolveAttack(game, p, col, weaponSpec(p), { view: "map", rng: () => 0 });
+      woke.colossusMiss = { hit: res0.hit, nat: res0.nat, state: col.state };
+      const hide = addCreature(z, spawnCreature("goblin", 3, 3, FLOOR_Z, { rng: () => 0.5, level: 1, state: "idle" }));
+      hide.armour = 1000; hide.hp = hide.maxHp = 1e6;
+      res0 = resolveAttack(game, p, hide, weaponSpec(p), { view: "map", rng: () => 0.7 });
+      woke.soaked = { hit: res0.hit, dmg: res0.dmg, state: hide.state };
+      const sleeper = addCreature(z, spawnCreature("goblin", 12, 8, FLOOR_Z, { rng: () => 0.5, level: 1, state: "idle" }));
+      res0 = resolveAttack(game, a, sleeper, naturalSpec(a), { rng: () => 0 });
+      woke.orcMiss = { hit: res0.hit, state: sleeper.state, grudge: !!sleeper.brain?.grudges?.[a.id] };
+      expect(!woke.colossusMiss.hit && woke.colossusMiss.state === "chase", `a missed Colossus: ${JSON.stringify(woke.colossusMiss)} (want a miss and chase)`);
+      expect(woke.soaked.hit && woke.soaked.dmg === 0 && woke.soaked.state === "chase", `a goblin whose hide turns your blow: ${JSON.stringify(woke.soaked)} (want hit, 0 damage, chase)`);
+      expect(!woke.orcMiss.hit && woke.orcMiss.state === "wander" && woke.orcMiss.grudge, `a goblin the orc missed: ${JSON.stringify(woke.orcMiss)} (want a grudge, wander)`);
+      for (const c of [col, hide, sleeper]) z.creatures.splice(z.creatures.indexOf(c), 1);
+      stats.creatures = { orcOnGoblin: { got: rate, want }, onYou: rates, woke };
       game.effects.length = 0;
     }
 

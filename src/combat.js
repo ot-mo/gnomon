@@ -149,6 +149,17 @@ function hurtCreature(game, m, dmg, label, color, src) {
   emit(game, "hurt", { tgt: m, src: src || null, dmg });
 }
 
+// A blow that missed or was soaked to nothing still tells (d20): the target turns on whoever swung, as
+// hurtCreature does (you: it hunts you; a creature: it bears that one a grudge).
+function noticeBlow(game, m, src) {
+  if (isPlayer(game, m)) return;
+  if (isPlayer(game, src)) { m.state = "chase"; m.lost = 0; return; }
+  if (m.state === "idle") m.state = "wander";
+  const brain = (m.brain ||= {});
+  brain.hurtBy = src.id;
+  (brain.grudges ||= {})[src.id] = 1;
+}
+
 // Armoured elites shrug off part of every hit (never all of it): the legacy soak.
 const flatSoak = (m, dmg, pierce = false) => Math.max(1, dmg - (pierce ? 0 : m.armour || 0));
 // The d20 soak: a random 0..AV (cursed armour below zero adds 0..−AV).
@@ -332,6 +343,7 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
   Object.assign(result, rollToHit(game, att, tgt, spec, ctx, rng));
   if (!result.hit) {
     float(game, tgt, "miss", [170, 170, 180]);
+    noticeBlow(game, tgt, att);
     if (you) game.log(spec.kind === "thrown" ? `Your knife misses the ${tgt.name}.` : `You miss the ${tgt.name}.`, [170, 170, 180]);
     else if (onYou) { game.log(`${ctx.blocked ? cap(ctx.blocked) : `The ${att.name}`} misses you.`, [170, 170, 180]); sfx("block", { at: att }); }
     return;
@@ -365,6 +377,7 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
   if (dmg <= 0) {
     result.dmg = 0;
     float(game, tgt, "0", [170, 180, 200]);
+    noticeBlow(game, tgt, att);
     if (you) game.log(`The ${tgt.name}'s hide turns your ${spec.kind === "thrown" ? "knife" : "blow"}.`, [170, 180, 200]);
     sfx("block", { at: tgt });
     return;
