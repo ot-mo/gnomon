@@ -28,7 +28,8 @@ openTarget(game, { purpose: "look" | "throw" | "missile" | "ability", range, ver
 //   flight (throwing.js flightOf); without it a straight line, red past the first wall.
 //   target = { creature, point: { x, y, z }, tile: { x, y }, dir: [dx, dy, 0] }   (abilities.js aimTarget's shape)
 requestTarget(game, ability, done)   // abilities.js's seam with the screen behind it: in 3D done(aimTarget) at once,
-                                     // on the map done(target | null) later (see Integration requests 1)
+                                     // on the map done(target | null) later (see Integration requests 1). An
+                                     // AbilityDef may add spec(game, e) → a combat spec: the screen shows its hit chance
 look(game)                           // L: map → the look cursor; 3D → the crosshair at once. Both emit
                                      // inspect { zone, x, y, z, creature?, item?, block?, open: true } and log lookLine
 lookLine(game, payload) → string     // "A goblin, level 3, out for you, 75% to hit with your weapon. Weak to fire."
@@ -74,7 +75,8 @@ AI_RULES = RULES.ai = { foeRange 8, foeForget 3, lose 8, outdoorRadius 32,
   living creatures one, and the legacy set none (no new random draws either: the legacy fights match).
 - **Abilities**: a creature with abilities (`c.innate`, or its gear's) tries each ready one every 0.5 s when
   `def.ai.when(game, c, target)` is true; `use(game, c, lvl, target)` gets `{ creature, point, tile, dir }` with
-  `creature` what it fights, **you included** (WS4: an ability's `use` must expect the player as a target).
+  `creature` what it fights, **you included** (WS4: an ability's `use` must expect the player as a target). `when` is
+  asked with `target` null when the creature fights nothing (an ability on itself can still say yes).
 - **Zone changes** (§5.1): `zone:leave` takes along every follower of yours in the zone (over an edge, by the stairs,
   or on WS1's world-map travel, `how: "travel"`) and, over an edge, whatever hunts you within 3 tiles of the exit (not guardians, bosses, statues or the rooted), out of the zone you leave
   before write-behind snapshots it; `zone:enter` puts them in at the border you crossed (the stairs: beside you),

@@ -21,7 +21,8 @@
 //       target = { creature, point, tile, dir } (abilities.js aimTarget's shape); creature: one you can
 //       see on the tile (a person for a look), else null
 //   requestTarget(game, ability, done)     abilities.js's seam with the screen behind it: in 3D
-//       done(aimTarget(game, range)) at once, on the map done(target | null) when you confirm or cancel
+//       done(aimTarget(game, range)) at once, on the map done(target | null) when you confirm or cancel; an
+//       ability with spec(game, e) → a combat spec gets its hit chance shown
 //   look(game)                             L in either view
 //   lookLine(game, payload) → string       the line a look tells
 //   cursorTarget(game) → target            what the open screen points at (checks, the browser tool)
@@ -115,7 +116,7 @@ export function openTarget(game, opts) {
 export function requestTarget(game, ability, done) {
   if (game.mode !== "map") { done(aimTarget(game, ability?.range || REQUEST_RANGE)); return; }
   openTarget(game, { purpose: "ability", range: ability?.range || REQUEST_RANGE, verb: `use ${ability?.name || "it"}`,
-                     done: (g, t) => done(t) });
+                     spec: ability?.spec?.(game, game.player) || null, done: (g, t) => done(t) });
 }
 
 // T on the map with the d20 set (throwing.js throwAtNearest calls it through THROW_AIM): the ready stack
@@ -345,8 +346,9 @@ function infoLine(game, data, t, fire) {
   if (data.purpose === "look") return lookLine(game, inspectAt(game, data.cursor, false)) + (c && !canTalk(c) ? ` (${far} tiles)` : "");
   if (c && !canTalk(c)) {
     let chance = null;
-    if (data.spec && touchable(game, c)) chance = RULES.combat === "d20" ? hitChance(toHitMod(game, p, c, data.spec, { aimed: true }), dvOf(game, c), critNat(p)) : 1;
-    parts.push(`${c.name}${chance !== null ? `: ${Math.round(chance * 100)}% to hit if it gets there` : ""}`);
+    const flies = data.purpose === "throw" || data.purpose === "missile";   // (a projectile that reaches it is aimed: +3)
+    if (data.spec && touchable(game, c)) chance = RULES.combat === "d20" ? hitChance(toHitMod(game, p, c, data.spec, { aimed: flies }), dvOf(game, c), critNat(p)) : 1;
+    parts.push(`${c.name}${chance !== null ? `: ${Math.round(chance * 100)}% to hit${flies ? " if it gets there" : ""}` : ""}`);
   } else parts.push(describeTile(game, data.cursor));
   parts.push(`${far} tiles${far > data.range + 0.5 ? ` (out of range: ${data.range})` : ""}`);
   if (fire.end === "interposed") parts.push(`the ${fire.hit.name} is in the way`);

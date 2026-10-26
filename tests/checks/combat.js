@@ -577,6 +577,11 @@ export function checkTargeting(ctx) {
     expect(game.mode === "target" && got === "none", `requestTarget on the map: mode ${game.mode}, answered ${got === "none" ? "not yet" : "at once"} (want the screen)`);
     key("Enter");
     expect(got?.creature === gob && game.mode === "map", `requestTarget on the map: Enter gave ${got?.creature?.name ?? got}`);
+    // An ability that strikes (spec) shows your chance, without the aimed bonus.
+    requestTarget(game, { name: "Test", range: 8, spec: (g, e) => weaponSpec(e) }, () => {});
+    const abilityLine = targetText(game).bottom, want = Math.round(100 * hitChance(toHitMod(game, p, gob, weaponSpec(p), {}), dvOf(game, gob), critNat(p)));
+    expect(abilityLine.includes(`${want}% to hit`) && !/gets there/.test(abilityLine), `an ability with a spec: "${abilityLine.trim()}" (want ${want}% to hit)`);
+    key("Escape");
     got = "none";
     requestTarget(game, { name: "Test", range: 8 }, (t) => { got = t; });
     key("Escape");
@@ -585,7 +590,8 @@ export function checkTargeting(ctx) {
     p.inv = p.inv.filter((s) => s.kind !== "knife"); p.inv.push({ kind: "knife", count: 20 });
     key("KeyT");
     game.debug.draw();
-    const tf = targetText(game);
+    const tf = targetText(game), wantThrow = Math.round(100 * hitChance(toHitMod(game, p, gob, thrownSpec(game), { aimed: true }), dvOf(game, gob), critNat(p)));
+    expect(tf.bottom.includes(`${wantThrow}% to hit`), `the throw's hit chance: "${tf.bottom.trim()}" (want ${wantThrow}%)`);
     expect(game.mode === "target" && /THROW/.test(tf.top) && /% to hit/.test(tf.bottom), `T on the map (d20): mode ${game.mode}, "${tf.top.trim().slice(0, 40)}" / "${tf.bottom.trim().slice(0, 80)}"`);
     const fire0 = lineOfFire(game, game.modeStack[game.modeStack.length - 1].data);
     expect(fire0.end === "clear" && fire0.tiles.length >= 3, `the line of fire at the goblin: ${fire0.end}, ${fire0.tiles.length} tiles`);
