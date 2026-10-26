@@ -11,7 +11,7 @@
 // Bombs go off 2 s after they leave your hand (on the map you set them down at your feet):
 // they hurt everything close, smash crates, and open the thin walls of secret rooms.
 import { damageMonster, hitPlayer, touchable } from "./monsters.js";
-import { POTIONS, POTION_COLORS, FLOOR_ART, itemPalette, makeItem, awayFromWalls } from "./items.js";
+import { POTIONS, POTION_COLORS, FLOOR_ART, itemPalette, makeItem, awayFromWalls, takeOne } from "./items.js";
 import { B, FLOOR_Z } from "./world.js";
 import { EYE, RADIUS, HEIGHT } from "./player.js";
 import { noise2 } from "./rng.js";
@@ -28,12 +28,6 @@ export function readyStack(p) {
   const r = p.ready;
   return (r && p.inv.find((s) => s.kind === r.kind && s.effect === r.effect)) ||
          p.inv.find((s) => s.kind === "knife") || null;
-}
-
-function takeOne(p, stack) {
-  stack.count--;
-  if (stack.count <= 0) p.inv.splice(p.inv.indexOf(stack), 1);
-  return { kind: stack.kind, effect: stack.effect };
 }
 
 // 3D: throw the ready thing where you're looking.

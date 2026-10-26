@@ -5,12 +5,18 @@
 // Gear's enchantment is hidden until you equip it. Cursed gear (−) can't be taken off
 // until a scroll of remove curse lifts the curse.
 import * as S from "./screen.js";
-import { WEAPONS, ARMOURS, ELEMENTS, itemName, itemInfo, itemGlyph, itemAura, makeItem, isGear, strNeeded, RELIC_COLOR } from "./items.js";
+import { WEAPONS, ARMOURS, ELEMENTS, ITEM_KINDS, itemName, itemInfo, itemGlyph, itemAura, makeItem, isGear, strNeeded, takeOne,
+  registerItemAction, useItem, canUse, RELIC_COLOR } from "./items.js";
 import { drinkPotion, readScroll } from "./effects.js";
+import { RULES } from "./rules.js";
 import { armourValue, bonus, weaponReach } from "./player.js";
 import { attr, maxHp, invalidateStats, clampHp } from "./stats.js";
 
-const DRINK_TIME = 0.5, READ_TIME = 1.0, EQUIP_TIME = 1.0;
+// What using things from the pack does (the kinds in content name these actions).
+registerItemAction("drink", (game, e, it) => { takeOne(e, it); drinkPotion(game, it.effect); return RULES.body.drinkTime; });
+registerItemAction("read", (game, e, it) => { takeOne(e, it); readScroll(game, it.effect); return RULES.body.readTime; });
+registerItemAction("wear", (game, e, it) => (equip(game, it, e.inv.indexOf(it)) ? RULES.body.equipTime : 0));
+
 const layout = { x0: 0, y0: 0, listY: 0, w: 0 };   // where the list was drawn, for mouse clicks
 const TOP = 9;   // the item list starts this many rows below the top of the box
 const AURA = { good: ["(good)", [120, 220, 120]], neutral: ["(neutral)", [170, 170, 170]], bad: ["(bad)", [255, 110, 100]] };
@@ -34,7 +40,7 @@ export function inventoryKey(game, code) {
   else if (code === "KeyE" || code === "Enter" || code === "Space" || code === "NumpadEnter") return useSelected(game);
   else if (code === "KeyT") {
     const it = inv[game.invSel];
-    if (it && (it.kind === "potion" || it.kind === "knife" || it.kind === "bomb")) { game.throwStack = it; return "throw"; }
+    if (it && ITEM_KINDS[it.kind]?.throwable) { game.throwStack = it; return "throw"; }
     game.log("You can throw potions, throwing knives and bombs.", [170, 170, 170]);
   }
   else if (code === "KeyX") return dropSelected(game);
@@ -53,23 +59,14 @@ export function inventoryClick(game, cell) {
   return 0;
 }
 
+// E: use the selected thing the way its kind says (drink, read, put on: items.js registry).
 export function useSelected(game) {
   const p = game.player;
   const it = p.inv[game.invSel];
-  if (!it) return 0;
-  if (it.kind === "potion") {
-    takeOne(p, game.invSel);
-    drinkPotion(game, it.effect);
-    return DRINK_TIME;
-  }
-  if (it.kind === "scroll") {
-    takeOne(p, game.invSel);
-    readScroll(game, it.effect);
-    game.invSel = Math.min(game.invSel, Math.max(0, p.inv.length - 1));
-    return READ_TIME;
-  }
-  if (isGear(it)) return equip(game, it, game.invSel) ? EQUIP_TIME : 0;
-  return 0;
+  if (!it || !canUse(it)) return 0;
+  const t = useItem(game, p, it);
+  game.invSel = Math.min(game.invSel, Math.max(0, p.inv.length - 1));
+  return t;
 }
 
 // Put on (or take in hand) a piece of gear from the inventory. A new weapon goes into your hand
@@ -131,25 +128,13 @@ function dropSelected(game) {
   const p = game.player;
   const it = p.inv[game.invSel];
   if (!it) return 0;
-  const one = takeOne(p, game.invSel);
+  const one = takeOne(p, it);
   const item = makeItem(one, p.x, p.y, p.z);
   item.dropped = true;   // don't pick it straight back up
   game.zone.items.push(item);
   game.log(`You drop the ${itemName(game, one)}.`, [170, 170, 170]);
   game.invSel = Math.min(game.invSel, Math.max(0, p.inv.length - 1));
   return 0;
-}
-
-// Remove one item from a slot (potions and scrolls come off their stack) and return it.
-function takeOne(p, index) {
-  const it = p.inv[index];
-  if (it.kind === "potion" || it.kind === "scroll" || it.kind === "knife" || it.kind === "bomb") {
-    it.count--;
-    if (it.count <= 0) p.inv.splice(index, 1);
-    return { kind: it.kind, effect: it.effect };
-  }
-  p.inv.splice(index, 1);
-  return it;
 }
 
 // ---------------------------------------------------------------------------

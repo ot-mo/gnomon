@@ -47,6 +47,12 @@ const CORE = {
   // is asked at least every 60 chunks; hostiles awake within activeRadius tiles interrupt.
   time: { chunk: 1, activeRadius: 12 },
 
+  // Body and items (TECH_DESIGN §2.5, §2.9): what equipping, drinking, reading and the belt swap (R) cost
+  // in seconds of game time (the parent's numbers), the off-hand chance for extra holding hands (WS4/WS5),
+  // and the levels where a treasure may be a relic (the parent's floors 14–19).
+  body: { equipTime: 1, drinkTime: 0.5, readTime: 1, beltSwap: 0.4, offhandChance: 0.15 },
+  relics: { minLevel: 14, maxLevel: 19, chance: 0.15 },
+
   // Levels (DECISIONS: surface zone level = 3 × tier − 1; legacy tables read min(level, 20) until C3).
   level: { contentMax: 20, tierMax: 8 },
 };
