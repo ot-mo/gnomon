@@ -49,6 +49,8 @@ import { openCubeWall } from "./content/world/temple.js";
 import { openTalk, talkKey, talkClick, talkHover, drawTalk, shopKey, drawShop, openJournal, journalKey, drawJournal,
          openStory, storyKey, nextPage, drawStory, updateTalk } from "./dialogue.js";
 import { maxHp } from "./stats.js";
+import { addStatus, hasStatus, statusFlag, statusLeft, cooldownLeft, startCooldown } from "./status.js";
+import { RULES } from "./rules.js";
 
 export const game = {
   seed: 0, zone: null, player: null,
@@ -126,6 +128,9 @@ export const game = {
   },
   questEvent(what, data) { questEvent(this, what, data); },
 
+  // Flat (status.js, bible §10.2): you exist only in the Plane, so the view is the map until it ends.
+  forceMapView() { if (this.mode === "explore") toggleMap(); },
+
   // A tip shown once per run.
   hint(id, text) {
     if (this.hints.has(id)) return;
@@ -142,9 +147,10 @@ export const game = {
     if (this.mode === "dead") return;
     const p = this.player;
     p.hp -= dmg;
-    // Second wind: once per floor, a killing blow leaves you on 1 HP.
-    if (p.hp <= 0 && p.perks.has("secondWind") && !this.zone.secondWind) {
-      this.zone.secondWind = true;
+    // Second wind: a killing blow leaves you on 1 HP, then not again for RULES.cooldown.secondWind
+    // seconds of game time (it was once per floor; TECH_DESIGN §2.4).
+    if (p.hp <= 0 && p.perks.has("secondWind") && !(cooldownLeft(p, "secondWind") > 0)) {
+      startCooldown(p, "secondWind", RULES.cooldown.secondWind);
       p.hp = 1;
       this.log("Everything goes grey... and you get up again. (Second wind!)", [255, 230, 140]);
     }
@@ -157,7 +163,7 @@ export const game = {
     if (p.hp <= 0) {
       p.hp = 0;
       this.mode = "dead";
-      this.deathCause = source;
+      this.deathCause = statusFlag(p, "flat") ? `${source}, while pressed flat` : source;   // bible §10.2
       this.travel = null;
       unlockPointer();
     }
@@ -313,6 +319,7 @@ function update(dt) {
   updateBombs(game, dt);
   updateClouds(game, dt);
   tickEffects(game, dt);
+  if (statusFlag(p, "flat")) game.forceMapView();   // pressed flat: the map view only
   vaultHint(game);
   p.attackCd = Math.max(0, p.attackCd - dt);
   p.throwCd = Math.max(0, p.throwCd - dt);
@@ -468,12 +475,12 @@ function toggleMap() {
 function foldPowers() {
   const p = game.player;
   const guard = bonus(p, "foldGuard");
-  if (guard > 0) p.guardTime = guard;
-  if (p.perks.has("foldingStrike") && game.time >= (p.foldReady || 0)) {
+  if (guard > 0) addStatus(game, p, "guarded", { t: guard, stack: "refresh" });
+  if (p.perks.has("foldingStrike") && !(cooldownLeft(p, "foldingStrike") > 0)) {
     const near = game.zone.monsters.filter((m) => Math.hypot(m.x - p.x, m.y - p.y) < 1.9 && !m.guardian);
     if (near.length) {
-      for (const m of near) m.stun = Math.max(m.stun, 2);
-      p.foldReady = game.time + 10;
+      for (const m of near) addStatus(game, m, "stunned", { t: 2, stack: "max" });
+      startCooldown(p, "foldingStrike", RULES.cooldown.foldingStrike);
       game.log(`The world folds around you, and ${near.length > 1 ? `${near.length} monsters reel` : `the ${near[0].name} reels`}! (stunned)`, [200, 190, 255]);
     }
   }
@@ -525,7 +532,7 @@ function inventoryAction(cost) {
   }
   if (game.mode === "map") {
     mapUseTime(game, cost);
-    if (game.player.paralyzed > 0 && game.mode === "map") mapUseTime(game, game.player.paralyzed);   // frozen: the world moves on
+    if (hasStatus(game.player, "paralyzed") && game.mode === "map") mapUseTime(game, statusLeft(game.player, "paralyzed"));   // frozen: the world moves on
   } else if (game.mode === "explore") { game.paused = false; lockPointer(); }
 }
 
@@ -598,12 +605,17 @@ export const inputHandlers = {
       return;
     }
     if (game.mode === "inventory") { inventoryAction(inventoryKey(game, code)); return; }
-    if (code === "Tab") { if (!repeat) toggleMap(); return; }
+    if (code === "Tab") {
+      if (repeat) return;
+      if (statusFlag(game.player, "flat")) game.log("You're flat: you can't turn until it passes.", [220, 220, 230]);   // bible §10.2
+      else toggleMap();
+      return;
+    }
     if (game.mode === "map") { if (!repeat || MAP_MOVES[code]) mapKey(code); return; }
     if (repeat) return;
     if (code === "KeyI") { openInv(); return; }
     if (code === "KeyJ") { openJournal(game); return; }
-    if (game.paused || game.player.paralyzed > 0) return;
+    if (game.paused || statusFlag(game.player, "noAct")) return;
     if (code === "Enter") playerAttack(game);   // for when a mouse button isn't handy
     if (code === "KeyE") interact(game);
     if (code === "KeyQ") quickHeal();

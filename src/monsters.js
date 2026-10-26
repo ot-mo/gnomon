@@ -9,6 +9,8 @@ import { EYE, HEIGHT, RADIUS, moveAxis, attackTime, armourValue, bonus, weaponRe
 import { gainXp } from "./leveling.js";
 import { sfx } from "./sfx.js";
 import { attr, maxHp } from "./stats.js";
+import { addStatus, removeStatus, capStatus, hasStatus, statusFlag, tickStatuses, cooldownLeft, startCooldown, setStatusHarm, STATUS_DEFS } from "./status.js";
+import { RULES } from "./rules.js";
 
 // art: pixel art, one letter per pixel (a palette entry), space = see-through.
 // Two frames: standing / mid-step. palette: letter → [colour, glow]
@@ -350,8 +352,7 @@ export function spawnMonster(type, tx, ty, z, state = "idle", depth = 1, elite =
     speedMul: e?.speed || 1, cdMul: e?.cd || 1, armour: (e?.armour || 0) + (t.armour || 0), ward: !!e?.ward,
     venom: Math.max(t.venom || 0, e?.venom || 0), drain: !!(t.drain || e?.drain), burns: t.burns || 0,
     xp: Math.round(t.xp * (1 + 0.1 * (depth - 1)) * (e ? 2.5 : 1)),   // what killing it is worth
-    burn: 0, burnTick: 0, chill: 0,                                      // elemental effects on it
-    stun: 0, blind: 0, poison: 0, poisonTick: 0, haste: 0,               // from potions thrown at it
+    status: {}, cooldowns: {},             // burning, chilled, stunned, blinded, poisoned, hasted… (status.js)
     regenAcc: 0, shot: 1 + rand(), phase: 0, sees: false,
     tx, ty, nx: tx, ny: ty, p: 0,          // current tile, next tile, progress of the step
     x: tx + 0.5, y: ty + 0.5, z: z + (t.hover || 0),
@@ -371,9 +372,10 @@ export function monsterSprite(m, zone) {
   const bob = t.hover ? Math.sin(m.anim * 3) * 0.08 : 0;
   // Burning monsters flicker orange; chilled ones go pale blue.
   const flicker = 0.8 + 0.2 * Math.sin(m.anim * 25);
-  const tint = m.burn > 0 ? [1.5, 0.9, 0.5] : m.chill > 0 ? [0.7, 1.0, 1.6] : m.stun > 0 ? [1.2, 0.7, 1.6] :
-               m.poison > 0 ? [0.7, 1.5, 0.6] : m.blind > 0 ? [0.5, 0.5, 0.6] : null;
-  let emit = m.burn > 0 ? [0.9 * flicker, 0.4 * flicker, 0.1] : null;   // flames light it up even in the dark
+  const has = (id) => hasStatus(m, id);
+  const tint = has("burning") ? [1.5, 0.9, 0.5] : has("chilled") ? [0.7, 1.0, 1.6] : has("stunned") ? [1.2, 0.7, 1.6] :
+               has("poisoned") ? [0.7, 1.5, 0.6] : has("blinded") ? [0.5, 0.5, 0.6] : null;
+  let emit = has("burning") ? [0.9 * flicker, 0.4 * flicker, 0.1] : null;   // flames light it up even in the dark
   if (m.elite) {   // elites glow with a slow pulse of their colour
     const k = (0.18 + 0.08 * Math.sin(m.anim * 4)) / 255, c = m.color;
     emit = [(emit?.[0] || 0) + c[0] * k, (emit?.[1] || 0) + c[1] * k, (emit?.[2] || 0) + c[2] * k];
@@ -413,48 +415,29 @@ export function updateMonsters(game, dt, radius = Infinity) {
     if (!zone.monsters.includes(m)) continue;   // killed earlier this update (lightning, a split…)
     const t = MONSTER_TYPES[m.type];
     if (m.state !== "chase" && Math.hypot(m.x - player.x, m.y - player.y) > radius) continue;
-    const pace = (m.chill > 0 ? 0.5 : 1) * (m.haste > 0 ? 1.6 : 1);
+    const pace = (hasStatus(m, "chilled") ? 0.5 : 1) * (hasStatus(m, "hasted") ? RULES.haste : 1);
     m.anim += dt;
     m.hurt = Math.max(0, m.hurt - dt);
     m.cd = Math.max(0, m.cd - dt * pace);   // chilled: half as often; hasted: faster
     m.shot -= dt * pace;
-    m.chill = Math.max(0, m.chill - dt);
 
     // The ground vanished (a trap opened): it falls to the floor below.
     if (stand[m.tx + m.ty * w] < 0) { killMonster(game, m, `The ${m.name} falls into the dark.`, false, false); continue; }
 
-    // On fire: 1 damage every half second while it burns.
-    if (m.burn > 0) {
-      m.burn -= dt;
-      m.burnTick += dt;
-      if (m.burnTick >= 0.5) {
-        m.burnTick -= 0.5;
-        m.hp -= 1;
-        m.hurt = 0.1;
-        if (m.hp <= 0) { killMonster(game, m, `The ${m.name} burns to ashes.`); continue; }
-      }
-    } else if (t.regen && m.hp < m.maxHp) {   // trolls knit back together — unless they're burning
+    // Its statuses: on fire or poisoned, 1 damage every half second (status.js; the kill goes through
+    // the harm handler below); chill, blindness, haste and stuns run down.
+    const regenOk = !statusFlag(m, "noRegen");   // trolls knit back together — unless they're burning
+    tickStatuses(game, m, dt);
+    if (!zone.monsters.includes(m)) continue;
+    if (regenOk && t.regen && m.hp < m.maxHp) {
       m.regenAcc += t.regen * dt;
       if (m.regenAcc >= 1) { m.regenAcc -= 1; m.hp++; }
     }
-    // Poisoned (gas cloud): same, 1 damage every half second.
-    if (m.poison > 0) {
-      m.poison -= dt;
-      m.poisonTick += dt;
-      if (m.poisonTick >= 0.5) {
-        m.poisonTick -= 0.5;
-        m.hp -= 1;
-        m.hurt = 0.1;
-        if (m.hp <= 0) { killMonster(game, m, `The ${m.name} chokes on the poison.`); continue; }
-      }
-    }
-    m.blind = Math.max(0, m.blind - dt);
-    m.haste = Math.max(0, m.haste - dt);
-    if (t.boss) { m.blind = 0; m.stun = Math.min(m.stun, 1.5); bossPhase(game, m, occ); }   // shrugs most of it off
-    if (t.guardian) { m.blind = 0; m.stun = Math.min(m.stun, 1); if (guardianThink(game, m, dt, occ)) continue; }
+    if (t.boss) { removeStatus(game, m, "blinded"); capStatus(m, "stunned", 1.5); bossPhase(game, m, occ); }   // shrugs most of it off
+    if (t.guardian) { removeStatus(game, m, "blinded"); capStatus(m, "stunned", 1); if (guardianThink(game, m, dt, occ)) continue; }
     if (t.fearsLight && fearLight(game, m, dt)) continue;
-    // Paralysed: it can't do anything at all.
-    if (m.stun > 0) { m.stun -= dt; continue; }
+    // Stunned (or paralysed): it can't do anything at all.
+    if (statusFlag(m, "noAct")) continue;
 
     m.think -= dt;
     if (m.think <= 0) { m.think = 0.25; perceive(game, m, t); }
@@ -511,9 +494,11 @@ export function updateMonsters(game, dt, radius = Infinity) {
 // below zero lets more through. Venom poisons you, and a draining monster heals.
 export function hitPlayer(game, m, dmg, source, blocked, ranged = false) {
   const p = game.player;
-  if (p.guardTime > 0) { game.log(`The blow passes through you: you're still half turned out of the world.`, [200, 230, 255]); return; }
-  if (bonus(p, "firstBlock") > 0 && !game.zone.firstBlocked) {
-    game.zone.firstBlocked = true;
+  if (statusFlag(p, "untouchable")) { game.log(`The blow passes through you: you're still half turned out of the world.`, [200, 230, 255]); return; }
+  // The warding amulet: the first blow misses, then not again for RULES.cooldown.firstBlock seconds
+  // (it was once per floor; TECH_DESIGN §2.4).
+  if (bonus(p, "firstBlock") > 0 && !(cooldownLeft(p, "firstBlock") > 0)) {
+    startCooldown(p, "firstBlock", RULES.cooldown.firstBlock);
     game.log(`Your amulet flares, and ${blocked} misses you!`, [220, 225, 240]);
     sfx("block", { at: m });
     return;
@@ -529,13 +514,13 @@ export function hitPlayer(game, m, dmg, source, blocked, ranged = false) {
     hurtMonster(game, m, thorns, `${thorns}`, [150, 200, 90]);
     if (m.hp <= 0) killMonster(game, m, `The ${m.name} dies on your thorns.`);
   }
-  if (m.burns) {   // a salamander's bite sets you smouldering
-    if (!(p.poisonTime > 0)) game.log(`The ${m.name}'s bite burns!`, [255, 140, 60]);
-    p.poisonTime = Math.max(p.poisonTime || 0, m.burns);
+  if (m.burns) {   // a salamander's bite sets you smouldering: 1 damage a second, as the parent's bite did
+    if (!hasStatus(p, "burning")) game.log(`The ${m.name}'s bite burns!`, [255, 140, 60]);
+    addStatus(game, p, "burning", { t: m.burns, mag: 0.5, stack: "max" });
   }
   if (m.venom) {
-    if (!(p.poisonTime > 0)) game.log(`The ${m.name}'s venom burns in your veins!`, [150, 210, 80]);
-    p.poisonTime = Math.max(p.poisonTime || 0, m.venom);
+    if (!hasStatus(p, "poisoned")) game.log(`The ${m.name}'s venom burns in your veins!`, [150, 210, 80]);
+    addStatus(game, p, "poisoned", { t: m.venom, stack: "max" });
   }
   if (m.drain && m.hp > 0 && m.hp < m.maxHp) {
     m.hp = Math.min(m.maxHp, m.hp + dmg);
@@ -588,15 +573,15 @@ function bossPhase(game, m, occ) {
 // Can it see the player? Torchlight makes you easier to spot; sprinting is loud.
 function perceive(game, m, t) {
   const { zone, player } = game;
-  if (m.blind > 0) {   // blinded (darkness or shadows splashed on it): it loses track of you
+  if (hasStatus(m, "blinded")) {   // blinded (darkness or shadows splashed on it): it loses track of you
     if (m.state === "chase") m.state = "wander";
     m.sees = false;
     return;
   }
   const dist = Math.hypot(player.x - m.x, player.y - m.y);
-  const hidden = player.shadowTime > 0;   // potion of shadows
+  const hidden = statusFlag(player, "hidden");   // potion of shadows
   const range = t.sight * (player.torch || t.darkSight ? 1 : 0.55) * (hidden ? 0.35 : 1) *
-    (player.darkTime > 0 && !t.darkSight ? 0.7 : 1) * Math.max(0.3, 1 - bonus(player, "stealth"));
+    (hasStatus(player, "darkened") && !t.darkSight ? 0.7 : 1) * Math.max(0.3, 1 - bonus(player, "stealth"));
   let sees = dist < range &&
     lineOfSight(zone, m.x, m.y, m.z + m.h * 0.8, player.x, player.y, player.z + EYE);
   m.sees = sees;
@@ -656,6 +641,16 @@ function eliteLoot(depth, luck = 0) {
 }
 
 // byPlayer: you killed it (by blade, fire or lightning), so you get its XP.
+// How a status hurts (status.js): you through hurtPlayer (quietly, as poison always did); a creature
+// flashes, and dies with the status's own line.
+setStatusHarm((game, e, n, id) => {
+  const def = STATUS_DEFS[id];
+  if (e === game.player) { game.hurtPlayer(n, def?.cause || id, true); return; }
+  e.hp -= n;
+  e.hurt = 0.1;
+  if (e.hp <= 0 && game.zone?.monsters.includes(e)) killMonster(game, e, def?.killed?.(e) || `The ${e.name} dies.`);
+});
+
 function killMonster(game, m, message, dropLoot = true, byPlayer = true) {
   const { zone } = game;
   const t = MONSTER_TYPES[m.type];
@@ -715,7 +710,7 @@ export function pushPlayerOut(game) {
 // 3D: swing at whatever is in front of you.
 export function playerAttack(game) {
   const p = game.player;
-  if (p.attackCd > 0 || p.paralyzed > 0) return;
+  if (p.attackCd > 0 || statusFlag(p, "noAct")) return;
   p.attackCd = attackTime(p);
   p.swingTime = p.attackCd * 0.78;   // the animation fills most of the time between swings
   p.swing = p.swingTime;
@@ -765,7 +760,7 @@ export function attackMonster(game, m) {
   if (vs === "weak") dmg = Math.ceil(dmg * 1.5);
   if (vs === "resist") dmg = Math.max(1, Math.round(dmg * 0.6));
   if (t.brittle && bonus(p, "crush") > 0) dmg *= 2;
-  if (m.burn > 0 && bonus(p, "burnBonus") > 0) dmg = Math.ceil(dmg * (1 + bonus(p, "burnBonus")));
+  if (hasStatus(m, "burning") && bonus(p, "burnBonus") > 0) dmg = Math.ceil(dmg * (1 + bonus(p, "burnBonus")));
   if (m.hp < m.maxHp * 0.25 && p.perks.has("executioner")) dmg = Math.ceil(dmg * 1.5);
   if ((m.elite || t.guardian || t.boss) && p.perks.has("giantSlayer")) dmg = Math.ceil(dmg * 1.3);
   const sunder = crit && bonus(p, "sunder") > 0;
@@ -786,11 +781,11 @@ export function attackMonster(game, m) {
     else game.log(`You ${crit ? "smash" : "hit"} the ${m.name} (${dmg}).${vs === "weak" ? " It's weak to that!" : ""}`, [230, 230, 230]);
     if (vs === "resist") game.log(`The ${m.name} shrugs off the ${{ fire: "flames", frost: "frost", shock: "lightning", holy: "light" }[el]}.`, [170, 170, 190]);
     else {
-      if (el === "fire") { if (!(m.burn > 0)) game.log(`The ${m.name} catches fire!`, ELEMENTS.fire.color); m.burn = 3; }
-      if (el === "frost") m.chill = 3;
+      if (el === "fire") { if (!hasStatus(m, "burning")) game.log(`The ${m.name} catches fire!`, ELEMENTS.fire.color); addStatus(game, m, "burning", { t: 3, stack: "refresh" }); }
+      if (el === "frost") addStatus(game, m, "chilled", { t: 3, stack: "refresh" });
     }
     const poison = bonus(p, "poisonHit");
-    if (poison > 0) m.poison = Math.max(m.poison, poison);
+    if (poison > 0) addStatus(game, m, "poisoned", { t: poison, mag: 2, stack: "max" });
   }
   if (el === "shock" && vs !== "resist") {
     // Lightning jumps to the nearest other monster within 3 tiles that you can see.

@@ -19,6 +19,7 @@ import { MONSTER_TYPES, spawnMonster, hitPlayer } from "./monsters.js";
 import { B, FLOOR_Z } from "./world.js";
 import { sampleLight } from "./light.js";
 import { sfx } from "./sfx.js";
+import { addStatus, statusFlag } from "./status.js";
 
 const QUEEN_FLAT = 4.5, QUEEN_RISEN = 3;
 const SLAM_EVERY = 4.5, SLAM_WARN = 1.5;
@@ -67,7 +68,7 @@ function queen(game, m, dt, occ) {
     m.risen = true;
     game.log("The Flat Queen peels herself up off the floor and stands, suddenly deep! (Only a blow in 3D will touch her now.)", m.color);
     sfx("rotate", { up: true, at: m });
-    for (const o of game.zone.monsters) if (o.type === "flatling") { o.blind = QUEEN_RISEN; o.state = "wander"; }   // her court scatters
+    for (const o of game.zone.monsters) if (o.type === "flatling") { addStatus(game, o, "blinded", { t: QUEEN_RISEN, stack: "refresh" }); o.state = "wander"; }   // her court scatters
   } else if (m.risen && g.t >= QUEEN_RISEN) {
     g.t = 0;
     m.risen = false;
@@ -133,7 +134,7 @@ function colossus(game, m, dt) {
   const hall = zone.guardianHall;
   // A slam: warn (the tiles shake on the map), then the quake.
   if (zone.slam && game.time >= zone.slam.at) {
-    const onGround = p.z < FLOOR_Z + 0.5 && !(p.flyTime > 0);
+    const onGround = p.z < FLOOR_Z + 0.5 && !statusFlag(p, "flying");
     const ptile = Math.floor(p.x) + Math.floor(p.y) * zone.w;
     game.effects.push({ kind: "boom", x: m.x, y: m.y, z: m.z, time: game.time });
     sfx("boom", { at: m });

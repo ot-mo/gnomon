@@ -15,6 +15,7 @@ import { pickUpItems } from "./items.js";
 import { useColumn } from "./interact.js";
 import { EYE, WALK, HEIGHT, WADE_SLOWDOWN, HASTE, attackTime, torchRange, canSwim, speedMul, jumpBonus, hasFeatherFall, bonus } from "./player.js";
 import { tickEffects } from "./effects.js";
+import { hasStatus, statusFlag, statusSpeed, updateDrowning } from "./status.js";
 import { updateClouds, updateProjectiles, updateBombs } from "./throwing.js";
 import { PLAYER_STEP_UP } from "./pathing.js";
 import { updateSpikes, nearSpikes, TICK } from "./traps.js";
@@ -27,7 +28,7 @@ const USE_TIME = 0.5;                // pulling a lever, opening a door
 const WAIT_TIME = 0.5;
 const ACTIVE_RADIUS = 12;            // monsters further away (and not hunting you) wait
 // How much faster your actions are: haste, and for walking anything that speeds you up.
-const haste = (p) => (p.hasteTime > 0 ? HASTE : 1);
+const haste = (p) => (hasStatus(p, "hasted") ? HASTE : 1);
 const fleet = (p) => speedMul(p);
 
 // Let `seconds` of game time pass for everything near you.
@@ -47,7 +48,7 @@ export function passTime(game, seconds) {
     p.throwCd = Math.max(0, p.throwCd - dt);
     p.hurt = Math.max(0, p.hurt - dt);
   }
-  if (game.mode === "map" && !(p.flyTime > 0)) land(game);   // flight over: come down (or fall)
+  if (game.mode === "map" && !statusFlag(p, "flying")) land(game);   // flight over: come down (or fall)
   if (game.mode === "map") refreshView(game);
 }
 
@@ -119,7 +120,7 @@ function settle(game) {
   const p = game.player;
   const tx = Math.floor(p.x), ty = Math.floor(p.y);
   p.x = tx + 0.5; p.y = ty + 0.5; p.vz = 0;
-  if (p.flyTime > 0) return;   // flying: stay at this height
+  if (statusFlag(p, "flying")) return;   // flying: stay at this height
   p.onGround = true;
   const z = groundBelow(solidFor(game), tx, ty, p.z);
   if (z >= 0) p.z = z;
@@ -133,7 +134,7 @@ export function mapStep(game, dx, dy) {
   const { zone, player: p } = game;
   settle(game);
   const S = solidFor(game);
-  const flying = p.flyTime > 0, swimmer = canSwim(p);
+  const flying = statusFlag(p, "flying"), swimmer = canSwim(p);
   const climb = PLAYER_STEP_UP + (jumpBonus(p) >= 1 ? 1 : 0);
   const tx = Math.floor(p.x), ty = Math.floor(p.y);
   const nx = tx + dx, ny = ty + dy;
@@ -205,14 +206,15 @@ export function mapStep(game, dx, dy) {
 
   pickUpItems(game);
   if (game.checkFloorEvents()) return true;   // stairs
-  const swimming = !flying && kind === KIND.DEEP;   // (only possible for a swimmer)
+  const swimming = !flying && kind === KIND.DEEP;   // a swimmer, or anyone on the surface (they float)
   const wading = !flying && (kind === KIND.SHALLOW || swimming);
   if (kind === KIND.SHALLOW && !zone.flags.waterHint) {
     zone.flags.waterHint = true;
     game.log("You wade into the shallow water. It slows you down.", [110, 180, 220]);
   }
   p.wade = swimming ? 1.6 : wading ? 1 : 0;
-  const slow = swimming ? 0.45 : wading ? WADE_SLOWDOWN : 1;
+  updateDrowning(game, p, { canSwim });   // in deep water without swimming: drowning (and its slowdown) now
+  const slow = (swimming ? 0.45 : wading ? WADE_SLOWDOWN : 1) * statusSpeed(p);
   passTime(game, ((dx && dy ? Math.SQRT2 : 1) * STEP_TIME) / slow / haste(p) / fleet(p));
   return true;
 }
@@ -222,7 +224,7 @@ export function mapStep(game, dx, dy) {
 // time there. A solid edge says why, once. Not off a corner: one side at a time.
 function stepOffEdge(game, dx, dy, nx, ny) {
   const { zone, player: p } = game;
-  if (zone.type !== "surface" || p.flyTime > 0) return false;
+  if (zone.type !== "surface" || statusFlag(p, "flying")) return false;
   const outX = nx < 0 || nx >= zone.w, outY = ny < 0 || ny >= zone.d;
   if (outX && outY) return false;
   const side = outX ? (nx < 0 ? "w" : "e") : ny < 0 ? "n" : "s";

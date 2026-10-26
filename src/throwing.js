@@ -17,6 +17,7 @@ import { EYE, RADIUS, HEIGHT } from "./player.js";
 import { noise2 } from "./rng.js";
 import { sfx } from "./sfx.js";
 import { maxHp } from "./stats.js";
+import { addStatus, hasStatus, statusFlag } from "./status.js";
 
 export const THROW_TIME = 0.5;
 const SPEED = 15, GRAVITY = 12, SPLASH = 1.8;
@@ -38,7 +39,7 @@ function takeOne(p, stack) {
 // 3D: throw the ready thing where you're looking.
 export function throwReady(game, stack = readyStack(game.player)) {
   const p = game.player;
-  if (p.throwCd > 0 || p.paralyzed > 0) return false;
+  if (p.throwCd > 0 || statusFlag(p, "noAct")) return false;
   if (!stack) { game.log("You have nothing to throw. (T in the inventory throws a potion.)", [170, 170, 170]); return false; }
   p.ready = { kind: stack.kind, effect: stack.effect };
   const it = takeOne(p, stack);
@@ -164,12 +165,12 @@ function shatter(game, effect, x, y, z) {
       game.log("A cloud of poison gas billows out!", [150, 210, 80]);
       break;
     case "paralysis":
-      for (const m of near) m.stun = 6;
+      for (const m of near) addStatus(game, m, "stunned", { t: 6, stack: "refresh" });
       if (near.length) game.log(`The ${names()} ${near.length > 1 ? "freeze" : "freezes"} in place!`, [200, 120, 255]);
-      if (youToo) { p.paralyzed = Math.max(p.paralyzed, 3); game.log("The fumes reach you too: you can't move!", [200, 120, 255]); }
+      if (youToo) { addStatus(game, p, "paralyzed", { t: 3, stack: "max" }); game.log("The fumes reach you too: you can't move!", [200, 120, 255]); }
       break;
     case "darkness": case "shadows":
-      for (const m of near) { m.blind = 10; if (m.state === "chase") m.state = "wander"; }
+      for (const m of near) { addStatus(game, m, "blinded", { t: 10, stack: "refresh" }); if (m.state === "chase") m.state = "wander"; }
       game.log(near.length ? `Darkness swallows the ${names()}. They've lost track of you.` : "A pool of darkness spreads and fades.", [130, 120, 170]);
       break;
     case "descent": {
@@ -196,7 +197,7 @@ function shatter(game, effect, x, y, z) {
       if (youToo) { p.hp = Math.min(maxHp(p), p.hp + 6); game.log("Some of it splashes on you. (+6 HP)", [230, 90, 110]); }
       break;
     case "haste":
-      for (const m of near) m.haste = 12;
+      for (const m of near) addStatus(game, m, "hasted", { t: 12, stack: "refresh" });
       if (near.length) game.log(`The ${names()} ${near.length > 1 ? "speed" : "speeds"} up! That was a mistake.`, [255, 240, 120]);
       break;
     default:
@@ -263,10 +264,10 @@ export function updateClouds(game, dt) {
   for (const c of zone.clouds) {
     c.time -= dt;
     for (const m of zone.monsters)
-      if (touchable(game, m) && Math.hypot(m.x - c.x, m.y - c.y) <= c.r && Math.abs(m.z - c.z) < 2.5) m.poison = Math.max(m.poison, 2);
+      if (touchable(game, m) && Math.hypot(m.x - c.x, m.y - c.y) <= c.r && Math.abs(m.z - c.z) < 2.5) addStatus(game, m, "poisoned", { t: 2, mag: 2, stack: "max" });
     if (Math.hypot(p.x - c.x, p.y - c.y) <= c.r && Math.abs(p.z + 1 - c.z) < 2.5) {
-      if (!(p.poisonTime > 0)) game.log("You're in the poison cloud!", [150, 210, 80]);
-      p.poisonTime = Math.max(p.poisonTime, 2);
+      if (!hasStatus(p, "poisoned")) game.log("You're in the poison cloud!", [150, 210, 80]);
+      addStatus(game, p, "poisoned", { t: 2, stack: "max" });
     }
   }
   zone.clouds = zone.clouds.filter((c) => c.time > 0);

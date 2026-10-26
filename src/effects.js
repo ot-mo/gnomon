@@ -2,7 +2,8 @@
 // (flying, haste, shadows, poison, paralysis, darkness), plus the Regeneration perk.
 import { POTIONS, POTION_COLORS, SCROLLS, ELEMENTS, WEAPONS, itemName, isGear } from "./items.js";
 import { bonus, regear, worn } from "./player.js";
-import { maxHp, raiseAttr } from "./stats.js";
+import { maxHp, raiseAttr, regenEvery, canSwim } from "./stats.js";
+import { addStatus, tickStatuses, statusFlag, updateDrowning } from "./status.js";
 import { FLOOR_Z } from "./world.js";
 import { sfx } from "./sfx.js";
 import { spawnMonster, pickMonsterType } from "./monsters.js";
@@ -28,12 +29,12 @@ export function drinkPotion(game, effect) {
       game.log("Your muscles swell. STR +1!", [255, 170, 80]);
       break;
     case "flying":
-      p.flyTime = 20;
+      addStatus(game, p, "flying", { t: 20, stack: "refresh" });
       game.log(game.view === "map" ? "You float up into the air! Fly over chasms and water for 20 s."
                                    : "You float up into the air! Space rises, C sinks. 20 s.", [160, 220, 255]);
       break;
     case "haste":
-      p.hasteTime = 15;
+      addStatus(game, p, "hasted", { t: 15, stack: "refresh" });
       game.log("Everything around you slows down. You're fast!", [255, 240, 120]);
       break;
     case "seeing":
@@ -42,7 +43,7 @@ export function drinkPotion(game, effect) {
       game.log("Your mind's eye opens: the floor unfolds on your map, and you sense the nature of all you carry.", [200, 160, 255]);
       break;
     case "shadows":
-      p.shadowTime = 30;
+      addStatus(game, p, "shadowed", { t: 30, stack: "refresh" });
       game.log("Shadows cling to you. Monsters will struggle to notice you.", [140, 130, 170]);
       break;
     case "descent":
@@ -51,15 +52,15 @@ export function drinkPotion(game, effect) {
       game.fallThrough();
       break;
     case "poison":
-      p.poisonTime = 6;
+      addStatus(game, p, "poisoned", { t: 6, stack: "refresh" });
       game.log("You feel very sick...", [150, 200, 80]);
       break;
     case "paralysis":
-      p.paralyzed = 5;
+      addStatus(game, p, "paralyzed", { t: 5, stack: "refresh" });
       game.log("Your limbs lock up! You can't move!", [200, 120, 255]);
       break;
     case "darkness":
-      p.darkTime = 40;
+      addStatus(game, p, "darkened", { t: 40, stack: "refresh" });
       game.log("Darkness pours from the bottle. Your torch shrinks to a glimmer.", [110, 100, 140]);
       break;
   }
@@ -133,44 +134,37 @@ export function liftCurses(p) {
   return lifted;
 }
 
-// Count down your timed effects. Called with game time: real time in 3D, action time on the map.
+// Count down your timed effects (status.js) and regenerate. Called with game time: real time in 3D,
+// action time on the map; skipTime (time.js) calls it with whole chunks, so everything here is exact
+// for any dt.
 export function tickEffects(game, dt) {
   const p = game.player;
-  const countdown = (key, warnAt, warning, ended) => {
-    if (!(p[key] > 0)) return;
-    const before = p[key];
-    p[key] -= dt;
-    if (warnAt && before > warnAt && p[key] <= warnAt) game.log(warning, [255, 200, 120]);
-    if (p[key] <= 0) { p[key] = 0; game.log(ended, [170, 170, 170]); }
-  };
-  countdown("flyTime", 5, "Your flight is wearing off!", "You're no longer flying.");
-  countdown("hasteTime", 0, "", "You slow back down.");
-  countdown("shadowTime", 0, "", "The shadows fall away from you.");
-  countdown("paralyzed", 0, "", "You can move again.");
-  countdown("darkTime", 0, "", "Your torch flares back to life.");
-  p.guardTime = Math.max(0, (p.guardTime || 0) - dt);
-  if (p.poisonTime > 0) {
-    p.poisonTime -= dt;
-    p.poisonTick = (p.poisonTick || 0) + dt;
-    const every = p.perks.has("thickBlood") ? 2 : 1;
-    while (p.poisonTick >= every && game.mode !== "dead") {
-      p.poisonTick -= every;
-      game.hurtPlayer(1, "poison", true);
-    }
-    if (p.poisonTime <= 0) { p.poisonTime = 0; p.poisonTick = 0; game.log("The sickness passes.", [170, 170, 170]); }
-  }
-  // Regeneration (perks, rings, armour of the stars; Brann's Lantern in the dark): 1 HP every
-  // 12/points seconds. A cursed ring of regeneration (negative points) drains you instead.
+  updateDrowning(game, p, { canSwim });
+  tickStatuses(game, p, dt);
+  if (game.mode !== "dead") regenerate(game, p, dt);
+}
+
+// Regeneration (perks, rings, armour of the stars; Brann's Lantern in the dark): 1 HP every
+// 12/points seconds. A cursed ring of regeneration (negative points) drains you instead. Burning (and,
+// with the attribute formulas, poison) stops it. The attribute formulas add natural regeneration,
+// 1 HP every regenEvery(p) seconds (stats.js; none in the legacy set). Back at full health the counter
+// starts again from nothing, so a long catch-up can't bank healing.
+export function regenerate(game, p, dt) {
   const regen = bonus(p, "regen") + (p.torch ? 0 : bonus(p, "darkRegen"));
-  if (regen > 0 && p.hp < maxHp(p)) {
-    p.regenTick = (p.regenTick || 0) + dt;
-    const every = 12 / regen;
-    while (p.regenTick >= every && p.hp < maxHp(p)) { p.regenTick -= every; p.hp++; }
-  } else if (regen < 0) {
+  const blocked = statusFlag(p, "noRegen");
+  const heal = (key, every) => {
+    if (blocked || !(every < Infinity) || p.hp >= maxHp(p)) return;
+    p[key] = (p[key] || 0) + dt;
+    while (p[key] >= every - 1e-9 && p.hp < maxHp(p)) { p[key] -= every; p.hp++; }
+    if (p.hp >= maxHp(p)) p[key] = 0;
+  };
+  if (regen > 0) heal("regenTick", 12 / regen);
+  else if (regen < 0) {
     p.regenTick = (p.regenTick || 0) + dt;
     const every = 12 / -regen;
-    while (p.regenTick >= every && game.mode !== "dead") { p.regenTick -= every; if (p.hp > 1) p.hp--; }
+    while (p.regenTick >= every - 1e-9 && game.mode !== "dead") { p.regenTick -= every; if (p.hp > 1) p.hp--; }
   }
+  heal("naturalTick", regenEvery(p));
 }
 
 // Potion of seeing, part 1: every open space on the floor (and the walls around it) appears

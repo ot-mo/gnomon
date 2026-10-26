@@ -6,6 +6,7 @@ import { WEAPONS, WEAPON_PALETTE, ELEMENTS, itemName, itemGlyph } from "./items.
 import { readyStack } from "./throwing.js";
 import { PERKS, xpToNext, perkLabel } from "./leveling.js";
 import { attr, maxHp } from "./stats.js";
+import { statusLine } from "./status.js";
 
 export function drawHud(game) {
   const p = game.player;
@@ -130,15 +131,8 @@ function drawStatus(game, p, y) {
   seg(`torch ${p.torch ? "on" : "off"}`, p.torch ? [255, 200, 120] : [120, 120, 120]);
   const ready = readyStack(p);   // what T throws
   if (ready) seg(`T: ${itemName(game, ready)} x${ready.count}`, itemGlyph(game, ready)[1]);
-  // Active potion effects, blinking when about to run out.
-  const blink = (t) => t > 5 || Math.floor(game.time * 4) % 2 === 0;
-  if (p.flyTime > 0 && blink(p.flyTime)) seg(`FLYING ${Math.ceil(p.flyTime)}s`, [160, 220, 255]);
-  if (p.hasteTime > 0) seg(`HASTE ${Math.ceil(p.hasteTime)}s`, [255, 240, 120]);
-  if (p.shadowTime > 0) seg(`SHADOWS ${Math.ceil(p.shadowTime)}s`, [150, 140, 190]);
-  if (p.poisonTime > 0) seg("POISONED", [150, 210, 80]);
-  if (p.paralyzed > 0) seg(`PARALYZED ${Math.ceil(p.paralyzed)}s`, [200, 120, 255]);
-  if (p.darkTime > 0) seg(`DARKNESS ${Math.ceil(p.darkTime)}s`, [130, 120, 160]);
-  if (p.guardTime > 0) seg("UNTOUCHABLE", [200, 230, 255]);
+  // Active statuses (status.js), each as its def draws it (flying blinks when about to run out).
+  for (const { text, color } of statusLine(game, p)) seg(text, color);
   if (game.view === "3d") {
     const perf = `${game.fps.toFixed(0)} fps · ${game.frameMs.toFixed(1)} ms`;
     if (x + perf.length < S.cols) S.text(S.cols - perf.length - 1, y, perf, 90, 140, 90);   // only if there's room

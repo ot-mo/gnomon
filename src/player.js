@@ -1,8 +1,9 @@
 // The player: body (look, walk, sprint, jump, fly, collide — learn/04 §5), stats and gear.
-import { FLOOR_Z, B, solidFor } from "./world.js";
+import { FLOOR_Z, B, solidFor, floatsOn } from "./world.js";
 import { WEAPONS } from "./items.js";
 import { bonus, wornItems, invalidateStats, clampHp, makeAttrs, speedMul, canSwim } from "./stats.js";
 import { RULES } from "./rules.js";
+import { hasStatus, statusFlag, statusSpeed } from "./status.js";
 
 export const RADIUS = 0.3, HEIGHT = 1.6, EYE = 1.45;
 export const WALK = 4.2;           // blocks per second; also sets how long a step takes on the map
@@ -27,9 +28,8 @@ export function makePlayer() {
     ring: null, amulet: null,
     inv: [{ kind: "potion", effect: "healing", count: 1 }, { kind: "knife", count: 4 }, { kind: "bomb", count: 1 }],
     ready: { kind: "knife" },   // what T / right-click throws (see throwing.js)
-    flyTime: 0, hasteTime: 0, shadowTime: 0, poisonTime: 0, paralyzed: 0, darkTime: 0,
+    status: {}, cooldowns: {},  // timed effects (flying, haste, poison…) and cooldowns: status.js
     attackCd: 0, throwCd: 0, swing: 0, swingTime: 0.35, hurt: 0, sprinting: false, impact: 0,
-    guardTime: 0,               // untouchable (the Mantle of Angles)
   };
 }
 
@@ -49,7 +49,7 @@ export function regear(p, it, change) {
 // How long one swing of your weapon takes (also what an attack costs on the map).
 export function attackTime(p) {
   const faster = Math.min(0.6, bonus(p, "swing"));
-  return (WEAPONS[p.weapon.id].swing * (1 - faster)) / (p.hasteTime > 0 ? HASTE : 1);
+  return (WEAPONS[p.weapon.id].swing * (1 - faster)) / (hasStatus(p, "hasted") ? HASTE : 1);
 }
 export const weaponReach = (p) => WEAPONS[p.weapon.id].reach + bonus(p, "reach");
 
@@ -60,22 +60,23 @@ export { av as armourValue } from "./stats.js";
 // you see nothing by it, unless something lets you see in the dark a little (darkSight).
 export function torchRange(p) {
   if (!p.torch) return Math.min(4, bonus(p, "darkSight") * 1.5);
-  return 6 * (1 + bonus(p, "torch")) * (p.darkTime > 0 ? 0.4 : 1);
+  return 6 * (1 + bonus(p, "torch")) * (hasStatus(p, "darkened") ? 0.4 : 1);
 }
 export function torchPower(p) {
   if (!p.torch) return Math.min(0.9, bonus(p, "darkSight") * 0.3);
-  return 2.2 * (1 + bonus(p, "torch") * 1.2) * (p.darkTime > 0 ? 0.3 : 1);
+  return 2.2 * (1 + bonus(p, "torch") * 1.2) * (hasStatus(p, "darkened") ? 0.3 : 1);
 }
 export { speedMul };
 export const jumpBonus = (p) => bonus(p, "jump");
 export const hasFeatherFall = (p) => bonus(p, "featherFall") > 0;
 
 // Swimmers (bonus swim: the Swimmer perk) float on deep water instead of sinking: for them it's solid to stand on.
+// On the surface every body floats (world.js floatsOn); one that can't swim drowns there (status.js).
 export { canSwim };
 
 export function inShallowWater(p, zone) {
   const g = zone.get(Math.floor(p.x), Math.floor(p.y), Math.round(p.z) - 1);
-  return g === B.WATER_SHALLOW || (g === B.WATER_DEEP && canSwim(p));
+  return g === B.WATER_SHALLOW || (g === B.WATER_DEEP && floatsOn(zone, p));
 }
 
 export function clampPitch(p) {
@@ -114,7 +115,7 @@ export function moveAxis(p, zone, axis, amount) {
 }
 
 export function updatePlayer(p, zone, keys, dt) {
-  if (p.paralyzed > 0) keys = new Set();   // potion of paralysis: you can't do a thing
+  if (statusFlag(p, "noAct")) keys = new Set();   // potion of paralysis: you can't do a thing
   const LOOK = 2.0 * dt;
   if (keys.has("ArrowLeft")) p.yaw -= LOOK;
   if (keys.has("ArrowRight")) p.yaw += LOOK;
@@ -129,13 +130,13 @@ export function updatePlayer(p, zone, keys, dt) {
   if (keys.has("KeyD")) { mx -= fy; my += fx; }
   if (keys.has("KeyA")) { mx += fy; my -= fx; }
   const len = Math.hypot(mx, my);
-  const flying = p.flyTime > 0;
+  const flying = statusFlag(p, "flying");
   p.sprinting = len > 0 && (keys.has("ShiftLeft") || keys.has("ShiftRight"));
   const wading = p.onGround && !flying && inShallowWater(p, zone);
   const swimming = wading && zone.get(Math.floor(p.x), Math.floor(p.y), Math.round(p.z) - 1) === B.WATER_DEEP;
   p.wade = (p.wade || 0) + ((wading ? (swimming ? 1.6 : 1) : 0) - (p.wade || 0)) * Math.min(1, dt * 8);   // eases the view down/up
   const speed = (p.sprinting ? SPRINT : WALK) * (wading ? (swimming ? 0.45 : WADE_SLOWDOWN) : 1) *
-    (p.hasteTime > 0 ? HASTE : 1) * speedMul(p);
+    (hasStatus(p, "hasted") ? HASTE : 1) * speedMul(p) * statusSpeed(p);   // drowning: ×0.4
   if (len > 0 && p.onGround) p.walkPhase = (p.walkPhase || 0) + dt * speed * 2.2;   // for the weapon's bob
   if (len > 0) { mx = (mx / len) * speed; my = (my / len) * speed; }
 

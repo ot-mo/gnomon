@@ -12,6 +12,7 @@
 import { B, FLOOR_Z } from "./world.js";
 import { distance } from "./rng.js";
 import { damageMonster, MONSTER_TYPES } from "./monsters.js";
+import { statusFlag } from "./status.js";
 
 export const TICK = 0.5;
 
@@ -56,7 +57,7 @@ export function updateSpikes(game) {
     const i = Math.floor(x) + Math.floor(y) * zone.w;
     return last !== beat && spikeState(zone, i, game.time) === "up" && z < FLOOR_Z + 0.35 && zone.stand[i] === FLOOR_Z;
   };
-  if (!(p.flyTime > 0) && p.onGround !== false && hits(p.x, p.y, p.z, p.spikeBeat)) {
+  if (!statusFlag(p, "flying") && p.onGround !== false && hits(p.x, p.y, p.z, p.spikeBeat)) {
     p.spikeBeat = beat;
     game.hurtPlayer(2 + Math.floor(zone.level / 3) + Math.floor(Math.random() * 3), "the spikes");
   }

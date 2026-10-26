@@ -18,6 +18,7 @@ import { revealFloor, liftCurses } from "./effects.js";
 import { regear, worn } from "./player.js";
 import { sfx } from "./sfx.js";
 import { maxHp, raiseAttr, raiseMaxHp } from "./stats.js";
+import { addStatus, removeStatus } from "./status.js";
 
 // --- How they look ---------------------------------------------------------------------
 const ROBE = [
@@ -192,11 +193,11 @@ function bless(game, bold) {
   const gear = worn(p).filter((it) => !(it.kind === "ring" || it.kind === "amulet") || !(it.kind === "ring" ? RINGS : AMULETS)[it.id].fixed);
   const plain = [
     () => { raiseMaxHp(p, 3); p.hp += 3; return "Warmth settles into your bones. (+3 max HP)"; },
-    () => { p.hp = maxHp(p); p.poisonTime = 0; return "Every hurt you carry fades away. (Healed fully.)"; },
+    () => { p.hp = maxHp(p); removeStatus(game, p, "poisoned"); return "Every hurt you carry fades away. (Healed fully.)"; },
     () => { regear(p, p.weapon, (w) => { w.ench = Math.min(5, w.ench + 1); w.known = true; }); return `Light runs along your weapon. It's now a ${itemName(game, p.weapon)}.`; },
     () => (liftCurses(p) ? "Something heavy lets go of you. (Every curse lifted.)" : null),
     () => { revealFloor(game); return "You see this whole floor laid out flat in your mind. (Your map is filled in.)"; },
-    () => { p.hasteTime = 60; return "Time slows around you. (Haste, for a minute.)"; },
+    () => { addStatus(game, p, "hasted", { t: 60, stack: "refresh" }); return "Time slows around you. (Haste, for a minute.)"; },
     () => {
       let n = 0;
       for (const it of [...worn(p), p.sidearm, ...p.inv].filter(Boolean)) {
@@ -316,7 +317,7 @@ export function talkTo(game, n) {
         ]) },
       ]);
       return node(p.hp < maxHp(p) ? "You're hurt. Sit, child. Rest a while." : "Be careful down there. And come back whenever you need rest.", [
-        ...(p.hp < maxHp(p) ? [{ label: "Rest (heal fully)", go: () => { p.hp = maxHp(p); p.poisonTime = 0; game.log("You rest in the temple. You feel whole again.", [140, 255, 160]); return node("There. Off you go.", [bye()]); } }] : []),
+        ...(p.hp < maxHp(p) ? [{ label: "Rest (heal fully)", go: () => { p.hp = maxHp(p); removeStatus(game, p, "poisoned"); game.log("You rest in the temple. You feel whole again.", [140, 255, 160]); return node("There. Off you go.", [bye()]); } }] : []),
         { label: "Tell me about Vorlath.", go: () => node("He was clever, and he was lonely, and he thought the world had too many directions in it. Down at the bottom he found something that agreed with him. That's all anyone knows.", [bye("Thank you.")]) },
         bye(),
       ]);

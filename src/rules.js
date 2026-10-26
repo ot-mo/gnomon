@@ -33,12 +33,20 @@ const CORE = {
   hp: { touPlus: 4, perLevel: 3, perLevelMin: 1 },     // TOU + 4 at level 1, then max(1, 3 + TOU mod) per level
   dv: { base: 6 },                                     // player DV = 6 + AGI mod + worn DV + bonus(dv); 0 while unable to act
   ma: { base: 4 },                                     // MA = 4 + WIL mod + bonus(ma)
-  cooldown: { perPoint: 0.05, min: 0.2, max: 2 },      // × (1 − 0.05 × (WIL − 16)), clamped
+  cooldown: { perPoint: 0.05, min: 0.2, max: 2,        // × (1 − 0.05 × (WIL − 16)), clamped
+              // Once-per-floor effects are game-time cooldowns (TECH_DESIGN §2.4, review #26), in seconds;
+              // a rest of an hour clears the first two.
+              secondWind: 300, firstBlock: 120, foldingStrike: 10, restClears: 3600 },
   price: { buy: 1.5, buyPerMod: 0.1, sell: 0.3, sellPerMod: 0.05, minBuy: 0.2 },   // value × (1.5 − 0.1·EGO mod − step) …
   carry: { perStr: 15 },
   encumbrance: false,
   regen: { base: 60 },                                 // attribute set: 1 HP per base / (1 + 0.1 (TOU mod + WIL mod)) s
   haste: 1.6,                                          // speed (and action time) while hasted
+  drown: { air: 10, dps: 1, speed: 0.4 },              // TECH_DESIGN §2.7: breath in s, then damage per s; speed ×0.4
+  // skipTime (time.js): the player catches up in chunks this long (statuses, regen and cooldowns are exact
+  // within a chunk; the chunk only bounds how their interplay at full HP rounds); hostiles awake within
+  // activeRadius tiles interrupt.
+  time: { chunk: 1, activeRadius: 12 },
 
   // Levels (DECISIONS: surface zone level = 3 × tier − 1; legacy tables read min(level, 20) until C3).
   level: { contentMax: 20, tierMax: 8 },
