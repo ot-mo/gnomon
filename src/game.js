@@ -129,7 +129,7 @@ export const game = {
   questEvent(what, data) { questEvent(this, what, data); },
 
   // Flat (status.js, bible §10.2): you exist only in the Plane, so the view is the map until it ends.
-  forceMapView() { if (this.mode === "explore") toggleMap(); },
+  forceMapView() { if (this.mode === "explore") toMapView(); },
 
   // A tip shown once per run.
   hint(id, text) {
@@ -444,22 +444,8 @@ function toggleMap() {
     return;
   }
   foldPowers();
-  if (game.mode === "explore") {
-    sfx("rotate", { up: false });
-    // In 3D you may stand up to half a tile past an open edge, over the apron; the map works in the
-    // zone's own tiles, so step back onto the border tile you came from.
-    const p = game.player, z = game.zone;
-    if (p.x < 0 || p.y < 0 || p.x >= z.w || p.y >= z.d) {
-      const tx = Math.max(0, Math.min(z.w - 1, Math.floor(p.x))), ty = Math.max(0, Math.min(z.d - 1, Math.floor(p.y)));
-      p.x = tx + 0.5; p.y = ty + 0.5;
-      const s = z.stand[tx + ty * z.w];
-      if (s >= 0) p.z = s;
-    }
-    game.mode = "map";
-    game.view = "map";
-    unlockPointer();
-    refreshView(game);
-  } else if (game.mode === "map") {
+  if (game.mode === "explore") toMapView();
+  else if (game.mode === "map") {
     sfx("rotate", { up: true });
     game.mode = "explore";
     game.view = "3d";
@@ -468,6 +454,24 @@ function toggleMap() {
     game.player.vz = 0;
     lockPointer();   // allowed: we're inside a key press
   }
+}
+
+// From 3D to the map: by Tab, or forced (pressed flat; that is no turn of yours, so no fold powers).
+function toMapView() {
+  sfx("rotate", { up: false });
+  // In 3D you may stand up to half a tile past an open edge, over the apron; the map works in the
+  // zone's own tiles, so step back onto the border tile you came from.
+  const p = game.player, z = game.zone;
+  if (p.x < 0 || p.y < 0 || p.x >= z.w || p.y >= z.d) {
+    const tx = Math.max(0, Math.min(z.w - 1, Math.floor(p.x))), ty = Math.max(0, Math.min(z.d - 1, Math.floor(p.y)));
+    p.x = tx + 0.5; p.y = ty + 0.5;
+    const s = z.stand[tx + ty * z.w];
+    if (s >= 0) p.z = s;
+  }
+  game.mode = "map";
+  game.view = "map";
+  unlockPointer();
+  refreshView(game);
 }
 
 // Turning the world: the Mantle of Angles makes you untouchable for a moment, and Folding
