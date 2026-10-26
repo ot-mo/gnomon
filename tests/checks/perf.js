@@ -22,11 +22,13 @@
 //
 // The verdict: an item is within budget when its statistic (p50, or p95 / max where §6.7 says so) is at most the
 // budget. Timing depends on the machine: tools/check-perf.mjs measures a reference tree as well (p0-0d1 by default,
-// unpacked by `git archive`, run alternately with this one in the same conditions) whenever an item is over budget, and
-// then an item over budget here that is also over budget there, and at most 15% slower, is reported as the machine's
-// ("over budget on this machine: p0-0d1 too") and does not fail; one that p0-0d1 keeps within budget, or that is more
-// than 15% slower, fails ("over budget against p0-0d1"). Without a reference (the browser, or --against none) every
-// item over budget fails.
+// unpacked by `git archive`, run as many times as this one, alternately, in the same conditions) whenever an item is
+// over budget, and then an item over budget here but at most 15% slower than there (MACHINE_SLACK; the reference is
+// then itself within 15% of the budget) is reported as the machine's ("over budget on this machine, and p0-0d1 as
+// slow") and does not fail; one more than 15% slower than p0-0d1 fails ("over budget against p0-0d1"), whether or not
+// p0-0d1 kept within the budget. (Until 0D2's verification an item failed whenever the reference landed under the
+// budget, so two trees level within noise near a budget passed or failed by chance.) Without a reference (the
+// browser, or --against none) every item over budget fails. verdictProblems() tests the verdict itself.
 export const BUDGETS = [
   { id: "frame.outdoor", what: "Node outdoor frame at 180×56, apron included", budget: 17, stat: "p50", from: "§6.7" },
   { id: "frame.dungeon", what: "Node dungeon frame at 180×56 (the outdoor budget)", budget: 17, stat: "p50", from: "§6.7 (outdoor row)" },
@@ -43,7 +45,7 @@ export const BUDGETS = [
 ];
 export const NOT_YET = ["sun bake ≤ 4 ms per light bucket (WS3 builds it)", "world map draw ≤ 3 ms (WS1)",
   "render3d in the browser ≤ 13 ms and present ≤ 5 ms (tools/browser-0d1.mjs measures the browser's frame time)"];
-export const MACHINE_SLACK = 1.15;   // over budget in both trees and at most this much slower: the machine's
+export const MACHINE_SLACK = 1.15;   // over budget, and at most this much slower than the reference: the machine's
 
 const pct = (sorted, q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))];
 export function summary(ms) {
@@ -204,10 +206,10 @@ export function judgePerf(head, { ref = null, refName = "the reference" } = {}) 
       const r = summary(rms), ratio = v / r[b.stat];
       line += ` · ${refName} ${b.stat} ${r[b.stat]} (×${ratio.toFixed(2)})`;
       if (over) {
-        if (r[b.stat] > b.budget && ratio <= MACHINE_SLACK) notes.push(`${b.id}: over budget on this machine, and ${refName} as much (${b.stat} ${v} ms here, ${r[b.stat]} there, ` +
-          `budget ${b.budget}): not this tree's doing, so not failed`);
+        if (ratio <= MACHINE_SLACK) notes.push(`${b.id}: over budget on this machine, and ${refName} as slow (${b.stat} ${v} ms here, ${r[b.stat]} there, ` +
+          `×${ratio.toFixed(2)}, budget ${b.budget}): not this tree's doing, so not failed`);
         else problems.push(`${b.id}: ${b.what}: ${b.stat} ${v} ms is over the ${b.budget} ms budget against ${refName} ` +
-          `(${r[b.stat]} ms there, ×${ratio.toFixed(2)}${r[b.stat] <= b.budget ? ", within budget there" : ""})`);
+          `(${r[b.stat]} ms there, ×${ratio.toFixed(2)}, more than ×${MACHINE_SLACK}${r[b.stat] <= b.budget ? ", within budget there" : ""})`);
       }
     } else if (over) problems.push(`${b.id}: ${b.what}: ${b.stat} ${v} ms is over the ${b.budget} ms budget (no reference measured)`);
     stats[b.id] = line;
@@ -215,6 +217,26 @@ export function judgePerf(head, { ref = null, refName = "the reference" } = {}) 
   for (const [k, v] of Object.entries(head.info || {})) notes.push(`${k}: ${v}`);
   notes.push(`not measured yet: ${NOT_YET.join("; ")}`);
   return { name: "perf", ok: problems.length === 0, problems, stats, notes };
+}
+
+// The verdict's own test (tools/check-perf.mjs runs it with every measurement): synthetic samples, every item at
+// 1 ms but one, whose p95 and max are the value given. → [problem]
+export function verdictProblems() {
+  const item = BUDGETS.find((b) => b.id === "gen.dungeon"), out = [];
+  const run = (v) => ({ samples: Object.fromEntries(BUDGETS.map((b) => [b.samples || b.id, Array.from({ length: 20 }, (_, k) => (b === item && k === 19 ? v : 1))])) });
+  for (const [head, ref, fails, what] of [
+    [39, null, false, "within budget, no reference"],
+    [41, null, true, "over budget, no reference"],
+    [40.92, 39.51, false, "over budget, the reference within it but as slow (×1.04): the machine's"],
+    [46, 39.51, true, "over budget and ×1.16 the reference: this tree's"],
+    [41, 45, false, "over budget, the reference slower still"],
+    [52, 45, true, "over budget, both over, ×1.16: this tree's"],
+  ]) {
+    const r = judgePerf(run(head), { ref: ref === null ? null : run(ref), refName: "ref" });
+    const failed = r.problems.some((p) => p.startsWith(`${item.id}:`)), others = r.problems.filter((p) => !p.startsWith(`${item.id}:`));
+    if (failed !== fails || others.length) out.push(`the verdict on p95 ${head} ms against ${ref ?? "nothing"} (${what}): ${failed ? "failed" : "passed"}${others.length ? `; ${others[0]}` : ""}`);
+  }
+  return out;
 }
 
 export const overBudget = (head) => BUDGETS.filter((b) => { const ms = head.samples[b.samples || b.id]; return !ms?.length || summary(ms)[b.stat] > b.budget; }).map((b) => b.id);

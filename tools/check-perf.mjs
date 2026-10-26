@@ -4,8 +4,9 @@
 //   node tools/check-perf.mjs [--against p0-0d1 | none] [--rounds 1] [--frames 72]
 // Each measurement runs in a Node process of its own (a fresh JIT, as run-all gives each check). When an item is over
 // budget (or --against is given), the reference tree (default p0-0d1, `git archive` unpacked into a temporary folder,
-// removed afterwards) is measured too, alternately with this one, --rounds times each, and an item over budget in
-// both trees and at most 15% slower here is the machine's: reported, not failed (tests/checks/perf.js).
+// removed afterwards) is measured as many times as this one, alternately (this, ref, this, ref…: --rounds + 1 each),
+// and an item over budget here but at most 15% slower than there is the machine's: reported, not failed
+// (tests/checks/perf.js; its verdictProblems() is run first, on synthetic numbers).
 //   node tools/check-perf.mjs --child --src DIR    (one measurement of the tree at DIR; prints "PERF <json>")
 import fs from "node:fs";
 import os from "node:os";
@@ -14,7 +15,7 @@ import { spawn, execSync } from "node:child_process";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { installNodeEnv, parseArgs, ROOT, SRC } from "./node-env.mjs";
 import { report } from "./report.mjs";
-import { judgePerf, overBudget } from "../tests/checks/perf.js";
+import { judgePerf, overBudget, verdictProblems } from "../tests/checks/perf.js";
 
 const args = parseArgs();
 
@@ -58,6 +59,7 @@ if (against !== "none" && against !== "false" && (over.length || args.against)) 
     refDir = fs.mkdtempSync(path.join(os.tmpdir(), "gnomon-perf-"));
     execSync(`git archive ${JSON.stringify(against)} src package.json | tar -x -C ${JSON.stringify(refDir)}`, { cwd: ROOT, stdio: ["ignore", "ignore", "inherit"] });
     for (let k = 0; k < (Number(args.rounds) || 1); k++) { refs.push(await measure(path.join(refDir, "src"))); heads.push(await measure(SRC)); }
+    refs.push(await measure(path.join(refDir, "src")));   // as many of each (a p95 or a max over more samples reads higher)
     ref = pool(refs);
   } catch (e) {
     console.log(`(no reference measured: ${String(e.message || e).slice(0, 300)})`);
@@ -66,6 +68,8 @@ if (against !== "none" && against !== "false" && (over.length || args.against)) 
   }
 }
 const result = judgePerf(pool(heads), { ref, refName: against });
+const verdict = verdictProblems();
+if (verdict.length) { result.ok = false; result.problems.push(...verdict); }
 result.stats.runs = `${heads.length} of this tree${ref ? `, ${refs.length} of ${against} (alternating: this, ${against}, this…)` : ""}` +
-  `${over.length ? `; over budget in the first: ${over.join(", ")}` : ""}; ${((performance.now() - t0) / 1000).toFixed(1)} s`;
+  `${over.length ? `; over budget in the first: ${over.join(", ")}` : ""}; ${((performance.now() - t0) / 1000).toFixed(1)} s; the verdict's own test ${verdict.length ? "FAILED" : "passed (6 cases)"}`;
 process.exit(report(result));
