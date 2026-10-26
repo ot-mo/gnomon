@@ -12,7 +12,8 @@
 //      music; losing the pointer lock in 3D opens pause. Here too: the victory card (the Lich King's
 //      epilogue paged by Space, then by clicks; R and a click on "Press R…"), and since 0D2 the title screen (the
 //      page without ?quick=1: Enter, then a click on "New quick game"), so every registered mode is reached.
-//   2. The HUD at 100×30 (a 600×300 window): tests/checks/hud.js in the browser (screen sizes 100×30,
+//   2. The HUD at 100×30 (a 600-pixel window 30 cells tall: 300 px with 10-pixel cells, 330 with Windows'
+//      11): tests/checks/hud.js in the browser (screen sizes 100×30,
 //      100×40, 180×56, 80×25), then on the real canvas with every Phase 0 segment and seven statuses on, in
 //      both views: one row, every piece drawn whole inside 100 columns, location and HP shown, and nothing
 //      dropped that outranks something shown.
@@ -181,6 +182,16 @@ try {
   // --- 2. The HUD at 100×30 -----------------------------------------------------------------------------
   if (!SKIP.has("hud")) {
     const page = await openPage(here.base, 600, 300);
+    // 600 px is 100 columns (6-pixel cells); a cell's height follows the browser's monospace font (10 px with
+    // DejaVu Sans Mono, 11 with Windows' Consolas), so the window is made 30 cells tall whatever the font.
+    const cellH = await page.evaluate(async () => (await import("/src/screen.js")).cellH);
+    if (cellH * 30 !== 300) {
+      await page.setViewportSize({ width: 600, height: cellH * 30 });
+      await page.evaluate(async () => {   // (the page's resize listener calls S.resize)
+        const S = await import("/src/screen.js");
+        for (let k = 0; k < 100 && S.rows !== 30; k++) await new Promise((ok) => setTimeout(ok, 20));
+      });
+    }
     const r = await page.evaluate(async () => {
       const S = await import("/src/screen.js"), { canvasBackend } = await import("/src/screen-canvas.js");
       const G = await import("/src/game.js"), hud = await import("/src/hud.js");
@@ -232,9 +243,9 @@ try {
       return { cells, check: { ok: check.ok, problems: check.problems, stats: check.stats }, segments: hud.hudSegments(), views };
     });
     const bad = [...r.check.problems, ...Object.entries(r.views).flatMap(([v, x]) => x.issues.map((i) => `${v}: ${i}`))];
-    if (r.cells !== "100×30") bad.push(`a 600×300 window is ${r.cells} cells, not 100×30`);
+    if (r.cells !== "100×30") bad.push(`a 600×${cellH * 30} window is ${r.cells} cells, not 100×30`);
     for (const v of Object.values(r.views)) if (v.rows !== 1) bad.push(`the status line takes ${v.rows} rows at 100×30`);
-    out(`${bad.length ? "FAIL" : "PASS"} HUD at ${r.cells}: ${r.segments.length} segments registered (${r.segments.join(", ")}); check-hud in the browser ${r.check.ok ? "passes" : "fails"}`);
+    out(`${bad.length ? "FAIL" : "PASS"} HUD at ${r.cells} (a 600×${cellH * 30} window): ${r.segments.length} segments registered (${r.segments.join(", ")}); check-hud in the browser ${r.check.ok ? "passes" : "fails"}`);
     for (const [v, x] of Object.entries(r.views)) out(`  ${v}: ${x.rows} row, shown ${x.shown.join(" ")}; dropped ${x.dropped.join(" ") || "nothing"}`);
     problems.push(...bad.map((b) => `HUD: ${b}`));
     await page.close();
