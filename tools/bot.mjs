@@ -22,9 +22,21 @@
 // The smoke run (runSmoke) is the fights: on levels 3, 5, 10, 15 and 20 (the three guardians and
 // the Lich) it plays for a while with every monster alive, attacking, throwing and drawing frames,
 // in either view, and fails on any exception. It asserts nothing else.
+//
+// Golden (a) in both views (runGoldenA, 0B): the mechanics scenario of tests/golden/scenarios.js, replayed
+// through the controls of one view and compared with the parent's trace (tests/fixtures/golden/
+// mechanics.json) step for step. The scenario's steps become key presses: the inventory opens with I
+// (on the map through the map's keys, in 3D through the real-time keys), the selection moves with the
+// arrow keys and Enter uses it (on the map the use takes game time, as in play; in 3D the game runs on
+// for a frame); R swaps weapons from the inventory; a perk is chosen on the level-up screen with 1; and
+// a crystal, key or pile is picked up by walking over it: on the map it lies on the next tile and the bot
+// steps onto it, in 3D it lies at your feet and the game runs a frame. RULES.stats stays "legacy".
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { installNodeEnv, parseArgs } from "./node-env.mjs";
+import { installNodeEnv, parseArgs, seedRandom, ROOT } from "./node-env.mjs";
+import { currentApi } from "../tests/golden/current-api.js";
+import { checkGolden } from "../tests/checks/golden.js";
 
 const env = await installNodeEnv();
 const { game, startRun, inputHandlers } = await import("../src/game.js");
@@ -287,12 +299,67 @@ export function runSmoke({ seed = 1234, view = "map", levels = [3, 5, 10, 15, 20
   return { ok: problems.length === 0, steps, problems };
 }
 
+// Golden (a) through one view's controls. Returns { ok, steps, problems, stats }.
+export async function runGoldenA({ view = "map" } = {}) {
+  const fixtures = { mechanics: JSON.parse(fs.readFileSync(path.join(ROOT, "tests", "fixtures", "golden", "mechanics.json"), "utf8")) };
+  const api = await currentApi(env, seedRandom);
+  const press = (code) => inputHandlers.onKeyDown(code, false, code);
+  const counts = { keys: 0, mapSteps: 0, frames: 0 };
+  const key = (code) => { press(code); counts.keys++; };
+  const frame = () => { game.debug.step(1 / 60); counts.frames++; };
+  const ready = () => {   // back in the view, playing
+    if (view === "map") { game.view = "map"; if (game.mode === "explore") game.mode = "map"; }
+    else { game.view = "3d"; if (game.mode === "map") game.mode = "explore"; game.paused = false; }
+  };
+  const openInv = () => { ready(); key("KeyI"); if (game.mode !== "inventory") throw new Error(`I opened ${game.mode}, not the inventory`); };
+  const after = () => { if (view === "3d" && game.mode === "explore") frame(); };
+  let lying = null;
+  const bot = {
+    ...api,
+    name: `bot ${view}`,
+    prepare() { api.prepare(); ready(); },
+    useInv(index) {
+      openInv();
+      for (let k = 0; k < 64 && game.invSel !== index; k++) key(game.invSel < index ? "ArrowDown" : "ArrowUp");
+      if (game.invSel !== index) throw new Error(`the selection stuck at ${game.invSel}, not ${index}`);
+      key("Enter");
+      if (game.mode === "inventory") key("Escape");   // nothing happened (a refusal keeps it open)
+      after();
+    },
+    invKey(code) { openInv(); key(code); if (game.mode === "inventory") key("Escape"); after(); },
+    dropAtFeet(item) { lying = item; },
+    pickUp() {
+      const p = game.player, zone = game.zone;
+      if (view === "3d") { zone.items.push(api_makeItem(lying, p.x, p.y, p.z)); frame(); return; }
+      const tx = Math.floor(p.x), ty = Math.floor(p.y), here = zone.stand[tx + ty * zone.w];
+      const next = Object.entries(ARROWS).map(([d, code]) => [...d.split(",").map(Number), code])
+        .find(([dx, dy]) => zone.stand[tx + dx + (ty + dy) * zone.w] === here && !zone.npcs.some((n) => n.tx === tx + dx && n.ty === ty + dy)
+          && zone.get(tx + dx, ty + dy, FLOOR_Z - 1) !== B.STAIRS && zone.get(tx + dx, ty + dy, FLOOR_Z - 1) !== B.STAIRS_UP);
+      if (!next) throw new Error(`no free tile beside (${tx}, ${ty}) to lay the ${lying.kind} on`);
+      zone.items.push(api_makeItem(lying, tx + next[0] + 0.5, ty + next[1] + 0.5, here));
+      ready(); game.debug.mapKey(next[2]); counts.mapSteps++;
+    },
+    takePerk(k) {
+      ready();
+      game.perkChoices = [k]; game.levelReturn = game.mode; game.mode = "levelup";
+      key("Digit1");
+      after();
+    },
+  };
+  const r = checkGolden(bot, fixtures, { only: ["mechanics"] });
+  const st = r.stats.mechanics || {};
+  return { ok: r.ok, steps: [`golden (a) ${view}: ${st.steps} steps, ${st.mismatched} mismatched`], problems: r.problems,
+           stats: { steps: st.steps, mismatched: st.mismatched, ...counts } };
+}
+const api_makeItem = (item, x, y, z) => ({ ...item, x, y, z });
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = parseArgs();
   const views = !args.view || args.view === "both" ? ["map", "3d"] : [args.view];
   let ok = true;
   for (const view of views) {
-    for (const [what, r] of [["stairs", runStairs({ seed: Number(args.seed) || 1234, view })],
+    for (const [what, r] of [["golden (a)", await runGoldenA({ view })],
+                             ["stairs", runStairs({ seed: Number(args.seed) || 1234, view })],
                              ["smoke", runSmoke({ seed: Number(args.seed) || 1234, view })],
                              ...(view === "3d" ? [["edges", runEdges({ seed: Number(args.seed) || 1234 })]] : [])]) {
       console.log(`${r.ok ? "OK  " : "FAIL"} ${view} ${what}: ${r.steps.join(" · ")}`);
