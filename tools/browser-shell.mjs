@@ -154,7 +154,15 @@ try {
       };
     });
     await key("Escape"); await frames(3); await expect("pause", "Esc in the inventory over 3D, the lock request refused");
+    // Every request refused (a frame without pointer lock, say): the card's click is refused too, and 3D then
+    // runs with keyboard look instead of the card coming back on every click.
+    await click("Click to play"); await frames(3); await expect("explore", "a click on the card, its lock request refused too");
     await page.evaluate(() => { const c = document.getElementById("screen"); c.requestPointerLock = c.__request; delete c.__request; });
+    await page.mouse.click(Math.floor(width / 2), Math.floor(height / 2)); await frames(5);   // a click in the view: the lock now
+    if ((await mode()) !== "explore") problems.push(`after the lock came back: in ${await mode()}`);
+    await page.evaluate(() => { if (document.pointerLockElement) document.exitPointerLock(); });
+    await frames(5);
+    if ((await mode()) !== "pause") await page.evaluate(() => window.game.debug.lockChange(false));
     await key("Tab"); await expect("map", "Tab from the pause card");
     await click("Tab: 3D"); await expect("explore", "clicking Tab: 3D");
     await key("Tab"); await expect("map", "Tab in 3D");

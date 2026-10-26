@@ -264,6 +264,7 @@ bind("*", "KeyM", (game) => game.log(toggleMusic() ? "Music on. (M)" : "Music of
 bind("*", "KeyN", (game) => game.log(toggleSounds() ? "Sounds and voices on. (N)" : "Sounds and voices off. (N)", [170, 170, 170]), { help: "sounds" });
 
 // Input goes to the top screen (screens.js) and the bindings (keys.js).
+let lockRefused = false;   // a refused lock request has paused 3D since the lock was last held (onLockRefused)
 export const inputHandlers = {
   onKeyDown(code, repeat, key = "") {
     unlockAudio();   // browsers only allow sound once you've pressed something
@@ -279,11 +280,20 @@ export const inputHandlers = {
     dispatchHover(game, mapView.hover);
   },
   onWheel(sign) { dispatchWheel(game, sign); },
-  // Esc under pointer lock never reaches keydown: losing the lock in 3D (or a request for it refused:
-  // input-browser.js) opens the pause card; getting it back (a click) closes it.
+  // Esc under pointer lock never reaches keydown: losing the lock in 3D opens the pause card; getting it
+  // back (a click) closes it.
   onLockChange(locked) {
-    if (locked) { if (game.mode === "pause") popMode(game, undefined, { pointer: false }); game.paused = false; }
+    if (locked) { lockRefused = false; if (game.mode === "pause") popMode(game, undefined, { pointer: false }); game.paused = false; }
     else if (game.mode === "explore") pushMode(game, "pause");
+  },
+  // A request for the lock refused (input-browser.js): the one Esc makes closing a screen over 3D is refused
+  // once the player took the lock away, so the card asks for a click. If that click's request is refused too,
+  // the lock isn't to be had here (a sandboxed frame, say): 3D runs with keyboard look, as it always did without
+  // one, instead of the card coming back on every click.
+  onLockRefused() {
+    if (lockRefused || game.mode !== "explore") return;
+    lockRefused = true;
+    pushMode(game, "pause");
   },
 };
 

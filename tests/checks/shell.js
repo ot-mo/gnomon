@@ -346,7 +346,16 @@ export function checkShell({ game, startRun, inputHandlers, screens, keys, ui, i
     inputHandlers.onLockChange(false);
     click("I inventory"); expect("inventory", "clicking \"I inventory\" on the pause card");
     press("Escape"); expect("explore", "Esc in the inventory over 3D");
-    inputHandlers.onLockChange(false);
+    // A lock request refused (input-browser.js: the one Esc makes once the player took the lock away): the card,
+    // once. The card's click refused too means no lock to be had: 3D runs (keyboard look), not the card again on
+    // every click; the lock got back clears that, and the next refusal pauses again.
+    inputHandlers.onLockChange(true);
+    inputHandlers.onLockRefused(); expect("pause", "a lock request refused in 3D");
+    click("Click to play"); expect("explore", "a click on the card after a refusal");
+    inputHandlers.onLockRefused(); expect("explore", "the card's own lock request refused too");
+    if (game.paused) fail("3D paused after the card's lock request was refused too");
+    inputHandlers.onLockChange(true);
+    inputHandlers.onLockRefused(); expect("pause", "a refusal after the lock was held again");
     press("Tab"); expect("map", "Tab from the pause card");
     click("Tab: 3D"); expect("explore", "clicking \"Tab: 3D\" on the map");
     press("Tab"); expect("map", "Tab in 3D");

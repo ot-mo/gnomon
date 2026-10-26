@@ -32,9 +32,8 @@ export const browserInput = {
     });
     addEventListener("wheel", (e) => handlers.onWheel?.(Math.sign(e.deltaY)), { passive: true });
     document.addEventListener("pointerlockchange", () => handlers.onLockChange?.(isLocked()));
-    // A refused request is the lock still lost: Esc closing a screen over 3D asks for the lock again, and a
-    // browser refuses it once the player took the lock away (Escape is not a user activation), so 3D would
-    // run with no mouse look and no card.
-    document.addEventListener("pointerlockerror", () => handlers.onLockChange?.(isLocked()));
+    // A request refused: Esc closing a screen over 3D asks for the lock again, and a browser refuses it once the
+    // player took the lock away (Escape is not a user activation). game.js onLockRefused decides.
+    document.addEventListener("pointerlockerror", () => handlers.onLockRefused?.());
   },
 };
