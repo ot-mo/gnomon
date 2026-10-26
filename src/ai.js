@@ -30,7 +30,7 @@
 //              dropped, and the creature goes back to wandering
 //   leader     a follower keeps within RULES.ai.follow.near..far tiles of its leader (your flow field, or
 //              greedy steps after a creature leader), fights what its leader's side fights, never you,
-//              and goes with you across an edge or the stairs from within follow.edge tiles
+//              and goes with you wherever you go (over an edge, by the stairs, on the world map)
 //   wary       (from factions.js attitude "wary" toward you) it watches you from within RULES.ai.wary.watch
 //              tiles and backs off to stay RULES.ai.wary.keep tiles away; it never strikes first
 //   flee       under fleeLevel × its health it runs from what hurts it (greedy steps away), until it has
@@ -44,7 +44,8 @@
 // or a creature), passed to use() as { creature, point, tile, dir } like aimTarget's (creature may be you).
 //
 // Zone changes (zones.js events): on zone:leave the followers within reach (over an edge, by the stairs, on
-// the world map), and over an edge the hunters within RULES.ai.chaseEdge tiles, leave the zone you leave (before write-behind snapshots it); on
+// the world map: every one of them, §5.1), and over an edge the hunters within RULES.ai.chaseEdge tiles of the
+// exit, leave the zone you leave (before write-behind snapshots it); on
 // zone:enter they come in at the border you crossed (the stairs: beside you), each `arriving` for as long
 // as its way to you took. On zone:enter, a zone you come back to catches up on the time you were away:
 // statuses run out (status.js catchUpStatuses), creatures heal (fully after RULES.ai.heal.fullAfter s),
@@ -75,8 +76,8 @@ export const AI_RULES = extendRules("ai", {
           most: 10, brave: 15,        // or after 10 s however it goes; then it stands and fights for 15 s
           byType: { rat: 0.3, bat: 0.3, goblin: 0.2, archer: 0.3, spider: 0.2, orc: 0.12, salamander: 0.15 } },   // (d20 only)
   wary: { keep: 3, watch: 8 },
-  follow: { near: 2, far: 5, edge: 8 },
-  chaseEdge: 6,                       // hunters this close follow you over an edge
+  follow: { near: 2, far: 5 },
+  chaseEdge: 3,                       // hunters this close to the exit follow you over it (§5.1)
   heal: { fullAfter: 3600 },          // a zone you come back to: its creatures healed after an hour away
   ability: { every: 0.5 },
 });
@@ -538,13 +539,14 @@ on("zone:leave", (game, { zone, how }) => {
   if (!zone?.creatures || !p) return;
   const edge = how === "edge", stairs = how === "down" || how === "up" || how === "travel";   // (travel: WS1's world map)
   if (!edge && !stairs) return;
+  const ex = Math.max(0, Math.min(zone.w, p.x)), ey = Math.max(0, Math.min(zone.d, p.y));   // the exit: where you left the zone's ground
   for (const c of [...zone.creatures]) {
     if (canTalk(c) || c.hp <= 0) continue;   // (one still arriving comes along again, from where it was put)
     const t = CREATURE_TYPES[c.type];
     if (t.guardian || t.boss || t.statue || !(t.speed > 0) || statusFlag(c, "noAct") || statusFlag(c, "noMove")) continue;
     const d = distance(c.x - p.x, c.y - p.y);
-    const follows = leaderOf(game, c) === p && d <= AI_RULES.follow.edge;
-    const chases = edge && !follows && c.state === "chase" && d <= AI_RULES.chaseEdge && attitude(game, c, p) === "hostile";
+    const follows = leaderOf(game, c) === p;
+    const chases = edge && !follows && c.state === "chase" && distance(c.x - ex, c.y - ey) <= AI_RULES.chaseEdge && attitude(game, c, p) === "hostile";
     if (!follows && !chases) continue;
     removeCreature(zone, c);
     zone.sightings?.delete(c.id);

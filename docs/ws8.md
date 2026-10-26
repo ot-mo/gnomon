@@ -62,7 +62,7 @@ dismiss(game, c) → c                         // never strikes you; WS6b's Kind
 leaderOf(game, c) → entity | null            fleeLevel(c) → share of health it runs below (0: never)
 AI_RULES = RULES.ai = { foeRange 8, foeForget 3, lose 8, outdoorRadius 32,
   flee: { recover 0.5, forget 6, most 10, brave 15, byType: { rat, bat, goblin, archer, spider, orc, salamander } },
-  wary: { keep 3, watch 8 }, follow: { near 2, far 5, edge 8 }, chaseEdge 6, heal: { fullAfter 3600 }, ability: { every 0.5 } }
+  wary: { keep 3, watch 8 }, follow: { near 2, far 5 }, chaseEdge 3, heal: { fullAfter 3600 }, ability: { every 0.5 } }
 ```
 
 - **States** (`c.state`, saved): `idle`, `wander`, `chase` (hunting you), `flee`. **Brain** (`c.brain`, saved): `target`,
@@ -75,9 +75,8 @@ AI_RULES = RULES.ai = { foeRange 8, foeForget 3, lose 8, outdoorRadius 32,
 - **Abilities**: a creature with abilities (`c.innate`, or its gear's) tries each ready one every 0.5 s when
   `def.ai.when(game, c, target)` is true; `use(game, c, lvl, target)` gets `{ creature, point, tile, dir }` with
   `creature` what it fights, **you included** (WS4: an ability's `use` must expect the player as a target).
-- **Zone changes**: `zone:leave` takes along your followers within 8 tiles (over an edge, by the stairs, or on WS1's
-  world-map travel, `how: "travel"`) and, over
-  an edge, whatever hunts you within 6 tiles (not guardians, bosses, statues or the rooted), out of the zone you leave
+- **Zone changes** (§5.1): `zone:leave` takes along every follower of yours in the zone (over an edge, by the stairs,
+  or on WS1's world-map travel, `how: "travel"`) and, over an edge, whatever hunts you within 3 tiles of the exit (not guardians, bosses, statues or the rooted), out of the zone you leave
   before write-behind snapshots it; `zone:enter` puts them in at the border you crossed (the stairs: beside you),
   `arriving` for as long as their way to you took (at most 4 s). A zone you come back to (`away` s later, not a load)
   catches up: statuses (status.js catchUpStatuses), healing (all of it after an hour), hunts and targets lapse, lit

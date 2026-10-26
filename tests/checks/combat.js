@@ -791,24 +791,25 @@ export function checkAiDepth(ctx) {
       z0.creatures = z0.creatures.filter((c) => c.talk);
       Object.assign(p, { x: z0.w - 0.5, y: y + 0.5, z: s(z0.w - 1), vz: 0, yaw: 0, pitch: 0 });
       const mk = (type, x, state) => addCreature(z0, spawnCreature(type, x, y, s(x), { rng: () => 0.5, level: 2, state }));
-      const follower = recruit(game, mk("goblin", z0.w - 3, "wander"));
-      const hunter = mk("rat", z0.w - 5, "chase");
-      const farHunter = mk("rat", z0.w - 12, "chase");
+      const follower = recruit(game, mk("goblin", z0.w - 4, "wander"));
+      const farFollower = recruit(game, mk("goblin", z0.w - 13, "wander"));
+      const hunter = mk("rat", z0.w - 3, "chase");
+      const farHunter = mk("rat", z0.w - 6, "chase");
       for (const c of [hunter, farHunter]) c.cd = Infinity;
       if (view === "map") { onMap(game); mapStep(game, 1, 0, { force: false }); }
       else { in3d(game); p.x = z0.w + 0.6; game.debug.update(1 / 60); }
       const z1 = game.zone;
       const there = (c) => z1.creatures.includes(c), left = (c) => z0.creatures.includes(c);
-      expect(z1.key === "1,0,0" && there(follower) && there(hunter) && !there(farHunter) && !left(follower) && !left(hunter) && left(farHunter),
-        `${view}: over the edge into ${z1.key}: follower there ${there(follower)} (left behind ${left(follower)}), hunter at 4 tiles there ${there(hunter)}, hunter at 11 tiles there ${there(farHunter)}`);
+      expect(z1.key === "1,0,0" && there(follower) && there(farFollower) && there(hunter) && !there(farHunter) && !left(follower) && !left(hunter) && left(farHunter),
+        `${view}: over the edge into ${z1.key}: follower at 3 tiles there ${there(follower)} (left behind ${left(follower)}), follower at 12 there ${there(farFollower)}, hunter at 2 tiles there ${there(hunter)}, hunter at 5 tiles there ${there(farHunter)} (want all but the last)`);
       expect(follower.brain?.arriving > 0 && hunter.brain?.arriving > 0 && follower.tx <= 2 && hunter.tx <= 2,
         `${view}: they come in at the west border, a moment later: arriving ${follower.brain?.arriving?.toFixed(2)} / ${hunter.brain?.arriving?.toFixed(2)}, at x ${follower.tx} / ${hunter.tx}`);
       const rec = JSON.parse(snapshotZone(z0, {}).json);
       expect(!rec.creatures.some((c) => c.id === follower.id || c.id === hunter.id), `${view}: the record of the zone you left still holds the creatures that went with you`);
       // They arrive, and get on with it.
       if (view === "map") passTime(game, 3); else for (let k = 0; k < 180; k++) game.debug.update(1 / 60);
-      expect(!follower.brain.arriving && !hunter.brain.arriving && distance(follower.x - p.x, follower.y - p.y) <= AI_RULES.follow.far + 1.5,
-        `${view}: after 3 s: arriving ${follower.brain.arriving}/${hunter.brain.arriving}, follower ${distance(follower.x - p.x, follower.y - p.y).toFixed(1)} tiles from you`);
+      expect(!follower.brain?.arriving && !hunter.brain?.arriving && distance(follower.x - p.x, follower.y - p.y) <= AI_RULES.follow.far + 1.5,
+        `${view}: after 3 s: arriving ${follower.brain?.arriving}/${hunter.brain?.arriving}, follower ${distance(follower.x - p.x, follower.y - p.y).toFixed(1)} tiles from you`);
       // On the map you may step onto the tile of one still on its way: it comes in beside you, not on you.
       if (view === "map") {
         const z1b = game.zone, lurker = addCreature(z1b, spawnCreature("rat", Math.floor(p.x) + 1, Math.floor(p.y), z1b.stand[Math.floor(p.x) + 1 + Math.floor(p.y) * z1b.w], { rng: () => 0.5, level: 1, state: "wander" }));
@@ -819,7 +820,7 @@ export function checkAiDepth(ctx) {
         expect(stepped && !lurker.brain.arriving && !onYou, `a creature arriving where you stepped: stepped ${stepped}, arrived ${!lurker.brain.arriving}, on your tile ${onYou}`);
         z1b.creatures.splice(z1b.creatures.indexOf(lurker), 1);
       }
-      edge[view] = { follower: "came", hunterAt4: "came", hunterAt11: "stayed", arrivedIn: "< 3 s" };
+      edge[view] = { followerAt3: "came", followerAt12: "came", hunterAt2: "came", hunterAt5: "stayed", arrivedIn: "< 3 s" };
       run.restore(); run = null;
     }
     stats.edge = edge;
@@ -848,7 +849,7 @@ export function checkAiDepth(ctx) {
       run = fresh(ctx, 4242);
       changeZone(game, "0,0,1", { how: "down" });
       const z = game.zone, p = game.player;
-      const gs = z.creatures.filter((c) => !c.talk && c.maxHp >= 4 && distance(c.x - p.x, c.y - p.y) > AI_RULES.follow.edge).slice(0, 2);
+      const gs = z.creatures.filter((c) => !c.talk && c.maxHp >= 4 && distance(c.x - p.x, c.y - p.y) > 4).slice(0, 2);
       if (expect(gs.length === 2, "level 1 has no two creatures to leave behind")) {
         const [a, b] = gs;
         a.hp = 2; addStatus(game, a, "chilled", { t: 5 }); a.state = "chase";
