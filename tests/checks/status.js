@@ -130,6 +130,10 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles, capture }
     p.hp = 9;
     p.status = { poisoned: { t: 60, mag: 1, src: null, acc: 0 } };
   });
+  cases.deathMidStep = playerCase("poison kills; the statuses after it still run to the moment of death", (p) => {
+    p.hp = 4; p.body.equip.finger_r = ring(2);
+    p.status = { poisoned: { t: 33, mag: 0.5, src: null, acc: 0 }, hasted: { t: 14, mag: 1, src: null, acc: 0 } };
+  });
   {
     const undo = overrideRules("stats", "attributes");
     cases.naturalRegen = playerCase("attribute formulas: natural regeneration, stopped while poisoned", (p) => {

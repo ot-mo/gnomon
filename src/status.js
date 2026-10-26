@@ -135,23 +135,35 @@ export const cooldownLeft = (e, id) => e?.cooldowns?.[id] || 0;
 export function startCooldown(e, id, seconds) { (e.cooldowns ||= {})[id] = seconds; }
 export function clearCooldown(e, id) { if (e?.cooldowns) delete e.cooldowns[id]; }
 
+// The bearer died partway through the list: the statuses after the killing one still run to the moment
+// of death (the end of this step, where ticks land), quietly, so a bulk step and small steps agree.
+function runOutQuietly(e, id, dt) {
+  const s = e.status[id];
+  s.t -= dt;
+  if (s.t <= 1e-9) { delete e.status[id]; if (STATUS_DEFS[id]?.bonus) invalidateStats(e); }
+}
+
 export function tickStatuses(game, e, dt) {
+  let dead = false;
   if (e.status) for (const id of Object.keys(e.status)) {
     if (!e.status[id]) continue;
+    if (dead) { runOutQuietly(e, id, dt); continue; }
     advance(game, e, id, dt);
-    if (!alive(game, e)) break;
+    dead = !alive(game, e);
   }
   tickCooldowns(e, dt);
 }
 // The exact bulk version (skipTime): every status here is a function of elapsed time alone, so this is
 // the same code run once over `seconds`; a def may supply its own catchUp(game, e, s, seconds).
 export function catchUpStatuses(game, e, seconds) {
+  let dead = false;
   if (e.status) for (const id of Object.keys(e.status)) {
     const s = e.status[id], def = STATUS_DEFS[id];
     if (!s) continue;
+    if (dead) { runOutQuietly(e, id, seconds); continue; }
     if (def?.catchUp) def.catchUp(game, e, s, seconds);
     else advance(game, e, id, seconds);
-    if (!alive(game, e)) break;
+    dead = !alive(game, e);
   }
   tickCooldowns(e, seconds);
 }
