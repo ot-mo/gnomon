@@ -61,17 +61,20 @@ const shift = () => keys.has("ShiftLeft") || keys.has("ShiftRight");
 const tileOf = (e) => ({ x: Math.floor(e.x), y: Math.floor(e.y) });
 
 // What you can see on the map now: the creatures sighted this moment and the people shown (a look adds
-// people and every creature; the rest only creatures not friendly to you), nearest first.
+// people and your friends; the rest only creatures not friendly to you). Those out for you first, then
+// the nearest first.
 function candidates(game, purpose) {
   const { zone, player: p } = game, out = [];
   for (const c of zone.creatures) {
     if (c.brain?.arriving > 0) continue;
-    if (canTalk(c)) { if (purpose === "look" && zone.seen[c.tx + c.ty * zone.w] && !ghostOffMap(game, c)) out.push(c); continue; }
+    if (canTalk(c)) { if (purpose === "look" && zone.seen[c.tx + c.ty * zone.w] && !ghostOffMap(game, c)) out.push({ c, foe: false }); continue; }
     if (zone.sightings.get(c.id)?.time !== game.time) continue;
-    if (purpose !== "look" && attitude(game, c, p) === "friendly") continue;
-    out.push(c);
+    const feel = attitude(game, c, p);
+    if (purpose !== "look" && feel === "friendly") continue;
+    out.push({ c, foe: feel === "hostile" });
   }
-  return out.sort((a, b) => distance(a.x - p.x, a.y - p.y) - distance(b.x - p.x, b.y - p.y) || a.id - b.id);
+  return out.sort((a, b) => b.foe - a.foe || distance(a.c.x - p.x, a.c.y - p.y) - distance(b.c.x - p.x, b.c.y - p.y) || a.c.id - b.c.id)
+    .map((e) => e.c);
 }
 
 // The creature you'd mean on a tile: a person shown there, else one sighted there this moment.
