@@ -10,6 +10,7 @@
 //                                     `every` (seconds), at most that often, and dt is the time since
 //                                     its last run. Registering an id again replaces it.
 //   runUpdates(game, dt)              game.js calls this once per frame.
+//   busCounts() → { handlers: { [type]: n }, updates: [id] }   what is registered (for checks)
 //
 // Events so far: "zone:prepare" { zone, arrival, from } (before you're placed: open gates, resolve
 // loot), "zone:enter" { zone, arrival, how, away, first, from /* the key of the zone you left, or null */ } (after), "zone:leave" { zone, side, how, to };
@@ -53,6 +54,9 @@ export function registerUpdate(id, fn, { modes = ["explore", "map"], every = 0 }
 }
 
 export function unregisterUpdate(id) { updates.delete(id); }
+
+// What is registered (check-imports compares it before and after a module loads): handlers per event type, update ids.
+export const busCounts = () => ({ handlers: Object.fromEntries([...handlers].map(([t, l]) => [t, l.length])), updates: [...updates.keys()] });
 
 export function runUpdates(game, dt) {
   for (const u of updates.values()) {

@@ -44,6 +44,7 @@ export const CHECKS = [
   { name: "edges", owner: "WS2", load: () => import("./edges.js"), slow: "the longest: about 40 s in a page (75 s in run-all); 600 neighbour pairs and every landmark edge" },
   { name: "golden", owner: "P0", load: () => import("./golden.js") },
   { name: "hud", owner: "P0", load: () => import("./hud.js") },
+  { name: "imports", owner: "P0", load: () => import("./imports.js") },
   { name: "items", owner: "WS5", load: () => import("./items.js") },
   { name: "landmarks", owner: "WS2", load: () => import("./landmarks.js") },
   { name: "legacyfights", owner: "P0", load: () => import("./legacyfights.js") },

@@ -67,6 +67,8 @@ registerAbilitySource("innate", (e) => (e.innate || []).map((id) => ({ id, lvl: 
 // Gear you wear or wield whose kind lists abilities (ItemKindDef.abilities, §2.9).
 registerAbilitySource("item", (e) => worn(e).flatMap((it) => (ITEM_KINDS[it.kind]?.abilities?.(it) || []).map((id) => ({ id, lvl: 1, item: it }))));
 
+export const abilitySources = () => SOURCES.map((s) => s.name);   // what is registered (for checks)
+
 export function abilitiesOf(e) {
   const out = [], seen = new Set();
   if (!e) return out;

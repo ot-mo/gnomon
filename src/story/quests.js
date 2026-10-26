@@ -29,6 +29,7 @@ export function registerQuest(id, template) {
     for (const type of Object.keys(stage.on || {})) subscribe(type);
 }
 export const questTemplate = (id) => TEMPLATES.get(id) || null;
+export const questIds = () => [...TEMPLATES.keys()];   // what is registered (for checks)
 
 function subscribe(type) {
   if (SUBSCRIBED.has(type)) return;

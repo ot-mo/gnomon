@@ -36,6 +36,8 @@ export function registerService(id, def) {
 }
 export const dialogueIds = () => [...DIALOGUES.keys()];
 export const serviceDef = (id) => SERVICES.get(id) || null;
+export const serviceIds = () => [...SERVICES.keys()];
+export const talkOptionIds = () => [...TALK_OPTIONS.keys()];
 
 // A merchant's services, in the order its list names them; each target that's available now.
 export function servicesFor(game, c) {

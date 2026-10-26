@@ -30,6 +30,7 @@ export function registerBacking(kind, def) {
     if (typeof def[f] !== "function") throw new Error(`registerBacking: ${kind} needs ${f}()`);
   BACKINGS[kind] = def;
 }
+export const backingKinds = () => Object.keys(BACKINGS);   // what is registered (for checks)
 function backing() {
   const b = BACKINGS[CURRENCY.backing?.kind];
   if (!b) throw new Error(`currency: no backing "${CURRENCY.backing?.kind}" registered`);

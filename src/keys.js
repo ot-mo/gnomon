@@ -14,6 +14,7 @@
 //   helpFor(mode) → [{ code, help }]              the mode's bindings with help text, then "play", then "*"
 //   keyLabel(code) → "M", "1", "Esc", "↑"…        how a code is written in help lines
 //   globalKey(code) → bool                        is it a "*" binding (M, N)?
+//   boundCodes() → { [mode]: [code] }            what is bound (for checks)
 import { screenFor } from "./screens.js";
 
 const BINDINGS = new Map();   // mode → [{ code, handler, repeat, help, when }]
@@ -43,6 +44,9 @@ export function dispatchKey(game, code, repeat = false, key = "") {
   }
   return false;
 }
+
+// What is bound, per mode (check-imports compares it before and after a module loads).
+export const boundCodes = () => Object.fromEntries([...BINDINGS].map(([mode, l]) => [mode, l.map((b) => b.code)]));
 
 // Is `code` bound in "*" (M, N)? The map lets those through without stopping a click-to-travel.
 export const globalKey = (code) => (BINDINGS.get("*") || []).some((b) => b.code === code);
