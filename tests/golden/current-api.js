@@ -2,7 +2,9 @@
 // tools/check-golden.mjs replays tests/golden/scenarios.js through it and compares the result with
 // the fixtures recorded at 75edbd3 (legacy-api.js). When a later session changes an API the
 // scenarios touch (stats in 0B, creatures in 0C), it updates this adapter, never the fixtures.
-// Since 0B the derived numbers come from the stat bus (stats.js) with RULES.stats = "legacy".
+// Since 0B the derived numbers come from the stat bus (stats.js) with RULES.stats = "legacy", and the
+// parent's five gear fields are read from the body (body.js): the primary hand, the body part, the first
+// finger, the neck and the belt.
 //
 // env: from tools/node-env.mjs.
 export async function currentApi(env, seedRandom) {
@@ -20,6 +22,7 @@ export async function currentApi(env, seedRandom) {
   const temple = await env.load("content/world/temple.js");
   const zones = await env.load("zones.js");
   const stats = await env.load("stats.js");
+  const body = await env.load("body.js");
   const game = G.game;
   const STACKS = ["potion", "scroll", "knife", "bomb"];
 
@@ -72,7 +75,8 @@ export async function currentApi(env, seedRandom) {
       return {
         derived: { str: stats.attr(p, "str"), maxHp: stats.maxHp(p), armour: stats.av(p), reach: player.weaponReach(p),   // the stat bus (0B)
                    bonus: Object.fromEntries(keys.map((k) => [k, stats.bonus(p, k)])) },
-        gear: { weapon: p.weapon, armour: p.armour, ring: p.ring, amulet: p.amulet, sidearm: p.sidearm },
+        gear: { weapon: body.wielded(p), armour: body.wornOn(p, "body"), ring: body.wornOn(p, "finger_r"),   // the body (0B)
+                amulet: body.wornOn(p, "neck"), sidearm: body.belt(p) },
         inv: p.inv, keys: p.keys, gold: p.gold, torch: p.torch,
         perks: [...p.perks].map((k) => [k, leveling.perkRank(p, k)]),
         known: { potions: game.knownPotions, scrolls: game.knownScrolls, auras: game.auraKnown },

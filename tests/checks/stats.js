@@ -23,6 +23,11 @@ import { WEAPONS, ARMOURS, RINGS, AMULETS, RELICS, PROPERTIES, itemBonuses, make
 import { PERKS, perkRank, takePerk } from "../../src/leveling.js";
 import { registerStatus, addStatus, removeStatus, STATUS_DEFS } from "../../src/status.js";
 
+// Where the parent game's four slots are on a humanoid body (the gear catalog puts each piece there).
+const PART = { weapon: "hand_r", armour: "body", ring: "finger_r", amulet: "neck" };
+// What's on the body, read straight from body.equip (not through body.js worn()).
+const onBody = (e) => Object.values(e.body?.equip || {}).filter((it) => it && typeof it === "object");
+
 const SETS = ["legacy", "attributes"];
 
 // Every derived number of an entity, as plain data.
@@ -43,7 +48,7 @@ const diff = (a, b) => Object.keys(a).filter((k) => !same(a[k], b[k])).join(", "
 function expectedBonus(e, statusBonus) {
   const out = {};
   const add = (b) => { for (const k in b) out[k] = (out[k] || 0) + b[k]; };
-  for (const it of [e.weapon, e.armour, e.ring, e.amulet]) if (it) add(itemBonuses(it));
+  for (const it of onBody(e)) add(itemBonuses(it));
   for (const k of e.perks || []) if (PERKS[k].bonus) add(PERKS[k].bonus(perkRank(e, k)));
   for (const id in e.status || {}) add(statusBonus(id, e.status[id]) || {});
   return out;
@@ -54,7 +59,7 @@ function expectedCore(e, b) {
   const tou = e.attrs.tou + g("tou"), touMod = Math.floor((tou - 16) / 2);
   const maxHp = legacy ? Math.max(1, 20 + 3 * (e.level - 1) + e.maxHpGain + g("maxHp"))
                        : Math.max(1, tou + 4 + (e.level - 1) * Math.max(1, 3 + touMod) + e.maxHpGain + g("maxHp"));
-  const body = ARMOURS[e.armour.id].armour + e.armour.ench;
+  const body = onBody(e).filter((it) => it.kind === "armour").reduce((s, it) => s + ARMOURS[it.id].armour + it.ench, 0);
   const av = legacy ? body + g("armour") : body + g("armour") + g("av");
   return { str, maxHp, av };
 }
@@ -120,11 +125,11 @@ export function checkStats({ game, startRun, inventory, mechanics }) {
     if (set === "legacy" && (before0.attrs.str !== 10 || before0.maxHp !== 20)) problems.push(`legacy start: STR ${before0.attrs.str}, max HP ${before0.maxHp} (want 10, 20)`);
     if (set === "attributes" && (before0.attrs.str !== 16 || before0.maxHp !== 20)) problems.push(`attribute start: STR ${before0.attrs.str}, max HP ${before0.maxHp} (want 16, 20)`);
     for (const proto of gear) {
-      const it = { ...proto, props: proto.props && [...proto.props] }, slot = it.kind;
-      const before = derived(game, p), old = p[slot];
-      p[slot] = it; St.invalidateStats(p); changes++;
+      const it = { ...proto, props: proto.props && [...proto.props] }, slot = it.kind, part = PART[slot];
+      const before = derived(game, p), old = p.body.equip[part];
+      p.body.equip[part] = it; St.invalidateStats(p); changes++;
       consistent(`wearing ${slot} ${it.relic || it.id} ${it.ench}${it.props ? " " + it.props : ""}`);
-      p[slot] = old; St.invalidateStats(p);
+      p.body.equip[part] = old; St.invalidateStats(p);
       const after = derived(game, p);
       if (!same(before, after)) problems.push(`${set}: taking off ${slot} ${it.relic || it.id} ${it.ench} changed ${diff(before, after)}`);
     }
@@ -151,7 +156,7 @@ export function checkStats({ game, startRun, inventory, mechanics }) {
     for (const k in PERKS) for (let r = 0; r < (PERKS[k].max || 1); r++) { takePerk(game, k); consistent(`perk ${k} ${r + 1}`); }
     // A stale cache is caught (the check itself works).
     St.STATS_DEBUG.verify = true;
-    p.ring = { kind: "ring", id: "strength", ench: 3, known: true };   // no invalidateStats on purpose
+    p.body.equip.finger_r = { kind: "ring", id: "strength", ench: 3, known: true };   // no invalidateStats on purpose
     if (!throws(() => St.bonus(p, "str"))) problems.push(`${set}: STATS_DEBUG.verify missed a stale cache`);
     St.STATS_DEBUG.verify = false;
     St.invalidateStats(p);
@@ -176,7 +181,7 @@ export function checkStats({ game, startRun, inventory, mechanics }) {
       if (!ok) { problems.push(`inventory.equip refused ${it.kind} ${it.relic || it.id}`); continue; }
       equips++;
       if (St.maxHp(p) < p.hp) problems.push(`after equipping ${it.id}, HP ${p.hp} is above max HP ${St.maxHp(p)}`);
-      if (it.kind === "weapon" && p.sidearm) { inventory.swapWeapons(game); inventory.swapWeapons(game); equips += 2; }
+      if (it.kind === "weapon" && p.body.belt) { inventory.swapWeapons(game); inventory.swapWeapons(game); equips += 2; }
     }
     game.player = real;
     stats.inventory = { equips, baseWrites: writes.length };

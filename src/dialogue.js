@@ -12,6 +12,7 @@ import { lockPointer, unlockPointer } from "./input.js";
 import { NPC_TYPES, talkTo, mapPercent } from "./npcs.js";
 import { itemName, itemGlyph, itemInfo, addToInventory, sellPrice, priceFactor, isGear, ELEMENTS, RINGS, AMULETS, POTIONS } from "./items.js";
 import { worn, regear } from "./player.js";
+import { wielded, carried } from "./body.js";
 import { raiseAttr, raiseMaxHp } from "./stats.js";
 import { sfx, speakLetter } from "./sfx.js";
 
@@ -181,12 +182,13 @@ function services(game) {
         act: () => regear(p, it, (o) => { o.ench = Math.min(5, o.ench + 1); o.known = true; }), target: it });
     }
   }
+  const weapon = wielded(p);
   for (const el of ["fire", "frost", "shock", "holy"])
-    if (p.weapon.element !== el && !p.weapon.relic)
-      rows.push({ label: `Forge ${ELEMENT_WORDS[el]} into your ${itemName(game, p.weapon)}`, glyph: [")", ELEMENTS[el].color], price: cost(150),
-        info: `Your weapon ${ELEMENTS[el].info}.${p.weapon.element ? ` (It stops being ${ELEMENTS[p.weapon.element].adj}.)` : ""}`,
-        act: () => { p.weapon.element = el; }, target: p.weapon });
-  for (const it of [p.sidearm, ...p.inv].filter(Boolean)) {
+    if (weapon.element !== el && !weapon.relic)
+      rows.push({ label: `Forge ${ELEMENT_WORDS[el]} into your ${itemName(game, weapon)}`, glyph: [")", ELEMENTS[el].color], price: cost(150),
+        info: `Your weapon ${ELEMENTS[el].info}.${weapon.element ? ` (It stops being ${ELEMENTS[weapon.element].adj}.)` : ""}`,
+        act: () => { weapon.element = el; }, target: weapon });
+  for (const it of carried(p).slice(worn(p).length)) {   // the belt and the pack
     if (isGear(it) && !it.known && !it.relic) rows.push({ label: `Identify the ${itemName(game, it)}`, glyph: itemGlyph(game, it), price: cost(25),
       info: "Pell tells you how good it is, or whether it's cursed.", act: () => { it.known = true; }, target: it });
     if (it.kind === "potion" && !game.knownPotions.has(it.effect)) rows.push({ label: `Name the ${itemName(game, it)}`, glyph: itemGlyph(game, it), price: cost(25),

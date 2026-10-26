@@ -1,7 +1,8 @@
 // What potions and scrolls do, and the timed effects they leave on you
 // (flying, haste, shadows, poison, paralysis, darkness), plus the Regeneration perk.
 import { POTIONS, POTION_COLORS, SCROLLS, ELEMENTS, WEAPONS, itemName, isGear } from "./items.js";
-import { bonus, regear, worn } from "./player.js";
+import { bonus, regear } from "./player.js";
+import { wielded, carried } from "./body.js";
 import { maxHp, raiseAttr, regenEvery, canSwim } from "./stats.js";
 import { addStatus, tickStatuses, statusFlag, updateDrowning } from "./status.js";
 import { FLOOR_Z } from "./world.js";
@@ -73,7 +74,7 @@ export function readScroll(game, effect) {
   const title = game.scrollTitle[effect];
   game.knownScrolls.add(effect);
   if (unknown) game.log(`You read "${title}". It's a scroll of ${SCROLLS[effect].name}!`, [235, 220, 175]);
-  const wname = () => itemName(game, p.weapon);
+  const weapon = wielded(p), wname = () => itemName(game, weapon);
 
   switch (effect) {
     case "uncurse": {
@@ -82,15 +83,15 @@ export function readScroll(game, effect) {
       break;
     }
     case "fire": case "frost": case "shock": case "holy": {
-      const old = p.weapon.element;
-      p.weapon.element = effect;
+      const old = weapon.element;
+      weapon.element = effect;
       const verb = { fire: "bursts into flame", frost: "frosts over", shock: "crackles with lightning", holy: "shines with holy light" }[effect];
-      game.log(`Your ${WEAPONS[p.weapon.id].name} ${verb}!${old && old !== effect ? ` (It's no longer ${ELEMENTS[old].adj}.)` : ""}`, ELEMENTS[effect].color);
+      game.log(`Your ${WEAPONS[weapon.id].name} ${verb}!${old && old !== effect ? ` (It's no longer ${ELEMENTS[old].adj}.)` : ""}`, ELEMENTS[effect].color);
       break;
     }
     case "blessing":
-      p.weapon.ench = Math.min(5, p.weapon.ench + 1);
-      p.weapon.known = true;
+      weapon.ench = Math.min(5, weapon.ench + 1);
+      weapon.known = true;
       game.log(`Your weapon glows softly. It's now a ${wname()}.`, [255, 245, 200]);
       break;
     case "teleport": {
@@ -117,8 +118,8 @@ export function readScroll(game, effect) {
       break;
     }
     case "malice":
-      p.weapon.ench = Math.min(p.weapon.ench, 0) - 1 - Math.floor(Math.random() * 2);
-      p.weapon.known = true;
+      weapon.ench = Math.min(weapon.ench, 0) - 1 - Math.floor(Math.random() * 2);
+      weapon.known = true;
       game.log(`Dark energy coils around your weapon. It's cursed! (${wname()}, and it won't leave your hand)`, [200, 80, 120]);
       break;
   }
@@ -129,7 +130,7 @@ export function readScroll(game, effect) {
 // Returns how many there were.
 export function liftCurses(p) {
   let lifted = 0;
-  for (const it of [...worn(p), p.sidearm, ...p.inv])
+  for (const it of carried(p))
     if (isGear(it) && it.ench < 0) { regear(p, it, (o) => { o.ench = 0; o.known = true; }); lifted++; }
   return lifted;
 }
@@ -204,7 +205,7 @@ export function revealFloor(game) {
 // potions and scrolls by kind (so it covers that colour / title for good), gear piece by piece.
 function senseAuras(game) {
   const p = game.player;
-  for (const it of [...worn(p), p.sidearm, ...p.inv].filter(Boolean)) {
+  for (const it of carried(p)) {
     if (it.kind === "potion") game.auraKnown.add(`potion:${it.effect}`);
     else if (it.kind === "scroll") game.auraKnown.add(`scroll:${it.effect}`);
     else if (isGear(it)) it.auraKnown = true;

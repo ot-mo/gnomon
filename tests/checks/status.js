@@ -102,17 +102,17 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles }) {
   const ring = (n) => ({ kind: "ring", id: "regeneration", ench: n, known: true });
   const cases = {};
   cases.poisonRegenCooldowns = playerCase("poison, regeneration and cooldowns", (p) => {
-    p.hp = 15; p.ring = ring(2);
+    p.hp = 15; p.body.equip.finger_r = ring(2);
     p.status = { poisoned: { t: 10, mag: 1, src: null, acc: 0 }, hasted: { t: 15, mag: 1, src: null, acc: 0 },
                  flying: { t: 20, mag: 1, src: null, acc: 0 }, darkened: { t: 650, mag: 1, src: null, acc: 0 } };
     p.cooldowns = { secondWind: 300, firstBlock: 120, foldingStrike: 10, long: 640.5 };
   });
   cases.poisonAgainstRegenAtFull = playerCase("slow poison against regeneration at full health", (p) => {
-    p.hp = 15; p.ring = ring(1);
+    p.hp = 15; p.body.equip.finger_r = ring(1);
     p.status = { poisoned: { t: 900, mag: 0.05, src: null, acc: 0 } };
   });
   cases.thickBloodDrain = playerCase("Thick blood, poison and a cursed ring that drains", (p) => {
-    p.hp = 20; p.ring = ring(-1); p.perks = new Set(["thickBlood"]);
+    p.hp = 20; p.body.equip.finger_r = ring(-1); p.perks = new Set(["thickBlood"]);
     p.status = { poisoned: { t: 25, mag: 1, src: null, acc: 0 } };
   });
   cases.deadlyPoison = playerCase("poison that kills", (p) => {
@@ -170,7 +170,7 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles }) {
   const r1b = skipTime(game, 60, { interruptible: false });
   if (r1b.elapsed !== 60) fail(`skipTime, not interruptible, with a hostile near: elapsed ${r1b.elapsed}`);
   game.zone.monsters.length = 0;
-  p0.hp = 5; p0.ring = ring(2); invalidateStats(p0);
+  p0.hp = 5; p0.body.equip.finger_r = ring(2); invalidateStats(p0);
   const r2 = skipTime(game, 3600, { until: (g) => g.player.hp >= maxHp(g.player) });
   if (!(r2.why === "until" && !r2.interrupted && p0.hp === maxHp(p0) && r2.elapsed <= (maxHp(p0) - 5) * 6 + 1))
     fail(`skipTime until healed: ${JSON.stringify(r2)}, HP ${p0.hp}/${maxHp(p0)}`);
@@ -194,7 +194,8 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles }) {
   // --- 4. Drowning on the map and in 3D -------------------------------------------------------------
   const zone = pondZone();
   const freshPlayer = () => {
-    game.player = structuredClone({ ...base, status: {}, cooldowns: {}, ring: null, perks: new Set() });
+    game.player = structuredClone({ ...base, status: {}, cooldowns: {}, perks: new Set() });
+    game.player.body.equip.finger_r = null;
     invalidateStats(game.player);
     game.player.hp = maxHp(game.player);
   };

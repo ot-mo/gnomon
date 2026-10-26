@@ -1,7 +1,8 @@
 // The player: body (look, walk, sprint, jump, fly, collide — learn/04 §5), stats and gear.
 import { FLOOR_Z, B, solidFor, floatsOn } from "./world.js";
 import { WEAPONS } from "./items.js";
-import { bonus, wornItems, invalidateStats, clampHp, makeAttrs, speedMul, canSwim } from "./stats.js";
+import { bonus, invalidateStats, clampHp, makeAttrs, speedMul, canSwim } from "./stats.js";
+import { makeBody, wielded, worn } from "./body.js";
 import { RULES } from "./rules.js";
 import { hasStatus, statusFlag, statusSpeed } from "./status.js";
 
@@ -16,27 +17,27 @@ const FLY_SPEED = 4;               // blocks per second up (Space) or down (C) w
 const EPS = 0.001;
 
 export function makePlayer() {
-  return {
+  const p = {
     x: 0, y: 0, z: FLOOR_Z, vz: 0, onGround: false, yaw: 0, pitch: 0,
     hp: 20, keys: 0, gold: 0, torch: true,
     attrs: makeAttrs(), maxHpGain: 0,   // base fields: max HP, STR and the rest are derived (stats.js)
     level: 1, xp: 0, perks: new Set(), pendingLevels: 0, bonusPerks: 0,   // bonusPerks: gifts from people, not levels
-    // What you're holding and wearing: { id, ench (+blessed / −cursed), known, element? }
-    weapon: { kind: "weapon", id: "shortsword", ench: 0, known: true },
-    armour: { kind: "armour", id: "clothes", ench: 0, known: true },
-    sidearm: null,              // a second weapon on your belt: R swaps it into your hand
-    ring: null, amulet: null,
+    // What you're holding and wearing (body.js): parts of a humanoid body, each with an item
+    // { kind, id, ench (+blessed / −cursed), known, element? }, and a second weapon on the belt (R swaps).
+    body: makeBody("humanoid"),
     inv: [{ kind: "potion", effect: "healing", count: 1 }, { kind: "knife", count: 4 }, { kind: "bomb", count: 1 }],
     ready: { kind: "knife" },   // what T / right-click throws (see throwing.js)
     status: {}, cooldowns: {},  // timed effects (flying, haste, poison…) and cooldowns: status.js
     attackCd: 0, throwCd: 0, swing: 0, swingTime: 0.35, hurt: 0, sprinting: false, impact: 0,
   };
+  p.body.equip.hand_r = { kind: "weapon", id: "shortsword", ench: 0, known: true };
+  p.body.equip.body = { kind: "armour", id: "clothes", ench: 0, known: true };
+  return p;
 }
 
-// What you're wearing and wielding (the sidearm only counts once it's in your hand), and one bonus
-// (see stats.js for the list) added up over your gear, your perks and your statuses: the stat bus.
-export const worn = wornItems;
-export { bonus };
+// What you're wearing and wielding (body.js; the belt only counts once it's in your hand), and one
+// bonus (see stats.js for the list) added up over your gear, your perks and your statuses: the stat bus.
+export { worn, wielded, bonus };
 
 // Change something you're wearing (its enchantment, say). STR, max HP and the rest are derived from
 // your gear (stats.js), so this only drops the cached bonuses, and your HP if your max HP fell.
@@ -49,9 +50,9 @@ export function regear(p, it, change) {
 // How long one swing of your weapon takes (also what an attack costs on the map).
 export function attackTime(p) {
   const faster = Math.min(0.6, bonus(p, "swing"));
-  return (WEAPONS[p.weapon.id].swing * (1 - faster)) / (hasStatus(p, "hasted") ? HASTE : 1);
+  return (WEAPONS[wielded(p).id].swing * (1 - faster)) / (hasStatus(p, "hasted") ? HASTE : 1);
 }
-export const weaponReach = (p) => WEAPONS[p.weapon.id].reach + bonus(p, "reach");
+export const weaponReach = (p) => WEAPONS[wielded(p).id].reach + bonus(p, "reach");
 
 // Can be negative with cursed armour: then blows hurt more (stats.js av()).
 export { av as armourValue } from "./stats.js";

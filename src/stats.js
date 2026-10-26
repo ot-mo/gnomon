@@ -33,7 +33,8 @@
 //   carry · price · cooldown · resistFire · resistFrost · resistShock · resistPoison · swim.
 // (`pv` from the tech design is gone: DECISIONS, no penetration dice.)
 import { RULES } from "./rules.js";
-import { itemBonuses, ARMOURS } from "./items.js";
+import { itemBonuses, ITEM_KINDS } from "./items.js";
+import { worn } from "./body.js";
 import { PERKS, perkRank } from "./leveling.js";
 
 export const ATTRS = ["str", "agi", "tou", "int", "wil", "ego"];
@@ -56,11 +57,9 @@ export function registerBonusSource(name, fn) {
 }
 export const bonusSources = () => SOURCES.map((s) => s.name);
 
-// What an entity wears and wields (the sidearm only counts once it's in your hand). body.js takes
-// this over in 0B's body step; until then it reads the parent game's four slots.
-export const wornItems = (e) => [e.weapon, e.armour, e.ring, e.amulet].filter(Boolean);
-
-registerBonusSource("gear", (e) => wornItems(e).map(itemBonuses));
+// What an entity wears and wields (body.js worn(): equipped items and implants; the weapon on the
+// belt only counts once it's in your hand).
+registerBonusSource("gear", (e) => worn(e).map(itemBonuses));
 registerBonusSource("powers", function* (e) {
   if (!e.perks) return;
   for (const k of e.perks) { const b = PERKS[k]?.bonus; if (b) yield b(perkRank(e, k)); }
@@ -120,9 +119,11 @@ export function maxHp(e) {
   const H = RULES.hp, perLevel = Math.max(H.perLevelMin, H.perLevel + mod(e, "tou"));
   return Math.max(1, attr(e, "tou") + H.touPlus + (level - 1) * perLevel + gain + bonus(e, "maxHp"));
 }
-// Armour (can be negative with cursed armour: then blows hurt more).
+// Armour (can be negative with cursed armour: then blows hurt more): the worn pieces' armour values
+// (ITEM_KINDS[kind].av, today only body armour) plus bonuses.
 export function av(e) {
-  const body = e.armour ? ARMOURS[e.armour.id].armour + e.armour.ench : 0;
+  let body = 0;
+  for (const it of worn(e)) body += ITEM_KINDS[it.kind]?.av?.(it) || 0;
   if (legacy()) return body + bonus(e, "armour");
   return body + bonus(e, "armour") + bonus(e, "av") + (e.naturalAv || 0);
 }

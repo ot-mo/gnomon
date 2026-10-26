@@ -9,6 +9,7 @@ import { EYE, HEIGHT, RADIUS, moveAxis, attackTime, armourValue, bonus, weaponRe
 import { gainXp } from "./leveling.js";
 import { sfx } from "./sfx.js";
 import { attr, maxHp } from "./stats.js";
+import { wielded } from "./body.js";
 import { addStatus, removeStatus, capStatus, hasStatus, statusFlag, tickStatuses, cooldownLeft, startCooldown, setStatusHarm, STATUS_DEFS } from "./status.js";
 import { RULES } from "./rules.js";
 
@@ -715,7 +716,7 @@ export function playerAttack(game) {
   p.swingTime = p.attackCd * 0.78;   // the animation fills most of the time between swings
   p.swing = p.swingTime;
   const reach = weaponReach(p);
-  sfx("swing", { heavy: WEAPONS[p.weapon.id].swing >= 0.6 });
+  sfx("swing", { heavy: WEAPONS[wielded(p).id].swing >= 0.6 });
   const cp = Math.cos(p.pitch);
   const fx = cp * Math.cos(p.yaw), fy = cp * Math.sin(p.yaw), fz = Math.sin(p.pitch);
   const ex = p.x, ey = p.y, ez = p.z + EYE;
@@ -744,7 +745,7 @@ const soak = (m, dmg, pierce = false) => Math.max(1, dmg - (pierce ? 0 : m.armou
 //   holy – double damage against the undead
 export function attackMonster(game, m) {
   const t = MONSTER_TYPES[m.type];
-  const p = game.player, weapon = p.weapon, w = WEAPONS[weapon.id];
+  const p = game.player, weapon = wielded(p), w = WEAPONS[weapon.id];
   if (!touchable(game, m, true)) {   // on the map, bumping into something that isn't in the plane
     game.log(m.risen ? `Your blow passes under the ${m.name}: she has risen out of the plane! Turn the world (Tab) to strike her.`
                      : t.ghostly ? `Your blow passes through empty air. Something cold is here, but your torchlight hides it.`

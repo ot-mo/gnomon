@@ -312,7 +312,7 @@ registerItemKind("armour", gear({
   slot: () => "body", req: strReq,
   glyph: (game, it) => ["[", it.relic ? RELIC_COLOR : [175, 180, 195]],
   info: (game, it) => `armour ${ARMOURS[it.id].armour}${extrasInfo(it)} · needs ${strNeeded(it)} STR`,
-  // Its armour value is read by stats.js av() from the piece on the body part, not as a bonus.
+  av: (it) => ARMOURS[it.id].armour + it.ench,   // stats.js av() adds up what's worn (not a bonus)
   art: FLOOR_ART.armour,
   palette(game, it) {
     if (it.relic) return { d: [[150, 120, 50], 0.4], D: [RELIC_COLOR, 0.7] };

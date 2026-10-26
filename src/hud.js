@@ -6,6 +6,7 @@ import { WEAPONS, WEAPON_PALETTE, ELEMENTS, itemName, itemGlyph } from "./items.
 import { readyStack } from "./throwing.js";
 import { PERKS, xpToNext, perkLabel } from "./leveling.js";
 import { attr, maxHp } from "./stats.js";
+import { wielded } from "./body.js";
 import { statusLine } from "./status.js";
 
 export function drawHud(game) {
@@ -189,8 +190,8 @@ function thrustPose(s) {
 }
 
 function drawSword(game) {
-  const p = game.player, zone = game.zone;
-  const weapon = WEAPONS[p.weapon.id];
+  const p = game.player, zone = game.zone, inHand = wielded(p);
+  const weapon = WEAPONS[inHand.id];
   const held = weapon.held;
   // Lit like the world: your torch, or whatever light is around you.
   const lamp = sampleLight(zone, zone.lampLight, p.x, p.y, p.z + 1.2);
@@ -199,8 +200,8 @@ function drawSword(game) {
   const pose = weapon.thrust ? thrustPose : swingPose;
   const [t0, t1] = weapon.thrust ? [0.25, 0.6] : [0.2, 0.75];   // when the motion trail shows
   // An element makes the metal glow its colour (flickering, for fire and storm) and colours the trail.
-  const el = p.weapon.element && ELEMENTS[p.weapon.element];
-  const glow = el && { color: el.color, flicker: p.weapon.element === "fire" || p.weapon.element === "shock" ? 0.75 + 0.25 * Math.sin(game.time * 23) : 1 };
+  const el = inHand.element && ELEMENTS[inHand.element];
+  const glow = el && { color: el.color, flicker: inHand.element === "fire" || inHand.element === "shock" ? 0.75 + 0.25 * Math.sin(game.time * 23) : 1 };
 
   if (p.swing > 0) {
     const s = 1 - p.swing / p.swingTime;

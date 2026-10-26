@@ -16,6 +16,7 @@ import { randomPotion, randomScroll, randomEquipment, randomJewel, addToInventor
          RINGS, AMULETS, POTIONS, POTION_COLORS } from "./items.js";
 import { revealFloor, liftCurses } from "./effects.js";
 import { regear, worn } from "./player.js";
+import { wielded, carried } from "./body.js";
 import { sfx } from "./sfx.js";
 import { maxHp, raiseAttr, raiseMaxHp } from "./stats.js";
 import { addStatus, removeStatus } from "./status.js";
@@ -194,13 +195,13 @@ function bless(game, bold) {
   const plain = [
     () => { raiseMaxHp(p, 3); p.hp += 3; return "Warmth settles into your bones. (+3 max HP)"; },
     () => { p.hp = maxHp(p); removeStatus(game, p, "poisoned"); return "Every hurt you carry fades away. (Healed fully.)"; },
-    () => { regear(p, p.weapon, (w) => { w.ench = Math.min(5, w.ench + 1); w.known = true; }); return `Light runs along your weapon. It's now a ${itemName(game, p.weapon)}.`; },
+    () => { regear(p, wielded(p), (w) => { w.ench = Math.min(5, w.ench + 1); w.known = true; }); return `Light runs along your weapon. It's now a ${itemName(game, wielded(p))}.`; },
     () => (liftCurses(p) ? "Something heavy lets go of you. (Every curse lifted.)" : null),
     () => { revealFloor(game); return "You see this whole floor laid out flat in your mind. (Your map is filled in.)"; },
     () => { addStatus(game, p, "hasted", { t: 60, stack: "refresh" }); return "Time slows around you. (Haste, for a minute.)"; },
     () => {
       let n = 0;
-      for (const it of [...worn(p), p.sidearm, ...p.inv].filter(Boolean)) {
+      for (const it of carried(p)) {
         if (isGear(it) && !it.known) { it.known = true; n++; }
         if (it.kind === "potion" && !game.knownPotions.has(it.effect)) { game.knownPotions.add(it.effect); n++; }
         if (it.kind === "scroll" && !game.knownScrolls.has(it.effect)) { game.knownScrolls.add(it.effect); n++; }
@@ -386,7 +387,7 @@ export function talkTo(game, n) {
           p.inv.splice(p.inv.indexOf(skull), 1);
           s.done = true;
           liftCurses(p);
-          regear(p, p.weapon, (w) => { w.ench = Math.min(5, w.ench + 1); w.known = true; });
+          regear(p, wielded(p), (w) => { w.ench = Math.min(5, w.ench + 1); w.known = true; });
           finishQuest(game, "brann", "Bones for Brann");
           game.log("A cold hand touches your weapon. Every curse you carry lifts, and your weapon grows sharper (+1).", [150, 230, 255]);
           return node("Now I can rest. Take what's left of my blessing. It was never much use to me down here.", [bye("Rest well, Brann.")]);

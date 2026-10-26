@@ -10,7 +10,8 @@ import { WEAPONS, ARMOURS, ELEMENTS, ITEM_KINDS, itemName, itemInfo, itemGlyph, 
 import { drinkPotion, readScroll } from "./effects.js";
 import { RULES } from "./rules.js";
 import { armourValue, bonus, weaponReach } from "./player.js";
-import { attr, maxHp, invalidateStats, clampHp } from "./stats.js";
+import { attr, maxHp } from "./stats.js";
+import { defaultPart, canEquip, equip as bodyEquip, swapBelt, wielded, wornOn, belt } from "./body.js";
 
 // What using things from the pack does (the kinds in content name these actions).
 registerItemAction("drink", (game, e, it) => { takeOne(e, it); drinkPotion(game, it.effect); return RULES.body.drinkTime; });
@@ -69,40 +70,37 @@ export function useSelected(game) {
   return t;
 }
 
-// Put on (or take in hand) a piece of gear from the inventory. A new weapon goes into your hand
-// and the one you held moves to your belt (the sidearm, swapped in with R); whatever was on
-// your belt goes back in your pack. Returns true if it worked.
+// Put on (or take in hand) a piece of gear from the inventory, on the part the body picks for it
+// (body.js defaultPart). A new weapon goes into your hand and the one you held moves to your belt
+// (swapped in with R); whatever was on your belt goes back in your pack. Returns true if it worked.
 export function equip(game, it, index) {
   const p = game.player;
-  if (it.kind === "weapon" || it.kind === "armour") {
-    const need = strNeeded(it);
-    if (attr(p, "str") < need) {
-      game.log(`You're not strong enough for the ${itemName(game, it)} (needs ${need} STR, you have ${attr(p, "str")}).`, [255, 150, 120]);
-      return false;
-    }
-  }
-  const slot = it.kind;   // "weapon", "armour", "ring" or "amulet"
-  const old = p[slot];
-  if (old && old.ench < 0) {
-    game.log(`Your cursed ${itemName(game, old)} won't come off! A scroll of remove curse would help.`, [200, 80, 120]);
+  const part = defaultPart(p, it);
+  const check = canEquip(game, p, it, part);
+  if (!check.ok) {
+    if (check.reason === "weak") game.log(`You're not strong enough for the ${itemName(game, it)} (needs ${check.need} STR, you have ${attr(p, "str")}).`, [255, 150, 120]);
+    else if (check.reason === "cursed") game.log(`Your cursed ${itemName(game, check.item)} won't come off! A scroll of remove curse would help.`, [200, 80, 120]);
+    else game.log(`You have nowhere to put the ${itemName(game, it)}.`, [170, 170, 170]);
     return false;
   }
   p.inv.splice(index, 1);
-  p[slot] = it;
-  invalidateStats(p);   // STR, max HP and armour follow your gear (stats.js)
-  clampHp(p);
-  if (slot === "weapon") {
-    if (p.sidearm) p.inv.push(p.sidearm);
-    p.sidearm = old;
-  } else if (old && !(slot === "armour" && old.id === "clothes")) p.inv.push(old);   // plain clothes just get left behind
+  const { removed } = bodyEquip(game, p, it, part);   // STR, max HP and armour follow (stats.js)
+  const holds = p.body.parts.find((q) => q.id === part).holds;
+  const old = removed[0] || null;
+  for (const r of removed) {
+    if (holds && r === old) {
+      if (p.body.belt) p.inv.push(p.body.belt);
+      p.body.belt = old;
+    } else if (!(r.kind === "armour" && r.id === "clothes")) p.inv.push(r);   // plain clothes just get left behind
+  }
   // Wearing it shows what it really is.
   const wasKnown = it.known;
   it.known = true;
-  const verb = slot === "weapon" ? "wield" : "put on";
+  const verb = holds ? "wield" : "put on";
   if (!wasKnown && it.ench < 0) game.log(`You ${verb} the ${itemName(game, it)}. A chill runs through you: it's cursed, and it won't let go!`, [200, 80, 120]);
   else if (!wasKnown && it.ench > 0 && !it.relic) game.log(`You ${verb} the ${itemName(game, it)}. It hums with a blessing.`, [255, 245, 200]);
   else game.log(`You ${verb} the ${itemName(game, it)}.`, [220, 220, 220]);
-  if (slot === "weapon" && old) game.log(`Your ${itemName(game, old)} goes on your belt. (R: swap weapons)`, [170, 170, 170]);
+  if (holds && old) game.log(`Your ${itemName(game, old)} goes on your belt. (R: swap weapons)`, [170, 170, 170]);
   game.invSel = Math.min(game.invSel, Math.max(0, p.inv.length - 1));
   return true;
 }
@@ -110,18 +108,20 @@ export function equip(game, it, index) {
 // R: swap the weapon in your hand with the one on your belt. Returns the time it took (0 if not).
 export function swapWeapons(game) {
   const p = game.player;
-  if (!p.sidearm) { game.log("You have no second weapon on your belt. (Wield another weapon and the old one goes there.)", [170, 170, 170]); return 0; }
-  if (p.weapon.ench < 0) { game.log(`Your cursed ${itemName(game, p.weapon)} won't leave your hand!`, [200, 80, 120]); return 0; }
-  if (attr(p, "str") < strNeeded(p.sidearm)) { game.log(`You're not strong enough for the ${itemName(game, p.sidearm)}.`, [255, 150, 120]); return 0; }
-  [p.weapon, p.sidearm] = [p.sidearm, p.weapon];
-  invalidateStats(p);
-  clampHp(p);
-  const fresh = !p.weapon.known;
-  p.weapon.known = true;
-  const bad = fresh && p.weapon.ench < 0;
-  game.log(`You draw the ${itemName(game, p.weapon)}.${bad ? " It's cursed, and it won't let go!" : ""}`, bad ? [200, 80, 120] : [220, 220, 220]);
-  p.attackCd = Math.max(p.attackCd, 0.4);
-  return 0.4;
+  const r = swapBelt(game, p);
+  if (!r.ok) {
+    if (r.reason === "empty") game.log("You have no second weapon on your belt. (Wield another weapon and the old one goes there.)", [170, 170, 170]);
+    else if (r.reason === "cursed") game.log(`Your cursed ${itemName(game, r.item)} won't leave your hand!`, [200, 80, 120]);
+    else if (r.reason === "weak") game.log(`You're not strong enough for the ${itemName(game, belt(p))}.`, [255, 150, 120]);
+    return 0;
+  }
+  const w = wielded(p);
+  const fresh = !w.known;
+  w.known = true;
+  const bad = fresh && w.ench < 0;
+  game.log(`You draw the ${itemName(game, w)}.${bad ? " It's cursed, and it won't let go!" : ""}`, bad ? [200, 80, 120] : [220, 220, 220]);
+  p.attackCd = Math.max(p.attackCd, r.time);
+  return r.time;
 }
 
 function dropSelected(game) {
@@ -152,7 +152,8 @@ export function drawInventory(game) {
   S.text(x0 + 2, y0 + 1, "INVENTORY", 255, 230, 140);
   S.text(x0 + w - header.length - 2, y0 + 1, header, 170, 170, 170);
 
-  const wpn = WEAPONS[p.weapon.id], arm = ARMOURS[p.armour.id];
+  const weapon = wielded(p), armour = wornOn(p, "body"), ring = wornOn(p, "finger_r"), amulet = wornOn(p, "neck"), sidearm = belt(p);
+  const wpn = WEAPONS[weapon.id], arm = armour ? ARMOURS[armour.id] : { armour: 0 };
   const curse = (it) => (it.ench < 0 ? "  CURSED" : "");
   const nameColor = (it) => (it.ench < 0 ? [255, 110, 100] : it.relic ? RELIC_COLOR : [230, 230, 240]);
   const slotLine = (y, label, it, detail) => {
@@ -163,13 +164,13 @@ export function drawInventory(game) {
     const dx = Math.max(36, 12 + name.length + 2);
     S.text(x0 + dx, y, detail.slice(0, Math.max(0, w - dx - 2)), 150, 150, 160);
   };
-  const el = p.weapon.element ? ` · ${ELEMENTS[p.weapon.element].info}` : "";
+  const el = weapon.element ? ` · ${ELEMENTS[weapon.element].info}` : "";
   const maxDmg = bonus(p, "maxDmg");
-  slotLine(y0 + 3, "Wielding", p.weapon, `${wpn.dmg[0] + p.weapon.ench}-${wpn.dmg[1] + p.weapon.ench + maxDmg} dmg · ${wpn.swing}s · reach ${weaponReach(p).toFixed(1)}${el}`);
-  slotLine(y0 + 4, "Belt", p.sidearm, p.sidearm ? "R: swap" : "");
-  slotLine(y0 + 5, "Wearing", p.armour, `armour ${arm.armour + p.armour.ench}`);
-  slotLine(y0 + 6, "Ring", p.ring, p.ring ? itemInfo(game, p.ring) : "");
-  slotLine(y0 + 7, "Amulet", p.amulet, p.amulet ? itemInfo(game, p.amulet) : "");
+  slotLine(y0 + 3, "Wielding", weapon, `${wpn.dmg[0] + weapon.ench}-${wpn.dmg[1] + weapon.ench + maxDmg} dmg · ${wpn.swing}s · reach ${weaponReach(p).toFixed(1)}${el}`);
+  slotLine(y0 + 4, "Belt", sidearm, sidearm ? "R: swap" : "");
+  slotLine(y0 + 5, "Wearing", armour, armour ? `armour ${arm.armour + armour.ench}` : "");
+  slotLine(y0 + 6, "Ring", ring, ring ? itemInfo(game, ring) : "");
+  slotLine(y0 + 7, "Amulet", amulet, amulet ? itemInfo(game, amulet) : "");
   line(y0 + 8);
 
   layout.x0 = x0; layout.w = w; layout.listY = y0 + TOP;

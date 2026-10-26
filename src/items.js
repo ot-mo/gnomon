@@ -6,7 +6,7 @@
 //                                   price(it), weight(it), art, palette(game, it), stands?,
 //                                   use?: (game, e, it) → s | the name of an item action,
 //                                   throwable?, onImpact?, onPickup?(game, e, it) → consumed, sound?, bonuses?(it),
-//                                   aura?(game, it), abilities?(it), examine? }
+//                                   aura?(game, it), av?(it) (worn armour value), abilities?(it), examine? }
 //   registerItemAction(name, fn)    fn(game, e, it) → seconds: a use shared by kinds ("drink", "read", "wear"),
 //                                   so content can name it without importing the modules that do it
 //   useItem(game, e, it) → seconds  0 if it has no use
