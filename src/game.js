@@ -148,7 +148,7 @@ export const randomSeed = () => 1 + Math.floor(Math.random() * 999999);
 //   game.quests     = state.quests                     story/quests.js
 //   game.knownPotions, game.knownScrolls, game.auraKnown   over state.ident.known.potion / .scroll, state.ident.aura
 //   game.hints      over state.hints                   tips already shown (game.hint)
-//   game.relicsFound over state.relics                  relics already found (or dropped): each turns up once
+//   game.relicsFound over state.relicsFound             relics already found (or dropped): each turns up once (§2.17)
 //   state.merchants.crystalsBought                     crystals bought from Pell (each makes the next dearer)
 export function attachState(game, state) {
   const t = Number(state.time) || 0;
@@ -158,7 +158,7 @@ export function attachState(game, state) {
   state.story ||= { cube: false };
   state.quests ||= [];
   state.hints ||= {};
-  state.relics ||= {};
+  state.relicsFound ||= {};
   state.merchants ||= {};
   game.state = state;
   game.story = state.story;
@@ -167,7 +167,7 @@ export function attachState(game, state) {
   game.knownScrolls = keySet(state.ident.known.scroll);
   game.auraKnown = keySet(state.ident.aura);
   game.hints = keySet(state.hints);
-  game.relicsFound = keySet(state.relics);
+  game.relicsFound = keySet(state.relicsFound);
   game.time = t;
   game.clockSeen = t;   // clock.js: its events have fired up to here
   return state;

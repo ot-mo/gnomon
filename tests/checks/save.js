@@ -133,6 +133,8 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
   if (typeof slotRec.blocks !== "undefined") fail("the slot record carries blocks");
   for (const k of ["id", "game", "version", "genVersion", "worldVersion", "created", "updated", "mode", "seed", "character", "where", "time", "state",
                    "player", "ids", "run", "zones", "unclean"]) if (!(k in slotRec)) fail(`the slot record has no ${k} (§7.2)`);
+  for (const k of ["seed", "time", "uids", "zonePatches", "zoneLeft", "quests", "hints", "relicsFound", "merchants"])
+    if (!(k in slotRec.state)) fail(`the saved state has no ${k} (§2.17)`);
   if (zoneRecs.some((r) => typeof r.blocks !== "string")) fail("a zone's blocks weren't deflated (Node 20.11 has CompressionStream)");
   // In this process, after another run has replaced everything.
   startRun(4321);
