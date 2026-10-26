@@ -30,6 +30,10 @@ const keyOf = (addr) => (typeof addr === "string" ? addr : addr.key || zoneKey(a
 
 // (game, { wx, wy, z, key }) → a new, unsealed Zone, or null if nothing is there.
 export const ZONE_GENERATORS = { surface: null, dungeon: null };
+// The same work in stages (0D1): (game, addr) → an iterator; each next() does one stage and the last
+// returns { done: true, value: Zone | null }, the zone ZONE_GENERATORS would make. 3D prefetch runs one
+// stage per frame (prefetchNeighbours); a kind without one is made whole.
+export const ZONE_STAGED = { surface: null, dungeon: null };
 // (run, zone, side, neighbour | null) → the band for zone.apron[side] (world.js; gen/surface.js
 // buildApronBand, registered by world/zonegen.js).
 export const APRON_BUILDERS = { surface: null };
@@ -62,9 +66,20 @@ export function cachedZone(game, key) { return game.zones?.get(keyOf(key)) || nu
 export function makeZone(game, addr) {
   const key = keyOf(addr);
   const { wx, wy, z } = parseKey(key);
+  // A staged prefetch of this zone under way (you got to the edge first): finish it now.
+  const job = game.prefetchJob;
+  if (job && job.key === key) {
+    game.prefetchJob = null;
+    if (job.run === game.run) { let r; do r = job.it.next(); while (!r.done); return r.value ? adoptZone(game, r.value, key) : null; }
+  }
   const gen = ZONE_GENERATORS[z === 0 ? "surface" : "dungeon"];
   const zone = gen ? gen(game, { wx, wy, z, key }) : null;
-  if (!zone) return null;
+  return zone ? adoptZone(game, zone, key) : null;
+}
+
+// A newly made zone joins game.zones: sealed, and the band of your apron it borders rebuilt from it.
+function adoptZone(game, zone, key) {
+  const { wx, wy, z } = parseKey(key);
   zone.seal();
   (game.zones ||= new Map()).set(key, zone);
   // A neighbour of the zone you are in has just arrived in memory: its band of your apron becomes a copy.
@@ -74,6 +89,23 @@ export function makeZone(game, addr) {
     if (side && cur.apron[side]) fillApron(game, cur, [side]);
   }
   return zone;
+}
+
+// One stage of a staged make: starts game.prefetchJob for `key` if none, runs one stage, and adopts the
+// zone when the last one is done. → the zone once made, else null.
+function stepZone(game, key) {
+  let job = game.prefetchJob;
+  if (job && (job.run !== game.run || cachedZone(game, job.key))) job = game.prefetchJob = null;   // a new run, or made meanwhile
+  if (!job) {
+    const { wx, wy, z } = parseKey(key), staged = ZONE_STAGED[z === 0 ? "surface" : "dungeon"];
+    if (!staged) return makeZone(game, key);
+    job = game.prefetchJob = { key, run: game.run, it: staged(game, { wx, wy, z, key }), stages: 0 };
+  }
+  const r = job.it.next();
+  job.stages++;
+  if (!r.done) return null;
+  game.prefetchJob = null;
+  return r.value ? adoptZone(game, r.value, job.key) : null;
 }
 
 // Memory first, then storage (WS9), then generation.
@@ -235,12 +267,18 @@ export function tryWalkOff(game, side, along, opts = {}) {
 
 // Make the neighbours you may walk into next before you reach them, so the swap at the edge happens in
 // the same frame and the apron shows their real ground. On the map (time stands still between actions)
-// every missing open neighbour at once; in 3D only sides within ZONE_RULES.prefetchNear tiles, at most
-// one zone per frame. Registered as an update below.
+// every missing open neighbour at once; in 3D only sides within ZONE_RULES.prefetchNear tiles, one zone at
+// a time and one stage of it per frame (ZONE_STAGED: 0D1 measured 12-38 ms for a whole surface zone in
+// headless Chromium; 0-8.5 ms per stage). Never in the frame that swapped zones (0D1: arriving beside
+// another edge made that neighbour in the swap's own frame, 70-220 ms in headless Chromium): the first call after a swap only
+// notes the new zone (game.prefetchSeen), and making starts on the next frame. Registered as an update below.
 export function prefetchNeighbours(game) {
   const zone = game.zone;
   if (!zone || zone.type !== "surface" || !game.run || game.zoneLoading) return 0;
+  if (game.prefetchSeen !== zone) { game.prefetchSeen = zone; return 0; }
   const p = game.player, near = ZONE_RULES.prefetchNear, map = game.mode === "map";
+  if (!map && game.prefetchJob && game.prefetchJob.run === game.run && !cachedZone(game, game.prefetchJob.key))
+    return stepZone(game, game.prefetchJob.key) ? 1 : 0;   // the zone under way first
   let made = 0;
   for (const side of ["n", "e", "s", "w"]) {
     const addr = neighbourAddr(game, zone, side);
@@ -248,8 +286,9 @@ export function prefetchNeighbours(game) {
     const gap = side === "n" ? p.y : side === "s" ? zone.d - p.y : side === "w" ? p.x : zone.w - p.x;
     if (!map && gap > near) continue;
     if (ZONE_LOADER.load) continue;   // WS9: read stored neighbours asynchronously instead
-    if (makeZone(game, addr.key)) made++;
-    if (!map) break;
+    if (map) { if (makeZone(game, addr.key)) made++; continue; }
+    if (stepZone(game, addr.key)) made++;
+    break;
   }
   return made;
 }

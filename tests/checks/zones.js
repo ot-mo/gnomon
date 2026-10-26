@@ -6,7 +6,9 @@
 // game/startRun: the real game (game.js), so zone changes run exactly as in play.
 import { Zone, B, FLOOR_Z, BLOCKS, standWith, solidFor } from "../../src/world.js";
 import { changeZone, enterZone, arrivalPoint, addZonePatch, claimUid, uidWhere, killUid, zoneBelow, zoneAbove,
-         cachedZone, PATCH_OPS, parseKey, zoneKey, tryWalkOff, EDGE_RULES } from "../../src/zones.js";
+         cachedZone, PATCH_OPS, parseKey, zoneKey, tryWalkOff, EDGE_RULES, prefetchNeighbours, makeZone } from "../../src/zones.js";
+import { generateSurface, surfaceSteps } from "../../src/gen/surface.js";
+import { hashBytes } from "../lib/hash.js";
 import { on, emit, registerUpdate, unregisterUpdate, runUpdates } from "../../src/events.js";
 import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../../src/pathing.js";
 import { generateDungeonLevel, legacyParams } from "../../src/gen/dungeon.js";
@@ -273,6 +275,60 @@ export function checkZones({ game, startRun }) {
   offFall();
   stats.zones = { visited: game.zones.size, events: log.length };
   for (const off of offs) off();
+  // --- Staged prefetch (0D1): one stage per 3D frame, never in the swap's frame, the same zone ---------
+  {
+    const same = (a, b) => !!a && !!b && hashBytes(a.blocks) === hashBytes(b.blocks) && JSON.stringify(a.spawn) === JSON.stringify(b.spawn) &&
+                           a.attempts === b.attempts && JSON.stringify(a.gen.keyPoints) === JSON.stringify(b.gen.keyPoints);
+    const stages = [];
+    for (const seed of [1234, 7, 31]) {
+      startRun(seed);
+      for (const key of ["0,0,0", "1,0,0", "0,1,0", "1,1,0", "20,8,0"]) {
+        const { wx, wy } = parseKey(key), whole = generateSurface(game.run, wx, wy);
+        if (!whole) continue;
+        const it = surfaceSteps(game.run, wx, wy);
+        let r, n = 0;
+        do { r = it.next(); n++; } while (!r.done);
+        stages.push(n);
+        expect(same(whole, r.value), `seed ${seed} ${key}: the staged surface differs from generateSurface`);
+      }
+    }
+    expect(stages.length >= 9 && Math.min(...stages) >= 8, `surfaceSteps ran in ${stages} stages (want ≥ 8 each)`);
+    // In 3D near the east edge: nothing in the arrival frame, then one stage per call until it is made.
+    const near3d = (seed) => {
+      startRun(seed);
+      game.mode = "explore"; game.view = "3d";
+      const z0 = game.zone, p = game.player;
+      p.x = z0.w - 2.5; p.y = z0.d / 2;
+      return z0;
+    };
+    near3d(31);
+    const calls = [];
+    for (let k = 0; k < 40 && !cachedZone(game, "1,0,0"); k++) calls.push(prefetchNeighbours(game));
+    const staged = cachedZone(game, "1,0,0");
+    expect(calls[0] === 0 && !game.prefetchJob?.stages && calls.length >= 9 && calls[calls.length - 1] === 1,
+           `3D prefetch: ${calls.length} calls ${calls.join("")} (want 0 in the arrival frame, then ≥ 8 stages, one zone)`);
+    expect(same(staged, generateSurface(game.run, 1, 0)) && staged.sealed, "3D prefetch made a different zone (or didn't seal it)");
+    // Reaching the edge mid-job finishes it: the same zone, made once.
+    near3d(31);
+    prefetchNeighbours(game); prefetchNeighbours(game); prefetchNeighbours(game);
+    const mid = game.prefetchJob?.stages;
+    const made = makeZone(game, "1,0,0");
+    expect(mid >= 2 && !game.prefetchJob && cachedZone(game, "1,0,0") === made && same(made, staged), `makeZone mid-prefetch (after ${mid} stages) didn't finish the staged zone`);
+    // A job left over from another run is dropped, never adopted.
+    near3d(31);
+    prefetchNeighbours(game); prefetchNeighbours(game);
+    const old = game.prefetchJob;
+    near3d(7);
+    for (let k = 0; k < 40 && !cachedZone(game, "1,0,0"); k++) prefetchNeighbours(game);
+    expect(old && old.run !== game.run && same(cachedZone(game, "1,0,0"), generateSurface(game.run, 1, 0)), "a prefetch job from the last run leaked into this one");
+    // On the map: still every open neighbour in one frame (after the arrival frame).
+    startRun(31);
+    game.mode = "map";
+    const m0 = prefetchNeighbours(game), m1 = prefetchNeighbours(game);
+    expect(m0 === 0 && m1 >= 2, `map prefetch: ${m0} then ${m1} zones (want 0, then every open neighbour)`);
+    stats.prefetch = { stages: `${Math.min(...stages)}-${Math.max(...stages)}`, calls3d: calls.length, mapAtOnce: m1 };
+  }
+
   // The real world: the legacy stack is the Keeper's Stair under Hollowmere (5, 16), not at (0, 0).
   startRun(42, REAL_WORLD);
   expect(game.zone?.key === "5,16,0" && game.zone.hasBelow && changeZone(game, "5,16,1", { how: "down" }) === true &&

@@ -7,6 +7,9 @@
 //     W.portsOf(wx, wy) → [port]        where roads and rivers cross the span's open edges
 //   heightAt(world, seed, gx, gy), treeAt(world, seed, cx, cy), portsOf(world, seed, wx, wy)   the same, uncached
 //   generateSurface(run, wx, wy) → Zone the span's surface zone (unsealed), validated, up to 10 attempts
+//   surfaceSteps(run, wx, wy) → iterator   the same work in stages (0D1): each next() does one stage
+//                                       (a few ms) and the last returns { done: true, value: Zone }, so
+//                                       3D prefetch can spread a zone over frames; same zone, same bits
 //   validateSurface(zone) → string[]    the §5.3 item 9 rules the stub can break (empty: fine)
 //   dungeonRectFor(entrance) → rect     where the dungeon's 48×48 levels sit under the surface (§5.5)
 //   buildApronBand(run, zone, side, neighbour) → band   one apron band (world.js), registered as
@@ -235,16 +238,25 @@ function sitesOf(run, wx, wy) {
 }
 
 export function generateSurface(run, wx, wy) {
+  const it = surfaceSteps(run, wx, wy);
+  for (;;) { const r = it.next(); if (r.done) return r.value; }
+}
+
+// The stages: the world layer, then buildSurface's (yields between its numbered steps), then validation.
+export function* surfaceSteps(run, wx, wy) {
   const world = run.world, tile = world.tileAt(wx, wy);
   if (!tile) return null;
   const W = worldFns(world, run.seed), seed = zoneSeed(run, wx, wy, 0);
   const base = worldLayer(W, wx, wy);
+  yield "layer";
   let zone = null, problems = [];
   for (let attempt = 0; attempt < R.attempts; attempt++) {
-    zone = buildSurface(run, W, base, wx, wy, seed, makeRng(seedFor(seed, "surface", attempt)));
+    zone = yield* buildSurface(run, W, base, wx, wy, seed, makeRng(seedFor(seed, "surface", attempt)));
+    yield "built";
     zone.attempts = attempt + 1;
     problems = validateSurface(zone);
     if (!problems.length) break;
+    yield "retry";
   }
   zone.problems = problems;   // empty unless every attempt failed (check-landmarks reports it)
   return zone;
@@ -269,7 +281,7 @@ function worldLayer(W, wx, wy) {
   return { H, cliff, water, ground, trees, ports: W.portsOf(wx, wy) };
 }
 
-function buildSurface(run, W, base, wx, wy, seed, rng) {
+function* buildSurface(run, W, base, wx, wy, seed, rng) {
   const world = run.world, tile = world.tileAt(wx, wy), n = ZW * ZD;
   const sites = sitesOf(run, wx, wy), site = sites[0] || null;
   const L = tile.landmark ? world.landmarks.get(tile.landmark) : null;
@@ -410,6 +422,8 @@ function buildSurface(run, W, base, wx, wy, seed, rng) {
     }
   }
 
+  yield "roads";
+
   // 5. The ground, column by column (a plan writes its own columns later).
   for (let y = 0; y < ZD; y++)
     for (let x = 0; x < ZW; x++) {
@@ -432,6 +446,8 @@ function buildSurface(run, W, base, wx, wy, seed, rng) {
     if (inside && (road[ti] || water[ti] || reserved[ti] || plan[ti] || (t.x === hub.x && t.y === hub.y))) continue;
     buildTree(zone, inside ? { ...t, base: FLOOR_Z + H[ti] } : t, scenery);   // (banks may have lowered an inner one's ground)
   }
+
+  yield "trees";
 
   // 7. The landmark's plan, or the site (its builder, else the stub: an entrance if a dungeon lies below).
   const keyPoints = [];
@@ -460,6 +476,8 @@ function buildSurface(run, W, base, wx, wy, seed, rng) {
     zone.computeKinds();
   }
 
+  yield "plan";
+
   // 8. The dungeon below: where its levels sit, and sinkholes into it.
   if (site?.dungeon) {
     zone.hasBelow = true;
@@ -485,8 +503,11 @@ function buildSurface(run, W, base, wx, wy, seed, rng) {
     }
   }
 
+  yield "dungeon";
+
   // 9. The anchor: the plan's own, else the reachable ground nearest the hub that reaches the most.
   zone.refresh();
+  yield "refresh";
   zone.spawn = spawn || pickAnchor(zone, hub, scenery);
   zone.gen = { ports: base.ports.map((p) => ({ ...p, tiles: Array.from({ length: p.width }, (_, k) => portTile(p, k)) })),
                keyPoints, scenery, cliff: base.cliff, worldWater: base.water, plan, planAt, hub, entranceGated };

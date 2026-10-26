@@ -160,6 +160,8 @@ export function startRun(seed, world = game.world) {
   game.cam = null;
   game.pendingPages = null;
   game.toasts = [];
+  game.prefetchJob = null;   // zones.js: a staged prefetch under way, and the zone it last saw
+  game.prefetchSeen = null;
   game.modeStack = [];
   const start = game.run.world.start;
   changeZone(game, zoneKey(start.wx, start.wy, 0), { how: "start" });   // the test world's: the temple, over the legacy stack

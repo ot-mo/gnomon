@@ -2,7 +2,8 @@
 // Importing this module registers both ZONE_GENERATORS and the apron's builder (zones.js).
 //
 //   surface  "wx,wy,0": gen/surface.js generateSurface(game.run, wx, wy), for every span you can be in
-//            (a span whose edges are shut, the sea, has no zone)
+//            (a span whose edges are shut, the sea, has no zone); ZONE_STAGED.surface is the same in
+//            stages (surfaceSteps), for 3D prefetch
 //   dungeon  "wx,wy,z", z ≥ 1: the dungeon under the span's site. The legacy stack (the test world's
 //            temple, DECISIONS.md) is world/legacy.js legacyZone; any other site's level z is
 //            generateDungeonLevel(zoneSeed(run, wx, wy, z), dungeonParams(run, site, z)).
@@ -12,8 +13,8 @@
 //
 //   siteWithDungeon(run, wx, wy) → Site | null    the span's site that has a dungeon below it
 //   dungeonParams(run, site, z) → p               generateDungeonLevel's parameters for its level z
-import { ZONE_GENERATORS, APRON_BUILDERS } from "../zones.js";
-import { generateSurface, buildApronBand } from "../gen/surface.js";
+import { ZONE_GENERATORS, ZONE_STAGED, APRON_BUILDERS } from "../zones.js";
+import { generateSurface, surfaceSteps, buildApronBand } from "../gen/surface.js";
 import { generateDungeonLevel } from "../gen/dungeon.js";
 import { legacyZone } from "./legacy.js";
 import { zoneSeed } from "./run.js";
@@ -25,6 +26,12 @@ function surfaceZone(game, { wx, wy }) {
   const run = game.run, t = run?.world.tileAt(wx, wy);
   if (!t || (t.edges !== "open" && !t.landmark)) return null;
   return generateSurface(run, wx, wy);
+}
+// The same in stages (3D prefetch spreads it over frames, zones.js prefetchNeighbours).
+function* surfaceStaged(game, { wx, wy }) {
+  const run = game.run, t = run?.world.tileAt(wx, wy);
+  if (!t || (t.edges !== "open" && !t.landmark)) return null;
+  return yield* surfaceSteps(run, wx, wy);
 }
 
 function dungeonZone(game, { wx, wy, z }) {
@@ -40,5 +47,6 @@ function dungeonZone(game, { wx, wy, z }) {
 }
 
 ZONE_GENERATORS.surface = surfaceZone;
+ZONE_STAGED.surface = surfaceStaged;
 ZONE_GENERATORS.dungeon = dungeonZone;
 APRON_BUILDERS.surface = buildApronBand;
