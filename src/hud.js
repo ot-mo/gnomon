@@ -50,8 +50,7 @@ export function drawPause() {
     ["From inside you see height, depth, light and dark.", [130, 130, 130]],
     ["From above you see the whole floor, the floor's pictures, and the flat things.", [130, 130, 130]],
   ]);
-  hitLabel(at[6], "I inventory", { key: "KeyI" });
-  hitLabel(at[6], "J journal", { key: "KeyJ" });
+  for (const row of at.rows[6]) { hitLabel(row, "I inventory", { key: "KeyI" }); hitLabel(row, "J journal", { key: "KeyJ" }); }
   hitLabel(at[7], at[7].text, { key: "Tab" });
 }
 
@@ -402,17 +401,36 @@ function drawSpark(game) {
   S.put(cx, cy, "X", ...color);
 }
 
+// A line too long for the card goes onto more rows: at its " · " if it has them (a key-help line), else
+// at spaces. (At 180 columns every card's lines fit as they are.)
+function fitLine(t, width) {
+  if (t.length <= width) return [t];
+  if (!t.includes(" · ")) return wrap(t, width);
+  const out = [];
+  for (const part of t.split(" · ")) {
+    const last = out.length - 1;
+    if (last >= 0 && (out[last] + " · " + part).length <= width) out[last] += " · " + part;
+    else out.push(part);
+  }
+  return out;
+}
+
+// → at: for each line, where it went ({ x, y, text }; its first row); at.rows[k]: all its rows. For the
+// mouse (ui.hitLabel).
 function overlay(lines) {
   const w = Math.min(S.cols - 2, Math.max(...lines.map(([t]) => t.length)) + 6);
-  const h = lines.length + 4;
-  const x0 = (S.cols - w) >> 1, y0 = (S.rows - h) >> 1;
+  const fitted = lines.map(([t, c]) => [fitLine(t, w - 6), c]);
+  const h = fitted.reduce((n, [ts]) => n + ts.length, 0) + 4;
+  const x0 = (S.cols - w) >> 1, y0 = Math.max(0, (S.rows - h) >> 1);
   S.blank(x0, y0, w, h);
   for (let x = x0; x < x0 + w; x++) { S.put(x, y0, "-", 90, 90, 90); S.put(x, y0 + h - 1, "-", 90, 90, 90); }
-  const at = [];   // where each line went, for the mouse (ui.hitLabel)
-  lines.forEach(([t, c], k) => {
-    at.push({ x: x0 + ((w - t.length) >> 1), y: y0 + 2 + k, text: t });
-    if (!t) return;
-    S.text(x0 + ((w - t.length) >> 1), y0 + 2 + k, t, ...c);
-  });
+  const at = [];
+  at.rows = [];
+  let y = y0 + 2;
+  for (const [ts, c] of fitted) {
+    const rows = ts.map((t) => ({ x: x0 + ((w - t.length) >> 1), y: y++, text: t }));
+    at.push(rows[0]); at.rows.push(rows);
+    for (const r of rows) if (r.text) S.text(r.x, r.y, r.text, ...c);
+  }
   return at;
 }

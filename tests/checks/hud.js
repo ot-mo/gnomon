@@ -128,6 +128,26 @@ export function checkHud({ game, startRun, inputHandlers, hud, renderMap, events
             }
           }
         }
+    // The pause card at 100×30: its key-help line goes onto more rows inside the card, nothing cut off; at
+    // 180×56 it stays one row, as in the parent.
+    const help = "E use / talk · I inventory · J journal · T / right-click throw · Q quick-heal · R swap weapons · F torch · M music · N sounds";
+    for (const [cols, rows] of [[100, 30], [180, 56]]) {
+      resize(cols, rows);
+      fresh();
+      game.view = "3d"; game.mode = "explore"; game.modeStack = [];
+      inputHandlers.onLockChange(false);
+      S.clear(); game.debug.draw();
+      const screen = Array.from({ length: rows }, (_, y) => rowText(y));
+      const top = screen.findIndex((r) => /-{20,}/.test(r)), x0 = screen[top]?.indexOf("-"), x1 = screen[top]?.lastIndexOf("-");
+      if (game.mode !== "pause" || top < 0) { fail(`${cols}×${rows}: no pause card`); continue; }
+      for (const part of help.split(" · ")) {
+        const y = screen.findIndex((r) => r.includes(part));
+        const x = y >= 0 ? screen[y].indexOf(part) : -1;
+        if (y < 0 || x < x0 + 1 || x + part.length > x1) fail(`${cols}×${rows}: the pause card's "${part}" is cut off or outside the card`);
+      }
+      if (cols === 180 && !screen.some((r) => r.includes(help))) fail("180×56: the pause card's key help isn't one row any more");
+    }
+    resize(100, 30);
     if (inversions) fail(`100×30, ordinary states: ${inversions} priority inversion(s) in ${layouts} layouts, e.g. ${firstBad.join("; ")}`);
     stats.sweep = `${layouts} layouts at 100×30, ${inversions} inversions`;
   }
