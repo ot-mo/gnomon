@@ -19,7 +19,16 @@
 //      drawTextInput; keyHelp fits its width; hit-testing (the last rect drawn wins, beginFrame clears).
 //   4. The game draws, updates and routes the mouse, hover and wheel to a registered top screen.
 //      input-browser.js passes e.key.
-export function checkShell({ game, startRun, inputHandlers, screens, keys, ui, input, S, capture, srcFiles }) {
+//   5. The game's own screens (0D1): all 13 modes are registered, and each is reached (and left) through the
+//      game's real input handlers both by keys and by the mouse, at 100×30: the intro (Space, or clicks),
+//      the inventory and journal (I, J, Esc, or a click on their words in the map header, "I close", a click
+//      in the journal), the cube's turn and pages, the pause card (losing the pointer lock in 3D opens it,
+//      getting it back or a click closes it; I, J and Tab work from it and so do clicks on their words),
+//      Tab and Esc between the views and a click on "Tab: 3D", talk and the pack (keys; clicks on an answer,
+//      a tab, a row to select and again to buy, "Esc back", "Esc to leave"; M in the pack toggles nothing),
+//      levelup (1, or a click on a perk), the "DEPTH n" beat, and the death and victory cards (R, or a
+//      click on "Press R…").
+export function checkShell({ game, startRun, inputHandlers, screens, keys, ui, input, S, capture, srcFiles, creatures, encounters, makeRng }) {
   const problems = [], stats = {};
   const fail = (m) => problems.push(m);
   const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -258,6 +267,150 @@ export function checkShell({ game, startRun, inputHandlers, screens, keys, ui, i
     game.debug.draw();
     if (row(29).startsWith("TOP-SCREEN")) fail("a closed screen was still drawn");
     stats.routing = "draw (bottom-up), update, mouse, hover, wheel";
+  }
+
+  // --- 5. The game's own screens (0D1 port): every mode by keys and by the mouse ---------------------------
+  if (encounters && creatures) {
+    const modes = new Set(), byKey = new Set(), byMouse = new Set();
+    const stackOf = () => game.modeStack.map((e) => e.mode).join(">");
+    const seen = (via) => { modes.add(game.mode); via.add(game.mode); };
+    const press = (code, key = code) => { inputHandlers.onKeyDown(code, false, key); seen(byKey); };
+    const frame = () => { game.debug.draw(); };
+    // Click the first place `label` is on screen (node-env: pointer positions are cells).
+    const click = (label, button = 0) => {
+      frame();
+      for (let y = 0; y < capture.rows; y++) {
+        const x = capture.chars.slice(y * capture.cols, (y + 1) * capture.cols).join("").indexOf(label);
+        if (x >= 0) { inputHandlers.onMouseDown(button, x + 1, y); seen(byMouse); return true; }
+      }
+      fail(`"${label}" isn't on screen in ${game.mode}`);
+      return false;
+    };
+    const expect = (mode, what) => { if (game.mode !== mode) fail(`${what}: in ${game.mode} (stack ${stackOf()}), want ${mode}`); };
+    const steps = (n, dt = 1 / 30) => { for (let k = 0; k < n; k++) game.debug.step(dt); };
+
+    startRun(77);
+    expect("story", "a new run");
+    modes.add("story");
+    for (let k = 0; k < 8 && game.mode === "story"; k++) press("Space", " ");
+    expect("map", "Space through the intro");
+    startRun(77);
+    for (let k = 0; k < 8 && game.mode === "story"; k++) click("Space / click: continue");
+    expect("map", "clicking through the intro");
+    if (game.modeStack.length !== 1) fail(`after the intro the stack is ${stackOf()}`);
+
+    // The map: I, J; and their words in the header.
+    press("KeyI", "i"); expect("inventory", "I on the map");
+    press("Escape"); expect("map", "Esc in the inventory");
+    press("KeyJ", "j"); expect("journal", "J on the map");
+    press("KeyJ", "j"); expect("map", "J in the journal");
+    click("I: inventory"); expect("inventory", "clicking \"I: inventory\"");
+    click("I close"); expect("map", "clicking \"I close\"");
+    click("J: journal"); expect("journal", "clicking \"J: journal\"");
+    click("JOURNAL"); expect("map", "a click in the journal");
+
+    // The cube: rotate, its pages, then the 3D view paused under them.
+    game.onCube(); modes.add("rotate"); byKey.add("rotate"); byMouse.add("rotate");   // (touching the cube is a step or a click-to-travel)
+    expect("rotate", "touching the cube");
+    steps(150);
+    expect("story", "after the cube turns");
+    for (let k = 0; k < 8 && game.mode === "story"; k++) press("Enter");
+    expect("pause", "after the cube's pages");
+    if (stackOf() !== "explore>pause" || !game.paused) fail(`after the cube: stack ${stackOf()}, paused ${game.paused}`);
+    click("Click to play"); seen(byMouse);
+    expect("explore", "a click on the pause card");
+    if (game.paused) fail("still paused after the click");
+    // Losing the pointer lock in 3D opens pause; getting it back closes it.
+    inputHandlers.onLockChange(false); seen(byKey); seen(byMouse);   // (Esc, or the pointer leaving the window)
+    expect("pause", "losing the pointer lock in 3D");
+    inputHandlers.onLockChange(true);
+    expect("explore", "getting the lock back");
+    inputHandlers.onLockChange(false);
+    press("KeyI", "i"); expect("inventory", "I from the pause card");
+    press("KeyI", "i"); expect("explore", "I closing the inventory over 3D");
+    if (game.paused) fail("the inventory closed into a paused 3D view");
+    inputHandlers.onLockChange(false);
+    click("I inventory"); expect("inventory", "clicking \"I inventory\" on the pause card");
+    press("Escape"); expect("explore", "Esc in the inventory over 3D");
+    inputHandlers.onLockChange(false);
+    press("Tab"); expect("map", "Tab from the pause card");
+    click("Tab: 3D"); expect("explore", "clicking \"Tab: 3D\" on the map");
+    press("Tab"); expect("map", "Tab in 3D");
+    inputHandlers.onLockChange(false);   // (on the map that's nothing)
+    expect("map", "a lock change on the map");
+    press("Escape"); expect("explore", "Esc on the map");
+    inputHandlers.onLockChange(false);
+    click("Tab: rotate"); expect("map", "clicking the Tab line on the pause card");
+
+    // Talk and the pack: Pell, by keys, then by the mouse.
+    const p = game.player;
+    const pell = creatures.spawnCreature("pell", Math.floor(p.x), Math.floor(p.y), p.z, { level: 5, talk: { state: { stock: encounters.peddlerStock(makeRng(3), 5) } } });
+    game.onTalk(pell); seen(byKey);
+    expect("talk", "walking into Pell");
+    press("Space", " ");   // the rest of what he says
+    press("Digit1", "1"); expect("shop", "\"Show me your wares.\"");
+    if (stackOf() !== "map>talk>shop") fail(`the pack over talk: ${stackOf()}`);
+    const music0 = game.messages.filter((m) => /^Music/.test(m.text)).length;
+    press("KeyM", "m");
+    if (game.messages.filter((m) => /^Music/.test(m.text)).length !== music0) fail("M in the pack toggled the music");
+    press("Escape"); expect("talk", "Esc in the pack");
+    press("Escape"); expect("map", "Esc in talk");
+    game.onTalk(pell);
+    for (let k = 0; k < 600 && game.talk && game.talk.shown < game.talk.length; k++) game.debug.step(1 / 60);
+    click("Show me your wares."); expect("shop", "clicking \"Show me your wares.\"");
+    const sh = game.shop;
+    click("services"); if (sh.tab !== "services") fail(`clicking the services tab: ${sh.tab}`);
+    click("buy"); if (sh.tab !== "buy") fail(`clicking the buy tab: ${sh.tab}`);
+    const funds0 = p.funds;
+    p.funds = 5000;
+    const stock = sh.npc.talk.state.stock.filter((x) => x.count > 0), count1 = stock[1]?.count;
+    frame();
+    const rowY = capture.chars.findIndex((c, i) => c === ">" && i % capture.cols < capture.cols / 2) / capture.cols | 0;   // the selected row
+    inputHandlers.onMouseDown(0, capture.cols >> 1, rowY + 1); frame();   // the second row: select it
+    if (sh.sel !== 1) fail(`clicking the second row selected ${sh.sel}`);
+    inputHandlers.onMouseDown(0, capture.cols >> 1, rowY + 1); frame();   // again: buy it
+    if (stock[1] && stock[1].count !== count1 - 1) fail(`clicking the selected row didn't buy it (${count1} → ${stock[1].count})`);
+    p.funds = funds0;
+    click("Esc back"); expect("talk", "clicking \"Esc back\" in the pack");
+    click("Esc to leave"); expect("map", "clicking \"Esc to leave\"");
+
+    // A level gained: 1-4 or a click.
+    p.pendingLevels = 1; game.debug.step(1 / 60); seen(byKey); seen(byMouse);   // (XP from a fight: keys or the mouse)
+    expect("levelup", "a level gained on the map");
+    press("Digit1", "1"); expect("map", "1 on the levelup screen");
+    p.pendingLevels = 1; game.debug.step(1 / 60);
+    frame();
+    let row = -1;   // the first choice: its number, two spaces, its name
+    for (let y = 0; y < capture.rows && row < 0; y++) if (/^\s*-*\s*1  \S/.test(capture.chars.slice(y * capture.cols, (y + 1) * capture.cols).join("").replace(/^\s+/, " "))) row = y;
+    if (row >= 0) { const line = capture.chars.slice(row * capture.cols, (row + 1) * capture.cols).join(""); inputHandlers.onMouseDown(0, line.indexOf("1  ") + 4, row); seen(byMouse); }
+    expect("map", "a click on the first perk");
+    if (game.mode === "levelup") game.debug.choosePerk(0);
+
+    // Stairs: the "DEPTH n" beat, then back to the map.
+    game.debug.changeFloor("0,0,1", "down", "You descend the stairs..."); modes.add("transition"); byKey.add("transition"); byMouse.add("transition");
+    expect("transition", "taking the stairs");
+    steps(60);
+    expect("map", "after the beat");
+
+    // Death and a new run: R, or a click on its line.
+    game.hurtPlayer(99999, "a test"); seen(byKey);   // (a blow you walked into)
+    expect("dead", "a killing blow");
+    press("KeyR", "r"); expect("story", "R on the death card");
+    game.pages = null; game.mode = "map";
+    game.hurtPlayer(99999, "a test"); seen(byMouse);
+    click("Press R to start a new run"); expect("story", "clicking \"Press R…\" on the death card");
+    game.pages = null; game.mode = "map";
+    screens.setMode(game, "won"); seen(byKey); seen(byMouse);
+    click("Press R to start a new run"); expect("story", "clicking \"Press R…\" on the victory card");
+    game.pages = null; game.mode = "map";
+
+    const all = ["explore", "map", "rotate", "transition", "pause", "inventory", "levelup", "story", "talk", "shop", "journal", "dead", "won"];
+    const unreg = all.filter((m) => !screens.screenFor(m));
+    if (unreg.length) fail(`not registered screens: ${unreg.join(", ")}`);
+    const noKey = all.filter((m) => !byKey.has(m)), noMouse = all.filter((m) => !byMouse.has(m));
+    if (noKey.length) fail(`never reached by keys: ${noKey.join(", ")}`);
+    if (noMouse.length) fail(`never reached by the mouse: ${noMouse.join(", ")}`);
+    stats.screens = `${all.length - unreg.length} registered; by keys ${byKey.size}, by the mouse ${byMouse.size}`;
   }
 
   const ib = srcFiles.find((f) => f.file === "input-browser.js");
