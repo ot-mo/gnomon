@@ -148,6 +148,14 @@ export function checkHud({ game, startRun, inputHandlers, hud, renderMap, events
       if (cols === 180 && !screen.some((r) => r.includes(help))) fail("180×56: the pause card's key help isn't one row any more");
     }
     resize(100, 30);
+    // The map header at 100 columns: shorter, but it still says T throws and that you talk by walking into people.
+    for (const cube of [true, false]) {
+      fresh(); game.story.cube = cube; game.view = "map"; game.mode = "map";
+      S.clear(); game.debug.draw();
+      const head = rowText(0);
+      for (const want of cube ? ["T: throw", "talk", "X: explore", "I: inventory", "J: journal", "Tab: 3D"] : ["talk", "X: explore", "Space: wait", "I: inventory", "J: journal"])
+        if (!head.includes(want)) fail(`100×30 map header${cube ? "" : " before the cube"} lacks "${want}": "${head.trim()}"`);
+    }
     if (inversions) fail(`100×30, ordinary states: ${inversions} priority inversion(s) in ${layouts} layouts, e.g. ${firstBad.join("; ")}`);
     stats.sweep = `${layouts} layouts at 100×30, ${inversions} inversions`;
   }

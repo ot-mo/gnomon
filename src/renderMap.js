@@ -103,9 +103,9 @@ export function renderMap(game) {
   let header = game.story.cube
     ? " MAP · turn-based · WASD/arrows: move, attack, talk · click: walk there · X: explore · T: throw · Space: wait · I: inventory · J: journal · Tab: 3D "
     : " WASD/arrows: step (walk into people to talk) · click: walk there · X: explore · Space: wait · I: inventory · J: journal ";
-  if (header.length > S.cols - 2)   // a narrow screen (100 columns): the same keys, said shorter
-    header = game.story.cube ? " MAP · WASD: move · click: walk · X: explore · Space: wait · I: inventory · J: journal · Tab: 3D "
-      : " WASD: step · click: walk there · X: explore · Space: wait · I: inventory · J: journal ";
+  if (header.length > S.cols - 2)   // a narrow screen (100 columns): said shorter; Space: wait (in the key help) gives way to T
+    header = game.story.cube ? " MAP · WASD: move/talk · click: walk · X: explore · T: throw · I: inventory · J: journal · Tab: 3D"
+      : " WASD: step, bump to talk · click: walk · X: explore · Space: wait · I: inventory · J: journal ";
   mapView.header = { x: 1, y: 0, text: header.slice(0, S.cols - 2) };   // the map screen makes its keys clickable
   S.text(1, 0, mapView.header.text, 255, 255, 255);
   if (legend) drawLegend(S.cols - LEGEND_W + 1, top, game);
