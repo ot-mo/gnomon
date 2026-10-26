@@ -9,7 +9,7 @@ import { attr, maxHp, av, dv } from "./stats.js";
 import { wielded } from "./body.js";
 import { statusLine } from "./status.js";
 import { CURRENCY, formatFunds } from "./currency.js";
-import { hitLabel } from "./ui.js";
+import { hitLabel, wrap } from "./ui.js";
 import { RULES } from "./rules.js";
 import { on } from "./events.js";
 
@@ -132,13 +132,8 @@ export function drawLevelUp(game) {
     S.text(x0 + 3, y, `${k + 1}`, 255, 230, 120);
     const name = perkLabel(p, key) + (major ? "  (major)" : "");
     S.text(x0 + 6, y, name, ...(major ? [255, 205, 90] : [255, 255, 255]));
-    // The description, on up to two lines.
-    const words = PERKS[key].info.split(" "), lines = [""];
-    for (const word of words) {
-      if ((lines[lines.length - 1] + " " + word).trim().length > w - 8) lines.push(word);
-      else lines[lines.length - 1] = (lines[lines.length - 1] + " " + word).trim();
-    }
-    lines.slice(0, 2).forEach((line, j) => S.text(x0 + 6, y + 1 + j, line, 170, 170, 170));
+    // The description, on up to two lines (ui.js wrap: the same lines for every perk at 40-180 columns).
+    wrap(PERKS[key].info, w - 8).slice(0, 2).forEach((line, j) => S.text(x0 + 6, y + 1 + j, line, 170, 170, 170));
   });
   const keys = choices.length > 3 ? "1, 2, 3 or 4" : choices.length === 3 ? "1, 2 or 3" : choices.map((_, k) => k + 1).join(" or ");
   S.text(x0 + 3, y0 + h - 2, `Press ${keys} (or click one). The game waits.`, 120, 120, 130);
