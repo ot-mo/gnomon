@@ -7,7 +7,8 @@
 //   1. The API: registerAbility needs use(); abilitiesOf is computed from the registered sources (innate,
 //      item, and a test source added here) on every call and never stored on the entity; a creature has
 //      none; the player has Fold Step (innate) on hotbar key 1 (ids only); activate() refuses an ability
-//      you don't have or that cools down, and a use() that does nothing costs nothing.
+//      you don't have or that cools down, and a use() that does nothing costs nothing; cost.charge comes from
+//      the item that gives the ability (a cell of 3 pays one use of 2, then refuses), none without an item.
 //   2. Keys: 1-9 (the number row) are bound once each in explore and in map, to the hotbar, and nothing
 //      else in either view uses them (helpFor lists only the hotbar's); the numpad's digits still move you
 //      on the map. An empty slot says so and does nothing.
@@ -93,6 +94,14 @@ export function checkAbilities({ game, startRun, inputHandlers, abilities: A, ke
     if (A.activate(game, m, "checkPing") || m.pinged !== 1) fail("activate ran while cooling down");
     if (A.activate(game, p, "checkPing")) fail("activate ran an ability the player doesn't have");
     if (A.activate(game, p, "checkDud") || A.cooldownLeft(p, "checkDud") > 0) fail("a use() that did nothing started the cooldown");
+    // cost.charge (§2.8): from the item that gives it, paid only when used, refused when short or with no item.
+    A.registerAbility("checkZap", { name: "Zap", target: "self", cost: { charge: 2 }, use: (g, e) => { e.zapped = (e.zapped || 0) + 1; return true; } });
+    const cell = { kind: "checkCell", name: "a cell", charge: 3 };
+    m.checkGrants = [{ id: "checkZap", lvl: 1, item: cell }];
+    const z1 = A.activate(game, m, "checkZap"), z2 = A.activate(game, m, "checkZap");
+    if (!z1 || z2 || m.zapped !== 1 || cell.charge !== 1) fail(`charge 2 from a cell of 3, twice: ${z1}, ${z2}, used ${m.zapped}, the cell holds ${cell.charge}`);
+    m.checkGrants = [{ id: "checkZap", lvl: 1 }];
+    if (A.activate(game, m, "checkZap") || m.zapped !== 1) fail("an ability costing charge ran with no item to pay it");
     delete p.checkGrants;
   }
 

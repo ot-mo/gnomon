@@ -28,9 +28,12 @@
 //
 // AbilityDef = { name, source: "mutation" | "implant" | "item" | "power" | "innate",
 //   target: "self" | "dir" | "creature" | "tile" | "area", range, radius,
-//   cooldown(lvl, e) → seconds, cost?: { funds, hp }, mapTime (seconds on the map),
+//   cooldown(lvl, e) → seconds, cost?: { charge, funds, hp }, mapTime (seconds on the map),
 //   use(game, e, lvl, target) → bool (false: nothing happened, no cost, no cooldown), info(lvl) → string,
 //   ai?: { when(game, c, target) → bool } }
+// cost: paid only when use() did something, refused (nothing happens) when it can't be: charge from the item
+// that gives the ability (abilitiesOf's item: item.charge, §2.9; an ability no item gives can't pay it), funds
+// through currency.pay, hp (you need more than it).
 //
 // The sample (P0): Fold Step, a short teleport every player has (innate) on hotbar key 1, the same
 // cooldown seconds in both views. In 3D you step up to 4 tiles along your aim, on the map toward the
@@ -85,13 +88,17 @@ export function abilitiesOf(e) {
 export const abilityOf = (e, id) => abilitiesOf(e).find((a) => a.id === id) || null;
 export const abilityCooldown = (e, id, lvl = 1) => (ABILITIES[id]?.cooldown(lvl, e) || 0) * cooldownMul(e);
 
+const chargeOf = (a) => (Number.isFinite(a?.item?.charge) ? a.item.charge : 0);
+
 export function activate(game, e, id, target = null) {
   const def = ABILITIES[id], a = abilityOf(e, id);
   if (!def || !a || cooldownLeft(e, id) > 0) return false;
   const cost = def.cost || {};
+  if (cost.charge && !(chargeOf(a) >= cost.charge)) return false;
   if (cost.funds && funds(e) < cost.funds) return false;
   if (cost.hp && e.hp <= cost.hp) return false;
   if (!def.use(game, e, a.lvl, target)) return false;
+  if (cost.charge) a.item.charge -= cost.charge;
   if (cost.funds) pay(game, e, cost.funds);
   if (cost.hp) e.hp -= cost.hp;
   const cd = abilityCooldown(e, id, a.lvl);
@@ -145,6 +152,7 @@ export function useAbility(game, e, id) {
   if (statusFlag(e, "noAct")) { say(game, e, "You can't move a muscle."); return false; }
   const left = cooldownLeft(e, id);
   if (left > 0) { say(game, e, `${def.name} isn't ready yet (${Math.ceil(left)} s).`); return false; }
+  if (def.cost?.charge && !(chargeOf(a) >= def.cost.charge)) { say(game, e, `${def.name} needs ${def.cost.charge} charge, and ${a.item?.name || "nothing"} holds ${chargeOf(a)}.`); return false; }
   if (def.cost?.funds && funds(e) < def.cost.funds) { say(game, e, `${def.name} costs ${formatPrice(def.cost.funds)}.`); return false; }
   const onMap = game.mode === "map";
   let target = null;
