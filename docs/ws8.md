@@ -106,7 +106,8 @@ ballistic(sx, sy, sz, tx, ty, tz, speed, gravity) → { vx, vy, vz, time }   aim
 launch(game, it, from, to, { speed, gravity, extra }) → projectile           throwAt(game, stack, target) → projectile | null
 flightOf(game, pr, { maxT = 3 }) → { t, x, y, z, creature, stop, path }      finishFlight(game, pr, seconds)
 ballisticFrom(game, target, speed, gravity) → pretend projectile             THROW_AIM.aim (filled by screens/target.js)
-PATCH_OPS.landItem   // { op: "landItem", item, side, depth, along }: a thing thrown over an open edge waits in that zone
+landOutside(game, item, x, y) → patch | null      // a thing that came down past an open edge or corner waits there:
+PATCH_OPS.landItem   // { op: "landItem", item, ox, oy } (ox, oy from that zone's west/north edges, or negative from east/south)
 // missiles.js
 readyLauncher(p), ammoFor(p, launcher), missileSpec(p, launcher), fire(game), aimFire(game), fireAt(game, launcher, target)
 // the "pinned" status (noMove), the HUD segment "missile" ("V: bolt-bow x12 0.4s"), V bound in explore and map

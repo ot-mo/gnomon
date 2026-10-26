@@ -280,24 +280,22 @@ function groundUnder(zone, x, y, z) {
   for (let k = Math.floor(z); k >= 1; k--) if (zone.solid(bx, by, k - 1) && !zone.solid(bx, by, k)) return k;
   return -1;
 }
-// A thing that came down beyond the border, over an open edge: it waits in the next span's zone (a zone
-// patch, applied when you next enter it: zones.js addZonePatch), as far into it as it flew past the edge.
-function landOutside(game, item, x, y) {
+// A thing that came down beyond the border, over an open edge or corner: it waits in that span's zone (a zone
+// patch, applied when you next enter it: zones.js addZonePatch), as far into it as it flew past the edge. Spans
+// line up along a shared edge, so the coordinate along it carries over. → the patch, or null (no open way there).
+export function landOutside(game, item, x, y) {
   const zone = game.zone;
-  const side = x < 0 ? "w" : x >= zone.w ? "e" : y < 0 ? "n" : "s";
-  const addr = neighbourAddr(game, zone, side);
-  if (!addr) return;
-  const depth = side === "w" ? -x : side === "e" ? x - zone.w : side === "n" ? -y : y - zone.d;
-  const along = side === "w" || side === "e" ? y : x;
-  addZonePatch(game, addr.key, { op: "landItem", item, side, depth, along });
+  const ns = y < 0 ? "n" : y >= zone.d ? "s" : "", ew = x < 0 ? "w" : x >= zone.w ? "e" : "";
+  const addr = ns + ew && neighbourAddr(game, zone, ns + ew);
+  if (!addr) return null;
+  const patch = { op: "landItem", item, ox: ew === "e" ? x - zone.w : x, oy: ns === "s" ? y - zone.d : y };
+  addZonePatch(game, addr.key, patch);
+  return patch;
 }
-// { op: "landItem", item, side (the side of the zone it was thrown from), depth (tiles past that edge),
-// along (the coordinate along it) }: on the ground there, if there is ground.
+// { op: "landItem", item, ox, oy }: on the ground there, if there is ground. ox, oy: from this zone's west and
+// north edges, or (negative) back from its east and south ones.
 PATCH_OPS.landItem = (game, zone, p) => {
-  const fromSide = { e: "w", w: "e", n: "s", s: "n" }[p.side];   // it came in over this side of this zone
-  const d = Math.max(0, Math.floor(p.depth));
-  const x = fromSide === "w" ? d : fromSide === "e" ? zone.w - 1 - d : Math.floor(p.along);
-  const y = fromSide === "n" ? d : fromSide === "s" ? zone.d - 1 - d : Math.floor(p.along);
+  const x = Math.floor(p.ox < 0 ? zone.w + p.ox : p.ox), y = Math.floor(p.oy < 0 ? zone.d + p.oy : p.oy);
   if (x < 0 || y < 0 || x >= zone.w || y >= zone.d) return;
   const ground = zone.stand[x + y * zone.w];
   if (ground >= 0) zone.items.push(makeItem(p.item, x + 0.5, y + 0.5, ground));

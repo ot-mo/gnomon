@@ -59,7 +59,7 @@ import { registerFaction, FACTIONS } from "../../src/factions.js";
 import { registerAbility, ABILITIES } from "../../src/abilities.js";
 import { addStatus, hasStatus, tickStatuses } from "../../src/status.js";
 import { snapshotZone } from "../../src/save/codec.js";
-import { throwReady, throwAt, updateProjectiles, THROW_TIME } from "../../src/throwing.js";
+import { throwReady, throwAt, updateProjectiles, THROW_TIME, landOutside } from "../../src/throwing.js";
 import { fire, fireAt, readyLauncher } from "../../src/missiles.js";
 import { requestTarget, cursorTarget, lineOfFire, targetText } from "../../src/screens/target.js";
 import { mapView } from "../../src/renderMap.js";
@@ -728,10 +728,24 @@ export function checkTargeting(ctx) {
         expect(landed && landed.maxX > tz.w, `no knife thrown east over the temple's border came down in 1,0,0 (${landed ? `flew to x ${landed.maxX.toFixed(1)}` : "none"})`);
         if (landed) {
           changeZone(game, "1,0,0", { how: "travel" });
-          const k = game.zone.items.find((it) => it.kind === "knife" && Math.floor(it.x) <= Math.ceil(landed.patch.depth) + 1);
+          const k = game.zone.items.find((it) => it.kind === "knife" && Math.floor(it.x) === Math.floor(landed.patch.ox) && Math.floor(it.y) === Math.floor(landed.patch.oy));
           expect(!!k, `entering 1,0,0: the knife isn't there (patch ${JSON.stringify(landed.patch)})`);
           stats.overTheEdge = { flewTo: +landed.maxX.toFixed(2), border: tz.w, landed: k ? [Math.floor(k.x), Math.floor(k.y)] : null };
         }
+        // Landing past the south edge and past the south-east corner too (the temple is the world's north-west span).
+        changeZone(game, "0,0,0", { how: "travel" });
+        const t0z = game.zone, marks = [];
+        for (const [x, y, key, want] of [[t0z.w + 3.2, 10.5, "1,0,0", [3, 10]], [12.5, t0z.d + 0.7, "0,1,0", [12, 0]], [t0z.w + 2.3, t0z.d + 1.4, "1,1,0", [2, 1]]]) {
+          const item = { kind: "quest", name: `marker ${key}`, info: "" };
+          const patch = landOutside(game, item, x, y);
+          changeZone(game, key, { how: "travel" });
+          const got = game.zone.items.find((it) => it.name === item.name);
+          const stand = game.zone.stand[want[0] + want[1] * game.zone.w];
+          marks.push({ key, at: got ? [Math.floor(got.x), Math.floor(got.y)] : null });
+          expect(patch && (stand < 0 ? !got : got && Math.floor(got.x) === want[0] && Math.floor(got.y) === want[1]), `a thing landing past the border into ${key}: ${JSON.stringify(got && [got.x, got.y])} (want ${want}${stand < 0 ? ", nothing: no ground" : ""})`);
+          changeZone(game, "0,0,0", { how: "travel" });
+        }
+        stats.overTheEdge.sides = marks;
       }
     }
   } finally {
