@@ -11,7 +11,8 @@
 //      fighting at full health, a cursed ring that drains, the attribute formulas' natural regeneration
 //      (which poison stops), and creatures burning and poisoned (one of them to death).
 //   3. skipTime stops for a hostile awake nearby (nothing passes), stops on until(), and a rest of an
-//      hour clears the second-wind and first-block cooldowns; 8 game hours take ≤ 20 ms.
+//      hour clears the second-wind and first-block cooldowns; 8 game hours take ≤ 20 ms. A troll
+//      regenerates over a skip (1 HP/s), but not while it burns.
 //   4. Drowning: a non-swimmer stepping into surface deep water on the map and walking into it in 3D
 //      gets the same timer (RULES.drown.air s of breath), the same damage at the same moments, and
 //      the status ends when the feet leave the water, in both views. A swimmer doesn't drown. On the
@@ -20,8 +21,7 @@
 //      other way of turning) is locked too, and no fold power fires (Folding strike, a rat next to you).
 //      Set down safely when it ends: one tile into the pond with a person, a rat and a rat stepping onto
 //      the three shore tiles next to you, you come up on the nearest free one two tiles off; in the
-//      pond's middle (no dry tile within 3) you still come up on dry ground.
-//
+//      pond's middle (no dry tile within 3) you still come up on dry ground. Dying while flat says so.
 //   6. The HUD row (hud.js drawHud, read back from the screen) shows every active status's text in its
 //      colour, in both views, and drops it once the status is removed.
 //
@@ -188,6 +188,24 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles, capture }
   const r1b = skipTime(game, 60, { interruptible: false });
   if (r1b.elapsed !== 60) fail(`skipTime, not interruptible, with a hostile near: elapsed ${r1b.elapsed}`);
   game.zone.monsters.length = 0;
+  // A creature that regenerates (a troll, 1 HP/s) knits back over a skip, except while it burns.
+  {
+    const troll = (status) => {
+      const m = spawnMonster("troll", Math.floor(p0.x) + 30, Math.floor(p0.y), FLOOR_Z, "idle", 1, null, () => 0.5);
+      m.hp = 20; m.status = status; m.regenAcc = 0;
+      game.zone.monsters.length = 0; game.zone.monsters.push(m);
+      return m;
+    };
+    const plain = troll({});
+    skipTime(game, 15, { interruptible: false });
+    const burnt = troll({ burning: { t: 4, mag: 1, src: null, acc: 0 } }), alone = structuredClone(burnt);
+    skipTime(game, 15, { interruptible: false });
+    St.catchUpStatuses(game, alone, 15);   // the burn alone, no regeneration
+    const want = alone.hp + 11;
+    if (plain.hp !== 35 || burnt.hp !== want) fail(`a troll's regeneration over a 15 s skip: ${plain.hp} (want 35), burning 4 s: ${burnt.hp} (want ${want})`);
+    stats.trollRegen = { plain: plain.hp, burning: burnt.hp, want: [35, want] };
+    game.zone.monsters.length = 0;
+  }
   p0.hp = 5; p0.body.equip.finger_r = ring(2); invalidateStats(p0);
   const r2 = skipTime(game, 3600, { until: (g) => g.player.hp >= maxHp(g.player) });
   if (!(r2.why === "until" && !r2.interrupted && p0.hp === maxHp(p0) && r2.elapsed <= (maxHp(p0) - 5) * 6 + 1))
@@ -341,7 +359,12 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles, capture }
     const dry = (t) => zone.stand[t[0] + t[1] * zone.w] >= 0 && !(t[0] >= 30 && t[0] < 50 && t[1] >= 14 && t[1] < 34);
     if (near.join() !== "28,22") fail(`flat ends 1 tile into the pond, shore tiles taken: set down on ${near} (want 28,22)`);
     if (!dry(far) || St.hasStatus(p, "drowning")) fail(`flat ends in the pond's middle: set down on ${far}, drowning ${St.hasStatus(p, "drowning")}`);
-    stats.flatSetDown = { near, far };
+    Object.assign(p, { x: 25.5, y: 24.5, z: FLOOR_Z });
+    St.addStatus(game, p, "flat", { t: 30 });
+    game.hurtPlayer(999, "a falling anvil", true);
+    const cause = game.deathCause;
+    if (game.mode !== "dead" || !/while pressed flat/.test(cause)) fail(`death while flat: mode ${game.mode}, cause "${cause}"`);
+    stats.flatSetDown = { near, far, deathCause: cause };
     freshPlayer(); enter();
     game.mode = "map"; game.view = "map";
   }
