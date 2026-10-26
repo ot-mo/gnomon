@@ -7,6 +7,7 @@
 //   2. Glyphs (bible §15.7, binding): no creature uses a glyph reserved for terrain, items and features,
 //      except the people the registry keeps one for (`@` for people, `Ω` the Speaking Door, `†` a shrine);
 //      every monster's letter is one of the families' (or a free one); every (glyph, colour) pair is unique.
+//      Elites included: every monster type × every elite (its colour is species and elite, half and half).
 //   3. spawnCreature: anything that isn't a talker needs opts.rng, and draws its looks from it in the
 //      parent's order (shot, anim, think, pause: four draws); a talker draws nothing. Level scaling: +6%
 //      health per level, +1 damage per 4 levels, XP +10% per level. Ids come from one counter for
@@ -24,7 +25,7 @@ import { enterZone } from "../../src/zones.js";
 import { mapStep } from "../../src/turns.js";
 import { interact } from "../../src/interact.js";
 import { updateCreatures } from "../../src/ai.js";
-import { CREATURE_TYPES, spawnCreature, addCreature, creatureAt, creatureSprite, touchable, hostilesTo, talkersIn,
+import { CREATURE_TYPES, ELITES, spawnCreature, addCreature, creatureAt, creatureSprite, touchable, hostilesTo, talkersIn,
          canTalk } from "../../src/creatures.js";
 import { entityCounter } from "../../src/ids.js";
 
@@ -81,9 +82,21 @@ export function checkCreatures({ game, startRun, srcFiles }) {
     expect(!pairs.has(key), `${id} and ${pairs.get(key)} share the glyph and colour ${key}`);
     pairs.set(key, id);
   }
+  // Elites too: every monster type × every elite is drawn as its own (glyph, colour) on the map.
+  let eliteLooks = 0;
+  for (const [id, t] of Object.entries(CREATURE_TYPES)) {
+    if (t.talks) continue;
+    for (const el of Object.keys(ELITES)) {
+      const c = spawnCreature(id, 1, 1, FLOOR_Z, { rng: () => 0.5, elite: el });
+      const key = `${c.glyph} ${c.color.join(",")}`;
+      expect(!pairs.has(key), `${c.name} and ${pairs.get(key)} share the glyph and colour ${key}`);
+      pairs.set(key, c.name);
+      eliteLooks++;
+    }
+  }
   expect(CREATURE_TYPES.archer.glyph === "g" && CREATURE_TYPES.orc.glyph === "g" && CREATURE_TYPES.flatling.glyph === "f",
          "goblin archers and orcs are Rustbacks (g), and the flatling keeps f");
-  stats.glyphs = { monsters, people, pairs: pairs.size };
+  stats.glyphs = { monsters, people, eliteLooks, pairs: pairs.size };
 
   // --- 3. spawnCreature ---------------------------------------------------------------------------------
   let threw = false;

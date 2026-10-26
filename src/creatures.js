@@ -60,6 +60,11 @@ export const isFlat = (c) => !!c.vis?.flat && !c.risen;
 export const isGhostly = (c) => !!c.vis?.ghostly;
 export const canTalk = (c) => !!c.talk;
 
+// An elite's colour on the map: its species' and its elite's, half and half, so every (glyph, colour)
+// pair stays unique in a family that shares a letter (bible §15.7; goblins, archers and orcs are all
+// `g`). It glows in 3D with the elite's own colour (creatureSprite).
+export const eliteColor = (t, e) => t.color.map((v, k) => Math.round((v + e.color[k]) / 2));
+
 // Tougher at higher levels: +6% health per level, and +1 damage every four levels.
 // z is the ground it stands on.
 export function spawnCreature(type, tx, ty, z, opts = {}) {
@@ -83,7 +88,7 @@ export function spawnCreature(type, tx, ty, z, opts = {}) {
   const size = e?.size || 1;
   return {
     id: nextEntityId(), uid: opts.uid ?? null, type, elite, guardian: t.guardian || null,
-    name: opts.name ?? (e ? `${e.adj} ${t.name}` : t.name), glyph: t.glyph, color: e ? e.color : t.color,
+    name: opts.name ?? (e ? `${e.adj} ${t.name}` : t.name), glyph: t.glyph, color: e ? eliteColor(t, e) : t.color,
     w: t.w * size, h: t.h * size,
     hp, maxHp: hp, level,
     bonus: Math.floor((level - 1) / 4) + (e?.dmg || 0),
@@ -208,7 +213,7 @@ export function creatureSprite(game, c) {
                has("poisoned") ? [0.7, 1.5, 0.6] : has("blinded") ? [0.5, 0.5, 0.6] : null;
   let emit = has("burning") ? [0.9 * flicker, 0.4 * flicker, 0.1] : null;   // flames light it up even in the dark
   if (c.elite) {   // elites glow with a slow pulse of their colour
-    const k = (0.18 + 0.08 * Math.sin(c.anim * 4)) / 255, col = c.color;
+    const k = (0.18 + 0.08 * Math.sin(c.anim * 4)) / 255, col = elites()[c.elite]?.color || c.color;
     emit = [(emit?.[0] || 0) + col[0] * k, (emit?.[1] || 0) + col[1] * k, (emit?.[2] || 0) + col[2] * k];
   }
   return { x: c.x, y: c.y, z: c.z - (wet ? 0.3 : 0) + bob, w: c.w, h: c.h, art: t.frames[frame], palette: t.palette,
