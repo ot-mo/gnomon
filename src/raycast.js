@@ -140,7 +140,8 @@ export function castRay(zone, ox, oy, oz, dx, dy, dz, maxT, seen = null, torchRa
       return true;
     }
   }
-  // Above everything and going up: there is nothing more to hit. With `seen` the columns it passes over are still
+  // Above everything and going up: there is nothing more to hit. (Its tests are written so every comparison runs on
+  // every step: a branch the first zone never took would otherwise throw out the optimized code in the next zone.) With `seen` the columns it passes over are still
   // marked as before (in the grid, where the air is lit or within torchRange), without looking at the blocks;
   // without it the ray is done.
   if (seen) for (;;) {
@@ -150,7 +151,7 @@ export function castRay(zone, ox, oy, oz, dx, dy, dz, maxT, seen = null, torchRa
         seen[x + y * W] = 1;
         if (holes && z === HOLE_Z) holes[x + y * W] = 1;
       }
-    } else if ((x < 0 && stepX < 0) || (x >= W && stepX > 0) || (y < 0 && stepY < 0) || (y >= D && stepY > 0) || z >= H) break;
+    } else if (((x < 0) & (stepX < 0)) | ((x >= W) & (stepX > 0)) | ((y < 0) & (stepY < 0)) | ((y >= D) & (stepY > 0)) | (z >= H)) break;
     if (tMaxX < tMaxY && tMaxX < tMaxZ) { x += stepX; t = tMaxX; tMaxX += tDeltaX; }
     else if (tMaxY < tMaxZ)             { y += stepY; t = tMaxY; tMaxY += tDeltaY; }
     else                                { z += stepZ; t = tMaxZ; tMaxZ += tDeltaZ; }

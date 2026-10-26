@@ -112,8 +112,8 @@ export function sampleGrid(grid, blocks, w, d, h, clamp, x, y, z, airOnly = fals
     if (wgt === 0 || iz < 0) continue;
     if (ix < 0 || iy < 0 || ix >= w || iy >= d) {
       if (!clamp) continue;
-      ix = ix < 0 ? 0 : ix >= w ? w - 1 : ix;
-      iy = iy < 0 ? 0 : iy >= d ? d - 1 : iy;
+      ix = Math.min(w - 1, Math.max(0, ix));   // (no branch a first zone might not have taken)
+      iy = Math.min(d - 1, Math.max(0, iy));
     }
     if (iz >= h) iz = h - 1;
     const i = ix + iy * w + iz * w * d;
@@ -240,19 +240,19 @@ export function sunlitAt(zone, hx, hy, hz, nx, ny, nz, px, py, pz) {
 export function sunlitGrid(g, w, d, h, hx, hy, hz, nx, ny, nz, px, py, pz) {
   if (!g) return 1;
   const wd = w * d;
-  let u, v, fixed, axis;   // the two coordinates along the face, and the layer in front of it
-  if (nz !== 0) { axis = 2; fixed = hz + nz; u = px - 0.5; v = py - 0.5; }
-  else if (nx !== 0) { axis = 0; fixed = hx + nx; u = py - 0.5; v = pz - 0.5; }
-  else { axis = 1; fixed = hy + ny; u = px - 0.5; v = pz - 0.5; }
-  const u0 = Math.floor(u), v0 = Math.floor(v), fu = u - u0, fv = v - v0;
+  // The two coordinates along the face and the layer in front of it, every candidate computed (no branch a first
+  // zone might not have taken: the next zone's first frame would throw out the optimized code).
+  const az = nz !== 0, ax = nx !== 0, axis = az ? 2 : ax ? 0 : 1;
+  const qx = px - 0.5, qy = py - 0.5, qz = pz - 0.5, fx = hx + nx, fy = hy + ny, fz = hz + nz;
+  const u = az ? qx : ax ? qy : qx, v = az ? qy : qz, fixed = az ? fz : ax ? fx : fy;
+  const u0 = Math.floor(u), v0 = Math.floor(v), fu = u - u0, fv = v - v0, a2 = axis === 2, a0 = axis === 0;
   let sum = 0, wsum = 0;
   for (let k = 0; k < 4; k++) {
     const a = u0 + (k & 1), b = v0 + (k >> 1);
     const wgt = (k & 1 ? fu : 1 - fu) * (k & 2 ? fv : 1 - fv);
     if (wgt === 0) continue;
-    let x, y, z;
-    if (axis === 2) { x = a; y = b; z = fixed; } else if (axis === 0) { x = fixed; y = a; z = b; } else { x = a; y = fixed; z = b; }
-    if (x < 0 || y < 0 || z < 0 || x >= w || y >= d || z >= h) continue;
+    const x = a2 ? a : a0 ? fixed : a, y = a2 ? b : a0 ? a : fixed, z = a2 ? fixed : b;
+    if ((x < 0) | (y < 0) | (z < 0) | (x >= w) | (y >= d) | (z >= h)) continue;
     const s = g[x + y * w + z * wd];
     if (!s) continue;
     sum += wgt * (s - 1); wsum += wgt;

@@ -103,7 +103,7 @@ let fogR = FOG[0], fogG = FOG[1], fogB = FOG[2], fogD = FOG_DENSITY;
 let sunOn = false, sunX = 0, sunY = 0, sunZ = 1, sunR = 0, sunG = 0, sunB = 0;  // the faces' sun (the bake's)
 let zen = [50, 95, 190], hor = [170, 200, 240];                                // the sky's gradient
 let discX = 0, discY = 0, discZ = 1, discVis = 0, discR = 255, discG = 250, discB = 215;
-let cloudR = 245, cloudG = 245, cloudB = 250, starK = 0, horizon = null;
+let cloudR = 245, cloudG = 245, cloudB = 250, starK = 0, horizon = null, horizonSides = null;
 
 // The zone's arrays and sizes, read once a frame: the per-pixel code below never reads the zone object
 // (each zone has its own shape, and code tuned to one zone's would be thrown out in the first frame of the next).
@@ -157,6 +157,7 @@ function frameLook(game, zone) {
   cloudR = (245 + (hor[0] - 245) * tw) * sky + 26 * nsky; cloudG = (245 + (hor[1] - 245) * tw) * sky + 28 * nsky; cloudB = (250 + (hor[2] - 250) * tw) * sky + 40 * nsky;
   starK = smooth((0.55 - sky) / 0.4);
   horizon = horizonOf(game, zone);
+  horizonSides = [horizon.n, horizon.e, horizon.s, horizon.w];
 }
 
 function applyFog(t) {
@@ -359,9 +360,12 @@ export function horizonOf(game, zone) {
 // side is the one it left by (beyond a corner, or still inside at its reach: the way it was going), so sides that
 // differ meet where their aprons meet, not on a diagonal.
 function shadeHorizon(dx, dy, dz, tExit, time) {
-  const outX = hit.out === 1 && (hit.mx < 0 || hit.mx >= ZW), outY = hit.out === 1 && (hit.my < 0 || hit.my >= ZD);
-  const side = outX && !outY ? (hit.mx < 0 ? horizon.w : horizon.e) : outY && !outX ? (hit.my < 0 ? horizon.n : horizon.s)
-    : Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? horizon.e : horizon.w) : (dy > 0 ? horizon.s : horizon.n);
+  // Every comparison runs on every call (a branch the first zone never took would throw out the optimized code in
+  // the next zone's first frame); the side is an index into horizonSides (n, e, s, w).
+  const sideExit = hit.out === 1, mx = hit.mx, my = hit.my;
+  const wX = (mx < 0) & sideExit, eX = (mx >= ZW) & sideExit, nY = (my < 0) & sideExit, sY = (my >= ZD) & sideExit;
+  const byX = (wX | eX) & !(nY | sY), byY = (nY | sY) & !(wX | eX), alongX = Math.abs(dx) > Math.abs(dy), east = dx > 0, south = dy > 0;
+  const side = horizonSides[byX ? (eX ? 1 : 3) : byY ? (sY ? 2 : 0) : alongX ? (east ? 1 : 3) : (south ? 2 : 0)];
   let t = (side.z - cam.ez) / dz;
   if (!(t > tExit)) t = tExit;
   const px = cam.ex + dx * t, py = cam.ey + dy * t;
@@ -481,7 +485,7 @@ export function render3d(game) {
   if (player.hurt > 0) S.tint(1 + player.hurt * 1.6, 1 - player.hurt * 1.4, 1 - player.hurt * 1.4);
   // Sinking in deep water: everything goes murky blue.
   if (zone.get(Math.floor(cam.ex), Math.floor(cam.ey), Math.floor(cam.ez)) === B.WATER_DEEP) S.tint(0.3, 0.55, 1.1);
-  zBlocks = zSky = zLamp = zSun = zSecret = horizon = null;   // hold no zone's arrays between frames
+  zBlocks = zSky = zLamp = zSun = zSecret = horizon = horizonSides = null;   // hold no zone's arrays between frames
 }
 
 // Every cell of the view: a ray each (every other column when halved). Its own function, reading nothing
