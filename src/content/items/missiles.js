@@ -29,9 +29,9 @@ const signed = (n) => (n > 0 ? `+${n}` : `${n}`);
 const WOOD = { h: [[125, 85, 50], 0], H: [[165, 120, 75], 0] };
 const STRING = { c: [[215, 205, 180], 0.1] };
 const IRON = { i: [[150, 155, 170], 0.15], I: [[205, 210, 225], 0.25] };
+// On the floor in 3D one picture serves every launcher (an item kind has one: items.js itemSprite).
 const ART = {
-  sling: { w: 0.4, h: 0.22, art: ["c    c", " c  c ", "  hh  "] },
-  boltBow: { w: 0.5, h: 0.3, art: ["hhhhhh", "c iI c", " ciIc ", "  hh  "] },
+  launcher: { w: 0.5, h: 0.3, art: ["hhhhhh", "c iI c", " ciIc ", "  hh  "] },
   bolt: { w: 0.3, h: 0.1, art: ["IhhhH"] },
 };
 
@@ -39,19 +39,19 @@ registerItemKind("missile", {
   stack: false, weight: () => 0,
   price: (it) => MISSILES[it.id].price + 30 * Math.max(0, it.ench || 0),
   name: (game, it) => `${it.ench ? `${signed(it.ench)} ` : ""}${MISSILES[it.id].name}`,
-  glyph: () => ["}", [200, 165, 110]],
+  glyph: () => [")", [200, 165, 110]],   // a weapon (bible §15.7), in the colour of its wood
   info(game, it) {
     const m = MISSILES[it.id], ammo = m.ammo ? `shoots ${AMMO[m.ammo].plural}` : `shoots ${m.noun}s, free`;
     return `${m.dmg[0]}-${m.dmg[1]} damage · range ${m.range} · ${m.reload} s a shot · ${ammo} · ${m.info} · V fires it`;
   },
-  art: { w: ART.sling.w, h: ART.sling.h, art: ART.sling.art },
+  art: ART.launcher,
   palette: () => ({ ...WOOD, ...STRING, ...IRON }),
 });
 registerItemKind("ammo", {
   stack: true, weight: () => 0,
   price: (it) => AMMO[it.effect].price,
   name: (game, it) => AMMO[it.effect].name,
-  glyph: () => ["{", [205, 200, 185]],
+  glyph: () => [")", [175, 150, 120]],   // (bolts: weapons too, a darker wood)
   info: (game, it) => `ammunition for a ${Object.values(MISSILES).find((m) => m.ammo === it.effect)?.name || "missile weapon"}`,
   art: ART.bolt,
   palette: () => ({ ...WOOD, ...IRON }),

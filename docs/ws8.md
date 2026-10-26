@@ -158,8 +158,9 @@ the target screen: as above. (T on the map opens the target screen under the d20
    when `!touchesYou(game, null)` (creatures.js).
 4. **`monsters.js` (the integrator; §8.4 names no owner):** `pushPlayerOut` should skip creatures with
    `brain.arriving > 0` (hidden, still on their way in: today one could nudge you for up to 4 s at a zone's border).
-5. **`renderMap.js` (WS3):** legend rows for `}` missile weapon and `{` ammunition, and "L: look · V: fire" in the map
-   header if it fits (the T hint is there). Followers are drawn tinted toward cyan by `turns.js refreshView`'s
+5. **`renderMap.js` (WS3):** "L: look · V: fire" in the map header if it fits (the T hint is there); the legend's `)`
+   row could say "weapon (missile weapons and bolts in wood colours)". (Missile weapons and bolts use `)`, bible §15.7's
+   weapon glyph.) Followers are drawn tinted toward cyan by `turns.js refreshView`'s
    sighting colour; WS3 may prefer its own ally overlay.
 6. **`tests/checks/content.js` and `tests/checks/body.js` (frozen, P0's):** each lists a sample of every registered
    item kind and fails without one, so this branch added the `missile` and `ammo` samples (one line each, `// WS8`);
