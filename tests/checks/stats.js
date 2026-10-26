@@ -7,7 +7,8 @@
 //      amulet and property, enchantments −2, 0, +2, and every relic) leaves every derived number
 //      consistent: the cached bonus table equals a fresh sum over the sources, STR / max HP / armour
 //      equal the formulas worked out here from the raw tables, and taking it off restores the numbers
-//      before. Statuses (a stub status bonus) and every perk the same.
+//      before. Statuses through status.js (a test status with bonuses, then every registered one, added
+//      and removed with addStatus / removeStatus under STATS_DEBUG.verify) and every perk the same.
 //   3. No base-field writes: the real inventory code (equip, swap) runs on a player behind
 //      guardBaseFields; any write to attrs, maxHpGain or level is a problem.
 //   4. The attribute formulas at their reference points (TOU 16 gives the parent's 20 + 3 per level…).
@@ -20,6 +21,7 @@ import { RULES, extendRules, overrideRules } from "../../src/rules.js";
 import * as St from "../../src/stats.js";
 import { WEAPONS, ARMOURS, RINGS, AMULETS, RELICS, PROPERTIES, itemBonuses, makeRelic } from "../../src/items.js";
 import { PERKS, perkRank, takePerk } from "../../src/leveling.js";
+import { registerStatus, addStatus, removeStatus, STATUS_DEFS } from "../../src/status.js";
 
 const SETS = ["legacy", "attributes"];
 
@@ -96,10 +98,11 @@ export function checkStats({ game, startRun, inventory, mechanics }) {
   if (St.contentLevel(25) !== 20 || St.contentLevel(7) !== 7) problems.push(`contentLevel: 25 → ${St.contentLevel(25)}, 7 → ${St.contentLevel(7)}`);
 
   // --- 2. Gear, statuses and perks in both formula sets -----------------------------------------
-  const statusBonus = (id, s) => (id === "checkMight" ? { str: s.mag, maxHp: 4 * s.mag, av: 1, dv: 2 } : null);
-  St.setStatusBonus(statusBonus);
+  // Statuses go through status.js (its registry feeds the "statuses" source): a test status with bonuses.
+  if (!STATUS_DEFS.checkMight) registerStatus("checkMight", { t: 10, bonus: (s) => ({ str: s.mag, maxHp: 4 * s.mag, av: 1, dv: 2 }) });
+  const statusBonus = (id, s) => STATUS_DEFS[id]?.bonus?.(s) || null;
   const gear = gearCatalog();
-  let changes = 0;
+  let changes = 0, statusesChecked = 0;
   for (const set of SETS) {
     const undoSet = overrideRules("stats", set);
     startRun(1234);
@@ -125,13 +128,25 @@ export function checkStats({ game, startRun, inventory, mechanics }) {
       const after = derived(game, p);
       if (!same(before, after)) problems.push(`${set}: taking off ${slot} ${it.relic || it.id} ${it.ench} changed ${diff(before, after)}`);
     }
-    // Statuses through the "statuses" source.
+    // Statuses through the "statuses" source: addStatus / removeStatus drop the cache themselves (no
+    // invalidateStats here, so a status that forgot to would show as a stale cache).
     const before = derived(game, p);
-    p.status = { checkMight: { t: 10, mag: 2 } }; St.invalidateStats(p);
-    consistent("with a status");
-    if (St.attr(p, "str") !== before.attrs.str + 2) problems.push(`${set}: a +2 STR status gives STR ${St.attr(p, "str")}`);
-    delete p.status.checkMight; St.invalidateStats(p);
-    if (!same(before, derived(game, p))) problems.push(`${set}: removing the status changed ${diff(before, derived(game, p))}`);
+    St.STATS_DEBUG.verify = true;
+    try {
+      addStatus(game, p, "checkMight", { t: 10, mag: 2 });
+      consistent("with a status");
+      if (St.attr(p, "str") !== before.attrs.str + 2) problems.push(`${set}: a +2 STR status gives STR ${St.attr(p, "str")}`);
+      removeStatus(game, p, "checkMight");
+      if (!same(before, derived(game, p))) problems.push(`${set}: removing the status changed ${diff(before, derived(game, p))}`);
+      // Every registered status, on and off: the derived numbers come back exactly.
+      for (const id in STATUS_DEFS) {
+        if (id === "flat") continue;   // it switches the view; check-status covers it
+        addStatus(game, p, id, { t: 5 }); consistent(`status ${id}`); removeStatus(game, p, id);
+        if (!same(before, derived(game, p))) problems.push(`${set}: status ${id} on and off changed ${diff(before, derived(game, p))}`);
+        statusesChecked++;
+      }
+    } catch (err) { problems.push(`${set}: statuses: ${err.message}`); }
+    St.STATS_DEBUG.verify = false;
     // Every perk, every rank, through takePerk.
     for (const k in PERKS) for (let r = 0; r < (PERKS[k].max || 1); r++) { takePerk(game, k); consistent(`perk ${k} ${r + 1}`); }
     // A stale cache is caught (the check itself works).
@@ -142,8 +157,7 @@ export function checkStats({ game, startRun, inventory, mechanics }) {
     St.invalidateStats(p);
     undoSet();
   }
-  St.setStatusBonus(null);
-  stats.gear = { items: gear.length, changes, sets: SETS.length };
+  stats.gear = { items: gear.length, changes, sets: SETS.length, statusesOnOff: statusesChecked };
 
   // --- 3. No base-field writes from the inventory code ---------------------------------------
   {
