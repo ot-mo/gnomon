@@ -46,6 +46,9 @@ const { keys } = await import("../src/input.js");
 const { standWith, B, FLOOR_Z } = await import("../src/world.js");
 const { canWalk, PLAYER_STEP_UP, PLAYER_DROP } = await import("../src/pathing.js");
 const { cachedZone } = await import("../src/zones.js");
+const { killMonster } = await import("../src/monsters.js");
+const { on } = await import("../src/events.js");
+const { servicesFor } = await import("../src/talk.js");
 
 const ARROWS = { "1,0": "ArrowRight", "-1,0": "ArrowLeft", "0,1": "ArrowDown", "0,-1": "ArrowUp" };
 const tileOf = (p) => [Math.floor(p.x), Math.floor(p.y)];
@@ -302,6 +305,279 @@ export function runSmoke({ seed = 1234, view = "map", levels = [3, 5, 10, 15, 20
   return { ok: problems.length === 0, steps, problems };
 }
 
+// The legacy encounters (0C): every person of the parent game, met through one view's controls and
+// played to the end. The bot visits the legacy levels 1-20 (and the temple) to find who's where, then for
+// each one: stands beside them and talks (map: walks into them; 3D: faces them and presses E, the torch
+// out for Brann; Flatlanders can't be talked to in 3D, so the bot checks E finds only a shadow, then
+// talks on the map), reads every answer and picks one with a digit key, and does what the quest asks in
+// between (a healing potion for Corwin, the map filled in for Mira, Rook's quarry killed, Lio's lever
+// pulled by walking into it, Brann's skull picked up a floor below, Tee found, the Speaking Door's wrong
+// number and then the right one, a plain offering and a bold one with its trial at shrines, and Pell's
+// shop: buy, sell, a service, the news). Monsters other than the quarry are cleared and the bot can't
+// die. Returns { ok, steps, problems, stats: { done: [...], talks, keys } }.
+export function runEncounters({ seed = 1234, view = "map" } = {}) {
+  const problems = [], steps = [], done = [];
+  const counts = { talks: 0, keys: 0, questEvents: 0 };
+  const off = ["quest:start", "quest:done"].map((type) => on(type, () => { counts.questEvents++; }));
+  startRun(seed);
+  game.pages = null; game.pendingPages = null;
+  const p = game.player;
+  const press = (code) => { inputHandlers.onKeyDown(code, false, code); counts.keys++; };
+  const playing = () => {
+    for (let k = 0; k < 5 && game.mode === "levelup"; k++) press("Digit1");   // Lio's gift: take the first
+    game.view = view === "3d" ? "3d" : "map";
+    game.mode = game.view === "map" ? "map" : "explore";
+    game.paused = false;
+  };
+  const go = (z) => {
+    if (game.zone.key !== `0,0,${z}`) { game.debug.enterZone(`0,0,${z}`, "down"); settle(); }
+    playing();
+    game.zone.creatures = game.zone.creatures.filter((c) => canTalk(c) || c.bounty);
+    p.maxHpGain = p.hp = 999;
+  };
+  // Who's where: the temple, then every legacy level.
+  const where = new Map();   // dialogue → [{ z, c }]
+  const note = (z) => { for (const c of talkersIn(game.zone)) { if (!where.has(c.talk.dialogue)) where.set(c.talk.dialogue, []); where.get(c.talk.dialogue).push({ z, c }); } };
+  note(0);
+  for (let z = 1; z <= 20; z++) { go(z); note(z); }
+  const findSkull = (z) => { go(z); return game.zone.items.find((it) => it.kind === "quest" && it.id === "skull"); };
+
+  // Stand on a free tile beside (x, y) at about its height; returns the tile or null.
+  const beside = (x, y, z) => {
+    const zone = game.zone;
+    for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const bx = x + ox, by = y + oy, i = bx + by * zone.w;
+      if (bx < 0 || by < 0 || bx >= zone.w || by >= zone.d || zone.stand[i] < 0 || Math.abs(zone.stand[i] - z) > 1) continue;
+      if (zone.creatures.some((o) => o.tx === bx && o.ty === by)) continue;
+      const g = zone.get(bx, by, FLOOR_Z - 1);
+      if (g === B.STAIRS || g === B.STAIRS_UP) continue;
+      Object.assign(p, { x: bx + 0.5, y: by + 0.5, z: zone.stand[i], vz: 0, onGround: true });
+      return [bx, by];
+    }
+    return null;
+  };
+  // Open a conversation with c through this view's controls (flat people: on the map in either view).
+  const talk = (c, { flatCheck = true } = {}) => {
+    playing();
+    const spot = beside(c.tx, c.ty, c.z);
+    if (!spot) throw new Error(`no free tile beside ${c.name} at (${c.tx}, ${c.ty})`);
+    const in3d = view === "3d" && !(c.vis.flat && !flatCheck);
+    if (view === "3d") {
+      p.yaw = Math.atan2(c.y - p.y, c.x - p.x);
+      p.pitch = c.vis.flat ? -0.6 : 0;
+      p.torch = !c.vis.ghostly;
+      press("KeyE");
+      if (c.vis.flat) {   // only a shadow in 3D: E finds it but can't talk
+        if (game.mode === "talk") throw new Error(`${c.name} talked in 3D, but flat people only talk on the map`);
+        game.mode = "map"; game.view = "map";
+      }
+    }
+    if (!in3d || c.vis.flat) {
+      const code = ARROWS[`${c.tx - spot[0]},${c.ty - spot[1]}`];
+      game.debug.mapKey(code);
+    }
+    if (game.mode !== "talk") throw new Error(`walking into / facing ${c.name} at (${c.tx}, ${c.ty}) from (${spot}) in ${game.zone.key} opened ${game.mode}, not the talk screen: ${game.messages?.slice(-2).map((m) => m.text).join(" / ")}`);
+    counts.talks++;
+  };
+  const shown = () => { if (game.talk.shown < game.talk.length) press("Space"); };   // skip the typing
+  const say = (re) => {
+    if (game.mode !== "talk") throw new Error(`not talking (mode ${game.mode}) when answering ${re}`);
+    shown();
+    const opts = game.talk.node.options, k = opts.findIndex((o) => re.test(o.label));
+    if (k < 0) throw new Error(`no answer ${re} to "${game.talk.node.text.slice(0, 60)}…" (${opts.map((o) => o.label).join(" | ")})`);
+    press(`Digit${k + 1}`);
+  };
+  const text = () => { if (game.mode !== "talk") return ""; shown(); return game.talk.node.text; };
+  const ended = (who) => { if (game.mode === "talk") throw new Error(`the talk with ${who} didn't end`); };
+  const quest = (id) => game.quests.find((q) => q.id === id);
+  const expectQuest = (id, state) => {
+    const q = quest(id), now = !q ? "missing" : q.done ? "done" : "active";
+    if (now !== state) throw new Error(`quest ${id} is ${now}, expected ${state}`);
+  };
+  const first = (id) => { const e = where.get(id)?.[0]; if (!e) throw new Error(`nobody with the ${id} dialogue in levels 1-20`); go(e.z); return e.c; };
+
+  const encounters = {
+    maren() {   // the temple: the shaking floor, then (with the cube) the Lich King
+      game.story.cube = false;
+      const c = first("maren");
+      talk(c); say(/What's down there/); say(/I'll go and see/); ended("Maren"); expectQuest("temple", "active");
+      game.story.cube = true;
+      talk(c); say(/another direction/); say(/fold Hollowmere/); say(/I'll stop him/); say(/Goodbye/); ended("Maren");
+      expectQuest("temple", "done"); expectQuest("main", "active");
+    },
+    pell() {
+      const c = first("pell");
+      p.funds = 500; p.purse = 1000;
+      talk(c); say(/news/);
+      if (!/\w/.test(text())) throw new Error("Pell's news was empty");
+      say(/Interesting/); say(/wares/);
+      if (game.mode !== "shop") throw new Error(`"Show me your wares" opened ${game.mode}`);
+      const before = p.inv.reduce((n, it) => n + (it.count || 1), 0), f0 = p.funds;
+      press("Enter");
+      const bought = f0 - p.funds;
+      if (!(bought > 0) || p.inv.reduce((n, it) => n + (it.count || 1), 0) < before) throw new Error(`buying from Pell: paid ${bought}`);
+      press("Tab");   // sell: a mace from the pack
+      p.inv.unshift({ kind: "weapon", id: "mace", ench: 1, known: true });
+      const f1 = p.funds;
+      press("Enter");
+      if (!(p.funds > f1)) throw new Error("selling to Pell paid nothing");
+      press("Tab");   // services: the first one Pell offers (talk.js servicesFor), which must change its target
+      const svc = servicesFor(game, c)[0];
+      if (!svc) throw new Error("Pell offers no service");
+      const item = svc.target.it || svc.target, was = JSON.stringify(item);
+      const f2 = p.funds;
+      press("Enter");
+      if (!(p.funds < f2)) throw new Error("Pell's first service cost nothing");
+      if (JSON.stringify(item) === was) throw new Error(`Pell's ${svc.id} took the money and left the ${item.kind} as it was`);
+      press("Escape");
+      if (game.mode !== "talk") throw new Error(`Esc from the shop went to ${game.mode}`);
+      say(/Goodbye/); ended("Pell");
+      steps.push(`Pell: bought for ${bought}, sold for ${f2 - f1}, ${svc.id} for ${f2 - p.funds}`);
+    },
+    corwin() {
+      const c = first("corwin");
+      talk(c); say(/find something/); ended("Corwin"); expectQuest("corwin", "active");
+      p.inv.push({ kind: "potion", effect: "healing", count: 1 });
+      game.knownPotions.add("healing");
+      const weapons = p.inv.filter((it) => it.kind === "weapon").length;
+      talk(c); say(/potion of healing/); say(/Safe travels/); ended("Corwin");
+      expectQuest("corwin", "done");
+      if (p.inv.filter((it) => it.kind === "weapon").length !== weapons + 1) throw new Error("Corwin gave no sword");
+    },
+    mira() {
+      const c = first("mira");
+      talk(c); say(/Deal/); ended("Mira"); expectQuest("mira", "active");
+      talk(c); say(/keep looking/);
+      game.zone.seen.fill(1);   // the floor mapped (as walking it would)
+      talk(c); say(/Hand over/); say(/Goodbye/); ended("Mira");
+      expectQuest("mira", "done");
+    },
+    rook() {
+      const c = first("rook");
+      talk(c); say(/Consider it done/); ended("Rook"); expectQuest("rook", "active");
+      const quarry = game.zone.creatures.find((m) => m.bounty);
+      if (!quarry) throw new Error("Rook's quarry isn't on his floor");
+      killMonster(game, quarry, `The ${quarry.name} dies.`);
+      if (!/dead/.test(quest("rook").text)) throw new Error(`Rook's quest text after the kill: "${quest("rook").text}" (the bus didn't route "kill")`);
+      const f0 = p.funds;
+      talk(c); say(/Take the bounty/); ended("Rook");
+      expectQuest("rook", "done");
+      if (!(p.funds > f0)) throw new Error("Rook paid no bounty");
+    },
+    lio() {
+      const c = first("lio");
+      talk(c); say(/I'll find it/); ended("Lio"); expectQuest("lio", "active");
+      const [lx, ly] = c.talk.state.lever, [fx, fy] = c.talk.state.leverFront || [];
+      const zone = game.zone, front = fx !== undefined ? [fx, fy] : [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([ox, oy]) => [lx + ox, ly + oy]).find(([x, y]) => zone.stand[x + y * zone.w] >= 0);
+      Object.assign(p, { x: front[0] + 0.5, y: front[1] + 0.5, z: zone.stand[front[0] + front[1] * zone.w], vz: 0 });
+      game.mode = "map"; game.view = "map";
+      game.debug.mapKey(ARROWS[`${lx - front[0]},${ly - front[1]}`]);   // walk into the lever
+      if (!c.talk.state.free) throw new Error("pulling the lever didn't free Lio");
+      const perks = p.bonusPerks || 0;
+      talk(c); say(/listening/); ended("Lio");
+      expectQuest("lio", "done");
+      if ((p.bonusPerks || 0) !== perks + 1) throw new Error("Lio taught no trick");
+    },
+    brann() {
+      const e = where.get("brann")?.[0];
+      if (!e) throw new Error("no Brann in levels 1-20");
+      // You meet a ghost in 3D with the torch out, in either view.
+      const saved = view;
+      go(e.z);
+      game.view = "3d"; game.mode = "explore";
+      const c = e.c, spot = beside(c.tx, c.ty, c.z);
+      p.yaw = Math.atan2(c.y - p.y, c.x - p.x); p.pitch = 0;
+      p.torch = true; press("KeyE");
+      if (game.mode === "talk") throw new Error("Brann talked with the torch lit");
+      p.torch = false; press("KeyE");
+      if (game.mode !== "talk") throw new Error(`facing Brann with the torch out opened ${game.mode}`);
+      counts.talks++;
+      say(/I'll find it/); ended("Brann"); expectQuest("brann", "active");
+      const skull = findSkull(e.z + 1);
+      if (!skull) throw new Error(`no skull on level ${e.z + 1}`);
+      const sx = Math.floor(skull.x), sy = Math.floor(skull.y);
+      const spot2 = beside(sx, sy, skull.z);
+      if (view === "map") game.debug.mapKey(ARROWS[`${sx - spot2[0]},${sy - spot2[1]}`]);
+      else {
+        Object.assign(p, { x: skull.x, y: skull.y, z: game.zone.stand[sx + sy * game.zone.w], vz: 0 });
+        for (let k = 0; k < 10 && !p.inv.some((it) => it.id === "skull"); k++) { playing(); game.debug.step(1 / 60); }
+        if (!p.inv.some((it) => it.id === "skull")) throw new Error(`3D: standing on the skull (mode ${game.mode}, paused ${game.paused}, skull z ${skull.z}, you ${p.z})`);
+      }
+      if (!p.inv.some((it) => it.kind === "quest" && it.id === "skull")) throw new Error("the skull wasn't picked up");
+      go(e.z);
+      void spot; void saved;
+      talk(c); say(/Give Brann his skull/); say(/Rest well/); ended("Brann");
+      expectQuest("brann", "done");
+    },
+    essAndTee() {
+      const ess = first("ess");
+      talk(ess); say(/look for her/); ended("Ess"); expectQuest("ess", "active");
+      const tee = first("tee");
+      const f0 = p.funds;
+      talk(tee); say(/sister misses you/); say(/Go home safe/); ended("Tee");
+      expectQuest("ess", "done");
+      if (!(p.funds > f0)) throw new Error("Tee gave nothing");
+      talk(first("ess")); say(/Goodbye/); ended("Ess");
+    },
+    door() {
+      const c = first("door"), s = c.talk.state;
+      const wrong = s.choices.find((n) => n !== s.answer);
+      const before = game.zone.creatures.length;
+      talk(c); say(new RegExp(`^"${wrong}\\.?"`)); say(/Goodbye/); ended("the Speaking Door");
+      if (s.open) throw new Error("the wrong number opened the gate");
+      const hatch = game.zone.creatures.length - before;
+      game.zone.creatures = talkersIn(game.zone);
+      talk(c); say(new RegExp(`^"${s.answer}\\.?"`)); say(/Goodbye/); ended("the Speaking Door");
+      if (!s.open || s.gate.some(([x, y, z]) => game.zone.get(x, y, z) !== B.AIR)) throw new Error("the right number didn't open the gate");
+      steps.push(`the Speaking Door: wrong answer let out ${hatch}, the right one opened ${s.gate.length} gate cells`);
+    },
+    shrines() {
+      const all = where.get("shrine") || [];
+      if (all.length < 1) throw new Error("no shrine in levels 1-20");
+      // A plain offering.
+      const { z, c } = all[0];
+      go(z);
+      p.funds = 1000; p.purse = 1000;
+      talk(c); say(/^Offer /); say(/Thank you/); ended("the shrine");
+      if (!c.talk.state.used) throw new Error("the shrine took no offering");
+      // A bold one, until one asks for a trial (one in four); then win it and come back.
+      let trials = 0, tries = 0;
+      for (const { z: tz, c: t } of [...all, ...all, ...all, ...all]) {
+        if (trials) break;
+        go(tz); tries++;
+        Object.assign(t.talk.state, { used: false, trial: null });
+        p.funds = 1000;
+        talk(t); say(/bold offering/);
+        if (t.talk.state.trial) {
+          trials++;
+          say(/Fine/); ended("the shrine");
+          talk(t);
+          if (!/NOT OVER/.test(text())) throw new Error(`a shrine with its trial unfought said "${text()}"`);
+          say(/Goodbye/);
+          for (const m of game.zone.creatures.filter((o) => t.talk.state.trial.includes(o.id))) killMonster(game, m, "");
+          talk(t); say(/Thank you/); ended("the shrine");
+          if (t.talk.state.trial) throw new Error("the trial won, the shrine still waits");
+        } else { say(/Thank you/); ended("the shrine"); }
+      }
+      steps.push(`shrines: ${all.length} in levels 1-20, a plain offering, ${tries} bold ones until a trial`);
+      if (!trials) throw new Error(`no trial in ${tries} bold offerings`);
+    },
+  };
+  for (const [name, run] of Object.entries(encounters)) {
+    try { run(); done.push(name); }
+    catch (e) {
+      problems.push(`${view} ${name}: ${String(e.stack || e).split(/\r?\n/).slice(0, 3).join(" | ")}`);
+      if (game.mode === "talk" || game.mode === "shop") { game.talk = null; game.shop = null; }
+    }
+  }
+  off.forEach((f) => f());
+  const quests = game.quests.filter((q) => q.done).map((q) => q.id);
+  if (counts.questEvents !== game.quests.length + quests.length) problems.push(`${view}: ${counts.questEvents} quest:start/done events on the bus for ${game.quests.length} quests, ${quests.length} done`);
+  if (quests.length !== 7 || game.quests.length !== 8) problems.push(`${view}: ${quests.length} of ${game.quests.length} quests done (want 7 of 8: all but the Lich King's)`);
+  steps.unshift(`${view}: ${done.length} of ${Object.keys(encounters).length} encounters to the end (${done.join(", ")}); quests done ${quests.length} (${quests.join(", ")}); ${counts.talks} talks, ${counts.keys} keys, ${counts.questEvents} quest events`);
+  return { ok: problems.length === 0, steps, problems, stats: { done, quests, ...counts } };
+}
+
 // Golden (a) through one view's controls. Returns { ok, steps, problems, stats }.
 export async function runGoldenA({ view = "map" } = {}) {
   const fixtures = { mechanics: JSON.parse(fs.readFileSync(path.join(ROOT, "tests", "fixtures", "golden", "mechanics.json"), "utf8")) };
@@ -364,6 +640,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     for (const [what, r] of [["golden (a)", await runGoldenA({ view })],
                              ["stairs", runStairs({ seed: Number(args.seed) || 1234, view })],
                              ["smoke", runSmoke({ seed: Number(args.seed) || 1234, view })],
+                             ["encounters", runEncounters({ seed: Number(args.seed) || 1234, view })],
                              ...(view === "3d" ? [["edges", runEdges({ seed: Number(args.seed) || 1234 })]] : [])]) {
       console.log(`${r.ok ? "OK  " : "FAIL"} ${view} ${what}: ${r.steps.join(" · ")}`);
       for (const p of r.problems) console.log(`  ✗ ${p}`);

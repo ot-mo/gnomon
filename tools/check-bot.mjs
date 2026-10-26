@@ -1,10 +1,11 @@
 // The bot in both views (tools/bot.mjs): down three legacy levels and back up, landing beside the
-// right stairs each time; then a smoke run with monsters alive on levels 3, 5, 10, 15 and 20; and the
-// edge walk: off the temple span's east edge in 3D, back west on the map.
+// right stairs each time; then a smoke run with monsters alive on levels 3, 5, 10, 15 and 20; every
+// legacy encounter played to the end (0C); and the edge walk: off the temple span's east edge in 3D, back
+// west on the map.
 //   node tools/check-bot.mjs [--seeds 1234,7]
 import { parseArgs } from "./node-env.mjs";
 import { report } from "./report.mjs";
-import { runStairs, runSmoke, runEdges } from "./bot.mjs";
+import { runStairs, runSmoke, runEdges, runEncounters } from "./bot.mjs";
 
 const args = parseArgs();
 const seeds = String(args.seeds || "1234,7").split(",").map(Number);
@@ -15,6 +16,12 @@ for (const seed of seeds)
     const smoke = runSmoke({ seed, view, seconds: 20 });
     stats[`${view} seed ${seed}`] = `${stairs.steps.length} stair trips, smoke: ${smoke.steps.length} levels`;
     problems.push(...stairs.problems.map((p) => `seed ${seed} stairs: ${p}`), ...smoke.problems.map((p) => `seed ${seed} smoke: ${p}`));
+  }
+for (const seed of seeds)
+  for (const view of ["map", "3d"]) {
+    const enc = runEncounters({ seed, view });
+    stats[`encounters ${view} seed ${seed}`] = enc.steps[0];
+    problems.push(...enc.problems.map((p) => `seed ${seed} encounters: ${p}`));
   }
 for (const seed of seeds) {
   const edges = runEdges({ seed });
