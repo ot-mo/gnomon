@@ -10,7 +10,8 @@
 //      600×300 (100×30 cells): the intro, I, J, the cube, pause, Tab, Esc, Pell's talk and pack, a level
 //      gained, stairs, death; a text field takes "m", "Ö" and "M" from real keys without toggling the
 //      music; losing the pointer lock in 3D opens pause. Here too: the victory card (the Lich King's
-//      epilogue paged by Space, then by clicks; R and a click on "Press R…"), so all 13 modes are reached.
+//      epilogue paged by Space, then by clicks; R and a click on "Press R…"), and since 0D2 the title screen (the
+//      page without ?quick=1: Enter, then a click on "New quick game"), so every registered mode is reached.
 //   2. The HUD at 100×30 (a 600×300 window): tests/checks/hud.js in the browser (screen sizes 100×30,
 //      100×40, 180×56, 80×25), then on the real canvas with every Phase 0 segment and seven statuses on, in
 //      both views: one row, every piece drawn whole inside 100 columns, location and HP shown, and nothing
@@ -153,6 +154,23 @@ try {
     };
     await won("keys");
     await won("mouse");
+    // The title screen (0D2): the page opens on it without ?quick=1; Enter, then a click on "New quick game",
+    // start a run (its intro).
+    for (const how of ["keys", "mouse"]) {
+      await page.goto(`${here.base}/index.html?silent=1&seed=1234`);
+      await page.waitForFunction(() => window.game && window.game.mode === "title");
+      await page.evaluate(async () => {   // (a new page: what it presents is kept again, for click())
+        const { canvasBackend } = await import("/src/screen-canvas.js");
+        const present = canvasBackend.present.bind(canvasBackend);
+        canvasBackend.present = (chars, colors, cols, rows) => { present(chars, colors, cols, rows); window.__frame = { chars: chars.slice(), cols, rows }; };
+      });
+      await frames(page, 2);
+      if (how === "keys") await page.keyboard.press("Enter"); else await click("New quick game");
+      await frames(page, 2);
+      const after = await mode();
+      if (after !== "story") problems.push(`title by ${how}: ${how === "keys" ? "Enter" : "a click on New quick game"} led to ${after}, not the intro`);
+      else reached.add("title");
+    }
     const all = await page.evaluate(async () => [...(await import("/src/screens.js")).SCREENS.keys()].filter((m) => !m.startsWith("test:")));
     const missing = all.filter((m) => !reached.has(m));
     out(`${missing.length || shell.code ? "FAIL" : "PASS"} modes: ${reached.size} of ${all.length} registered reached by keys and clicks (${[...reached].sort().join(", ")})`);
