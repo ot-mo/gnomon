@@ -250,8 +250,9 @@ export function attackMonster(game, m) {
 export function creatureHits(game, m, target, dmg) {
   if (!touchable(game, target, m)) return 0;
   dmg = soak(target, dmg);
+  const state = target.state, lost = target.lost;
   hurtMonster(game, target, dmg, `${dmg}`, [255, 150, 150]);
-  target.state = target.state === "chase" ? "chase" : "wander";   // (hurtMonster set it hunting you)
+  target.state = state === "idle" ? "wander" : state; target.lost = lost;   // (hurtMonster would set it hunting you)
   const brain = (target.brain ||= {});
   brain.hurtBy = m.id;
   (brain.grudges ||= {})[m.id] = 1;
