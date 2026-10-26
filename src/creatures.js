@@ -16,12 +16,16 @@
 //   talkerAt(zone, x, y)                the person standing on tile (x, y)
 //   creatureSprite(game, c)             its 3D sprite, or null where it isn't drawn (flat, a hidden ghost)
 //   touchable(game, target, attacker = game.player, { blade = false })
-//                                       can this blow reach it? (planes, ghosts; talkers never)
+//                                       can this blow reach it? (planes, ghosts; talkers never; pressed
+//                                       flat, you reach only flat things)
+//   touchesYou(game, attacker)          does its blow, arrow or splash reach you? (not while you're flat
+//                                       and it isn't)
 //   ghostHidden(game, c)                a ghostly creature drowned out by light (the one place that asks;
 //                                       light.js inDark at the creature)
 //   ghostOffMap(game, c)                a ghost person the map neither draws nor lets you talk to
 //   hostilesTo(game, e), targetsFor(game, e), talkersIn(zone)   (through factions.js attitude)
 //   creaturesNear(zone, x, y, r)        through spatial buckets during an AI update; buildBuckets, dropBuckets
+//   nearestCreature, sees, witnessesOf, creaturesAlong, eyesOf, bodyMid   the spatial queries (see there)
 //   isFlat(c), isGhostly(c), canTalk(c)
 //   pickCreatureType(rand, level, table = null), rollElite(rand, level)
 //
@@ -32,10 +36,11 @@
 // Talkers have no health, can't be attacked and stand their ground (the AI skips them, and they hold
 // their tile in its occupancy grid with their own id).
 import { B, FLOOR_Z } from "./world.js";
-import { hasStatus } from "./status.js";
+import { hasStatus, statusFlag } from "./status.js";
 import { bonus, contentLevel } from "./stats.js";
 import { nextEntityId, genUid } from "./ids.js";
 import { distance } from "./rng.js";
+import { lineOfSight } from "./raycast.js";
 import { inDark } from "./light.js";
 import { attitude } from "./factions.js";
 import "./content/creatures/legacy.js";   // the parent game's creatures register themselves
@@ -139,14 +144,20 @@ export const ghostOffMap = (game, c) => isGhostly(c) && (!c.talk?.met || (!!game
 // Queen has risen out of the plane: then only in 3D). Ghostly things only in the dark (your torch out).
 // blade: your own weapon (the Edge of the Plane cuts flat things in 3D too). People can't be attacked.
 // A creature's blow (attacker not the player) reaches any creature that isn't a talker.
+// Pressed flat yourself (status.js "flat", bible §10.2) you exist only in the Plane: you touch flat
+// things and nothing else, and only flat things touch you (touchesYou).
 export function touchable(game, target, attacker = game.player, { blade = false } = {}) {
   if (canTalk(target)) return false;
   if (attacker !== game.player) return true;
   if (ghostHidden(game, target)) return false;
+  if (statusFlag(attacker, "flat")) return isFlat(target);
   if (target.risen) return game.view !== "map";
   if (!target.vis?.flat || game.view === "map") return true;
   return blade && bonus(game.player, "cutsFlat") > 0;
 }
+// Does a blow, an arrow or a splash from `attacker` (a creature, or null for no one) reach you? Always,
+// unless you are flat and it isn't.
+export const touchesYou = (game, attacker) => !statusFlag(game.player, "flat") || (!!attacker && isFlat(attacker));
 
 // Who is out for whom: factions.js attitude (a stub until WS6a: monsters are hostile to you and to
 // nobody else, talkers to nobody).
@@ -188,6 +199,59 @@ export function creaturesNear(zone, x, y, r) {
     for (let bx = x0; bx <= x1; bx++)
       for (const c of b.cells[bx + by * b.cols]) if (distance(c.x - x, c.y - y) <= r) out.push(c);
   return out;
+}
+
+// --- Spatial queries (WS8; WS6a's witnesses, the AI, targeting) ---------------------------------------
+// nearestCreature(zone, x, y, r, ok = () => true) → the closest creature within r tiles that ok() accepts
+//     (ties: the lower id), or null.
+// eyesOf(e) → z of its eyes (yours, or a creature's 0.8 of its height); bodyMid(e) → z of its middle.
+// sees(game, c, e) → bool   can creature c see e (the player or a creature) now? Within its type's sight
+//     (people: 10 tiles) and in line of sight from its eyes; for you the parent's rules on top (your
+//     torch or daylight, the shadows potion, stealth, darkness; light.js inDark), and pressed flat you are
+//     a shadow with nobody casting it to anything that isn't flat itself. Ghosts the light drowns out and
+//     things across the plane or the dark (factions.js "unaware") are never seen.
+// witnessesOf(game, e, r = 12) → every creature, people included, within r tiles that sees e: who saw it.
+// creaturesAlong(zone, x0, y0, z0, x1, y1, z1, { pad = 0.15, skip }) → [{ c, t }]: the creatures whose
+//     bodies the segment passes through, nearest first (t: 0..1 along it). skip(c) → true leaves one out.
+//     What a shot would hit on its way (the target screen's interposed creature).
+export function nearestCreature(zone, x, y, r, ok = () => true) {
+  let best = null, bestD = Infinity;
+  for (const c of creaturesNear(zone, x, y, r)) {
+    const d = distance(c.x - x, c.y - y);
+    if ((d < bestD || (d === bestD && c.id < best.id)) && ok(c)) { best = c; bestD = d; }
+  }
+  return best;
+}
+const EYE_PLAYER = 1.45;   // (player.js EYE; creatures.js may not import player.js: it loads first)
+export const eyesOf = (e) => e.z + (e.attrs || e.inv ? EYE_PLAYER : (e.h || 1.7) * 0.8);
+export const bodyMid = (e) => e.z + (e.attrs || e.inv ? EYE_PLAYER * 0.6 : (e.h || 1.7) * 0.6);
+const PEOPLE_SIGHT = 10;
+
+export function sees(game, c, e) {
+  const { zone, player } = game, t = types()[c.type] || {};
+  if (e === c) return true;
+  if (e !== player && (ghostHidden(game, e) || attitude(game, c, e) === "unaware")) return false;
+  if (e === player && statusFlag(player, "flat") && !isFlat(c)) return false;
+  let range = t.sight ?? PEOPLE_SIGHT;
+  if (e === player) {
+    const lit = !inDark(game, zone, player.x, player.y, player.z + EYE_PLAYER);
+    range *= (lit || t.darkSight ? 1 : 0.55) * (statusFlag(player, "hidden") ? 0.35 : 1) *
+      (hasStatus(player, "darkened") && !t.darkSight ? 0.7 : 1) * Math.max(0.3, 1 - bonus(player, "stealth"));
+  }
+  if (distance(e.x - c.x, e.y - c.y) >= range) return false;
+  return lineOfSight(zone, c.x, c.y, eyesOf(c), e.x, e.y, e === player ? eyesOf(e) : bodyMid(e));
+}
+export const witnessesOf = (game, e, r = 12) => creaturesNear(game.zone, e.x, e.y, r).filter((c) => c !== e && sees(game, c, e));
+
+export function creaturesAlong(zone, x0, y0, z0, x1, y1, z1, { pad = 0.15, skip = null } = {}) {
+  const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0, len2 = dx * dx + dy * dy || 1e-9, out = [];
+  for (const c of creaturesNear(zone, (x0 + x1) / 2, (y0 + y1) / 2, Math.sqrt(len2) / 2 + 2)) {
+    if (skip?.(c)) continue;
+    const t = Math.max(0, Math.min(1, ((c.x - x0) * dx + (c.y - y0) * dy) / len2));
+    const px = x0 + dx * t, py = y0 + dy * t, pz = z0 + dz * t;
+    if (distance(px - c.x, py - c.y) < (c.w || 0.75) * 0.45 + pad && pz > c.z - 0.1 && pz < c.z + (c.h || 1.7) + 0.1) out.push({ c, t });
+  }
+  return out.sort((a, b) => a.t - b.t || a.c.id - b.c.id);
 }
 
 // The 3D picture. Monsters: two frames (standing / mid-step), flyers flap, the boss's orb pulses, a
