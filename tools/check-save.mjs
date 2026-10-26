@@ -1,6 +1,6 @@
 // Saves: the codec, the store, snapshot-first saves, write-behind, loading, and the 0D2 gate (save → load →
 // identical after the bot's 10-zone session, in this process and in a fresh one). See tests/checks/save.js.
-//   node tools/check-save.mjs
+//   node tools/check-save.mjs [--seeds 1,7]      (the gate's seeds besides 1234; default 1 and 7)
 //   node tools/check-save.mjs --fresh <store.json> --slot <id> --keys "k1;k2;…"
 //       (the gate's fresh process: loads the slot from that store dump into a game that never ran, and prints
 //       the digest on a line starting "DIGEST ")
@@ -53,4 +53,5 @@ const { runSession } = await import("./bot.mjs");   // (installs the Node enviro
 const { game, startRun, inputHandlers } = await import("../src/game.js");
 const { checkSave } = await import("../tests/checks/save.js");
 const screen = (cols, rows) => installNodeEnv({ cols, rows });   // (the title screen at 100×30, last)
-process.exit(report(await checkSave({ game, startRun, inputHandlers, runSession, fresh, screen, root: ROOT })));
+const seeds = args.seeds === undefined ? undefined : String(args.seeds).split(",").filter(Boolean).map(Number);   // the gate's other seeds
+process.exit(report(await checkSave({ game, startRun, inputHandlers, runSession, fresh, screen, root: ROOT, seeds })));

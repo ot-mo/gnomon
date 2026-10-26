@@ -1,7 +1,7 @@
 // Saves (0D2; TECH_DESIGN §7, §1.4 "save"; P0 skeleton → WS9): the codec, the store, snapshot-first saves,
 // write-behind, loading, and the 0D2 gate.
 //
-//   checkSave({ game, startRun, inputHandlers, runSession, fresh, screen, root }) → Promise<{ name, ok, problems, stats, notes }>
+//   checkSave({ game, startRun, inputHandlers, runSession, fresh, screen, root, seeds = [1, 7] }) → Promise<{ name, ok, problems, stats, notes }>
 //   digestGame(game, keys) → Promise<{ state, player, run, ids, zones: { key: json } }>   canonical JSON (sorted keys)
 //
 // game/startRun/inputHandlers: the real game; runSession: tools/bot.mjs's 10-zone session; fresh(dump, slotId,
@@ -31,6 +31,8 @@
 //      says "load", never a first visit; a stored neighbour and a stored level are read back over an edge and
 //      down stairs, never generated; refused: another game's slot, another save version, another map version,
 //      a slot without the zone you were in; listSlots newest first; deleteSlot takes the zones too.
+//   7. The gate again on more seeds (seeds, default 1 and 7; 1234 is section 1's): the session, save, load in this
+//      process and in a fresh one, canonical JSON identical, buildRun never called, ids above every loaded id.
 //   6. The title screen at 100×30, through the real input handlers: with nothing saved only "New quick game";
 //      with a slot "Continue" too; each by keys (Enter, ↓ Enter, 2) and by a click on its line; New starts a
 //      run at the intro, Continue loads the newest slot; M still switches the music there.
@@ -61,7 +63,7 @@ export async function digestGame(game, keys) {
 const visitedKeys = (game) => [...game.zones.keys()].filter((k) => k === game.zone.key || game.state.zoneLeft[k] !== undefined).sort();
 const playing = (game, view = game.view) => { game.view = view; game.mode = view === "map" ? "map" : "explore"; game.paused = false; game.modeStack = []; };
 
-export async function checkSave({ game, startRun, inputHandlers, runSession, fresh, screen, root }) {
+export async function checkSave({ game, startRun, inputHandlers, runSession, fresh, screen, root, seeds = [1, 7] }) {
   const problems = [], stats = {}, notes = [];
   const fail = (m) => problems.push(m);
   const compare = (what, a, b) => {
@@ -426,6 +428,43 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
     stats.title = `100×30: New quick game and Continue reached ${ways} of 5 ways (Enter, click; ↓ Enter, 2, click)`;
     useStore(was);
   }
+
+  // --- 7. The gate on more seeds ----------------------------------------------------------------------------
+  // The same session, save and load on each seed (the gate asks for 3 with 1234): canonical JSON identical in this
+  // process and in a fresh one, buildRun never called by a load, the id counter above every loaded id.
+  const gates = [];
+  for (const seed of seeds) {
+    const n0 = problems.length;
+    const s = await runSession({ seed });
+    if (!s.ok) fail(`seed ${seed}: the 10-zone session: ${s.problems.join("; ")}`);
+    const ks = visitedKeys(game);
+    if (ks.length < 10) fail(`seed ${seed}: the session visited ${ks.length} zones, not 10`);
+    walk(`seed ${seed}, after the session`);
+    const st = memoryAdapter(), was = currentStore();
+    const a = await digestGame(game, ks);
+    const m = await saveGame(game, { store: st, reason: "gate" });
+    startRun(seed + 1000); game.pages = null;
+    const b0 = RUN_STATS.builds;
+    await loadGame(m.id, { store: st });
+    if (RUN_STATS.builds !== b0) fail(`seed ${seed}: loadGame called buildRun ${RUN_STATS.builds - b0} time(s)`);
+    compare(`seed ${seed}, loaded in this process`, a, await digestGame(game, ks));
+    idsAbove(`seed ${seed}`);
+    walk(`seed ${seed}, after the load`);
+    let freshly = "not run";
+    if (fresh) {
+      try {
+        const other = await fresh(st.dump(), m.id, ks);
+        const n1 = problems.length;
+        compare(`seed ${seed}, loaded in a fresh process`, a, other);
+        if (other.builds !== 0) fail(`seed ${seed}: the fresh process called buildRun ${other.builds} time(s)`);
+        if (other.idProblems?.length) fail(`seed ${seed}, fresh process: ${other.idProblems.slice(0, 3).join("; ")}`);
+        freshly = problems.length === n1 ? "identical" : "differs";
+      } catch (e) { fail(`seed ${seed}, the fresh process: ${String(e.message || e).slice(0, 300)}`); }
+    }
+    useStore(was);
+    gates.push(`${seed}: ${ks.length} zones, run ${a.run.length} chars, ${problems.length === n0 ? "identical" : "DIFFERS"} (fresh process ${freshly})`);
+  }
+  if (seeds.length) stats.moreSeeds = gates.join("; ");
 
   return { name: "save", ok: problems.length === 0, problems, stats, notes };
 }
