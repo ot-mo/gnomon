@@ -14,7 +14,8 @@
 //   4. An empty purse: the torch gutters (once told), to a flicker 1 tile across whose strength jumps about
 //      but never reaches 0, and stays lit for every light rule (inDark false, the map's ring around you still
 //      seen); the HUD says so; a skip that runs the purse dry mid-way ends as fine stepping does. The next
-//      glim relights it the moment it burns in the dark (told once), back to the full torch.
+//      glim relights it at once (told once), back to the full torch, underground and by day alike (it pays
+//      the glim it owes).
 //   5. The old game is untouched: a new player's torch is the parent's (range 6, power 2.2) and nothing is
 //      owed; only torch.js burns glim, through currency.pay.
 export function checkTorch({ game, startRun, torch, clock, time, turns, player, light, hud, currency, compileWorld, REAL_WORLD, torchSrc }) {
@@ -134,6 +135,20 @@ export function checkTorch({ game, startRun, torch, clock, time, turns, player, 
     turns.mapWait(game); game.debug.step(1 / 60);   // (on the map time passes only when you act)
     if (torch.torchGutters(p) || p.funds !== 4 || told(/flares up/) !== 1) fail(`with 5 glim again: guttering ${torch.torchGutters(p)}, funds ${p.funds}, told ${told(/flares up/)}`);
     if (player.torchRange(p) !== 6 || hud.segmentDef("torch").parts(game, p).text !== "torch on") fail(`relit: range ${player.torchRange(p)}`);
+    // Guttering when you come up into daylight, and glim comes in there: relit at once (nothing burns by day, but
+    // the glim it owes is paid), told once.
+    {
+      const q = fresh({ depth: 0, funds: 0 });
+      q.torchBurn = PER;   // (as it arrives from below with an empty purse)
+      if (clock.phase(game) !== "day" || !torch.torchGutters(q)) fail(`the daylight case: ${clock.phase(game)}, guttering ${torch.torchGutters(q)}`);
+      turns.mapWait(game); game.debug.step(1 / 60);
+      if (!torch.torchGutters(q) || q.funds !== 0) fail(`guttering by day with no glim: guttering ${torch.torchGutters(q)}, funds ${q.funds}`);
+      currency.receive(game, q, 3);
+      turns.mapWait(game); game.debug.step(1 / 60);
+      if (torch.torchGutters(q) || q.funds !== 2 || q.torchBurn !== 0 || told(/flares up/) !== 1 || player.torchRange(q) !== 6)
+        fail(`3 glim by day while guttering: guttering ${torch.torchGutters(q)}, funds ${q.funds}, burn ${q.torchBurn}, told ${told(/flares up/)}, range ${player.torchRange(q)}`);
+      stats.relitByDay = `${clock.clockLabel(game)}: relit, 1 owed glim paid, told once`;
+    }
     // A skip that runs the purse dry mid-way equals fine stepping.
     const a = fresh({ funds: 2 });
     time.skipTime(game, 4 * PER + 30, { interruptible: false });
