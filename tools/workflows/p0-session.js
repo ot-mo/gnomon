@@ -12,15 +12,19 @@ export const meta = {
 // The workflow every Phase 0 session ran in the cloud: sequential implementers in one checkout, then three
 // independent read-only verifiers, a fixer, and a rechecker that decides whether the session can be tagged.
 // Run it with Claude Code's Workflow tool: { scriptPath: "tools/workflows/p0-session.js", args: { id, base,
-// prevNotes, extra, steps: [{ key, prompt }], branch, scratch, trailer, verifyExtra } }. The args used for 0B-0D1
-// are in docs/HANDOFF.md's history (git log -p docs/HANDOFF.md) and in the session notes' scope.
+// prevNotes, extra, steps: [{ key, prompt }], branch, scratch, trailer, verifyExtra, repo, python, playwright,
+// machine } }. The last four default to the cloud machine; a local run passes its own (repo path, "python",
+// how Playwright is found, a line about the machine). The args used for 0B-0D1 are in the session notes' scope.
 const S = args
 const BR = S.branch || 'wip/p0-0a2-vgrk8n'
 const SCRATCH = S.scratch || '/tmp/gnomon-scratch'
 const TRAILER = S.trailer || 'Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>'
+const REPO = S.repo || '/home/user/gnomon'
+const PY = S.python || 'python3'
+const PW = S.playwright || "require('playwright')"
 
 const COMMON = `
-GNOMON is a browser ASCII roguelike (repo /home/user/gnomon, branch ${BR}; stay on it). You work on Phase 0 session
+GNOMON is a browser ASCII roguelike (repo ${REPO}, branch ${BR}; stay on it). ${S.machine || ''} You work on Phase 0 session
 ${S.id} (TECH_DESIGN §8.2 "${S.id}": its scope and gate are your contract). Read CLAUDE.md and docs/HANDOFF.md first.
 Governing documents, in order of authority: docs/design/DECISIONS.md (read it fully; it overrides everything), then
 docs/design/WORLD_BIBLE.md §15 (binding data), the rest of the bible, then docs/design/TECH_DESIGN.md (data models §2,
@@ -36,9 +40,9 @@ Rules:
 - Keep the old game and the 0A2 world playable at every commit: main is served by GitHub Pages.
 - Commit each logical step separately and push right after: \`git push origin ${BR}\`. End every commit message with:
 ${TRAILER}
-  Never rewrite history, never touch other branches, never tag (tag pushes are refused here anyway).
-- Browser checks (headless Playwright; require('playwright'), chromium.launch() with no options; serve with
-  \`python3 -m http.server <port>\` from /home/user/gnomon in the background): BEFORE any page script, add an init script
+  Never rewrite history, never touch other branches, never tag (the session's lead tags after the recheck).
+- Browser checks (headless Playwright; ${PW}, chromium.launch() with no options; serve with
+  \`${PY} -m http.server <port>\` from ${REPO} in the background): BEFORE any page script, add an init script
   that redirects every connect() to an AudioDestinationNode into an AnalyserNode followed by a zero-gain GainNode. Close
   the browser and kill the server when done. tools/browser-gate.mjs is the 0A2 example.
 - Match the surrounding code style. New checks: tests/checks/<name>.js + tools/check-<name>.mjs, picked up by run-all.
