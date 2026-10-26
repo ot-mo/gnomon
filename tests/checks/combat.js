@@ -10,6 +10,9 @@
 //      against creatures of several levels, and for creatures against your DV. Crit rates too. One row
 //      also goes through the whole resolveAttack (10⁵ blows on a goblin that can't die). A natural 20
 //      hits a DV no roll can beat (5% of rolls, each a natural-20 crit), through rollToHit and resolveAttack.
+//   2b. Damage and soak (d20): your blade's mean (range + material + floor((STR − req)/2) + enchantment)
+//      and ×crit; a creature's armour soaks 0..AV uniformly; a creature's blow on you (range + level
+//      bonus, ×crit), and your armour's soak 0..AV, uniformly.
 //   3. Both views, one resolution: a bump duel on the map and a swing duel in 3D with the same combat RNG
 //      give identical result sequences (hit, crit, natural, total, DV, damage, soak).
 //   4. The planes, the dark and the core: a flatling is struck on the map and never in 3D (the bump lands,
@@ -28,7 +31,8 @@ import { resolveAttack, rollToHit, hitChance, toHitMod, critNat, dvOf, weaponSpe
 import { guardianThink } from "../../src/guardians.js";
 import { mapStep } from "../../src/turns.js";
 import { overrideRules, RULES } from "../../src/rules.js";
-import { invalidateStats, mod } from "../../src/stats.js";
+import { invalidateStats, mod, maxHp, av as armourValue } from "../../src/stats.js";
+import { makeBody } from "../../src/body.js";
 import { makeRng } from "../../src/rng.js";
 import { on } from "../../src/events.js";
 import { setDaylight } from "../../src/light.js";
@@ -177,6 +181,74 @@ export function checkCombat({ game, startRun, srcFiles }) {
       expect(Math.abs(full / 20000 - 0.05) <= 0.008 && fullOdd === 0, `resolveAttack against DV ${dvOf(game, far)}: hit ${full / 20000} (want 0.05), ${fullOdd} not a natural-20 crit`);
       stats.natural20 = { dv: dvOf(game, far), rollToHit: hits / ROLLS, resolveAttack: full / 20000 };
       setAgi(16);
+      game.effects.length = 0;
+    }
+
+    // --- 2b. Damage and soak (d20) ------------------------------------------------------------------------
+    // Your blade: range + material + floor((STR − req) / 2) + enchantment, ×crit; a creature's armour soaks
+    // a random 0..AV. A creature's blow: range + its level bonus, ×crit, then your armour soaks 0..AV.
+    {
+      const mean = (xs) => xs.reduce((a, x) => a + x, 0) / Math.max(1, xs.length);
+      const DT = 0.05, N = 40000;
+      const dummy = mk("goblin", 1);
+      dummy.hp = dummy.maxHp = 1e9;
+      const blade = { ...sword, dmg: [2, 5], req: 6, ench: 1, material: 1 };   // STR 10: +floor(4/2) = +2
+      const wantPlain = 3.5 + 1 + 2 + 1;
+      const blows = (tgt, spec, n = N) => {
+        const out = [];
+        for (let k = 0; k < n; k++) {
+          out.push(resolveAttack(game, p, tgt, spec, { view: "map" }));
+          if ((k & 1023) === 0) { game.effects.length = 0; logged.length = 0; }
+        }
+        return out.filter((x) => x.hit);
+      };
+      game.combatRng = makeRng(31);
+      let landed = blows(dummy, blade);
+      const plain = mean(landed.filter((x) => !x.crit).map((x) => x.dmg)), crits = mean(landed.filter((x) => x.crit).map((x) => x.dmg));
+      expect(Math.abs(plain - wantPlain) <= DT, `your blade (2-5, +1 material, +1 enchantment, STR 10 over req 6): mean ${plain.toFixed(3)}, want ${wantPlain}`);
+      expect(Math.abs(crits - wantPlain * RULES.d20.crit) <= DT * 4, `your crits: mean ${crits.toFixed(3)}, want ×${RULES.d20.crit} = ${wantPlain * RULES.d20.crit}`);
+      expect(landed.every((x) => x.soaked === 0), "a creature with no armour soaked a blow");
+      // Its armour: 0..4 at random, uniformly.
+      dummy.armour = 4;
+      landed = blows(dummy, blade);
+      const soaks = landed.map((x) => x.soaked), counts = [0, 1, 2, 3, 4].map((v) => soaks.filter((s) => s === v).length / soaks.length);
+      expect(soaks.every((s) => s >= 0 && s <= 4) && counts.every((c) => Math.abs(c - 0.2) <= 0.02) && Math.abs(mean(soaks) - 2) <= DT,
+        `a creature's AV 4 soaks ${counts.map((c) => c.toFixed(3))} of 0..4 (mean ${mean(soaks).toFixed(3)}), want 0.2 each, mean 2`);
+      expect(landed.every((x) => x.dmg + x.soaked >= 6), "a blow on an armoured creature lost more than its soak");
+      dummy.armour = 0;
+      stats.damage = { yours: { plain: +plain.toFixed(3), crit: +crits.toFixed(3), want: wantPlain }, creatureSoak: counts.map((c) => +c.toFixed(3)) };
+      // A creature's blow on you (goblin level 5: 2-4 + 1). First with no armour, then with AV 4.
+      const biter = mk("goblin", 5);
+      const wantBite = 3 + 1;
+      const onYou = (n = N) => {
+        const out = [];
+        for (let k = 0; k < n; k++) {
+          p.hp = 1e6;
+          out.push(resolveAttack(game, biter, p, naturalSpec(biter)));
+          if ((k & 1023) === 0) { game.effects.length = 0; logged.length = 0; }
+        }
+        p.hp = maxHp(p);
+        return out.filter((x) => x.hit);
+      };
+      const savedBody = p.body;
+      p.body = makeBody(p.body?.plan || "humanoid");   // nothing worn: AV 0
+      invalidateStats(p);
+      const av0 = armourValue(p);
+      game.combatRng = makeRng(32);
+      let bites = onYou();
+      const bPlain = mean(bites.filter((x) => !x.crit).map((x) => x.dmg)), bCrit = mean(bites.filter((x) => x.crit).map((x) => x.dmg));
+      expect(av0 === 0 && bites.every((x) => x.soaked === 0), `with nothing worn your AV is ${av0} and blows were soaked`);
+      expect(Math.abs(bPlain - wantBite) <= DT && Math.abs(bCrit - wantBite * RULES.d20.crit) <= DT * 4,
+        `a level-5 goblin's blow on you: mean ${bPlain.toFixed(3)} (want ${wantBite}), crits ${bCrit.toFixed(3)} (want ${wantBite * RULES.d20.crit})`);
+      p.innate = { armour: 4 }; invalidateStats(p);
+      const av4 = armourValue(p);
+      bites = onYou();
+      const ySoaks = bites.map((x) => x.soaked), yCounts = [0, 1, 2, 3, 4].map((v) => ySoaks.filter((s) => s === v).length / ySoaks.length);
+      expect(av4 === 4 && yCounts.every((c) => Math.abs(c - 0.2) <= 0.02),
+        `your AV ${av4} soaks ${yCounts.map((c) => c.toFixed(3))} of 0..4, want 0.2 each`);
+      expect(bites.every((x) => x.dmg >= 0 && x.dmg <= (x.crit ? RULES.d20.crit : 1) * 5), "a blow on you did more than its range (×crit) allows");
+      delete p.innate; p.body = savedBody; invalidateStats(p);
+      stats.damage.onYou = { plain: +bPlain.toFixed(3), crit: +bCrit.toFixed(3), want: wantBite, soak: yCounts.map((c) => +c.toFixed(3)) };
       game.effects.length = 0;
     }
     field.creatures.length = 0;
