@@ -34,8 +34,9 @@
 //   wary       (from factions.js attitude "wary" toward you) it watches you from within RULES.ai.wary.watch
 //              tiles and backs off to stay RULES.ai.wary.keep tiles away; it never strikes first
 //   flee       under fleeLevel × its health it runs from what hurts it (greedy steps away), until it has
-//              healed to RULES.ai.flee.recover or not seen its foe for RULES.ai.flee.forget seconds;
-//              cornered, it turns and fights. A type's `flee` (a share) says how cowardly it is; under
+//              healed to RULES.ai.flee.recover or not seen its foe for RULES.ai.flee.forget seconds; it
+//              runs RULES.ai.flee.most seconds at most, and cornered or run out it turns at bay and fights
+//              for RULES.ai.flee.brave seconds before it may run again. A type's `flee` (a share) says how cowardly it is; under
 //              the d20 set RULES.ai.flee.byType gives the parent's living creatures one, the legacy set none
 //   arriving   seconds until it comes after you into this zone (hidden, not acting, not touchable)
 // Abilities (abilities.js): a creature with any (its innate list, its gear) tries each ready one every
@@ -70,7 +71,8 @@ export const AI_RULES = extendRules("ai", {
   foeRange: 8, foeForget: 3,          // creature targets: picked and followed within 8 tiles, dropped after 3 s out of sight
   lose: 8,                            // a hunter that hasn't seen you for this long gives up (the parent's)
   outdoorRadius: 32,                  // 3D on a surface zone: creatures further away that aren't busy wait (§3.4)
-  flee: { recover: 0.5, forget: 6,    // fleeing ends at half health, or after 6 s without seeing its foe
+  flee: { recover: 0.5, forget: 6,    // fleeing ends at half health, or after 6 s without seeing its foe,
+          most: 10, brave: 15,        // or after 10 s however it goes; then it stands and fights for 15 s
           byType: { rat: 0.3, bat: 0.3, goblin: 0.2, archer: 0.3, spider: 0.2, orc: 0.12, salamander: 0.15 } },   // (d20 only)
   wary: { keep: 3, watch: 8 },
   follow: { near: 2, far: 5, edge: 8 },
@@ -170,6 +172,9 @@ export function updateCreatures(game, dt, radius = Infinity) {
       m.hurt = Math.max(0, m.hurt - dt);
       m.cd = Math.max(0, m.cd - dt * pace);   // chilled: half as often; hasted: faster
       m.shot -= dt * pace;
+      if (b?.fleeT > 0) b.fleeT -= dt;        // fleeing: time out of sight of what it fears
+      if (b?.fleeLeft > 0) b.fleeLeft -= dt;  // … and how long it will run at most
+      if (b?.braveT > 0) b.braveT -= dt;      // cornered: time before it thinks of running again
 
       // The ground vanished (a trap opened): it falls to the floor below.
       if (stand[m.tx + m.ty * w] < 0) { killMonster(game, m, `The ${m.name} falls into the dark.`, false, false); continue; }
@@ -220,7 +225,7 @@ export function updateCreatures(game, dt, radius = Infinity) {
         else {
           const brain = (m.brain ||= {});
           brain.braveT = 3;   // cornered: it fights for a while before it thinks of running again
-          delete brain.fleeFrom; delete brain.fleeT;
+          delete brain.fleeFrom; delete brain.fleeT; delete brain.fleeLeft;
           if (from === player) { m.state = "chase"; m.lost = 0; } else { brain.target = from.id; m.state = "wander"; }
         }
       } else if (foe) {
@@ -354,13 +359,13 @@ function perceive(game, m, t) {
   }
   // Hurt badly enough, it runs from what it was fighting (not for a while after it was cornered).
   const fleeAt = fleeLevel(m);
-  if (fleeAt > 0 && m.brain?.braveT > 0) m.brain.braveT -= 0.25;
-  else if (fleeAt > 0 && m.hp < m.maxHp * fleeAt) {
+  if (fleeAt > 0 && !(m.brain?.braveT > 0) && m.hp < m.maxHp * fleeAt) {
     const from = m.state === "chase" ? player : foeOf(game, m) || byId(game, m.brain?.hurtBy);
     if (from) {
       const brain = (m.brain ||= {});
       brain.fleeFrom = from === player ? "player" : from.id;
       brain.fleeT = AI_RULES.flee.forget;
+      brain.fleeLeft = AI_RULES.flee.most;
       brain.target = null;
       m.state = "flee";
       if (dist < 14 && from === player) game.log(`The ${m.name} turns and runs!`, m.color);
@@ -378,11 +383,14 @@ function perceive(game, m, t) {
 function keepFleeing(game, m, seenYou) {
   const b = (m.brain ||= {}), from = threatOf(game, m);
   const seen = from === game.player ? seenYou : !!from && sees(game, m, from);
-  b.fleeT = seen ? AI_RULES.flee.forget : (b.fleeT ?? AI_RULES.flee.forget) - 0.25;
-  if (!from || m.hp >= m.maxHp * AI_RULES.flee.recover || b.fleeT <= 0) {
+  if (seen || b.fleeT === undefined) b.fleeT = AI_RULES.flee.forget;   // (updateCreatures counts it down)
+  const healed = m.hp >= m.maxHp * AI_RULES.flee.recover;
+  if (!from || healed || b.fleeT <= 0 || !(b.fleeLeft > 0)) {
     m.state = "wander";
-    delete b.fleeFrom; delete b.fleeT;
-    if (m.hp >= m.maxHp * AI_RULES.flee.recover && from === game.player && seenYou) { m.state = "chase"; m.lost = 0; }
+    if (!healed && from && b.fleeT > 0) b.braveT = AI_RULES.flee.brave;   // run out of running: it turns at bay
+    delete b.fleeFrom; delete b.fleeT; delete b.fleeLeft;
+    if (from === game.player && seenYou && (healed || b.braveT > 0)) { m.state = "chase"; m.lost = 0; }
+    else if (from && from !== game.player && b.braveT > 0) b.target = from.id;
   }
 }
 
@@ -595,7 +603,7 @@ function catchUpZone(game, zone, away) {
     if (b) {
       if (away > FOE_FORGET) b.target = null;
       if (b.arriving > 0) b.arriving = Math.max(0, b.arriving - away);
-      delete b.fleeFrom; delete b.fleeT; delete b.wary; delete b.braveT;
+      delete b.fleeFrom; delete b.fleeT; delete b.fleeLeft; delete b.wary; delete b.braveT;
     }
   }
   zone.bombs = (zone.bombs || []).filter((bomb) => (bomb.fuse -= away) > 0);   // went off while you were away

@@ -271,11 +271,11 @@ registerScreen(MODE, {
       S.put(sx + 1, sy, "]", ...(data.purpose === "look" ? UI.cursor : c));
     }
     // Header: what you're doing and the keys; the last row: what's under the cursor.
+    const { top: head, bottom } = texts(game, data, t, fire);
     S.blank(0, 0, S.cols, 1);
-    const confirmKey = AGAIN[data.purpose] ? `Enter/${AGAIN[data.purpose].slice(3)}` : "Enter";
-    S.text(1, 0, ` ${TITLE[data.purpose] || "TARGET"}${data.verb ? `: ${data.verb}` : ""} · arrows/WASD or mouse: aim · Tab: next · ${confirmKey} or click: ${data.purpose === "look" ? "look" : "go"} · Esc: cancel `.slice(0, S.cols - 2), ...UI.title);
+    S.text(1, 0, head.slice(0, S.cols - 2), ...UI.title);
     S.blank(0, S.rows - 1, S.cols, 1);
-    S.text(1, S.rows - 1, ` ${infoLine(game, data, t, fire)} `.slice(0, S.cols - 2), ...UI.text);
+    S.text(1, S.rows - 1, bottom.slice(0, S.cols - 2), ...UI.text);
   },
   key(game, code, repeat) {
     const data = modeData(game);
@@ -300,6 +300,17 @@ registerScreen(MODE, {
   },
   wheel(game, sign) { cycle(modeData(game), sign > 0 ? 1 : -1); },
 });
+
+// The screen's two rows of text: the header (what you're doing, the keys) and the last row (infoLine).
+function texts(game, data, t = targetAt(game, data.cursor), fire = lineOfFire(game, data)) {
+  const confirmKey = AGAIN[data.purpose] ? `Enter/${AGAIN[data.purpose].slice(3)}` : "Enter";
+  const top = ` ${TITLE[data.purpose] || "TARGET"}${data.verb ? `: ${data.verb}` : ""} · arrows/WASD or mouse: aim · Tab: next · ${confirmKey} or click: ${data.purpose === "look" ? "look" : "go"} · Esc: cancel `;
+  return { top, bottom: ` ${infoLine(game, data, t, fire)} ` };
+}
+export function targetText(game) {
+  const data = game.mode === MODE ? modeData(game) : null;
+  return data ? texts(game, data) : { top: "", bottom: "" };
+}
 
 // What the last row says: the creature and your chance against it, or the tile; how far; what's in the way.
 function infoLine(game, data, t, fire) {
