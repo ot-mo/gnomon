@@ -9,9 +9,10 @@
 //      shadows by day along the Hand; the Hand by the bible's cases, dimming the span under it to dusk; the noon sky the parent's,
 //      the night's dark, dusk's horizon warm; the haze the horizon's colour outdoors and the parent's dark fog
 //      (exactly) underground; one light bucket all night, a new one every 15 minutes by day.
-//   2. No black below the horizon: at noon on the test world's start span (three seeds) and the real world's,
-//      their aprons filled, facing every open side and corner from 6 tiles and 1 tile in, no cell of the 3D
-//      view below the horizon is black (a blank character or a colour under 8). p0-done drew a 6-row band.
+//   2. No black below the horizon: at noon on the test world's start span (three seeds), the real world's, and two
+//      real spans beside Hollowmere with a shut corner between open sides, their aprons filled, facing every side
+//      and corner from 6 tiles and 1 tile in, no cell of the 3D view below the horizon is black (a blank character
+//      or a colour under 8); nor, at 180×55 (an odd row count), the level row at pitch 0. p0-done drew a 6-row band.
 //   3. The dark-only rules by the clock (not setDaylight): on a sky-lit field with your torch out a ghost plank
 //      is not drawn at noon and is at midnight (never with the torch lit); runes look different at noon and
 //      midnight; with the torch out at night the auto-map marks only what lamps light, by day much more, in 3D
@@ -108,11 +109,22 @@ export async function checkRender(m) {
 
   // --- 2. No black below the horizon at noon -----------------------------------------------------------------
   {
-    const runs = [[4242, undefined, "test"], [1234, undefined, "test"], [7, undefined, "test"], [4242, worldmap.REAL_WORLD, "real"]];
+    const runs = [[4242, undefined, "test"], [1234, undefined, "test"], [7, undefined, "test"], [4242, worldmap.REAL_WORLD, "real"],
+                  [4242, worldmap.REAL_WORLD, "real", "3,17,0"], [4242, worldmap.REAL_WORLD, "real", "7,19,0"]];
     const spots = [];
     let worst = 0, views = 0;
-    for (const [seed, w, name] of runs) {
+    const blackBelow = () => {
+      let black = 0;
+      for (let y = Math.ceil(capture.rows / 2); y < capture.rows; y++)
+        for (let x = 0; x < capture.cols; x++) {
+          const i = y * capture.cols + x;
+          if (capture.chars[i] === " " || capture.colors[i * 3] + capture.colors[i * 3 + 1] + capture.colors[i * 3 + 2] < 8) black++;
+        }
+      return black;
+    };
+    for (const [seed, w, name, key] of runs) {
       fresh(seed, w);
+      if (key) game.debug.enterZone(key, "start");
       const zone = game.zone;
       for (const side of ["n", "e", "s", "w", "ne", "nw", "se", "sw"]) {
         const a = zones.neighbourAddr(game, zone, side);
@@ -121,24 +133,33 @@ export async function checkRender(m) {
       zones.fillApron(game, zone);
       game.time = T(12);
       const open = ["n", "e", "s", "w", "ne", "nw", "se", "sw"].filter((s) => zone.apron?.[s]);
-      for (const side of open) {
+      for (const side of ["n", "e", "s", "w", "ne", "nw", "se", "sw"]) {
         const dx = side.includes("e") ? 1 : side.includes("w") ? -1 : 0, dy = side.includes("s") ? 1 : side.includes("n") ? -1 : 0;
         for (const inset of [6, 1]) {
           const tx = dx > 0 ? zone.w - 1 - inset : dx < 0 ? inset : zone.w >> 1, ty = dy > 0 ? zone.d - 1 - inset : dy < 0 ? inset : zone.d >> 1;
           const s = standNear(zone, tx, ty);
           Object.assign(p(), { x: s.x + 0.5, y: s.y + 0.5, z: s.z, vz: 0, yaw: Math.atan2(dy, dx), pitch: 0, torch: true });
           frame3d();
-          let black = 0;
-          for (let y = Math.ceil(capture.rows / 2); y < capture.rows; y++)
-            for (let x = 0; x < capture.cols; x++) {
-              const i = y * capture.cols + x;
-              if (capture.chars[i] === " " || capture.colors[i * 3] + capture.colors[i * 3 + 1] + capture.colors[i * 3 + 2] < 8) black++;
-            }
+          const black = blackBelow();
           views++; worst = Math.max(worst, black);
           if (black) spots.push(`${name} ${seed} ${zone.key} facing ${side} from ${s.x},${s.y}: ${black}`);
         }
       }
-      expect(open.length > 0, `${name} ${seed}: the start span ${zone.key} has no open side to face`);
+      expect(open.length > 0, `${name} ${seed}: the span ${zone.key} has no open side to face`);
+      if (key) expect(!zone.apron.se || !zone.apron.sw || !zone.apron.ne || !zone.apron.nw, `${key}: no shut corner to face`);
+      // An odd number of rows: at pitch 0 the middle row's rays are level (dz 0).
+      if (m.resize && !key && name === "real") {
+        m.resize(180, 55);
+        const s = standNear(zone, zone.w >> 1, zone.d >> 1);
+        for (const yaw of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+          Object.assign(p(), { x: s.x + 0.5, y: s.y + 0.5, z: s.z, vz: 0, yaw, pitch: 0, torch: true });
+          frame3d();
+          const black = blackBelow();
+          views++; worst = Math.max(worst, black);
+          if (black) spots.push(`${name} ${seed} ${zone.key} at 180×55, yaw ${yaw.toFixed(2)}, pitch 0: ${black}`);
+        }
+        m.resize(180, 56);
+      }
     }
     expect(!spots.length, `black cells below the horizon at noon: ${spots.slice(0, 4).join("; ")}`);
     stats.horizon = { views, worstBlackBelow: worst };
@@ -428,7 +449,7 @@ export async function run(env) {
   const { currentApi } = await import("../golden/current-api.js");
   const S = await load("screen.js");
   const result = await checkRender({ game: g.game, startRun: g.startRun, S, capture: scr.capture, frameHash: scr.frameHash, clock, light, raycast,
-    render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, golden: null, seedRandom: env.seedRandom });
+    render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, golden: null, seedRandom: env.seedRandom, resize: scr.resize });
   // Golden (b) last: its api reseeds Math.random and replaces the run.
   const api = await currentApi({ load, capture: scr.capture, frameHash: scr.frameHash }, env.seedRandom);
   const gold = checkGolden(api, fixtures, { only: ["frames"] });
