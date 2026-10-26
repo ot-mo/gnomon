@@ -10,7 +10,7 @@
 //       new memory store).
 //   loadGame(slotId, { game, store } = {}) → Promise<game>
 //       §7.3 "Loading": the world compiled (game.world), restoreRun(slot.run), never buildRun; state, player and
-//       the id counter (before any zone); then changeZone(where, { how: "load" }) reads the zone you were in
+//       the id counter (before any zone: the slot's, or a zone record's when that is higher); then changeZone(where, { how: "load" }) reads the zone you were in
 //       and puts you back exactly as you were, and setMode(game, playMode(game)) starts the mode stack afresh
 //       (in 3D the pause card on top: a click takes the pointer); until then the title screen covers the wait,
 //       from wherever it was called. Every other visited zone stays in the store
@@ -171,7 +171,9 @@ export async function loadGame(slotId, { game = theGame, store } = {}) {
   // Until the zone is read the title screen covers the wait (frames go on, and there is no zone to draw).
   if (game.mode !== "title") setMode(game, "title", null, { pointer: false });
   resumeRun(game,{ seed: slot.seed, run, state: slot.state, player: decodePlayer(slot.player), view: slot.where.view });
-  setIds(slot.ids);   // before any zone is read (§7.4)
+  // The id counter, before any zone is read (§7.4), above every id in every record of the slot: write-behind
+  // goes on writing the zones you leave after a save, and the ones made since then hold ids past the slot's counter.
+  setIds({ ...slot.ids, entity: Math.max(slot.ids.entity, ...zones.map((r) => r.ids?.entity || 0)) });
   const sv = game.saving = newSaving(slotId, slot.created, st);
   for (const r of zones) { sv.committed.add(r.key); sv.stored.set(r.key, r.savedAt); }
   const p = game.player;

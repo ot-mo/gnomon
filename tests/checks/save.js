@@ -34,7 +34,8 @@
 //   7. The gate again on more seeds (seeds, default 1 and 7; 1234 is section 1's): the session, save, load in this
 //      process and in a fresh one, canonical JSON identical, buildRun never called, ids above every loaded id.
 //   8. What the session doesn't reach, saved → loaded → identical: legacy level 15 after the Colossus has slammed
-//      and while its next slam is warned (both views: zone.slam and zone.slamDone hold Sets).
+//      and while its next slam is warned (both views: zone.slam and zone.slamDone hold Sets). Zones made and left
+//      after a save (written behind): the load's id counter is above every id in them.
 //   6. The title screen at 100×30, through the real input handlers: with nothing saved only "New quick game";
 //      with a slot "Continue" too; each by keys (Enter, ↓ Enter, 2) and by a click on its line; New starts a
 //      run at the intro, Continue loads the newest slot; M still switches the music there.
@@ -58,7 +59,7 @@ export async function digestGame(game, keys) {
                 ids: canonicalJson(getIds()), zones: {} };
   for (const key of keys) {
     const z = cachedZone(game, key) || await getZone(game, key);
-    out.zones[key] = z ? canonicalJson({ ...(await encodeZone(z, {}, { deflate: false })), slot: null, savedAt: 0 }) : null;
+    out.zones[key] = z ? canonicalJson({ ...(await encodeZone(z, {}, { deflate: false })), slot: null, savedAt: 0, ids: null }) : null;
   }
   return out;
 }
@@ -515,6 +516,26 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
       if (!(back?.cells instanceof Set) || [...back.cells].sort((a, b) => a - b).join() !== cells || !(game.zone.slam?.cells instanceof Set))
         fail(`level 15 (${view}): the slam came back as ${JSON.stringify(back && { ...back, cells: [...back.cells || []].length })}`);
     }
+  }
+  // Zones made after the save and left (write-behind wrote them): a load sets the id counter above their ids too,
+  // before any zone is read, so no id is handed out twice.
+  {
+    startRun(1234); game.pages = null; game.story.cube = true;
+    playing(game, "map");
+    const st = memoryAdapter(), m = await saveGame(game, { store: st });
+    const atSave = entityCounter();
+    for (const key of ["0,0,1", "0,0,2"]) { await changeZone(game, key, { how: "down" }); playing(game, "map"); }
+    await changeZone(game, "0,0,0", { how: "up" }); playing(game, "map");
+    await whenWritten(game);
+    const recs = await st.list("zones", { slot: m.id });
+    const top = Math.max(...recs.flatMap((r) => r.creatures.map((c) => c.id)));
+    startRun(4321); game.pages = null;
+    await loadGame(m.id, { store: st });
+    const n = entityCounter();
+    if (!(n > top)) fail(`zones written after the save hold ids up to ${top}, and a load set the counter to ${n} (the slot's was ${atSave})`);
+    for (const key of ["0,0,1", "0,0,2"]) await getZone(game, key);
+    idsAbove("zones written after the save, read back");
+    hard.push(`zones written after the save (ids up to ${top}; the slot's counter ${atSave}): the counter ${n} after a load`);
   }
   stats.hardCases = hard.join("; ");
 
