@@ -132,13 +132,14 @@ export function dismiss(game, c) {
 }
 
 // --- Fleeing ----------------------------------------------------------------------------------------------
-export function fleeLevel(c) {
+export function fleeLevel(c, d20 = RULES.combat === "d20") {
   const t = CREATURE_TYPES[c.type] || {};
   if (c.brain?.flee !== undefined && typeof c.brain.flee === "number") return c.brain.flee;
   if (t.flee !== undefined) return t.flee;
-  if (RULES.combat !== "d20" || t.guardian || t.boss) return 0;
+  if (!d20 || t.guardian || t.boss) return 0;
   return AI_RULES.flee.byType[c.type] || 0;
 }
+let d20Now = false;   // RULES.combat === "d20", read once an update (RULES is a proxy)
 // What it runs from: you, or the creature it last fought.
 const threatOf = (game, c) => (c.brain?.fleeFrom === "player" ? game.player : byId(game, c.brain?.fleeFrom));
 
@@ -147,6 +148,7 @@ export function updateCreatures(game, dt, radius = Infinity) {
   const { w, stand } = zone;
   const ptx = Math.floor(player.x), pty = Math.floor(player.y);
   if (radius === Infinity && zone.type === "surface" && game.view !== "map") radius = AI_RULES.outdoorRadius;   // §3.4
+  d20Now = RULES.combat === "d20";
   flowTo(game, player);
 
   // Who holds which tile: a creature its tile and the one it steps to, a person (who stands their
@@ -196,8 +198,7 @@ export function updateCreatures(game, dt, radius = Infinity) {
 
       m.think -= dt;
       if (m.think <= 0) { m.think = 0.25; perceive(game, m, t); }
-      if (m.innate || m.body) useAbilities(game, m, dt);
-      if (!zone.creatures.includes(m)) continue;
+      if ((m.innate || m.body) && useAbilities(game, m, dt) && !zone.creatures.includes(m)) continue;
 
       const foe = m.state === "chase" ? null : foeOf(game, m);
       const leader = foe ? null : leaderOf(game, m);
@@ -206,13 +207,13 @@ export function updateCreatures(game, dt, radius = Infinity) {
       const flat = Math.hypot(dx, dy);
       const inReach = flat <= t.reach + RADIUS && dz > -1.2 && dz < 1.3;
       const r = t.ranged;
-      const pinned = statusFlag(m, "noMove");
+      const pinned = !moving && statusFlag(m, "noMove");   // (a step already begun is finished)
 
       if (moving) {
         const len = m.nx !== m.tx && m.ny !== m.ty ? Math.SQRT2 : 1;
         const wet = !t.hover && (zone.get(m.tx, m.ty, FLOOR_Z - 1) === B.WATER_SHALLOW || zone.get(m.nx, m.ny, FLOOR_Z - 1) === B.WATER_SHALLOW);
         const brisk = m.state === "chase" || foe || m.state === "flee" || (leader && distance(leader.x - m.x, leader.y - m.y) > AI_RULES.follow.far);
-        if (!pinned) m.p += (t.speed * m.speedMul * (brisk ? 1 : 0.45) * (wet ? 0.6 : 1) * pace * dt) / len;
+        m.p += (t.speed * m.speedMul * (brisk ? 1 : 0.45) * (wet ? 0.6 : 1) * pace * dt) / len;
         if (m.p >= 1) {
           occ[m.tx + m.ty * w] = 0;
           m.tx = m.nx; m.ty = m.ny; m.p = 0;
@@ -358,7 +359,7 @@ function perceive(game, m, t) {
     if (m.lost > AI_RULES.lose) m.state = "wander";
   }
   // Hurt badly enough, it runs from what it was fighting (not for a while after it was cornered).
-  const fleeAt = fleeLevel(m);
+  const fleeAt = fleeLevel(m, d20Now);
   if (fleeAt > 0 && !(m.brain?.braveT > 0) && m.hp < m.maxHp * fleeAt) {
     const from = m.state === "chase" ? player : foeOf(game, m) || byId(game, m.brain?.hurtBy);
     if (from) {
@@ -507,10 +508,11 @@ function followStep(game, m, occ, ptx, pty, leader) {
 
 // --- Abilities --------------------------------------------------------------------------------------------
 // Every RULES.ai.ability.every seconds, each ready ability whose def.ai.when says so, at what it fights.
+// → true when one was used (it may have moved or killed something).
 function useAbilities(game, m, dt) {
   const b = (m.brain ||= {});
   b.abilityT = (b.abilityT ?? 0) - dt;
-  if (b.abilityT > 0) return;
+  if (b.abilityT > 0) return false;
   b.abilityT = AI_RULES.ability.every;
   const tgt = m.state === "chase" ? game.player : foeOf(game, m);
   for (const a of abilitiesOf(m)) {
@@ -520,8 +522,9 @@ function useAbilities(game, m, dt) {
     const d = tgt ? distance(tgt.x - m.x, tgt.y - m.y) || 1 : 1;
     const target = tgt ? { creature: tgt, point: { x: tgt.x, y: tgt.y, z: tgt.z }, tile: { x: Math.floor(tgt.x), y: Math.floor(tgt.y) },
                            dir: [(tgt.x - m.x) / d, (tgt.y - m.y) / d, 0] } : null;
-    if (activate(game, m, a.id, target)) return;   // one a turn
+    if (activate(game, m, a.id, target)) return true;   // one a turn
   }
+  return false;
 }
 
 // --- Across zone changes ----------------------------------------------------------------------------------
