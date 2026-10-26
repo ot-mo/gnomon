@@ -91,7 +91,12 @@ export async function checkRender(m) {
     const day = [6, 6.24, 6.25, 12, 12.1].map((h) => clock.lightBucketAt(minute(h)));
     expect(nightBuckets.size === 1 && nightBuckets.has(0) && day[0] === day[1] && day[1] !== day[2] && day[3] === day[4] && day[2] !== day[3],
       `light buckets: night ${[...nightBuckets]}, day ${day}`);
-    stats.looks = { shade: +shade.toFixed(2), noonSun: noon.map((v) => +v.toFixed(3)), duskSky: sky(18.5), nightSky: sky(0) };
+    // The HUD's clock segment (for the integrator to register): the day and hour under the sky, nothing underground.
+    const seg = render3d.CLOCK_SEGMENT, skyGame = { time: T(12), state: {}, zone: { hasSky: true } }, underGame = { ...skyGame, zone: { hasSky: false } };
+    const atNoon = seg.parts(skyGame), atNight = seg.parts({ ...skyGame, time: T(23) }), atUnder = seg.parts(underGame);
+    expect(seg.priority === 30 && atNoon?.text === "day 1, 12:00" && atNight?.text === "day 1, 23:00" && atNoon.color.join() !== atNight.color.join() && !atUnder,
+      `the clock segment: ${JSON.stringify({ atNoon, atNight, atUnder })}`);
+    stats.looks = { shade: +shade.toFixed(2), noonSun: noon.map((v) => +v.toFixed(3)), duskSky: sky(18.5), nightSky: sky(0), clock: atNoon?.text };
   }
 
   // A frame of the 3D view alone (no HUD), presented so the capture holds it.

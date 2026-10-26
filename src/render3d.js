@@ -11,11 +11,15 @@
 //       over 17 ms for 2 s casts every other column and copies it to the next, until the full cast's cost
 //       (twice the halved one) is back under 12 ms for 2 s. On by default in a page, off in Node.
 //   horizonOf(game, zone) → { n, e, s, w: { z, color } }   the horizon plane's height and colour per side
+//   CLOCK_SEGMENT              the HUD's clock segment (§4.5: "clock", WS3, priority 30): the day and the hour,
+//       coloured by the time of day, under the sky only. Not registered here: check-hud (P0) holds the 180-column
+//       status row to the parent's order; registering it (hud.registerHudSegment("clock", CLOCK_SEGMENT)) is an
+//       integration request, docs/ws3.md.
 //   judgeFrame(ms, now)       one frame's cast time (ms) at time now (ms) for dynamic resolution (render3d calls it)
 import * as S from "./screen.js";
 import { castRay, hit, setGhostVisible, rayInfo } from "./raycast.js";
 import { sampleGrid, inDark, zoneIsLightless, daylight, syncLight, sunState, sunlitGrid } from "./light.js";
-import { sunDir, skyColors, fogFor, spanOf, daylightAt, minutes } from "./clock.js";
+import { sunDir, skyColors, fogFor, spanOf, daylightAt, minutes, clockLabel, phase } from "./clock.js";
 import { material, albedo, setMaterialTime, setDarkSight, DARK_SIGHT_BLOCKS } from "./materials.js";
 import { noise2, hash } from "./rng.js";
 import { creatureSprite, hostilesTo, talkersIn, isFlat } from "./creatures.js";
@@ -41,6 +45,10 @@ const EXPOSURE = 1.8;
 const MAX_DIST = 32;
 const MAX_DIST_OUT = 48;           // outdoors: far enough to cross the apron (§6.2)
 const smooth = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+
+const CLOCK_COLORS = { dawn: [255, 190, 160], day: [255, 230, 140], dusk: [255, 160, 100], night: [150, 170, 255] };
+export const CLOCK_SEGMENT = { priority: 30, parts: (game) => game.zone?.hasSky && game.state
+  ? { text: clockLabel(game), color: CLOCK_COLORS[phase(game)] } : null };
 
 // The camera, shared with sprites.
 export const cam = { ex: 0, ey: 0, ez: 0, fX: 1, fY: 0, fZ: 0, rX: 0, rY: 1, uX: 0, uY: 0, uZ: 1, halfW: 1, halfH: 1 };
