@@ -83,8 +83,9 @@ AI_RULES = RULES.ai = { foeRange 8, foeForget 3, lose 8, outdoorRadius 32,
   or on WS1's world-map travel, `how: "travel"`) and, over an edge, whatever hunts you within 3 tiles of the exit (not guardians, bosses, statues or the rooted), out of the zone you leave
   before write-behind snapshots it; `zone:enter` puts them in at the border you crossed (the stairs: beside you),
   `arriving` for as long as their way to you took (at most 4 s). A zone you come back to (`away` s later, not a load)
-  catches up: statuses (status.js catchUpStatuses), healing (all of it after an hour), hunts and targets lapse, lit
-  bombs and gas burn out.
+  catches up: statuses (status.js catchUpStatuses), healing (all of it after an hour), hunts and targets lapse; bosses
+  and guardians only run out their statuses (a set fight: they neither heal nor forget you); things in flight, lit
+  bombs and gas wait for you, as they always did.
 - **The activity radius**: in 3D a surface zone updates only creatures within 32 tiles (or hunting, fleeing,
   following, after a target); dungeons every creature; the map 12 (turns.js, unchanged).
 

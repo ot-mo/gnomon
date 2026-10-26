@@ -886,10 +886,14 @@ export function checkAiDepth(ctx) {
         lich.hp = 100;
         a.hp = 2; addStatus(game, a, "chilled", { t: 5 }); a.state = "chase";
         b.maxHp = 60; b.hp = 2; b.state = "chase";   // (60: 600 s heals a sixth, 10)
+        z.bombs.push({ x: far.x, y: far.y, z: far.z, fuse: 1.5 });
+        z.projectiles.push({ kind: "knife", x: far.x, y: far.y, z: far.z + 3, vx: 0, vy: 0, vz: 0, life: 2, spin: 0, mine: true });
         changeZone(game, "0,0,2", { how: "down" });
         game.time += 600;
         changeZone(game, "0,0,1", { how: "up" });
         const partB = b.hp;
+        expect(z.bombs.length === 1 && z.bombs[0].fuse === 1.5 && z.projectiles.length === 1, `600 s away: a lit bomb ${z.bombs.length ? `with ${z.bombs[0].fuse} s of fuse` : "gone"}, ${z.projectiles.length} knife in the air (want both waiting as they were)`);
+        z.bombs.length = 0; z.projectiles.length = 0;
         expect(lich.state === "chase" && lich.hp === 100, `600 s away: the Lich King ${lich.state}, HP 100 → ${lich.hp} (want still hunting you, unhealed: a set fight)`);
         expect(partB === Math.min(b.maxHp, 2 + Math.floor((b.maxHp * 600) / AI_RULES.heal.fullAfter)) && b.state !== "chase" && !hasStatus(a, "chilled"),
           `600 s away: hp 2 → ${partB} of ${b.maxHp} (want +${Math.floor((b.maxHp * 600) / 3600)}), still hunting ${b.state === "chase"}, still chilled ${hasStatus(a, "chilled")}`);

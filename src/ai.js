@@ -49,7 +49,8 @@
 // zone:enter they come in at the border you crossed (the stairs: beside you), each `arriving` for as long
 // as its way to you took. On zone:enter, a zone you come back to catches up on the time you were away:
 // statuses run out (status.js catchUpStatuses), creatures heal (fully after RULES.ai.heal.fullAfter s),
-// hunts and grudges lapse (bosses and guardians: only their statuses run out; they neither heal nor forget), bombs and gas burn out.
+// hunts and grudges lapse (bosses and guardians: only their statuses run out; they neither heal nor forget).
+// Things in flight, lit bombs and gas wait for you.
 //
 // Creatures live on the tile grid: each one stands on a tile or is stepping to a neighbour.
 import { lineOfSight } from "./raycast.js";
@@ -631,7 +632,5 @@ function catchUpZone(game, zone, away) {
       delete b.fleeFrom; delete b.fleeT; delete b.fleeLeft; delete b.wary; delete b.braveT;
     }
   }
-  zone.bombs = (zone.bombs || []).filter((bomb) => (bomb.fuse -= away) > 0);   // went off while you were away
-  zone.clouds = (zone.clouds || []).filter((cl) => (cl.time -= away) > 0);
-  zone.projectiles = [];
+  // (Things in flight, lit bombs and gas wait for you, as they always did: a bomb by a secret wall still opens it.)
 }
