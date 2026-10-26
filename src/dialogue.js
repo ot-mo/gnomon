@@ -15,26 +15,12 @@ import { typeOf, talkersIn } from "./creatures.js";
 import { itemName, itemGlyph, itemInfo, itemPrice, addToInventory, ITEM_KINDS } from "./items.js";
 import { funds, pay, receive, purseRoom, formatPrice, buyPrice, sellPrice, CURRENCY } from "./currency.js";
 import { sfx, speakLetter } from "./sfx.js";
+import { wrap, box as uiBox, UI } from "./ui.js";
 
 // --- Text helpers ----------------------------------------------------------------------
-export function wrap(text, width) {
-  const out = [];
-  for (const para of text.split("\n")) {
-    if (!para) { out.push(""); continue; }
-    let line = "";
-    for (const word of para.split(" ")) {
-      if (line && (line + " " + word).length > width) { out.push(line); line = word; }
-      else line = line ? line + " " + word : word;
-    }
-    out.push(line);
-  }
-  return out;
-}
-
-function box(x0, y0, w, h, edge = [140, 115, 50]) {
-  S.blank(x0, y0, w, h);
-  for (let x = x0; x < x0 + w; x++) { S.put(x, y0, "-", ...edge); S.put(x, y0 + h - 1, "-", ...edge); }
-}
+// wrap(text, width) and box() live in ui.js (one copy for every screen); these screens keep the
+// parent's look, a rule above and below.
+const box = (x0, y0, w, h, edge = UI.edge) => uiBox(x0, y0, w, h, { edge, rules: true });
 
 function leave(game, ret) {
   game.mode = ret;

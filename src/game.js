@@ -56,6 +56,9 @@ import { maxHp } from "./stats.js";
 import { addStatus, hasStatus, statusFlag, statusLeft, cooldownLeft, startCooldown } from "./status.js";
 import { RULES } from "./rules.js";
 import { setPurse } from "./currency.js";
+import { dispatchMouse, dispatchHover, dispatchWheel, updateScreen, drawStack } from "./screens.js";
+import { bind, dispatchKey } from "./keys.js";
+import { beginFrame } from "./ui.js";
 
 export const game = {
   seed: 0, zone: null, player: null,
@@ -64,6 +67,7 @@ export const game = {
   zones: new Map(),    // "wx,wy,z" → Zone: every zone you've visited stays as you left it
   state: null,         // persistent plain data (zones.js: uids, zonePatches, zoneLeft)
   mode: "explore", view: "3d", paused: true,
+  modeStack: [],       // screens.js: what each pushed screen returns to (game.mode is the top)
   time: 0, fov: 75, sensitivity: 0.0025,
   messages: [], effects: [], target: null, travel: null, fps: 60, frameMs: 0,
   descendT: 0, deathCause: "",
@@ -200,6 +204,7 @@ export function startRun(seed, world = game.world) {
   game.crystalsBought = 0;        // crystals bought from Pell (each makes the next dearer)
   game.cam = null;
   game.pendingPages = null;
+  game.modeStack = [];
   const start = game.run.world.start;
   changeZone(game, zoneKey(start.wx, start.wy, 0), { how: "start" });   // the test world's: the temple, over the legacy stack
   game.view = "map";
@@ -431,11 +436,13 @@ export function step(dt) {
       }
     }
   }
+  updateScreen(game, dt);   // a registered screen's own update (screens.js; the old modes above until they're ported)
   runUpdates(game, dt);   // registered per-frame hooks for this mode (events.js)
   game.effects = game.effects.filter((e) => game.time - e.time < 1.2);
 }
 
 export function draw() {
+  beginFrame();   // ui.js hit-testing: what this frame draws where
   if (game.mode === "story") { drawStory(game); S.present(); return; }
   if (game.view === "map" && game.mode !== "descend" && game.mode !== "rotate") renderMap(game);
   else render3d(game);
@@ -444,6 +451,7 @@ export function draw() {
   if (game.mode === "talk") drawTalk(game);
   if (game.mode === "shop") drawShop(game);
   if (game.mode === "journal") drawJournal(game);
+  drawStack(game);   // registered screens (screens.js), bottom-up
   S.present();
 }
 
@@ -599,17 +607,16 @@ function mapClick(button, clientX, clientY) {
   else startTravel(game, tile.x, tile.y);
 }
 
+// M and N work in every mode (TECH_DESIGN §4.3), after the top screen: talk and the shop still take
+// them for themselves until they are ported to screens.js.
+const notTalking = (game) => game.mode !== "talk" && game.mode !== "shop";
+bind("*", "KeyM", (game) => game.log(toggleMusic() ? "Music on. (M)" : "Music off. (M)", [170, 170, 170]), { help: "music", when: notTalking });
+bind("*", "KeyN", (game) => game.log(toggleSounds() ? "Sounds and voices on. (N)" : "Sounds and voices off. (N)", [170, 170, 170]), { help: "sounds", when: notTalking });
+
 export const inputHandlers = {
-  onKeyDown(code, repeat) {
+  onKeyDown(code, repeat, key = "") {
     unlockAudio();   // browsers only allow sound once you've pressed something
-    if (code === "KeyM" && !repeat && game.mode !== "talk" && game.mode !== "shop") {
-      game.log(toggleMusic() ? "Music on. (M)" : "Music off. (M)", [170, 170, 170]);
-      return;
-    }
-    if (code === "KeyN" && !repeat && game.mode !== "talk" && game.mode !== "shop") {
-      game.log(toggleSounds() ? "Sounds and voices on. (N)" : "Sounds and voices off. (N)", [170, 170, 170]);
-      return;
-    }
+    if (dispatchKey(game, code, repeat, key)) return;   // registered screens and bindings (keys.js), then the modes below
     if (game.mode === "dead" || game.mode === "won") { if (code === "KeyR" && !repeat) startRun(randomSeed()); return; }
     if (game.mode === "descend" || game.mode === "rotate") return;
     if (game.mode === "story") { if (!repeat) storyKey(game, code); return; }
@@ -640,6 +647,7 @@ export const inputHandlers = {
   },
   onMouseDown(button, clientX, clientY) {
     unlockAudio();
+    if (dispatchMouse(game, button, S.cellAt(clientX, clientY))) return;
     if (game.mode === "story") { if (button === 0) nextPage(game); return; }
     if (game.mode === "talk") { if (button === 0) talkClick(game, S.cellAt(clientX, clientY)); return; }
     if (game.mode === "journal") { journalKey(game, "Escape"); return; }
@@ -660,9 +668,10 @@ export const inputHandlers = {
   },
   onHover(clientX, clientY) {
     mapView.hover = S.cellAt(clientX, clientY);
+    if (dispatchHover(game, mapView.hover)) return;
     if (game.mode === "talk") talkHover(game, mapView.hover);
   },
-  onWheel(sign) { if (game.mode === "explore") game.fov = Math.max(40, Math.min(100, game.fov + sign * 5)); },
+  onWheel(sign) { if (dispatchWheel(game, sign)) return; if (game.mode === "explore") game.fov = Math.max(40, Math.min(100, game.fov + sign * 5)); },
   onLockChange(locked) {
     if (locked) game.paused = false;
     else if (game.mode === "explore") game.paused = true;   // Esc: pause until the next click

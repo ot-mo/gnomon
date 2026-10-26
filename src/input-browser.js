@@ -20,7 +20,7 @@ export const browserInput = {
     addEventListener("keydown", (e) => {
       if (e.code === "Tab" || e.code === "Space" || e.code.startsWith("Arrow")) e.preventDefault();
       keys.add(e.code);
-      handlers.onKeyDown?.(e.code, e.repeat);
+      handlers.onKeyDown?.(e.code, e.repeat, e.key);   // e.key: the character typed, for text fields
     });
     addEventListener("keyup", (e) => keys.delete(e.code));
     addEventListener("blur", () => keys.clear());
