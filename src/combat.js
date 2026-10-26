@@ -182,11 +182,11 @@ function noticeBlow(game, m, src) {
 }
 // Your blow on a creature that wasn't out for you: your friend (a follower) takes it and goes on as it was
 // (a shot of yours that hit it on the way, a slip); anything else holds it against you (a grudge: factions.js
-// attitude turns hostile) and hunts you. (Under the legacy set
+// attitude turns hostile) and hunts you. One already running from it keeps running. (Under the legacy set
 // every creature is out for you, so nothing here changes the parent's game.)
 function turnOnYou(game, m, state, lost) {
   const feel = attitude(game, m, game.player);
-  if (feel === "friendly") { m.state = state; m.lost = lost; return; }
+  if (feel === "friendly" || state === "flee") { m.state = state; m.lost = lost; return; }
   if (feel !== "hostile") ((m.brain ||= {}).grudges ||= {}).player = 1;
 }
 

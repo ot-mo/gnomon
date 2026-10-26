@@ -225,7 +225,7 @@ export function updateCreatures(game, dt, radius = Infinity) {
         else if (!pinned && t.speed > 0 && stepAway(game, m, occ, ptx, pty, from)) { /* away */ }
         else {
           const brain = (m.brain ||= {});
-          brain.braveT = 3;   // cornered: it fights for a while before it thinks of running again
+          brain.braveT = AI_RULES.flee.brave;   // cornered: it fights for a while before it thinks of running again
           delete brain.fleeFrom; delete brain.fleeT; delete brain.fleeLeft;
           if (from === player) { m.state = "chase"; m.lost = 0; } else { brain.target = from.id; m.state = "wander"; }
         }

@@ -943,7 +943,25 @@ export function checkAiDepth(ctx) {
       cornered.hp = 1; cornered.think = 0;
       for (let k = 0; k < 20; k++) updateCreatures(game, 1 / 20, Infinity);
       expect(cornered.state === "chase" && cornered.brain?.braveT > 0, `cornered: ${cornered.state}, brave ${cornered.brain?.braveT} (want chase, brave for a while)`);
-      stats.flee = { from: +d0.toFixed(1), to: +d1.toFixed(1), outOfSight: "wander", cornered: "fights" };
+      // Chased and struck while it runs: it keeps running (no fresh flight and no new line at every blow), runs
+      // 10 s at most, and then stands at bay.
+      const chaseZ = arena("ws8-chase", { w: 60, d: 12 });
+      enterZone(game, chaseZ, { how: "start" }); onMap(game);
+      Object.assign(p, { x: 5.5, y: 5.5, z: FLOOR_Z });
+      const runner = addCreature(chaseZ, spawnCreature("goblin", 7, 5, FLOOR_Z, { rng: () => 0.5, level: 3, state: "chase" }));
+      runner.maxHp = 1e6; runner.hp = 1e5; runner.think = 0; runner.cd = Infinity;   // (10%: under a goblin's 20%, and no blow kills it)
+      const runs0 = run.logged.filter((t) => /turns and runs/.test(t)).length;
+      let atBay = -1;
+      for (let k = 0; k < 36 * 4; k++) {
+        passTime(game, 0.25);
+        const bx = runner.tx - Math.sign(runner.tx - Math.floor(p.x)) || runner.tx - 1;   // you keep at its heels
+        if (chaseZ.stand[bx + runner.ty * chaseZ.w] >= 0 && !(bx === runner.tx)) Object.assign(p, { x: bx + 0.5, y: runner.ty + 0.5 });
+        if (k % 4 === 0) resolveAttack(game, p, runner, weaponSpec(p), { view: "map", rng: () => 0.6 });
+        if (atBay < 0 && runner.brain?.braveT > 0) atBay = (k + 1) / 4;
+      }
+      const runs = run.logged.filter((t) => /turns and runs/.test(t)).length - runs0;
+      expect(runs <= 3 && atBay > 0 && atBay <= AI_RULES.flee.most + 1, `chased and struck for 36 s: "turns and runs" ${runs} times (want 3 at most), at bay after ${atBay} s (want within ${AI_RULES.flee.most + 1})`);
+      stats.flee = { from: +d0.toFixed(1), to: +d1.toFixed(1), outOfSight: "wander", cornered: "fights", struckWhileRunning: { runs, atBayAfter: atBay } };
       // Under the legacy set nothing flees.
       const undoLegacy = overrideRules("combat", "legacy");
       cornered.state = "chase"; delete cornered.brain.braveT; cornered.think = 0;
