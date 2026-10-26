@@ -171,6 +171,9 @@ const STOP = "stop";
 function collide(game, pr, nx, ny, nz, ignore = null) {
   const { zone, player: p } = game;
   if (pr.hostile) {
+    // (one of your followers in the way takes it first; the shooter's own kind it flies past, as ever)
+    for (const mo of zone.creatures)
+      if (mo.brain?.leader === "player" && touchable(game, mo, pr.from) && Math.hypot(nx - mo.x, ny - mo.y) < mo.w * 0.45 + 0.15 && nz > mo.z - 0.1 && nz < mo.z + mo.h + 0.1) return mo;
     if (touchesYou(game, pr.from) && Math.abs(nx - p.x) < RADIUS + 0.1 && Math.abs(ny - p.y) < RADIUS + 0.1 && nz > p.z && nz < p.z + HEIGHT) return p;
   } else {
     for (const mo of zone.creatures)
@@ -225,6 +228,9 @@ export function updateProjectiles(game, dt) {
         done = true;
       } else if (hit === STOP) {
         impact(game, pr, pr.x, pr.y, pr.z, null);   // stop just before the surface it hit
+        done = true;
+      } else if (hit && pr.hostile) {   // your follower, in the way
+        resolveAttack(game, pr.from, hit, { kind: "missile", fixed: pr.dmg }, { aimed: true, ranged: true });
         done = true;
       } else if (hit) { impact(game, pr, nx, ny, nz, hit); done = true; }
       else { pr.x = nx; pr.y = ny; pr.z = nz; }
@@ -297,6 +303,10 @@ PATCH_OPS.landItem = (game, zone, p) => {
   if (ground >= 0) zone.items.push(makeItem(p.item, x + 0.5, y + 0.5, ground));
 };
 
+// Every creature a splash, a blast or gas can reach: friend or foe (people never; nor one still on its way in).
+// (Under the legacy set every one of them is out for you, as the parent's list was.)
+const bodies = (game) => game.zone.creatures.filter((c) => !canTalk(c) && !(c.brain?.arriving > 0));
+
 // A potion smashes at (x, y, z) and splashes everything within SPLASH blocks.
 function shatter(game, effect, x, y, z) {
   const { zone, player: p } = game;
@@ -306,7 +316,7 @@ function shatter(game, effect, x, y, z) {
   game.log(known ? `The potion of ${POTIONS[effect].name} shatters!`
                  : `The ${color.name} potion shatters. It was a potion of ${POTIONS[effect].name}!`, color.rgb);
   game.effects.push({ kind: "burst", x, y, z, color: color.rgb, time: game.time });
-  const near = hostilesTo(game, p).filter((m) => touchable(game, m) && Math.hypot(m.x - x, m.y - y) <= SPLASH && Math.abs(m.z - z) < 2.5);
+  const near = bodies(game).filter((m) => touchable(game, m) && Math.hypot(m.x - x, m.y - y) <= SPLASH && Math.abs(m.z - z) < 2.5);
   const youToo = touchesYou(game, null) && Math.hypot(p.x - x, p.y - y) <= SPLASH && Math.abs(p.z + 1 - z) < 2.5;   // (flat: it splashes over you)
   const names = () => near.map((m) => m.name).join(", ");
 
@@ -378,7 +388,7 @@ function explode(game, x, y, z) {
   sfx("boom", { at: { x, y } });
   const demo = hasKey(p.perks, "demolitionist"), blast = demo ? BLAST * 1.4 : BLAST;   // the Demolitionist perk
   for (const o of zone.bombs) if (Math.hypot(o.x - x, o.y - y) < blast) o.fuse = Math.min(o.fuse, 0.15);
-  for (const m of hostilesTo(game, p))
+  for (const m of bodies(game))
     if (Math.hypot(m.x - x, m.y - y) <= blast && Math.abs(m.z + m.h / 2 - z) < 2.5)
       damageMonster(game, m, 10 + Math.floor(Math.random() * 7), [255, 160, 60], `The ${m.name} is blown apart.`);
   if (touchesYou(game, null) && Math.hypot(p.x - x, p.y - y) <= blast && Math.abs(p.z + 0.8 - z) < 2.5)   // (flat: the blast passes over you)
@@ -414,7 +424,7 @@ export function updateClouds(game, dt) {
   const { zone, player: p } = game;
   for (const c of zone.clouds) {
     c.time -= dt;
-    for (const m of hostilesTo(game, p))
+    for (const m of bodies(game))
       if (touchable(game, m) && Math.hypot(m.x - c.x, m.y - c.y) <= c.r && Math.abs(m.z - c.z) < 2.5) addStatus(game, m, "poisoned", { t: 2, mag: 2, stack: "max" });
     if (touchesYou(game, null) && Math.hypot(p.x - c.x, p.y - c.y) <= c.r && Math.abs(p.z + 1 - c.z) < 2.5) {
       if (!hasStatus(p, "poisoned")) game.log("You're in the poison cloud!", [150, 210, 80]);

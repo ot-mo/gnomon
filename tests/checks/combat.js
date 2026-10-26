@@ -1029,7 +1029,19 @@ export function checkAiDepth(ctx) {
       const struckPal = attacks.filter((a) => a.att === p && a.tgt === pal).length, palStruck = attacks.filter((a) => a.att === pal && a.tgt === p).length;
       expect(struckPal >= 2 && palStruck === 0 && pal.state !== "chase", `your follower struck by you ${struckPal} times struck back ${palStruck} times in 10 s (want 0; state ${pal.state})`);
       fz.creatures.splice(fz.creatures.indexOf(foe2), 1);
-      stats.follow = { whileWalking: +walking.toFixed(1), after4s: +lag.toFixed(1), foughtYourFoe: true, swap: swapped, shiftStrikes: true, secondSwingIn3d: true, neverStrikesBack: true };
+      // Your bomb's blast reaches it too, and so does a creature's arrow flying at you through it.
+      p.hp = 1e6; pal.hp = 500; beside(); attacks.length = 0;
+      fz.bombs.push({ x: pal.x + 0.6, y: pal.y, z: pal.z, fuse: 0.01 });
+      passTime(game, 0.1);
+      const blasted = pal.hp < 500;
+      const archer = dummy(fz, "goblin", Math.floor(p.x) + 6, Math.floor(p.y));
+      beside();
+      fz.projectiles.push({ kind: "arrow", hostile: true, from: archer, dmg: 4, x: archer.x - 0.5, y: pal.y, z: pal.z + 1, vx: -12, vy: 0, vz: 0, g: 0, life: 2, spin: 0 });
+      for (let k = 0; k < 120 && fz.projectiles.length; k++) updateProjectiles(game, 1 / 60);
+      const arrowed = attacks.some((a) => a.att === archer && a.tgt === pal) && !attacks.some((a) => a.att === archer && a.tgt === p);
+      expect(blasted && arrowed, `your follower: in your bomb's blast hurt ${blasted}; an arrow at you through it hit it ${arrowed}`);
+      fz.creatures.splice(fz.creatures.indexOf(archer), 1); p.hp = maxHp(p);
+      stats.follow = { whileWalking: +walking.toFixed(1), after4s: +lag.toFixed(1), foughtYourFoe: true, swap: swapped, shiftStrikes: true, secondSwingIn3d: true, neverStrikesBack: true, bombAndArrowsReachIt: true };
       run.restore(); run = null;
     }
 
