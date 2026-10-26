@@ -238,7 +238,7 @@ export function sees(game, c, e) {
     range *= (lit || t.darkSight ? 1 : 0.55) * (statusFlag(player, "hidden") ? 0.35 : 1) *
       (hasStatus(player, "darkened") && !t.darkSight ? 0.7 : 1) * Math.max(0.3, 1 - bonus(player, "stealth"));
   }
-  if (distance(e.x - c.x, e.y - c.y) >= range) return false;
+  if (Math.hypot(e.x - c.x, e.y - c.y) >= range) return false;   // (hypot, as the parent measured it)
   return lineOfSight(zone, c.x, c.y, eyesOf(c), e.x, e.y, e === player ? eyesOf(e) : bodyMid(e));
 }
 export const witnessesOf = (game, e, r = 12) => creaturesNear(game.zone, e.x, e.y, r).filter((c) => c !== e && sees(game, c, e));
