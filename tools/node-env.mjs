@@ -11,6 +11,12 @@
 // golden fixtures were recorded at the parent commit 75edbd3 (tools/golden-record.mjs). It only
 // relies on what both versions share: screen.setBackend/resize/present, input.setInputBackend.
 // Sound stays off by itself: audio.js only builds an AudioContext when `window` exists.
+//
+// From 0D2 it also loads what main.js loads beside the game, when srcDir has it: game.js, then
+// content/index.js (every content file) and features.js (every Phase 1 workstream's index), in main.js's
+// order, so a check plays the game the browser plays. installNodeEnv({ features: false }) skips them
+// (check-imports, which watches what they register).
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { hashBytes, hashString } from "../tests/lib/hash.js";
@@ -44,7 +50,7 @@ class MemoryStorage {
 }
 
 // --- Install ------------------------------------------------------------------------------
-export async function installNodeEnv({ srcDir = SRC, cols = 180, rows = 56, cellW = 11, cellH = 20, seed = 1 } = {}) {
+export async function installNodeEnv({ srcDir = SRC, cols = 180, rows = 56, cellW = 11, cellH = 20, seed = 1, features = true } = {}) {
   if (!globalThis.localStorage) globalThis.localStorage = new MemoryStorage();
   seedRandom(seed);
   const load = (file) => import(pathToFileURL(path.join(srcDir, file)).href);
@@ -62,6 +68,14 @@ export async function installNodeEnv({ srcDir = SRC, cols = 180, rows = 56, cell
   const input = await load("input.js");
   // No pointer lock in Node: count as always locked (the 3D view then plays without clicks).
   input.setInputBackend({ canLock: false, isLocked: () => true, lock() {}, unlock() {}, init() {} });
+
+  // What main.js loads beside the game (0D2), in its order: the game first, so the legacy content and its bus
+  // handlers load in game.js's order.
+  if (features && fs.existsSync(path.join(srcDir, "features.js"))) {
+    await load("game.js");
+    await load("content/index.js");
+    await load("features.js");
+  }
 
   // The frame on screen, hashed: characters (UTF-16) and colours (bytes), each with its own seed.
   const frameHash = () => {

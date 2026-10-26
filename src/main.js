@@ -5,6 +5,8 @@ import { canvasBackend } from "./screen-canvas.js";
 import { setInputBackend, initInput } from "./input.js";
 import { browserInput } from "./input-browser.js";
 import { game, inputHandlers, startRun, randomSeed, tick } from "./game.js";
+import "./content/index.js";   // every content file (after game.js, whose graph loads the legacy ones in their order)
+import "./features.js";        // every Phase 1 workstream's index (stubs in P0: they register nothing)
 import { FLAGS, TITLE } from "./config.js";
 import { useStore, memoryAdapter } from "./save/index.js";
 import { openTitle } from "./screens/title.js";
