@@ -19,9 +19,10 @@
 //   4. Frame time: this tree against <against> (default p0-0c) in one page (both trees' modules loaded side
 //      by side, the page's own loop stopped); underground (legacy level 3) and on the start span, 3D and
 //      map: one run set up per case and tree (creatures on a seeded Math.random, 60 ticks to warm up), then
-//      5×rounds blocks of frames/5 tick(1/60) calls, the two trees alternating block by block while the
-//      camera turns through a full circle. Underground (3D and map) must be within 5% of <against>: the median over blocks of
-//      the ratio of the blocks' trimmed means (the slowest 5% left out). Pooled p50/p95/mean are printed.
+//      5×rounds blocks of frames/5 tick(1/60) calls per tree, the two trees alternating tick by tick (ABBA)
+//      while the camera turns through a full circle. Underground (3D and map) must be within 5% of <against>:
+//      the ratio of the pooled trimmed means (each tree's slowest 5% left out). Pooled p50/p95/mean are printed,
+//      and the quartiles of the blocks' ratios as a guide to the noise.
 // Exits non-zero on any failure, console error or warning.
 import http from "node:http";
 import fs from "node:fs";
@@ -260,10 +261,11 @@ try {
     // Both trees in one page: the head's modules (/src/…) and <against>'s (/__against/src/…) are two module
     // graphs with their own game, screen and registries, in one heap and one renderer process, so neither
     // gets a worse core, a background tab or the other's garbage collection more than the other. Each
-    // tree's creatures draw from their own seeded Math.random (swapped in per block). Blocks of ticks
-    // alternate between the trees; each block's trimmed mean (its slowest 5% left out: collection pauses)
-    // and the median over blocks of head / against is the figure. (Two pages, one per tree, swung it by
-    // ±6% from run to run; a fresh run per round by ±50%.)
+    // tree's creatures draw from their own seeded Math.random (swapped in per tick). The trees alternate
+    // tick by tick (ABBA); the figure is head's trimmed mean over all its ticks (the slowest 5% left out:
+    // collection pauses) over against's. (Two pages, one per tree, swung it by ±6% from run to run; a fresh
+    // run per round by ±50%; alternating 40-tick blocks and taking the median of the blocks' ratios let a
+    // real +6.5% in 3D through.)
     const pct = (a, q) => { const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(q * s.length))]; };
     const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
     const trimmed = (a) => mean([...a].sort((x, y) => x - y).slice(0, Math.max(1, Math.floor(a.length * 0.95))));
@@ -301,32 +303,38 @@ try {
           }, [name, scene, view]);
           (res[k] ||= {})[name] = { ...t, ms: [], blocks: [] };
         }
-        // The camera turns through a full circle over all the blocks: block j of both trees sees the same views.
-        for (let j = 0; j < BLOCKS; j++)
-          for (const name of j % 2 ? [...names].reverse() : names) {
-            const ms = await page.evaluate(([name, per, total]) => {
-              const T = window.__trees[name], game = T.G.game, p = game.player, ms = [], real = Math.random;
-              Math.random = T.rnd;
-              for (let i = 0; i < per; i++, T.k++) {
+        // The camera turns through a full circle over all the blocks: tick i of both trees sees the same view.
+        // Within a block the trees alternate tick by tick, ABBA (head, against, against, head, …), so drift
+        // (clock, thermal, the collector's mood) falls on both alike.
+        for (let j = 0; j < BLOCKS; j++) {
+          const got = await page.evaluate(([names, per, total]) => {
+            const out = {}, real = Math.random;
+            for (const n of names) out[n] = [];
+            for (let i = 0; i < per; i++)
+              for (const name of i % 2 ? [...names].reverse() : names) {
+                const T = window.__trees[name], game = T.G.game, p = game.player;
+                Math.random = T.rnd;
                 p.yaw = (T.k / total) * Math.PI * 2; p.hp = 9999;
                 const t0 = performance.now();
                 T.G.tick(1 / 60);
-                ms.push(performance.now() - t0);
+                out[name].push(performance.now() - t0);
+                T.k++;
               }
-              Math.random = real;
-              return ms;
-            }, [name, PER, BLOCKS * PER]);
-            res[k][name].ms.push(...ms);
-            res[k][name].blocks.push(trimmed(ms));
-          }
+            Math.random = real;
+            return out;
+          }, [names, PER, BLOCKS * PER]);
+          for (const name of names) { res[k][name].ms.push(...got[name]); res[k][name].blocks.push(trimmed(got[name])); }
+        }
       }
     out(`frame time (ms per tick at 1280×720; ${BLOCKS} blocks of ${PER} ticks per case, the trees alternating), this tree vs ${AGAINST}:`);
     for (const [k, v] of Object.entries(res)) {
       const h = v.head, b = v[AGAINST], s = (x) => ({ p50: pct(x.ms, 0.5), p95: pct(x.ms, 0.95), mean: mean(x.ms) });
-      const hs = s(h), bs = s(b), ratios = h.blocks.map((x, j) => x / b.blocks[j]), ratio = pct(ratios, 0.5);
+      // The figure: the ratio of the pooled trimmed means (every tick of the case, the slowest 5% of each tree
+      // left out). (The median over blocks of the blocks' ratios, used before, passed a real +6.5% in 3D.)
+      const hs = s(h), bs = s(b), ratios = h.blocks.map((x, j) => x / b.blocks[j]), ratio = trimmed(h.ms) / trimmed(b.ms);
       const gated = k.startsWith("under/"), fail = gated && ratio > 1.05;
       if (h.zone !== b.zone || h.mode !== b.mode) problems.push(`frame time ${k}: the trees drew different things (${h.zone} ${h.mode} vs ${b.zone} ${b.mode})`);
-      if (fail) problems.push(`frame time ${k}: ${(100 * (ratio - 1)).toFixed(1)}% slower than ${AGAINST} (median over ${ratios.length} blocks of the trimmed-mean ratio)`);
+      if (fail) problems.push(`frame time ${k}: ${(100 * (ratio - 1)).toFixed(1)}% slower than ${AGAINST} (ratio of the pooled trimmed means over ${h.ms.length} ticks each)`);
       const f = (x) => `p50 ${x.p50.toFixed(2)} p95 ${x.p95.toFixed(2)} mean ${x.mean.toFixed(2)}`;
       out(`  ${gated ? (fail ? "FAIL" : "PASS") : "    "} ${k.padEnd(11)} ${h.zone.padEnd(6)} head ${f(hs)} | ${AGAINST} ${f(bs)} | ${ratio >= 1 ? "+" : ""}${(100 * (ratio - 1)).toFixed(1)}% (blocks' quartiles ${(100 * (pct(ratios, 0.25) - 1)).toFixed(0)}..${(100 * (pct(ratios, 0.75) - 1)).toFixed(0)}%)`);
     }
