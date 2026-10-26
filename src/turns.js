@@ -14,7 +14,7 @@ import { bumpAttack } from "./combat.js";
 import { updateCreatures } from "./ai.js";
 import { creatureAt, talkerAt, hostilesTo, ghostHidden, ghostOffMap, canTalk } from "./creatures.js";
 import { pickUpItems } from "./items.js";
-import { useColumn } from "./interact.js";
+import { useColumn, usableAt } from "./interact.js";
 import { EYE, WALK, HEIGHT, WADE_SLOWDOWN, HASTE, attackTime, torchRange, canSwim, speedMul, jumpBonus, hasFeatherFall, bonus } from "./player.js";
 import { tickEffects } from "./effects.js";
 import { hasStatus, statusFlag, statusSpeed, updateDrowning } from "./status.js";
@@ -159,10 +159,11 @@ export function mapStep(game, dx, dy) {
 
   const kind = zone.kind[nx + ny * zone.w];
   const coldBrazier = zone.get(nx, ny, FLOOR_Z) === B.BRAZIER;   // bump it to light it
-  if (kind === KIND.DOOR || kind === KIND.LOCKED || kind === KIND.GATE || kind === KIND.LEVER || coldBrazier) {
-    if (!useColumn(game, nx, ny)) return false;
+  if (kind === KIND.DOOR || kind === KIND.LOCKED || kind === KIND.GATE || kind === KIND.LEVER || coldBrazier || usableAt(game, nx, ny, { legacy: false }) >= 0) {
+    const used = useColumn(game, nx, ny);   // (interact.js registerUse: seconds, or true for the usual time)
+    if (!used) return false;
     if (!flying && groundBelow(S, tx, ty, p.z) < 0) { p.z = -2; game.checkFloorEvents(); return true; }   // a trap opened under you
-    passTime(game, USE_TIME);
+    passTime(game, typeof used === "number" ? used : USE_TIME);
     return true;
   }
   if (kind === KIND.WALL) return false;

@@ -1,11 +1,44 @@
-// E: use whatever the crosshair points at — levers, doors, gates, braziers.
+// E: use whatever the crosshair points at — levers, doors, gates, braziers, and whatever else registers a use.
+//
+//   registerUse(blockOrKind, fn, { label }?)   (TECH_DESIGN §1.4; P0 API → WS10) what using a block does:
+//       blockOrKind  a block id (B.X: that block only) or the name of a BLOCKS flag ("lever", "door", "gate",
+//                    "brazier": every block with it); a block's own id wins over its flags, flags go in the order
+//                    registered; a key registered twice throws
+//       fn(game, x, y, z) → seconds | 0      0 (or false): nothing happened, no time, no refresh; else the zone
+//                    refreshes, the bus says useBlock { x, y, z, block }, and on the map the use takes that many
+//                    seconds (true: the usual half second, as the four legacy uses return)
+//       label        the crosshair's line in 3D, (game, target) → string or a string (default "use it")
+//   useIds() → [keys]                        what is registered, in order (read-only; check-content)
+//   usableAt(game, x, y, { legacy = true }) → z | -1   the height in column (x, y) a use would take (as useColumn);
+//                                            legacy false: only uses registered beyond the four legacy ones (the map
+//                                            walks into those as it always did, by the tile's kind)
+//   lookTarget(game), interact(game)         3D: what E would use or talk to, and doing it
+//   useColumn(game, x, y) → seconds | false  the map: walking into a usable block
+// The legacy uses (lever, door, gate, brazier) are registered here, in that order, and act as they always did.
 import { castRay, hit } from "./raycast.js";
 import { BLOCKS, B, FLOOR_Z } from "./world.js";
 import { EYE } from "./player.js";
 import { spawnCreature, addCreature, pickCreatureType, talkersIn, ghostHidden, canTalk } from "./creatures.js";
 import { lineOfSight } from "./raycast.js";
+import { emit } from "./events.js";
 
 const REACH = 2.0;   // the rune-lever puzzle relies on this: you must step onto the trap floor to reach
+
+const USES = new Map();   // block id or flag name → { fn, label }
+export function registerUse(blockOrKind, fn, { label = null } = {}) {
+  if (USES.has(blockOrKind)) throw new Error(`registerUse: ${blockOrKind} is already registered`);
+  if (typeof fn !== "function") throw new Error(`registerUse: ${blockOrKind} needs a function`);
+  USES.set(blockOrKind, { fn, label });
+}
+export const useIds = () => [...USES.keys()];
+function useOf(block) {
+  const own = USES.get(block);
+  if (own) return own;
+  const info = BLOCKS[block];
+  if (!info) return null;
+  for (const [key, use] of USES) if (typeof key === "string" && info[key]) return use;
+  return null;
+}
 
 export function lookTarget(game) {
   const p = game.player;
@@ -19,6 +52,8 @@ export function lookTarget(game) {
   if (info.door) return { ...target, label: info.locked ? "unlock the door" : "open the door" };
   if (info.gate) return { ...target, label: "examine the gate" };
   if (info.brazier) return { ...target, label: info.on ? "the brazier burns" : p.torch ? "light the brazier" : "a cold brazier (light your torch)" };
+  const use = useOf(hit.block);
+  if (use) return { ...target, label: (typeof use.label === "function" ? use.label(game, target) : use.label) || "use it" };
   return null;
 }
 
@@ -51,46 +86,64 @@ export function interact(game) {
   } else useBlock(game, t.x, t.y, t.z);
 }
 
-// Map: walking into a door, lever, gate or brazier uses it. Returns true if that took a turn.
-export function useColumn(game, x, y) {
+// Map: walking into a door, lever, gate, brazier or a block with a registered use uses it. Returns what the use
+// gave (seconds, or true for the usual time) if that took a turn, else false.
+const LEGACY_USES = ["lever", "door", "gate", "brazier"];
+export function usableAt(game, x, y, { legacy = true } = {}) {
   for (const z of [FLOOR_Z + 1, FLOOR_Z, FLOOR_Z + 2]) {
-    const info = BLOCKS[game.zone.get(x, y, z)];
-    if (info.lever || info.door || info.gate || info.brazier) return useBlock(game, x, y, z);
+    const block = game.zone.get(x, y, z), use = useOf(block);
+    if (use && (legacy || !LEGACY_USES.some((k) => USES.get(k) === use))) return z;
   }
-  return false;
+  return -1;
+}
+export function useColumn(game, x, y) {
+  const z = usableAt(game, x, y);
+  return z >= 0 ? useBlock(game, x, y, z) : false;
 }
 
-// Use one block. Returns true if something actually happened.
+// Use one block: its registered use. Returns what it gave (truthy) if something actually happened, else false.
 function useBlock(game, x, y, z) {
-  const { zone, player } = game;
-  const info = BLOCKS[zone.get(x, y, z)];
-
-  if (info.lever) {
-    if (info.on) { game.log("The lever won't move back.", [170, 170, 170]); return false; }
-    zone.set(x, y, z, B.LEVER_ON);
-    game.log("You pull the lever. *clunk*", [220, 220, 220]);
-    const link = zone.links.get(zone.index(x, y, z));
-    if (link) runLink(game, link);
-  } else if (info.door) {
-    if (info.locked) {
-      if (player.keys <= 0) { game.log("It's locked. You need a key.", [240, 200, 80]); return false; }
-      player.keys--;
-      game.log("You unlock the door.", [240, 200, 80]);
-    } else game.log("The door creaks open.", [200, 150, 100]);
-    for (let k = 0; k < zone.h; k++) if (BLOCKS[zone.get(x, y, k)].door) zone.set(x, y, k, B.AIR);
-  } else if (info.gate) {
-    game.log("The iron gate won't budge. There must be a mechanism somewhere.", [170, 170, 190]);
-    return false;
-  } else if (info.brazier) {
-    if (info.on) { game.log("The brazier is already burning.", [170, 170, 170]); return false; }
-    if (!player.torch) { game.log("You need a flame to light it. Your torch is out.", [255, 200, 120]); return false; }
-    zone.set(x, y, z, B.BRAZIER_LIT);
-    game.log("You light the brazier. Flames leap up.", [255, 190, 100]);
-    brazierLit(game, x, y);
-  } else return false;
-  zone.refresh();
-  return true;
+  const block = game.zone.get(x, y, z), use = useOf(block);
+  const done = use ? use.fn(game, x, y, z) : 0;
+  if (!done) return false;
+  game.zone.refresh();
+  emit(game, "useBlock", { x, y, z, block });
+  return done;
 }
+
+// The legacy uses. Each returns true when something happened (the map's usual use time), false when not.
+registerUse("lever", (game, x, y, z) => {
+  const { zone } = game, info = BLOCKS[zone.get(x, y, z)];
+  if (info.on) { game.log("The lever won't move back.", [170, 170, 170]); return false; }
+  zone.set(x, y, z, B.LEVER_ON);
+  game.log("You pull the lever. *clunk*", [220, 220, 220]);
+  const link = zone.links.get(zone.index(x, y, z));
+  if (link) runLink(game, link);
+  return true;
+});
+registerUse("door", (game, x, y, z) => {
+  const { zone, player } = game, info = BLOCKS[zone.get(x, y, z)];
+  if (info.locked) {
+    if (player.keys <= 0) { game.log("It's locked. You need a key.", [240, 200, 80]); return false; }
+    player.keys--;
+    game.log("You unlock the door.", [240, 200, 80]);
+  } else game.log("The door creaks open.", [200, 150, 100]);
+  for (let k = 0; k < zone.h; k++) if (BLOCKS[zone.get(x, y, k)].door) zone.set(x, y, k, B.AIR);
+  return true;
+});
+registerUse("gate", (game) => {
+  game.log("The iron gate won't budge. There must be a mechanism somewhere.", [170, 170, 190]);
+  return false;
+});
+registerUse("brazier", (game, x, y, z) => {
+  const { zone, player } = game, info = BLOCKS[zone.get(x, y, z)];
+  if (info.on) { game.log("The brazier is already burning.", [170, 170, 170]); return false; }
+  if (!player.torch) { game.log("You need a flame to light it. Your torch is out.", [255, 200, 120]); return false; }
+  zone.set(x, y, z, B.BRAZIER_LIT);
+  game.log("You light the brazier. Flames leap up.", [255, 190, 100]);
+  brazierLit(game, x, y);
+  return true;
+});
 
 // What a lever does:
 //   open   – removes the gate (or whatever) at `cells`

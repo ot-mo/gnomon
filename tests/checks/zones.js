@@ -14,6 +14,7 @@ import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../../src/pathing.js";
 import { generateDungeonLevel, legacyParams } from "../../src/gen/dungeon.js";
 import { makeRng, noise2 } from "../../src/rng.js";
 import { mapStep } from "../../src/turns.js";
+import { registerUse, useIds, lookTarget, interact } from "../../src/interact.js";
 import { damageMonster } from "../../src/combat.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
 
@@ -327,6 +328,37 @@ export function checkZones({ game, startRun }) {
     const m0 = prefetchNeighbours(game), m1 = prefetchNeighbours(game);
     expect(m0 === 0 && m1 >= 2, `map prefetch: ${m0} then ${m1} zones (want 0, then every open neighbour)`);
     stats.prefetch = { stages: `${Math.min(...stages)}-${Math.max(...stages)}`, calls3d: calls.length, mapAtOnce: m1 };
+  }
+
+  // registerUse (interact.js, TECH_DESIGN §1.4): a block with a use of its own is walked into on the map (its seconds
+  // pass, the bus says useBlock) and used by E in 3D (its label on the crosshair); a use giving 0 costs nothing.
+  {
+    startRun(5); game.pages = null; game.pendingPages = null; game.story.cube = true;
+    const zone = syntheticSurface(5), p = game.player;
+    enterZone(game, zone, { how: "start" });
+    expect(useIds().slice(0, 4).join(" ") === "lever door gate brazier", `registerUse: the legacy uses are ${useIds().join(" ")}`);
+    let threw = false;
+    try { registerUse("door", () => 0); } catch { threw = true; }
+    expect(threw, "registerUse took a second use for doors");
+    const calls = [], seen = [];
+    registerUse(B.COLUMN, (g, x, y, z) => { calls.push(`${x},${y},${z}`); return calls.length === 1 || calls.length === 3 ? 2 : 0; }, { label: "touch the column" });
+    const off = on("useBlock", (g, e) => seen.push(e));
+    zone.set(41, 24, FLOOR_Z, B.COLUMN); zone.set(41, 24, FLOOR_Z + 1, B.COLUMN); zone.refresh();
+    Object.assign(p, { x: 40.5, y: 24.5, z: zone.stand[40 + 24 * zone.w], yaw: 0, pitch: 0 });
+    game.view = "map"; game.mode = "map";
+    const t0 = game.time, took = mapStep(game, 1, 0), t1 = game.time;
+    expect(took === true && calls.join() === `41,24,${FLOOR_Z + 1}` && Math.abs(t1 - t0 - 2) < 1e-9 && seen.length === 1 && seen[0].block === B.COLUMN &&
+           Math.floor(p.x) === 40, `registerUse on the map: took ${took}, calls ${calls.join(" ")}, ${(t1 - t0).toFixed(3)} s, events ${seen.length}, at x ${p.x}`);
+    const took2 = mapStep(game, 1, 0);
+    expect(took2 === false && calls.length === 2 && game.time === t1 && seen.length === 1, `registerUse giving 0: took ${took2}, ${game.time - t1} s, events ${seen.length}`);
+    game.view = "3d"; game.mode = "explore";
+    Object.assign(p, { x: 40.5, y: 24.5, yaw: 0, pitch: 0 });
+    const look = lookTarget(game);
+    expect(look?.label === "touch the column" && look.x === 41, `registerUse in 3D: the crosshair says ${JSON.stringify(look?.label)} at x ${look?.x}`);
+    interact(game);
+    expect(calls.length === 3 && seen.length === 2, `registerUse in 3D: E used it ${calls.length - 2} time(s), events ${seen.length}`);
+    off();
+    stats.registerUse = `${useIds().length} uses (${useIds().map((k) => (typeof k === "number" ? `block ${k}` : k)).join(", ")}); map 2 s, 3D by E`;
   }
 
   // The real world: the legacy stack is the Keeper's Stair under Hollowmere (5, 16), not at (0, 0).

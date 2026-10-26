@@ -23,7 +23,7 @@
 //    updates, HUD segments, map overlays and describers, statuses, item kinds, creature types and elites,
 //    abilities and their sources, AI hooks, factions, dialogues, talk options, services, bonus sources, body
 //    plans, zone generators, site builders, legend handlers, gimmicks, themes, biome builders, currency
-//    backings, quest templates) must be the same before and after any of them that is still a STUB.
+//    backings, quest templates, block uses) must be the same before and after any of them that is still a STUB.
 // 4. The browser sees every module: each module of src/ is reachable from src/main.js or a check module by
 //    imports (tests/lib/crawl.js: what the browser's env.srcFiles() reads), unless it is a P0 stub nobody imports
 //    yet (listed in the notes). Node only (it needs the folder's listing).
@@ -122,7 +122,7 @@ export const FROZEN = {
 export async function registries(src) {
   const m = {};
   for (const f of ["screens", "keys", "events", "hud", "renderMap", "status", "items", "creatures", "abilities", "ai", "factions", "talk",
-    "stats", "body", "zones", "currency", "world/sites", "gen/vaults", "gen/dungeon", "gen/biomes/index", "story/quests"]) m[f] = await src(`${f}.js`);
+    "stats", "body", "zones", "currency", "world/sites", "gen/vaults", "gen/dungeon", "gen/biomes/index", "story/quests", "interact"]) m[f] = await src(`${f}.js`);
   const keys = (o) => Object.keys(o).sort();
   return {
     screens: [...m.screens.SCREENS.keys()].sort(), keys: m.keys.boundCodes(), bus: m.events.busCounts(),
@@ -137,6 +137,7 @@ export async function registries(src) {
     siteBuilders: keys(m["world/sites"].SITE_BUILDERS), legends: m["gen/vaults"].legendHandlers(),
     gimmicks: keys(m["gen/dungeon"].GIMMICKS), themes: keys(m["gen/dungeon"].DUNGEON_THEMES),
     biomes: keys(m["gen/biomes/index"].BIOME_BUILDERS), backings: m.currency.backingKinds(), quests: m["story/quests"].questIds(),
+    uses: m.interact.useIds().map(String),
   };
 }
 
