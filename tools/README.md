@@ -6,7 +6,7 @@ Node-only scripts for checking the game. They need **Node 20 or newer** and noth
 Run everything with:
 
 ```
-node tools/run-all.mjs            (or: --only golden,zones)
+node tools/run-all.mjs            (or: --only golden,zones; --jobs n, default one per CPU but one)
 ```
 
 It runs every `check-*.mjs` in this folder, each in its own Node process, and exits non-zero if any fails. The check
@@ -46,7 +46,8 @@ them too; the `check-*.mjs` files only load inputs and print the result.
 | `browser-0c.mjs` | The 0C browser smoke in headless Chromium (not a `check-*`). Serve the repository first (`python3 -m http.server 8642` from its root), then `node tools/browser-0c.mjs [--port 8642] [--seeds 1234,7]`. Audio silenced as above; per seed, fights by real key presses on the map (bumps) and in 3D (Enter swings), each in the legacy and the d20 set, counted on the bus; then walking into Pell, his news, his shop and its services tab, Esc back. Fails on a fight with no blows, a talk that doesn't open, or any console error or warning. Stop the server afterwards. |
 | `browser-shell.mjs` | The 0D1 shell in headless Chromium (not a `check-*`). Serve the repository (`python3 -m http.server 8642`), then `NODE_PATH=$(npm root -g) node tools/browser-shell.mjs [--port 8642] [--seed 1234] [--sizes 1280x720,600x300] [--verbose]` (600×300 is 100×30 cells). Audio silenced as above; with real key presses and real mouse clicks every mode is reached and left (the intro, inventory, journal, the cube and its pages, pause, both views, talk and the pack, levelup, the stairs' beat, death); a pushed text field takes "m", "M" and "Ö" without toggling the music; a click takes the pointer lock and `document.exitPointerLock()` opens pause. Fails on a mode out of place or any console error or warning. Stop the server afterwards. |
 | `browser-0d1.mjs` | The 0D1 gate in headless Chromium (not a `check-*`; needs Playwright). `NODE_PATH=$(npm root -g) node tools/browser-0d1.mjs [--against p0-0c] [--frames 200] [--rounds 8] [--skip shell,hud,golden,frametime]`, about 90 s. It serves the repository itself (and `git archive <against>` unpacked into a temporary folder, removed afterwards), silences audio as above, and: (1) runs `browser-shell.mjs` against its server at 1280×720 and 600×300, then reaches the victory card by keys and by clicks, so every registered mode (13) is reached by keys and clicks; the text field, `Ö` and `m`, and the pointer-lock loss opening pause come from `browser-shell`; (2) the HUD at 100×30: `tests/checks/hud.js` in the browser, then the real canvas with every segment and seven statuses on in both views (one row, every piece drawn whole, location/HP/statuses shown, nothing dropped outranking something shown); (3) golden (b)'s 27 frame hashes recorded in the browser and compared with the fixtures; (4) frame time: this tree against `<against>` in the same browser, underground (legacy level 3) and on the start span, 3D and map, the trees alternating tick by tick (ABBA) with the camera turning; underground must be within 5% (the ratio of the pooled trimmed means); pooled p50/p95/mean printed. Fails on any console error or warning. |
-| `report.mjs`, `run-all.mjs` | Printing a result; running every check. |
+| `report.mjs`, `run-all.mjs` | Printing a result; running every check, side by side (`--jobs`), the slowest first; the checks with a time budget (`check-dungeons`, `check-status`) run afterwards alone. |
+| `workflows/p0-session.js` | The Claude Code workflow each Phase 0 session ran (implement → 3 independent verifiers → fix → recheck). |
 
 ## Re-recording the golden fixtures
 
