@@ -19,10 +19,12 @@
 //   aimTarget(game, range) → { creature, point, tile, dir }   3D: along the view ray (pitch included); the
 //                                            creature nearest the crosshair inside a 6° cone with line of sight
 //                                            within range, the point where the ray meets a block (or its end)
-//   requestTarget(game, ability, done)       the map's target: P0 stub, done({ creature, point, tile, dir }) at
-//                                            once with the nearest hostile you can see now within
-//                                            REQUEST_RANGE tiles (as throwing.js throwAtNearest picks), or
-//                                            done(null). WS8 replaces the body with the target screen.
+//   requestTarget(game, ability, done)       a target, in either view: in 3D done(aimTarget(game, range)) at
+//                                            once (range: the ability's, else REQUEST_RANGE); on the map the P0
+//                                            stub, done({ creature, point, tile, dir }) at once with the nearest
+//                                            hostile you can see now within REQUEST_RANGE tiles (as throwing.js
+//                                            throwAtNearest picks), or done(null). WS8 replaces the map's body
+//                                            with the target screen.
 //
 // AbilityDef = { name, source: "mutation" | "implant" | "item" | "power" | "innate",
 //   target: "self" | "dir" | "creature" | "tile" | "area", range, radius,
@@ -122,6 +124,7 @@ export function aimTarget(game, range) {
 }
 
 export function requestTarget(game, ability, done) {
+  if (game.view !== "map") { done(aimTarget(game, ability?.range || REQUEST_RANGE)); return; }
   const { zone, player: p } = game;
   const seen = hostilesTo(game, p)
     .map((m) => ({ m, d: distance(m.x - p.x, m.y - p.y) }))
@@ -145,10 +148,7 @@ export function useAbility(game, e, id) {
   if (def.cost?.funds && funds(e) < def.cost.funds) { say(game, e, `${def.name} costs ${formatPrice(def.cost.funds)}.`); return false; }
   const onMap = game.mode === "map";
   let target = null;
-  if (def.target !== "self") {
-    if (onMap) requestTarget(game, def, (t) => { target = t; });
-    else target = aimTarget(game, def.range);
-  }
+  if (def.target !== "self") requestTarget(game, def, (t) => { target = t; });
   if (!activate(game, e, id, target)) return false;
   if (onMap && def.mapTime > 0) mapUseTime(game, def.mapTime);
   return true;

@@ -19,9 +19,10 @@
 //      and on the map (the use's 0.5 s, then waits); skipTime catches it up exactly (7 s left after a 5 s
 //      skip, ready after 7 more); the HUD shows "1 Fold Step 12s" while it cools (at 100×30 with two
 //      statuses on, in one row, whole; check-hud holds it to §4.5's priority 70) and nothing once it's ready.
-//   5. Targets: requestTarget gives the nearest hostile seen this moment within 10 tiles (not a person, not
-//      one unseen, not one farther), else null; aimTarget picks the creature nearest the crosshair inside
-//      6° with line of sight, none outside the cone or behind a wall, and its dir follows the pitch.
+//   5. Targets: requestTarget on the map gives the nearest hostile seen this moment within 10 tiles (not a
+//      person, not one unseen, not one farther), else null; aimTarget picks the creature nearest the crosshair
+//      inside 6° with line of sight, none outside the cone or behind a wall, and its dir follows the pitch;
+//      requestTarget in 3D gives aimTarget's (the rat in the crosshair, not a nearer one below it).
 //   6. Landing is always standable over many seeds and positions: legacy levels and surface spans, both
 //      views, random standable tiles and random facings: every landing stands on the zone's stand height,
 //      on no stairs and no creature, within reach on foot of where you stood, at most 2 × range + 1 tiles
@@ -244,6 +245,15 @@ export function checkAbilities({ game, startRun, inputHandlers, abilities: A, ke
     aim = A.aimTarget(game, 6);
     if (Math.abs(aim.dir[2] - Math.sin(-0.4)) > 1e-9) fail(`aimTarget's dir ignores the pitch: ${aim.dir}`);
     if (!(aim.point.z < p.z + 1.45)) fail("aimTarget's point doesn't follow a downward aim");
+    // requestTarget in 3D: the crosshair's creature (aimTarget), not the nearest one in sight.
+    const r2 = add(6);
+    place(p, at, 0);
+    p.pitch = Math.atan2(r2.z + r2.h * 0.6 - (p.z + 1.45), r2.x - p.x);   // on the farther rat (r1, 3 tiles on, is below the cone)
+    turns.refreshView(game);
+    got = undefined;
+    A.requestTarget(game, { ...A.ABILITIES.foldStep, range: 8 }, (t) => { got = t; });
+    if (got?.creature !== r2 || JSON.stringify(got.dir) !== JSON.stringify(A.aimTarget(game, 8).dir))
+      fail(`requestTarget in 3D: ${got?.creature ? `the rat at ${tile(got.creature)}` : "nothing"}, not the one in the crosshair at ${tile(r2)}`);
   }
 
   // --- 6. Landing is always standable -------------------------------------------------------------------------------
