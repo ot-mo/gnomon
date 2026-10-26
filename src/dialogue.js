@@ -10,10 +10,10 @@
 import * as S from "./screen.js";
 import { lockPointer, unlockPointer } from "./input.js";
 import { NPC_TYPES, talkTo, mapPercent } from "./npcs.js";
-import { itemName, itemGlyph, itemInfo, addToInventory, sellPrice, priceFactor, isGear, ELEMENTS, RINGS, AMULETS, POTIONS } from "./items.js";
+import { itemName, itemGlyph, itemInfo, itemPrice, addToInventory, isGear, ITEM_KINDS, ELEMENTS, RINGS, AMULETS, POTIONS } from "./items.js";
+import { funds, pay, receive, purseRoom, formatPrice, priceLevel, buyPrice, sellPrice, CURRENCY } from "./currency.js";
 import { worn, regear } from "./player.js";
 import { wielded, carried } from "./body.js";
-import { raiseAttr, raiseMaxHp } from "./stats.js";
 import { sfx, speakLetter } from "./sfx.js";
 
 // --- Text helpers ----------------------------------------------------------------------
@@ -159,15 +159,15 @@ export function drawTalk(game) {
 
 // --- The shop -----------------------------------------------------------------------------------
 // Three tabs: buy, sell, and Pell's services (sharpening, reforging, identifying, lifting curses).
-// Prices are set by depth when he's met; crystals get dearer every time you buy one (in the
-// whole run); the Haggler perk takes a fifth off.
+// Prices are set by the level when he's met (currency.js priceLevel); crystals get dearer every time
+// you buy one (in the whole run); the Haggler perk takes a fifth off (stats.js priceMul).
 const TABS = ["buy", "sell", "services"];
 const ELEMENT_WORDS = { fire: "flames", frost: "frost", shock: "lightning", holy: "holy light" };
 
-function haggle(game, price) { return game.player.perks.has("haggler") ? Math.round(price * 0.8) : price; }
+const haggle = (game, price) => buyPrice(game, game.player, price);
 
 function services(game) {
-  const p = game.player, depth = game.shop.npc.depth, f = priceFactor(depth), rows = [];
+  const p = game.player, f = priceLevel(game.shop.npc.depth), rows = [];
   const cost = (n) => haggle(game, Math.round(n * f));
   const jewelFixed = (it) => (it.kind === "ring" || it.kind === "amulet") && (it.kind === "ring" ? RINGS : AMULETS)[it.id].fixed;
   for (const it of worn(p)) {
@@ -207,7 +207,7 @@ function shopRows(game) {
     return { it: s.item, price: haggle(game, price), count: s.count, stock: s };
   });
   if (sh.tab === "services") return services(game);
-  return p.inv.map((it) => ({ it, price: sellPrice(it), count: it.count || 1 }));
+  return p.inv.map((it) => ({ it, price: sellPrice(game, p, itemPrice(it)), count: it.count || 1 }));
 }
 
 export function shopKey(game, code) {
@@ -224,30 +224,31 @@ function trade(game, row) {
   if (!row) return;
   const p = game.player, sh = game.shop;
   if (sh.tab === "services") {
-    if (p.gold < row.price) { game.log(`You can't afford that (${row.price} gold).`, [255, 150, 120]); return; }
-    p.gold -= row.price;
+    if (!pay(game, p, row.price)) { game.log(`You can't afford that (${formatPrice(row.price)}).`, [255, 150, 120]); return; }
     sfx("gold");
     row.act();
-    game.log(row.done || (row.target ? `Pell hands back your ${itemName(game, row.target)}. (${row.price} gold)` : `Done. (${row.price} gold)`), [255, 215, 90]);
+    game.log(row.done || (row.target ? `Pell hands back your ${itemName(game, row.target)}. (${formatPrice(row.price)})` : `Done. (${formatPrice(row.price)})`), [255, 215, 90]);
     sh.sel = Math.max(0, Math.min(sh.sel, shopRows(game).length - 1));
     return;
   }
   const name = itemName(game, { ...row.it, count: 1 });
   if (sh.tab === "buy") {
-    if (p.gold < row.price) { game.log(`You can't afford the ${name} (${row.price} gold).`, [255, 150, 120]); return; }
-    p.gold -= row.price;
+    if (!pay(game, p, row.price)) { game.log(`You can't afford the ${name} (${formatPrice(row.price)}).`, [255, 150, 120]); return; }
     sfx("gold");
     row.stock.count--;
-    if (row.it.kind === "heart") { raiseMaxHp(p, 5); p.hp += 5; game.log("You absorb the heart crystal. Max HP +5!", [240, 90, 110]); }
-    else if (row.it.kind === "strength") { raiseAttr(p, "str", 1); game.log("You absorb the strength crystal. STR +1!", [255, 170, 80]); }
-    else { addToInventory(p, { ...row.it, count: 1 }); game.log(`You buy the ${name} for ${row.price} gold.`, [255, 215, 90]); }
+    // A crystal is absorbed at once, as when you walk over one (its kind's onPickup).
+    if (!ITEM_KINDS[row.it.kind]?.onPickup?.(game, p, { ...row.it })) {
+      addToInventory(p, { ...row.it, count: 1 });
+      game.log(`You buy the ${name} for ${formatPrice(row.price)}.`, [255, 215, 90]);
+    }
     if (row.it.kind === "heart" || row.it.kind === "strength") game.crystalsBought = (game.crystalsBought || 0) + 1;
   } else {
     if (row.price <= 0) { game.log(`Pell doesn't want the ${name}.`, [170, 170, 170]); return; }
-    p.gold += row.price;
+    if (purseRoom(p) < row.price) { game.log(`Your purse can't hold another ${formatPrice(row.price)}.`, [255, 150, 120]); return; }
+    receive(game, p, row.price);
     sfx("gold");
     if (row.it.count > 1) row.it.count--; else p.inv.splice(p.inv.indexOf(row.it), 1);
-    game.log(`You sell the ${name} for ${row.price} gold.`, [255, 215, 90]);
+    game.log(`You sell the ${name} for ${formatPrice(row.price)}.`, [255, 215, 90]);
   }
   sh.sel = Math.max(0, Math.min(sh.sel, shopRows(game).length - 1));
 }
@@ -259,8 +260,8 @@ export function drawShop(game) {
   box(x0, y0, w, h, [200, 160, 60]);
   const tabs = TABS.map((t) => (t === sh.tab ? `[ ${t.toUpperCase()} ]` : `  ${t}  `)).join(" ");
   S.text(x0 + 3, y0 + 1, `PELL'S PACK  · ${tabs}`, 255, 220, 120);
-  const gold = `your gold: ${p.gold}`;
-  S.text(x0 + w - gold.length - 3, y0 + 1, gold, 255, 210, 70);
+  const purse = `your ${CURRENCY.name}: ${funds(p)}`;
+  S.text(x0 + w - purse.length - 3, y0 + 1, purse, ...CURRENCY.color);
   const empty = { buy: "(sold out)", sell: "(you have nothing to sell)", services: "(nothing Pell can do for you right now)" }[sh.tab];
   if (!rows.length) S.text(x0 + 5, y0 + 3, empty, 130, 130, 130);
   rows.forEach((r, k) => {
@@ -269,9 +270,9 @@ export function drawShop(game) {
     if (sel) S.text(x0 + 1, y, ">", 255, 230, 140);
     S.put(x0 + 3, y, glyph, ...color);
     const label = r.label || itemName(game, { ...r.it, count: 1 }) + (r.count > 1 ? ` x${r.count}` : "");
-    const price = r.price > 0 ? `${r.price} gold` : "-";
+    const price = r.price > 0 ? formatPrice(r.price) : "-";
     S.text(x0 + 5, y, label.slice(0, w - price.length - 10), ...(sel ? [255, 255, 255] : [200, 200, 200]));
-    S.text(x0 + w - price.length - 3, y, price, ...(sh.tab !== "sell" && r.price > p.gold ? [200, 90, 80] : [255, 210, 70]));
+    S.text(x0 + w - price.length - 3, y, price, ...(sh.tab !== "sell" && r.price > funds(p) ? [200, 90, 80] : CURRENCY.color));
   });
   const sel = rows[sh.sel];
   if (sel) S.text(x0 + 3, y0 + h - 4, (sel.info || itemInfo(game, sel.it)).slice(0, w - 6), 180, 180, 190);

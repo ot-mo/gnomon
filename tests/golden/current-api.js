@@ -4,7 +4,9 @@
 // scenarios touch (stats in 0B, creatures in 0C), it updates this adapter, never the fixtures.
 // Since 0B the derived numbers come from the stat bus (stats.js) with RULES.stats = "legacy", and the
 // parent's five gear fields are read from the body (body.js): the primary hand, the body part, the first
-// finger, the neck and the belt.
+// finger, the neck and the belt. The parent's `gold` field is the purse (currency.js funds), and its
+// `gold` piles are today's `cash` piles (the same pile in glim): the adapter shows generated and stamped
+// piles under the parent's kind name, so the dungeon and vault facts compare as recorded.
 //
 // env: from tools/node-env.mjs.
 export async function currentApi(env, seedRandom) {
@@ -23,8 +25,10 @@ export async function currentApi(env, seedRandom) {
   const zones = await env.load("zones.js");
   const stats = await env.load("stats.js");
   const body = await env.load("body.js");
+  const currency = await env.load("currency.js");
   const game = G.game;
   const STACKS = ["potion", "scroll", "knife", "bomb"];
+  const parentKinds = (zone) => { for (const it of zone.items) if (it.kind === "cash") it.kind = "gold"; return zone; };
 
   return {
     name: "current",
@@ -35,7 +39,7 @@ export async function currentApi(env, seedRandom) {
     generateLevel(seed, depth) {
       const zone = dungeon.generateDungeonLevel(seed, dungeon.legacyParams(depth, seed));
       zone.siteId = "legacy";
-      return zone.seal();
+      return parentKinds(zone.seal());
     },
     enterLevel(level, depth, how) { game.zones.set(level.key, level); zones.enterZone(game, level, { how, rng: Math.random }); },
     player: () => game.player,
@@ -77,7 +81,7 @@ export async function currentApi(env, seedRandom) {
                    bonus: Object.fromEntries(keys.map((k) => [k, stats.bonus(p, k)])) },
         gear: { weapon: body.wielded(p), armour: body.wornOn(p, "body"), ring: body.wornOn(p, "finger_r"),   // the body (0B)
                 amulet: body.wornOn(p, "neck"), sidearm: body.belt(p) },
-        inv: p.inv, keys: p.keys, gold: p.gold, torch: p.torch,
+        inv: p.inv, keys: p.keys, gold: currency.funds(p), torch: p.torch,   // the purse (0B)
         perks: [...p.perks].map((k) => [k, leveling.perkRank(p, k)]),
         known: { potions: game.knownPotions, scrolls: game.knownScrolls, auras: game.auraKnown },
       };
@@ -93,7 +97,7 @@ export async function currentApi(env, seedRandom) {
       f.blocks.fill(world.B.ROCK);
       return f;
     },
-    stampVault: (f, built, x, y, rng) => vaults.stampVault(f, built, x, y, rng),
+    stampVault: (f, built, x, y, rng) => { const at = vaults.stampVault(f, built, x, y, rng); parentKinds(f); return at; },
     // The temple is a plan since 0A2: stamped the parent's way (48×48×10, rock roof, no front door).
     buildTemple: (seed) => temple.templeFixture(seed),
   };

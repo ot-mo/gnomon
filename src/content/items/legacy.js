@@ -9,6 +9,7 @@
 import { registerItemKind, strNeeded } from "../../items.js";
 import { raiseAttr, raiseMaxHp } from "../../stats.js";
 import { CURRENCY } from "../currency.js";
+import { receive, formatPrice, purseRoom } from "../../currency.js";
 
 // --- Potions ----------------------------------------------------------------
 // Each run shuffles which colour is which effect. Drinking one tells you, for the rest of the run.
@@ -253,7 +254,7 @@ function gearName(game, it) {
   const fixed = jewel && jewelTable(it)[it.id].fixed;
   return `${it.known && it.ench && !fixed ? signed(it.ench) + " " : ""}${adj}${el}${base}${suffix}`;
 }
-// What the peddler charges at level 0 (deeper down, everything costs more: items.js priceFactor).
+// What the peddler charges at level 0 (deeper down, everything costs more: currency.js priceLevel).
 function gearPrice(it) {
   if (it.relic) return 400;
   if (it.ench < 0 && it.known) return 5;
@@ -368,17 +369,26 @@ registerItemKind("strength", {
   art: FLOOR_ART.strength, palette: () => ({ o: [[230, 120, 30], 0.6], O: [[255, 190, 90], 0.8] }),
   onPickup(game, e) { raiseAttr(e, "str", 1); game.log("You absorb the strength crystal. STR +1!", [255, 170, 80]); return true; },
 });
-// Money lying about. `gold` is the parent game's pile; `cash` is the same pile in the currency of
-// content/currency.js (glim). Both go into your purse when you walk over them.
-// (0B's currency step routes the purse through currency.js receive.)
+// Money lying about: `cash`, a pile of the currency of content/currency.js (glim). Walking over it
+// puts what fits into your purse (currency.js receive); the rest stays on the floor. `gold` is the
+// parent game's pile under its old name (the golden scenarios drop one); it is the same pile.
 const pile = (label) => ({
   stack: false, weight: () => 0, price: () => 0, sound: "gold",
   art: FLOOR_ART.gold, palette: () => ({ y: [[230, 175, 40], 0.4], Y: [[255, 230, 120], 0.6] }),
   name: (game, it) => `${it.amount} ${label()}`,
   glyph: () => ["$", [255, 210, 70]],
-  onPickup(game, e, it) { e.gold += it.amount; game.log(`You pick up ${it.amount} ${label()}.`, [255, 210, 70]); return true; },
+  canPickUp: (game, e, it) => purseRoom(e) > 0 || !it.fullHint,
+  onPickup(game, e, it) {
+    const left = receive(game, e, it.amount), took = it.amount - left;
+    if (took) game.log(`You pick up ${formatPrice(took)}.`, CURRENCY.color);
+    if (!left) return true;
+    if (took || !it.fullHint) game.log(`Your purse is full: ${formatPrice(left)} stays where it lies.`, [255, 150, 120]);
+    it.amount = left;
+    it.fullHint = true;
+    return "stay";
+  },
 });
-registerItemKind("gold", pile(() => "gold"));
+registerItemKind("gold", pile(() => CURRENCY.plural));
 registerItemKind("cash", { ...pile(() => CURRENCY.plural), art: FLOOR_ART.cash, glyph: () => [CURRENCY.glyph, CURRENCY.color] });
 registerItemKind("cube", {
   stack: false, weight: () => 0, price: () => 0, sound: "crystal",

@@ -4,6 +4,7 @@ import { WEAPONS } from "./items.js";
 import { bonus, invalidateStats, clampHp, makeAttrs, speedMul, canSwim } from "./stats.js";
 import { makeBody, wielded, worn } from "./body.js";
 import { RULES } from "./rules.js";
+import { CURRENCY } from "./currency.js";
 import { hasStatus, statusFlag, statusSpeed } from "./status.js";
 
 export const RADIUS = 0.3, HEIGHT = 1.6, EYE = 1.45;
@@ -19,7 +20,7 @@ const EPS = 0.001;
 export function makePlayer() {
   const p = {
     x: 0, y: 0, z: FLOOR_Z, vz: 0, onGround: false, yaw: 0, pitch: 0,
-    hp: 20, keys: 0, gold: 0, torch: true,
+    hp: 20, keys: 0, funds: 0, purse: CURRENCY.startPurse, torch: true,   // funds, purse: currency.js (the counter)
     attrs: makeAttrs(), maxHpGain: 0,   // base fields: max HP, STR and the rest are derived (stats.js)
     level: 1, xp: 0, perks: new Set(), pendingLevels: 0, bonusPerks: 0,   // bonusPerks: gifts from people, not levels
     // What you're holding and wearing (body.js): parts of a humanoid body, each with an item

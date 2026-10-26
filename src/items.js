@@ -5,7 +5,7 @@
 //                                   name(game, it), glyph(game, it) → [ch, rgb], info?(game, it), details?(game, it),
 //                                   price(it), weight(it), art, palette(game, it), stands?,
 //                                   use?: (game, e, it) → s | the name of an item action,
-//                                   throwable?, onImpact?, onPickup?(game, e, it) → consumed, sound?, bonuses?(it),
+//                                   throwable?, onImpact?, onPickup?(game, e, it) → consumed | "stay", canPickUp?(game, e, it), sound?, bonuses?(it),
 //                                   aura?(game, it), av?(it) (worn armour value), abilities?(it), examine? }
 //   registerItemAction(name, fn)    fn(game, e, it) → seconds: a use shared by kinds ("drink", "read", "wear"),
 //                                   so content can name it without importing the modules that do it
@@ -164,9 +164,6 @@ export function randomTreasure(rand, depth) {
   return { kind: "knife", count: 3 + Math.floor(rand() * 3) };
 }
 
-// What the peddler pays: less than a third. Deeper down everything costs more (priceFactor).
-export const priceFactor = (depth) => 1 + depth / 15;
-
 // Where something dropped at (x, y) comes to rest: not pressed up against a wall (it would
 // half disappear into it), but at least 0.3 from any wall of its tile.
 export function awayFromWalls(zone, x, y, z) {
@@ -181,7 +178,6 @@ export function awayFromWalls(zone, x, y, z) {
 export function makeItem(item, x, y, z) {
   return { ...item, x, y, z };
 }
-export const sellPrice = (it) => Math.floor(itemPrice(it) * 0.3);
 
 // --- Stacks -----------------------------------------------------------------------------------
 // Into the pack: stackable things join a stack with the same key. Returns the stack it's in.
@@ -224,8 +220,11 @@ export function pickUpItems(game) {
     }
     if (!near) return true;
     const name = itemName(game, it), def = kindOf(it);
+    if (def?.canPickUp && !def.canPickUp(game, p, it)) return true;   // (a full purse, once told)
     sfx(it.relic ? "crystal" : def?.sound || "pickup");
-    if (def?.onPickup?.(game, p, it)) return false;   // absorbed, counted or the story took over
+    const taken = def?.onPickup?.(game, p, it);
+    if (taken === "stay") return true;                // only part of it (a full purse): the rest stays
+    if (taken) return false;                          // absorbed, counted or the story took over
     addToInventory(p, it);
     if (it.relic) game.log(`You pick up ${name}, a relic! ${RELICS[it.relic].info[0].toUpperCase() + RELICS[it.relic].info.slice(1)}.`, RELIC_COLOR);
     else game.log(it.count > 1 ? `You pick up ${it.count} ${name}s.` : `You pick up ${it.kind === "quest" ? name : withArticle(name)}.`, itemGlyph(game, it)[1]);

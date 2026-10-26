@@ -12,7 +12,7 @@
 import { B, FLOOR_Z, KIND } from "./world.js";
 import { makeRng } from "./rng.js";
 import { spawnMonster, pickMonsterType, ELITES, MONSTER_TYPES } from "./monsters.js";
-import { randomPotion, randomScroll, randomEquipment, randomJewel, addToInventory, itemName, itemPrice, priceFactor, isGear,
+import { randomPotion, randomScroll, randomEquipment, randomJewel, addToInventory, itemName, itemPrice, makeItem, awayFromWalls, isGear,
          RINGS, AMULETS, POTIONS, POTION_COLORS } from "./items.js";
 import { revealFloor, liftCurses } from "./effects.js";
 import { regear, worn } from "./player.js";
@@ -20,6 +20,7 @@ import { wielded, carried } from "./body.js";
 import { sfx } from "./sfx.js";
 import { maxHp, raiseAttr, raiseMaxHp } from "./stats.js";
 import { addStatus, removeStatus } from "./status.js";
+import { pay, receive, funds, formatPrice, priceLevel, CURRENCY } from "./currency.js";
 
 // --- How they look ---------------------------------------------------------------------
 const ROBE = [
@@ -159,16 +160,16 @@ export function peddlerStock(rng, depth) {
     const same = merged.find((o) => o.item.kind === s.item.kind && o.item.effect === s.item.effect && !o.item.id && !s.item.id);
     if (same) same.count += s.count; else merged.push(s);
   }
-  for (const s of merged) s.price = Math.round(itemPrice(s.item) * priceFactor(depth));
+  for (const s of merged) s.price = Math.round(itemPrice(s.item) * priceLevel(depth));
   return merged;
 }
 
 // --- Shrines ---------------------------------------------------------------------------------
-// An offering: gold for a random blessing. A bold one (twice the gold) draws from a better
+// An offering: glim for a random blessing. A bold one (twice the glim) draws from a better
 // list, but one time in four the shrine wants a trial first: monsters, right here.
-function offering(game, n, gold, bold) {
+function offering(game, n, cost, bold) {
   const p = game.player;
-  p.gold -= gold;
+  if (!pay(game, p, cost)) return null;
   n.state.used = true;
   sfx("gold");
   if (bold && Math.random() < 0.25) {
@@ -255,7 +256,15 @@ const hasHealing = (p) => p.inv.find((s) => s.kind === "potion" && s.effect === 
 function takeFromStack(p, stack) {
   if (--stack.count <= 0) p.inv.splice(p.inv.indexOf(stack), 1);
 }
-function giveGold(game, n) { game.player.gold += n; game.log(`You receive ${n} gold.`, [255, 215, 90]); }
+// Money for you: into your purse, and what doesn't fit (a full purse) on the ground at your feet.
+function giveFunds(game, n) {
+  const p = game.player, left = receive(game, p, n);
+  game.log(`You receive ${formatPrice(n)}.`, [255, 215, 90]);
+  if (!left) return;
+  const [x, y] = awayFromWalls(game.zone, p.x, p.y, p.z);
+  game.zone.items.push({ ...makeItem({ kind: "cash", amount: left }, x, y, p.z), dropped: true });
+  game.log(`Your purse is full: ${formatPrice(left)} goes on the ground.`, [255, 150, 120]);
+}
 function give(game, it) {
   addToInventory(game.player, it);
   game.log(`You receive ${itemName(game, it)}.`, [200, 230, 255]);
@@ -279,7 +288,7 @@ const RUMOURS = [
   "The Lich King used to be a priest, they say. He went down looking for the bottom of the world.",
   "Three things guard the way down, they say. A queen who lies flat as a drawing, a warden who hates the light, and a giant with a star in its head. Each one sits on the stairs.",
   "Gear gets better the deeper you go. Heavier, too. And the deep floors keep the old relics: one of a kind, every one.",
-  "Shrines? Give them gold and they give something back. Give them a lot, and sometimes they test you first.",
+  `Shrines? Give them ${CURRENCY.name} and they give something back. Give them a lot, and sometimes they test you first.`,
   "Some things down there shrug off fire. Some freeze solid at a touch of frost. Carry a second blade on your belt, I say. (R swaps it.)",
 ];
 
@@ -310,8 +319,8 @@ export function talkTo(game, n) {
               finishQuest(game, "temple");
               addQuest(game, "main", "Stop the Lich King", "Vorlath, the Lich King, waits at the bottom of the dungeon (floor 20). Stop him before he folds Hollowmere into a line.");
               give(game, { kind: "potion", effect: "healing", count: 2 });
-              giveGold(game, 20);
-              game.log("Maren presses two potions and a few coins into your hands.", [245, 230, 170]);
+              giveFunds(game, 20);
+              game.log(`Maren presses two potions and a little ${CURRENCY.name} into your hands.`, [245, 230, 170]);
               return node("Take these. The stairs down are past the shaft behind the altar. You'll have to jump: that's what up is for. And come back if you need rest.", [bye("Goodbye, Maren.")]);
             } },
           ]) },
@@ -326,7 +335,7 @@ export function talkTo(game, n) {
 
     // --- Pell, the peddler ------------------------------------------------------------------
     case "pell":
-      return node(first ? "Pell the peddler, at your service! Don't mind the monsters. They never buy anything, but they never haggle either." : "Back again! Gold burning a hole in your pocket?", [
+      return node(first ? "Pell the peddler, at your service! Don't mind the monsters. They never buy anything, but they never haggle either." : `Back again! ${CURRENCY.name[0].toUpperCase() + CURRENCY.name.slice(1)} burning a hole in your purse?`, [
         { label: "Show me your wares.", go: () => ({ shop: "buy" }) },
         { label: "I have things to sell.", go: () => ({ shop: "sell" }) },
         { label: "Heard any news?", go: () => node(RUMOURS[(s.rumour = ((s.rumour ?? Math.floor(Math.random() * RUMOURS.length)) + 1) % RUMOURS.length)], [{ label: "Interesting.", go: () => talkTo(game, n) }]) },
@@ -372,7 +381,7 @@ export function talkTo(game, n) {
           s.done = true;
           revealFloor(game);
           game.log("Tee shows you her map of this floor. It's all there, from above.", [255, 170, 230]);
-          giveGold(game, 25 + n.depth * 2);
+          giveFunds(game, 25 + n.depth * 2);
           finishQuest(game, "ess");
           return node("...Fine. She always worries. Here: I drew this whole floor myself. Flat folk are good at maps! And take these shiny things, they're heavy.", [bye("Go home safe, Tee.")]);
         } },
@@ -408,7 +417,7 @@ export function talkTo(game, n) {
         if (pct >= 80) return node(`Let me see... ${pct}%! That's a proper map. Here, as promised.`, [
           { label: "Hand over a copy of your map.", go: () => {
             s.done = true;
-            giveGold(game, 35 + n.depth * 4);
+            giveFunds(game, 35 + n.depth * 4);
             game.knownPotions.add("seeing");
             give(game, { kind: "potion", effect: "seeing" });
             finishQuest(game, "mira");
@@ -428,12 +437,12 @@ export function talkTo(game, n) {
       const target = game.zone.monsters.find((m) => m.id === s.target);
       if (s.done) return node("Pleasure doing business.", [bye()]);
       if (questActive(game, "rook") && (s.killed || !target)) return node("Dead? Truly? Here's your cut. You earned it.", [
-        { label: "Take the bounty.", go: () => { s.done = true; giveGold(game, 40 + n.depth * 4); finishQuest(game, "rook"); return null; } },
+        { label: "Take the bounty.", go: () => { s.done = true; giveFunds(game, 40 + n.depth * 4); finishQuest(game, "rook"); return null; } },
       ]);
       if (questActive(game, "rook")) return node(`The ${s.targetName} is still out there. Get on with it.`, [bye()]);
       return node(`Name's Rook. I hunt things for coin. There's a ${s.targetName} on this floor that's eaten two of my partners. Kill it and I'll split the bounty with you.`, [
         { label: "Consider it done.", go: () => { addQuest(game, "rook", "Bounty", `Kill the ${s.targetName} somewhere on floor ${n.depth}, then tell Rook.`); return null; } },
-        { label: "What's in it for me?", go: () => node(`${40 + n.depth * 4} gold. More than you'll find in a skeleton's pockets.`, [{ label: "Fine.", go: () => talkTo(game, n) }]) },
+        { label: "What's in it for me?", go: () => node(`${formatPrice(40 + n.depth * 4)}. More than you'll find in a skeleton's pockets.`, [{ label: "Fine.", go: () => talkTo(game, n) }]) },
       ]);
     }
 
@@ -454,14 +463,14 @@ export function talkTo(game, n) {
       ]);
     }
 
-    // --- A shrine: gold for a blessing ---------------------------------------------------------------------
+    // --- A shrine: glim for a blessing ---------------------------------------------------------------------
     case "shrine": {
       if (s.trial) return shrineAfterTrial(game, n);
       if (s.used) return node("The candles have burnt down to nothing. The shrine is silent.", [bye()]);
       const cost = s.cost, bold = cost * 2, opts = [];
-      if (p.gold >= cost) opts.push({ label: `Offer ${cost} gold.`, go: () => offering(game, n, cost, false) });
-      if (p.gold >= bold) opts.push({ label: `Make a bold offering: ${bold} gold. (A greater blessing, but it may test you first.)`, go: () => offering(game, n, bold, true) });
-      if (p.gold < cost) opts.push({ label: `(You have ${p.gold} gold. It asks for ${cost}.)`, go: () => null });
+      if (funds(p) >= cost) opts.push({ label: `Offer ${formatPrice(cost)}.`, go: () => offering(game, n, cost, false) });
+      if (funds(p) >= bold) opts.push({ label: `Make a bold offering: ${formatPrice(bold)}. (A greater blessing, but it may test you first.)`, go: () => offering(game, n, bold, true) });
+      if (funds(p) < cost) opts.push({ label: `(You have ${formatPrice(funds(p))}. It asks for ${cost}.)`, go: () => null });
       opts.push(bye("Walk away."));
       return node(first ? "An old shrine of the builders, its candles still burning after who knows how long. A voice like settling stone fills your head: \"GIVE, AND BE GIVEN TO.\""
                         : "\"GIVE, AND BE GIVEN TO.\"", opts);

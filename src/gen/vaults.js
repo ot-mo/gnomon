@@ -11,7 +11,7 @@
 //   E  entrance (exactly one, on the border; a corridor connects here)
 //   !  random potion   ?  random scroll   k  key   h  heart crystal   S  strength crystal
 //   )  weapon   [  armour (suited to the depth, more likely blessed)   r g s  rat / goblin / skeleton
-//   *  treasure (mostly gear or a scroll; now and then a crystal)   $  a pile of gold
+//   *  treasure (mostly gear or a scroll; now and then a crystal)   $  a pile of glim (cash)
 //   B  the boss, on a one-block dais
 //   Y  a lever (one with its own link letter: the right one, in the mosaic hall)
 //   Q  the Speaking Door's stone face   ^  spike floor (traps.js; the vault says which pattern)
@@ -383,7 +383,7 @@ export const DEFAULT_LEGEND = {
   "#": "wall", "~": "chasm", "1": "step1", "2": "step2", "3": "step3", L: "lever", Y: "lever", Q: "speakingDoor",
   R: "runeLever", U: "rune", G: "gate", D: "door", K: "locked", l: "lamp", p: "ghostPlanks", F: "brazierPuzzle",
   "5": "numeral1", "6": "numeral2", "7": "numeral3", "8": "numeral4", B: "boss", Z: "guardian", ">": "stairs",
-  f: "brazier", E: "entrance", "!": "potion", "?": "scroll", k: "key", h: "heart", $: "gold", S: "strength",
+  f: "brazier", E: "entrance", "!": "potion", "?": "scroll", k: "key", h: "heart", $: "cash", S: "strength",
   ")": "weapon", "[": "armour", "*": "treasure", r: "rat", g: "goblin", s: "skeleton", y: "flatling",
 };
 
@@ -458,7 +458,7 @@ registerLegend("scroll", lying((c) => randomScroll(c.rng)));
 registerLegend("key", lying(() => ({ kind: "key" })));
 registerLegend("heart", lying(() => ({ kind: "heart" })));
 registerLegend("strength", lying(() => ({ kind: "strength" })));
-registerLegend("gold", lying((c) => ({ kind: "gold", amount: c.rng.int(10, 20) + c.zone.level })));
+registerLegend("cash", lying((c) => ({ kind: "cash", amount: c.rng.int(10, 20) + c.zone.level })));
 registerLegend("weapon", lying((c) => randomEquipment(c.rng, c.zone.level + 1, 0.15), "weapon"));
 registerLegend("armour", lying((c) => randomEquipment(c.rng, c.zone.level + 1, 0.15), "armour"));
 registerLegend("treasure", lying((c) => randomTreasure(c.rng, c.zone.level)));

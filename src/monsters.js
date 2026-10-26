@@ -674,7 +674,7 @@ function killMonster(game, m, message, dropLoot = true, byPlayer = true) {
     // Lucky: twice as likely to drop something.
     const luck = p.perks.has("lucky") ? 2 : 1;
     if (m.elite || Math.random() < 0.25 * luck)
-      zone.items.push(makeItem({ kind: "gold", amount: Math.round((1 + Math.floor(Math.random() * (2 + zone.level * 0.6))) * (m.elite ? 1.5 : 1)) }, ...awayFromWalls(zone, m.x + 0.15, m.y + 0.1, ground), ground));
+      zone.items.push(makeItem({ kind: "cash", amount: Math.round((1 + Math.floor(Math.random() * (2 + zone.level * 0.6))) * (m.elite ? 1.5 : 1)) }, ...awayFromWalls(zone, m.x + 0.15, m.y + 0.1, ground), ground));
     const [ix, iy] = awayFromWalls(zone, m.x, m.y, ground);
     if (m.elite) zone.items.push(makeItem(eliteLoot(zone.level, luck > 1 ? 0.15 : 0), ix, iy, ground));
     else if (Math.random() < 0.25 * luck) {

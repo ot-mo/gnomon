@@ -27,6 +27,7 @@ import * as Bd from "../../src/body.js";
 import * as St from "../../src/stats.js";
 import { generateDungeonLevel, legacyParams, LEGACY_LEVELS } from "../../src/gen/dungeon.js";
 import { makeRng } from "../../src/rng.js";
+import { funds } from "../../src/currency.js";
 import { derived, gearCatalog } from "./stats.js";
 
 const OLD_GEAR = /\b(p|player|game\.player|pl|e)\.(weapon|armour|ring|amulet|sidearm)\b/g;
@@ -125,12 +126,12 @@ export function checkBody({ game, startRun, inventory, srcFiles }) {
   }
   // Cash and gold piles go into the purse.
   {
-    const p = game.player, before = p.gold;
+    const p = game.player, before = funds(p);
     game.zone.items.push(I.makeItem({ kind: "cash", amount: 12 }, p.x, p.y, p.z), I.makeItem({ kind: "gold", amount: 5 }, p.x, p.y, p.z));
     const n = game.zone.items.length;
     I.pickUpItems(game);
-    if (p.gold !== before + 17 || game.zone.items.length !== n - 2) fail(`walking over 12 glim and 5 gold: purse ${before} → ${p.gold}`);
-    stats.cashPickup = { before, after: p.gold };
+    if (funds(p) !== before + 17 || game.zone.items.length !== n - 2) fail(`walking over 12 glim and 5 gold: purse ${before} → ${funds(p)}`);
+    stats.cashPickup = { before, after: funds(p) };
   }
 
   // --- 3. Plans -------------------------------------------------------------------------------------

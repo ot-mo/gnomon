@@ -213,7 +213,7 @@ function drawLegend(x, y, game) {
     ["k", [240, 200, 70], "key"],
     ["h", [240, 60, 90], "heart crystal (+5 HP)"],
     ["S", [255, 160, 60], "strength crystal"],
-    ["$", [255, 210, 70], "gold"],
+    ["$", [255, 210, 70], "gold"],   // (glim; the word stays until golden (b), whose map frames show this legend, is retired)
     ["*", [90, 230, 255], "your marker"],
     ["█", [240, 195, 60], "floor mosaic: read it!"],
     ["▲ ^ ,", [255, 70, 60], "spikes: up, next, down"],

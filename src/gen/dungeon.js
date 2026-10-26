@@ -302,7 +302,7 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   }
   // Loot lying around: a few potions and scrolls, a piece of gear (sometimes two), usually a few
   // throwing knives, once in a while a strength crystal, and from floor 3 now and then a ring
-  // or an amulet. Not much gold: a pile or two.
+  // or an amulet. Not much glim: a pile or two.
   for (let k = rng.int(2, 3); k > 0; k--) placeItem(f, rng, rng.pick(rooms), randomPotion(rng));
   for (let k = rng.int(1, 2); k > 0; k--) placeItem(f, rng, rng.pick(rooms), randomScroll(rng));
   for (let k = rng.chance(0.1) ? 2 : 1; k > 0; k--) placeItem(f, rng, rng.pick(rooms.filter((o) => o !== start)), randomEquipment(rng, depth));
@@ -310,7 +310,7 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   if (depth >= 3 && rng.chance(0.3)) placeItem(f, rng, rng.pick(rooms.filter((o) => o !== start)), randomJewel(rng, depth));
   if (rng.chance(0.6)) placeItem(f, rng, rng.pick(rooms), { kind: "knife", count: rng.int(2, 4) });
   if (rng.chance(0.75)) placeItem(f, rng, rng.pick(rooms), { kind: "bomb", count: rng.chance(0.3) ? 2 : 1 });
-  for (let k = rng.int(1, 2); k > 0; k--) placeItem(f, rng, rng.pick(rooms), { kind: "gold", amount: rng.int(5, 10) + depth });
+  for (let k = rng.int(1, 2); k > 0; k--) placeItem(f, rng, rng.pick(rooms), { kind: "cash", amount: rng.int(5, 10) + depth });
 
   // --- 10½. The site's gimmicks (none on the legacy stack).
   for (const id of p.gimmicks || []) GIMMICKS[id](f, rng, rooms, p);
@@ -775,7 +775,7 @@ function addSecretRoom(f, rng, rooms, start, roomAt, ringAt, corridor, blocked, 
   const roll = rng();
   const extra = roll < 0.1 ? { kind: rng.chance(0.5) ? "strength" : "heart" } : roll < 0.45 ? { kind: "bomb", count: 2 }
     : roll < 0.75 ? randomPotion(rng) : randomScroll(rng);
-  for (const [k, it] of [randomTreasure(rng, depth + 1), extra, { kind: "gold", amount: rng.int(10, 20) + depth }].entries())
+  for (const [k, it] of [randomTreasure(rng, depth + 1), extra, { kind: "cash", amount: rng.int(10, 20) + depth }].entries())
     if (spots[k]) f.items.push(makeItem(it, spots[k][0] + 0.5, spots[k][1] + 0.5, FLOOR_Z));
 }
 

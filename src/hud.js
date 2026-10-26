@@ -8,6 +8,7 @@ import { PERKS, xpToNext, perkLabel } from "./leveling.js";
 import { attr, maxHp } from "./stats.js";
 import { wielded } from "./body.js";
 import { statusLine } from "./status.js";
+import { CURRENCY, formatFunds } from "./currency.js";
 
 export function drawHud(game) {
   const p = game.player;
@@ -127,7 +128,7 @@ function drawStatus(game, p, y) {
   seg(`LV ${p.level} (${p.xp}/${xpToNext(p.level)} XP)`, [160, 230, 255]);
   seg(`STR ${attr(p, "str")}`, [255, 170, 80]);
   seg(`ARM ${armourValue(p)}`, [175, 180, 200]);
-  seg(`$${p.gold}`, [255, 210, 70]);
+  seg(formatFunds(p), CURRENCY.color);
   seg(`k ${p.keys}`, [240, 200, 70]);
   seg(`torch ${p.torch ? "on" : "off"}`, p.torch ? [255, 200, 120] : [120, 120, 120]);
   const ready = readyStack(p);   // what T throws
