@@ -82,7 +82,8 @@ export function setLegendKeyHint(text) { legendHint = String(text || ""); }
 
 // Outdoors: how a column's ground and water show (null: the parent's glyph for its kind). What the map shows as
 // floor but isn't (a pit or chasm you haven't looked into, ghost planks, a bridge whose crossing you haven't seen:
-// mapKind) takes the ground of a floor beside it, else the zone's commonest, so its colour gives nothing away.
+// mapKind) takes the ground of the nearest true floor (a chasm's middle the room's floor around it), so neither its
+// colour nor its shape gives anything away.
 const dim = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
 const lookOf = (id) => { const b = BLOCKS[id]; return !id || !b ? null : b.map ? [b.map.glyph, b.map.color] : [".", dim(b.color || [125, 120, 110], 0.85)]; };
 const COMMON = new WeakMap();   // zone → { v: navVersion, id }: its commonest floor look
@@ -98,15 +99,30 @@ function commonLook(zone) {
   return c.id;
 }
 const NEAR = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
+// Each column's nearest true floor's look (a breadth-first spread from every true floor, 8 ways, in index order:
+// the same every time), per zone and navVersion.
+const NEAREST = new WeakMap();
+function nearestLooks(zone) {
+  let c = NEAREST.get(zone);
+  if (c && c.v === zone.navVersion) return c.looks;
+  const { w, d } = zone, n = w * d, looks = new Uint8Array(n), queue = new Int32Array(n);
+  let head = 0, tail = 0;
+  for (let i = 0; i < n; i++) if (zone.kind[i] === KIND.FLOOR && zone.look[i]) { looks[i] = zone.look[i]; queue[tail++] = i; }
+  while (head < tail) {
+    const i = queue[head++], x = i % w, y = (i - x) / w;
+    for (const [dx, dy] of NEAR) {
+      const nx = x + dx, ny = y + dy, j = nx + ny * w;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= d || looks[j]) continue;
+      looks[j] = looks[i]; queue[tail++] = j;
+    }
+  }
+  NEAREST.set(zone, { v: zone.navVersion, looks });
+  return looks;
+}
 function groundLook(zone, i, kind) {
   if (kind === KIND.FLOOR) {
     if (zone.kind[i] === KIND.FLOOR) return lookOf(zone.look[i]);
-    const x = i % zone.w, y = (i - x) / zone.w;
-    for (const [dx, dy] of NEAR) {
-      const nx = x + dx, ny = y + dy, j = nx + ny * zone.w;
-      if (nx >= 0 && ny >= 0 && nx < zone.w && ny < zone.d && zone.kind[j] === KIND.FLOOR && zone.look[j]) return lookOf(zone.look[j]);
-    }
-    return lookOf(commonLook(zone));
+    return lookOf(nearestLooks(zone)[i] || commonLook(zone));
   }
   return waterLook(zone, i, kind);
 }

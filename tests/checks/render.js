@@ -388,7 +388,31 @@ export async function checkRender(m) {
     disguised.pitLookedInto = look(5, 5);
     expect(disguised.pit === disguised.grass && disguised.ghost === disguised.grass && disguised.bridge === disguised.grass &&
            disguised.pitLookedInto.startsWith(":"), `the outdoor map gives away what it hides: ${JSON.stringify(disguised)}`);
-    stats.map = { road: rc, grass: gc, legend: "glim", disguised };
+    // The legend doesn't list what you haven't seen for what it is: no "chasm / pit" row until you've looked in.
+    const legendText = () => Array.from({ length: capture.rows }, (_, y) => capture.chars.slice(y * capture.cols, (y + 1) * capture.cols).join("")).join("\n");
+    hidden.holeSeen.fill(0); renderMap.renderMap(game); S.present();
+    const pitRowUnseen = /chasm \/ pit/.test(legendText());
+    hidden.holeSeen[5 + 5 * hidden.w] = 1; renderMap.renderMap(game); S.present();
+    const pitRowSeen = /chasm \/ pit/.test(legendText());
+    expect(!pitRowUnseen && pitRowSeen, `the legend's pit row: before looking in ${pitRowUnseen}, after ${pitRowSeen}`);
+    // A chasm's middle (the temple span's chasm room, 60 columns, nothing looked into) draws as the floor around it:
+    // every unexplored hole looks like some true floor within 4 tiles, so the map shows neither its colour nor its shape.
+    fresh(4242);
+    const span = game.zone;
+    span.seen.fill(1); span.holeSeen.fill(0);
+    game.view = "map"; game.mode = "map"; renderMap.renderMap(game); S.present();
+    const drawn = (x, y) => look(x, y), K = world.KIND;
+    let holes = 0, unlike = 0;
+    for (let y = 0; y < span.d; y++) for (let x = 0; x < span.w; x++) {
+      if (span.kind[x + y * span.w] !== K.HOLE) continue;
+      holes++;
+      const near = new Set();
+      for (let v = Math.max(0, y - 4); v <= Math.min(span.d - 1, y + 4); v++) for (let u = Math.max(0, x - 4); u <= Math.min(span.w - 1, x + 4); u++)
+        if (span.kind[u + v * span.w] === K.FLOOR) near.add(drawn(u, v));
+      if (!near.has(drawn(x, y))) unlike++;
+    }
+    expect(holes > 20 && unlike === 0, `unexplored holes on the temple span unlike the floor around them: ${unlike} of ${holes}`);
+    stats.map = { road: rc, grass: gc, legend: "glim", disguised, chasm: { holes, unlike }, pitRow: { unseen: pitRowUnseen, seen: pitRowSeen } };
   }
 
   // --- 7. Music moods -------------------------------------------------------------------------------------------
