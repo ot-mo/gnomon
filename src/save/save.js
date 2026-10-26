@@ -5,7 +5,8 @@
 //       first: the slot's JSON and the zones' snapshots are made before saveGame returns (codec.js snapshotSlot,
 //       snapshotZone), and compression and the store come after and never read a live object, so play goes on
 //       while it is written. Only in a saveable screen (screens.js `saveable`: explore and map) with no zone
-//       being read: a request anywhere else waits for the first frame in one (its promise settles then). The
+//       being read: a request anywhere else waits for the first frame in one (its promise settles then; it is
+//       refused if by then that run has ended: a new run or a load). The
 //       first save of a run makes its slot (slotId, else a new id) in `store` (default: currentStore(), or a
 //       new memory store). A save to another slot or store than the run's copies the zones the old slot holds
 //       that have left memory, so the new slot has every visited zone.
@@ -86,15 +87,18 @@ const visited = (game, zone) => zone === game.zone || zoneState(game).zoneLeft[z
 
 export const canSave = (game) => !!(game.state && game.player && game.zone && !game.zoneLoading && screenFor(game.mode)?.saveable);
 
-const waiting = [];   // [{ game, opts, resolve, reject }]: requests made outside a saveable screen
+// Requests made outside a saveable screen: [{ game, run, opts, resolve, reject }]. One whose run has ended by the
+// time a save could happen (a new run, or a load) is refused, never written with the next run's state.
+const waiting = [];
 export function saveGame(game, opts = {}) {
-  if (!canSave(game)) return new Promise((resolve, reject) => waiting.push({ game, opts, resolve, reject }));
+  if (!canSave(game)) return new Promise((resolve, reject) => waiting.push({ game, run: game.run, opts, resolve, reject }));
   try { return writeSave(game, opts); } catch (e) { return Promise.reject(e); }
 }
 registerUpdate("save:waiting", (game) => {
   if (!waiting.length || !canSave(game)) return;
   for (const w of waiting.splice(0)) {
     if (w.game !== game) { waiting.push(w); continue; }
+    if (w.run !== game.run) { w.reject(new Error("saveGame: the run this save was asked for has ended")); continue; }
     try { writeSave(game, w.opts).then(w.resolve, w.reject); } catch (e) { w.reject(e); }
   }
 }, { modes: ["*"] });

@@ -38,7 +38,7 @@
 //      after a save (written behind): the load's id counter is above every id in them. A busy state on level 20
 //      (a monster hurt, poisoned and chasing, the Lich King in phase 1, holeSeen, uids and zone patches, a person met),
 //      every kept creature field compared as well. The run saved to another slot after a zone left memory: the new
-//      slot holds it. Legacy level 10's Gloom
+//      slot holds it. A save waiting over the inventory when a new run begins is refused. Legacy level 10's Gloom
 //      Warden awake with its shades: its fight and their halved xp come back, and it doesn't wake again.
 //   6. The title screen at 100×30, through the real input handlers: with nothing saved only "New quick game";
 //      with a slot "Continue" too; each by keys (Enter, ↓ Enter, 2) and by a click on its line; New starts a
@@ -646,6 +646,22 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
     if (!keysB.includes(L1.key) || gens.n || back.zones[L1.key] !== left.zones[L1.key])
       fail(`a save to another slot after ${L1.key} left memory: the slot holds ${keysB.join(" ")}; reading ${L1.key} generated ${gens.n} zone(s); ${back.zones[L1.key] === left.zones[L1.key] ? "identical" : "it differs from the zone left"}`);
     hard.push(`saved to another slot after ${L1.key} (${gone} hostiles killed) left memory: the slot holds ${keysB.join(" ")}, ${L1.key} read back ${gens.n ? "GENERATED" : "identical"}`);
+  }
+  // A save asked for over the inventory, then a new run before any frame back in a view: refused, never written
+  // with the new run's state.
+  {
+    startRun(1234); game.pages = null; game.story.cube = true;
+    playing(game, "map");
+    game.debug.openInv();
+    const st = memoryAdapter();
+    let outcome = "pending";
+    const wp = saveGame(game, { store: st }).then((m) => { outcome = `written (${m.id})`; }, (e) => { outcome = `refused: ${e.message}`; });
+    startRun(2222); game.pages = null; playing(game, "map");
+    game.debug.step(1 / 60);
+    await Promise.race([wp, tick(500)]);
+    const slots = await st.list("slots");
+    if (!outcome.startsWith("refused") || slots.length) fail(`a save asked for in one run, then a new run: ${outcome}; ${slots.length} slot(s) written (seed ${slots[0]?.seed})`);
+    hard.push(`a save waiting over the inventory when a new run began: ${outcome.split(":")[0]}`);
   }
   stats.hardCases = hard.join("; ");
 
