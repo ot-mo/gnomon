@@ -10,7 +10,7 @@
 // Items: { kind: "missile", id, ench } and { kind: "ammo", effect: an AMMO id, count } (a stack is keyed by
 // its effect, items.js stackKey). A missile weapon is carried in the pack, not held: V fires the ready one
 // (missiles.js), in 3D where you look and on the map at the target screen's cursor, and your hands keep
-// your blade for the swing.
+// your blade for the swing. E on one in the pack readies it.
 import { registerItemKind } from "../../items.js";
 
 export const MISSILES = {
@@ -46,6 +46,12 @@ registerItemKind("missile", {
   },
   art: ART.launcher,
   palette: () => ({ ...WOOD, ...STRING, ...IRON }),
+  // E in the pack: this is the one V fires from now on (missiles.js readyLauncher). It takes no time.
+  use(game, e, it) {
+    e.readyMissile = it.id;
+    if (e === game.player) game.log(`You ready your ${MISSILES[it.id].name}: V fires it.`, [200, 165, 110]);
+    return 0;
+  },
 });
 registerItemKind("ammo", {
   stack: true, weight: () => 0,

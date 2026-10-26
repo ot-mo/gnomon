@@ -50,7 +50,7 @@ import { overrideRules, RULES } from "../../src/rules.js";
 import { invalidateStats, mod, maxHp, av as armourValue } from "../../src/stats.js";
 import { makeBody } from "../../src/body.js";
 import { makeRng, distance } from "../../src/rng.js";
-import { WEAPONS, ARMOURS } from "../../src/items.js";
+import { WEAPONS, ARMOURS, useItem } from "../../src/items.js";
 import { on } from "../../src/events.js";
 import { setDaylight } from "../../src/light.js";
 import { setMode } from "../../src/screens.js";
@@ -700,7 +700,14 @@ export function checkTargeting(ctx) {
       expect(!fire(game) && run.logged.slice(n1).some((t) => /no bolts/.test(t)), `with no bolts: ${JSON.stringify(run.logged.slice(n1))}`);
       for (let s = 0; s < 240 && mz.projectiles.length; s++) updateProjectiles(game, 1 / 60);
       const dropped = mz.items.filter((it) => it.kind === "ammo").reduce((n, it) => n + (it.count || 1), 0);
-      stats.missiles = { reload: MISSILES.boltBow.reload, pinned: true, boltsOnTheFloor: dropped };
+      // Two launchers: the first in the pack is ready, E (use) on the other readies that one.
+      p.inv = p.inv.filter((s) => s.kind !== "missile");
+      const sling = { kind: "missile", id: "sling", ench: 0 }, bow = { kind: "missile", id: "boltBow", ench: 0 };
+      p.inv.push(sling, bow); delete p.readyMissile;
+      const before = readyLauncher(p);
+      useItem(game, p, bow);
+      expect(before === sling && readyLauncher(p) === bow, `E on the bolt-bow behind a sling: ready ${before?.id} → ${readyLauncher(p)?.id} (want sling → boltBow)`);
+      stats.missiles = { reload: MISSILES.boltBow.reload, pinned: true, boltsOnTheFloor: dropped, readiedByE: true };
       game.combatRng = null;
     }
     // --- 9. A knife over an open edge lands in the next zone ------------------------------------------------
