@@ -15,6 +15,11 @@
 //   buildApronBand(run, zone, side, neighbour) → band   one apron band (world.js), registered as
 //                                       APRON_BUILDERS.surface by world/zonegen.js
 //   SURFACE_RULES                       the numbers
+//   BIOME_BUILDERS, SITE_BUILDERS       TECH_DESIGN §1.4's registries, re-exported: biome id → (ctx) => void from
+//                                       gen/biomes/index.js (WS2; empty in P0), site kind → (ctx, site) => void
+//                                       from world/sites.js (where 0A2 put it, so this file can read it)
+// WS2's split of this file (0D2 stubs): gen/terrain.js (the world functions), gen/ports.js (edgePorts),
+// gen/apron.js (the band builder) re-export what is here today; WS2 moves the code into them.
 //
 // World coordinates: column x of span wx is gx = wx·80 + x (row y of span wy: gy = wy·48 + y), so two
 // zones that share an edge compute the same values for every column near it. A world function is a
@@ -51,6 +56,8 @@ import { SITE_BUILDERS, dungeonParams } from "../world/sites.js";
 import { generateDungeonLevel } from "./dungeon.js";
 import { zoneSeed } from "../world/run.js";
 import { stampVault } from "./vaults.js";
+export { SITE_BUILDERS } from "../world/sites.js";
+export { BIOME_BUILDERS } from "./biomes/index.js";
 
 export const SURFACE_RULES = {
   reliefWave: 24,     // tiles: the relief noise's base wavelength; its second octave is half that, 12 (§5.3: at least 12)
