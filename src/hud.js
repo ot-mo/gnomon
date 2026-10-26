@@ -7,7 +7,9 @@ import { readyStack } from "./throwing.js";
 import { PERKS, xpToNext, perkLabel } from "./leveling.js";
 import { attr, maxHp, av, dv } from "./stats.js";
 import { wielded } from "./body.js";
-import { statusLine } from "./status.js";
+import { statusLine, cooldownLeft } from "./status.js";
+import { ABILITIES } from "./abilities.js";
+import { FLAGS } from "./config.js";
 import { CURRENCY, formatFunds } from "./currency.js";
 import { hitLabel, wrap } from "./ui.js";
 import { RULES } from "./rules.js";
@@ -36,7 +38,7 @@ export function drawHud(game, layout = layoutHud(game)) {
   drawBossBar(game, top + n);
 }
 
-// The 3D view paused (pointer lock lost, or not yet taken): click to play.
+// The 3D view paused (pointer lock lost, or not yet taken): click to play. → the card's box { x0, y0, w, h }.
 export function drawPause() {
   const at = overlay([
     ["THE ROTATION CUBE", [255, 230, 120]],
@@ -53,6 +55,7 @@ export function drawPause() {
   ]);
   for (const row of at.rows[6]) { hitLabel(row, "I inventory", { key: "KeyI" }); hitLabel(row, "J journal", { key: "KeyJ" }); }
   hitLabel(at[7], at[7].text, { key: "Tab" });
+  return at.box;
 }
 
 export function drawDead(game) {
@@ -266,6 +269,21 @@ registerHudSegment("ready", { priority: 40, row: 1, parts(game, p) {   // what T
 } });
 // Active statuses (status.js), each as its def draws it (flying blinks when about to run out).
 registerHudSegment("statuses", { priority: 90, split: true, parts: (game, p) => statusLine(game, p) });
+// The hotbar's ready abilities (§4.3: keys 1-9), "1 Fold Step", while something hunts you within HOTBAR_NEAR tiles:
+// the moments you would reach for one, and how you learn the key. (One cooling down shows its seconds instead:
+// play.js's "abilities".) Nothing hunts you in the old game's recorded frames, so they stay as they were.
+export const HOTBAR_NEAR = 10;
+const hunted = (game, p) => !!game.zone?.creatures.some((c) => c.state === "chase" && !c.talk && Math.hypot(c.x - p.x, c.y - p.y) <= HOTBAR_NEAR);
+registerHudSegment("hotbar", { priority: 70, split: true, parts: (game, p) => hunted(game, p) && (p.hotbar || []).map((id, k) =>
+  (id && ABILITIES[id] && !(cooldownLeft(p, id) > 0) ? { text: `${k + 1} ${ABILITIES[id].name}`, color: [190, 170, 255] } : null)).filter(Boolean) });
+// ?debug=1 (config.js FLAGS.debug): where you are and how the save stands, last to be placed.
+const ago = (t) => (t ? `${Math.round((Date.now() - t) / 1000)} s ago` : "never");
+if (FLAGS.debug) registerHudSegment("debug", { priority: 1, row: 1, parts: (game, p) => {
+  const sv = game.saving;
+  const save = sv ? `slot ${sv.slotId.slice(-6)}${sv.cp ? ` cp ${sv.cp}` : ""}: ${sv.pending.size} writing, saved ${ago(sv.last?.at)}${sv.last ? ` (${sv.last.reason}${sv.last.ok ? "" : ", FAILED"})` : ""}${sv.failed.length ? `, ${sv.failed.length} failed` : ""}`
+    : "no slot";
+  return { text: `${game.zone.key} ${p.x.toFixed(1)},${p.y.toFixed(1)},${p.z.toFixed(1)} · ${save}`, color: [120, 150, 120] };
+} });
 registerHudSegment("fps", { priority: 0, align: "right", parts: (game) => game.view === "3d"
   && { text: `${game.fps.toFixed(0)} fps · ${game.frameMs.toFixed(1)} ms`, color: [90, 140, 90] } });
 
@@ -428,6 +446,7 @@ function overlay(lines) {
   for (let x = x0; x < x0 + w; x++) { S.put(x, y0, "-", 90, 90, 90); S.put(x, y0 + h - 1, "-", 90, 90, 90); }
   const at = [];
   at.rows = [];
+  at.box = { x0, y0, w, h };
   let y = y0 + 2;
   for (const [ts, c] of fitted) {
     const rows = ts.map((t) => ({ x: x0 + ((w - t.length) >> 1), y: y++, text: t }));
