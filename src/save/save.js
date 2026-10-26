@@ -182,8 +182,13 @@ export const canSave = (game) => !!(game.state && game.player && game.zone && !g
 // job = { rows: [{ zone: key, snap, cp, keep } | { slot: json } | { carry: { store, slot, key } } | { op }], run?: async (store) → void,
 //         checkpoint?: n, issued, absorbed: Promise | null }. rows are made into the store's ops when the job's turn
 // comes (zones compressed first); `run` jobs (a restore, which must read first) do their own transaction.
-function zoneRow(sv, zone, savedAt, { cp = sv.cp, keep = sv.cp > 0 } = {}) {
-  return { zone: zone.key, snap: snapshotZone(zone, { slot: sv.slotId, savedAt, cp }), cp, keep, savedAt };
+// A row keeps the stored one first (copy on write) only on its key's first write since the checkpoint: sv.kept holds
+// the keys that had theirs (or have a copy already, or were first written after it), so a later write has nothing to
+// read before it writes (and the unload save's transaction can commit at once).
+function zoneRow(sv, zone, savedAt, { cp = sv.cp, keep = sv.cp > 0 && !sv.kept?.has(zone.key), copy = false } = {}) {
+  const row = { zone: zone.key, snap: snapshotZone(zone, { slot: sv.slotId, savedAt, cp }), cp, keep, copy, savedAt };
+  if (keep || copy) (sv.kept ||= new Set()).add(zone.key);
+  return row;
 }
 async function opsOf(sv, job, now) {
   const ops = [];
@@ -191,7 +196,9 @@ async function opsOf(sv, job, now) {
     if (r.op) ops.push(r.op);
     else if (r.zone) {
       if (r.keep) ops.push({ op: "keep", key: [sv.slotId, r.zone], epoch: r.cp });
-      ops.push({ op: "put", store: "zones", value: now ? finishZoneNow(r.snap) : await finishZone(r.snap) });
+      const value = now ? finishZoneNow(r.snap) : await finishZone(r.snap);
+      ops.push({ op: "put", store: "zones", value });
+      if (r.copy) ops.push({ op: "put", store: "checkpointZones", value });   // (a checkpoint's own row, kept as its copy at once)
     } else if (r.slot) ops.push({ op: "put", store: "slots", value: JSON.parse(r.slot) });
     else if (r.carry) {
       const { store, slot, key, into, maybe } = r.carry;
@@ -253,7 +260,9 @@ function writeSave(game, { reason = "manual", store, slotId, clean = false, chec
   // The snapshot: everything live is read in these lines, and nothing after them. A checkpoint's rows are its
   // baseline (cp: the last checkpoint's number, so the first overwrite after it keeps them).
   const zones = [...game.zones.values()].filter((z) => visited(game, z) && (z === game.zone || moved || (!sv.committed.has(z.key) && !sv.pending.has(z.key))));
-  const rows = zones.map((z) => zoneRow(sv, z, now, cpSave ? { keep: false } : {}));
+  if (moved && sv.cp) sv.kept = new Set(old.kept || []);   // (the copies come over below, and the rows as they stand)
+  if (cpSave) sv.kept = new Set();   // (the last checkpoint's copies go: this one keeps its own)
+  const rows = zones.map((z) => zoneRow(sv, z, now, cpSave ? { keep: false, copy: true } : {}));
   // A run saved to another slot (or store) than before: the old slot's records come over, so the new slot has
   // every visited zone: the zones that left memory, and with a checkpoint up every row and every copy (the
   // keep ops then work on the new slot as they did on the old).
@@ -261,10 +270,7 @@ function writeSave(game, { reason = "manual", store, slotId, clean = false, chec
   if (moved) {
     const inMemory = new Set(rows.map((r) => r.zone));
     for (const k of old.committed) if (!inMemory.has(k) || sv.cp) carry.push({ carry: { store: old.store, slot: old.slotId, key: k, into: "zones" } });
-    if (sv.cp) {
-      for (const k of old.kept || []) carry.push({ carry: { store: old.store, slot: old.slotId, key: k, into: "checkpointZones", maybe: true } });
-      sv.kept = new Set(old.kept || []);
-    }
+    if (sv.cp) for (const k of old.kept || []) carry.push({ carry: { store: old.store, slot: old.slotId, key: k, into: "checkpointZones", maybe: true } });
     for (const c of carry) if (c.carry.into === "zones") pend(sv, c.carry.key, old.stored.get(c.carry.key) ?? now);
   }
   const n = cpSave ? sv.cp + 1 : sv.cp;
@@ -279,7 +285,6 @@ function writeSave(game, { reason = "manual", store, slotId, clean = false, chec
   if (cpSave) {   // the checkpoint: this very record, kept inside itself
     sv.cpRecord = { ...JSON.parse(json), n };
     sv.cp = n;
-    sv.kept = new Set();
     const rec = JSON.parse(json);
     rec.checkpoint = sv.cpRecord;
     json = JSON.stringify(rec);
@@ -295,7 +300,6 @@ function writeSave(game, { reason = "manual", store, slotId, clean = false, chec
     if (cpSave) SAVE_STATS.checkpoints++;
     autoFor(game).play = 0;
   };
-  for (const r of rows) if (r.keep && !sv.kept?.has(r.zone)) (sv.kept ||= new Set()).add(r.zone);   // (rows a restore may find copies of)
   const done = submit(game, sv, job);
   for (const r of rows) sv.stored.set(r.zone, now);
   return done.then(() => ({ id: sv.slotId, updated: now, zones: keys.size, reason, ...(cpSave ? { checkpoint: n } : {}) }));
@@ -307,7 +311,6 @@ export function writeZone(game, zone) {
   if (!sv || sv.dead) return null;
   let row;
   try { row = zoneRow(sv, zone, Date.now()); } catch (e) { failed(game, sv, `snapshotting ${zone.key}`, e); return null; }
-  if (row.keep) (sv.kept ||= new Set()).add(row.zone);
   return submit(game, sv, { rows: [row] }).catch((e) => failed(game, sv, `writing ${zone.key}`, e));
 }
 on("zone:leave", (game, { zone }) => { writeZone(game, zone); }, { priority: -100 });
@@ -368,7 +371,6 @@ export function unloadSave(game) {
   let own;
   try {
     const row = zoneRow(sv, game.zone, now);
-    if (row.keep) (sv.kept ||= new Set()).add(row.zone);
     const keys = new Map(sv.stored);
     keys.set(row.zone, now);
     const slot = snapshotSlot(game, { id: sv.slotId, created: sv.created, updated: now, zones: [...keys].map(([key, savedAt]) => ({ key, savedAt })),
@@ -383,7 +385,12 @@ export function unloadSave(game) {
   try {
     for (const j of jobs) for (const r of j.rows) {
       if (r.op) ops.push(r.op);
-      else if (r.zone) { if (r.keep) ops.push({ op: "keep", key: [sv.slotId, r.zone], epoch: r.cp }); ops.push({ op: "put", store: "zones", value: finishZoneNow(r.snap) }); }
+      else if (r.zone) {
+        if (r.keep) ops.push({ op: "keep", key: [sv.slotId, r.zone], epoch: r.cp });
+        const value = finishZoneNow(r.snap);
+        ops.push({ op: "put", store: "zones", value });
+        if (r.copy) ops.push({ op: "put", store: "checkpointZones", value });
+      }
       else if (r.slot) ops.push({ op: "put", store: "slots", value: JSON.parse(r.slot) });
     }
     p = sv.store.writeNow(ops);
@@ -517,7 +524,8 @@ export async function loadGame(slotId, { game = theGame, store, version = VERSIO
     cpRecord: slot.checkpoint ? JSON.parse(JSON.stringify(slot.checkpoint)) : null });   // (never the objects the game plays with)
   sv.version = version; sv.migrations = migrations;
   for (const r of zones) { sv.committed.add(r.key); sv.stored.set(r.key, r.savedAt); }
-  if (sv.cp) sv.kept = new Set((await st.list("checkpointZones", { slot: slotId })).map((r) => r.key));
+  // Keys with a copy, or first written after the checkpoint: their next write keeps nothing.
+  if (sv.cp) sv.kept = new Set([...(await st.list("checkpointZones", { slot: slotId })).map((r) => r.key), ...zones.filter((r) => (r.cp ?? 0) >= sv.cp).map((r) => r.key)]);
   // This session holds the slot now (and the count goes in at once).
   submit(game, sv, { rows: [{ op: { op: "put", store: "slots", value: { ...stored, live: SESSION, unclean } } }] }).catch((e) => failed(game, sv, "marking the slot live", e));
   const p = game.player;
