@@ -308,6 +308,20 @@ export function checkShell({ game, startRun, inputHandlers, screens, keys, ui, i
     click("I close"); expect("map", "clicking \"I close\"");
     click("J: journal"); expect("journal", "clicking \"J: journal\"");
     click("JOURNAL"); expect("map", "a click in the journal");
+    // Only the top screen's words answer the mouse: the map header's words, still visible above the pack, are
+    // not the pack's keys (a click on "Space: wait" there once drank the selected potion, "X: explore" dropped it).
+    press("KeyI", "i");
+    const packOf = () => JSON.stringify(game.player.inv) + "/" + game.player.hp + "/" + game.player.x + "," + game.player.y;
+    const pack0 = packOf();
+    for (const label of ["Space: wait", "X: explore", "T: throw", "Tab: 3D"]) {
+      frame();
+      if (!capture.chars.join("").includes(label)) continue;
+      click(label);
+      expect("inventory", `a click on the map header's "${label}" over the inventory`);
+      if (game.mode !== "inventory") press("KeyI", "i");
+    }
+    if (packOf() !== pack0) fail("a click on the map header under the inventory changed the pack, HP or place");
+    press("Escape"); expect("map", "Esc in the inventory");
 
     // The cube: rotate, its pages, then the 3D view paused under them.
     game.onCube(); modes.add("rotate"); byKey.add("rotate"); byMouse.add("rotate");   // (touching the cube is a step or a click-to-travel)

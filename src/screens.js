@@ -21,12 +21,14 @@
 //   updateScreen(game, dt)      the top screen's update
 //   timeRuns(game)              does the world run under the top screen (pausesTime === false)?
 //   drawStack(game) → bool      draws from the topmost opaque screen (over: "none": it draws the whole screen,
-//                               like the views) up to the top; false when the top mode has no registered screen
+//                               like the views) up to the top; false when the top mode has no registered screen.
+//                               Only the top screen's hit rects (ui.js) stay: the mouse never reaches a screen under it
 //
 // Tests and tools still set game.mode directly (game.mode = "map"); syncStack follows such a change the next
 // time the stack is touched: a mode already lower in the stack pops back to it, an opaque mode (a view, the
 // story, death) becomes the whole stack, and anything else goes on top.
 import { lockPointer, unlockPointer } from "./input.js";
+import { beginFrame } from "./ui.js";
 
 export const SCREENS = new Map();   // mode → def (with defaults filled in)
 const DEFAULTS = { pausesTime: true, pointer: "unlock", over: "view", saveable: false };
@@ -134,6 +136,11 @@ export function drawStack(game) {
   const st = syncStack(game);
   let from = st.length - 1;
   while (from > 0 && screenFor(st[from].mode)?.over !== "none") from--;
-  for (let k = from; k < st.length; k++) screenFor(st[k].mode)?.draw(game);
+  for (let k = from; k < st.length; k++) {
+    // Only the top screen's words answer the mouse: what the screens under it drew (the map header's
+    // "Space: wait") is still visible but is not the top screen's key.
+    if (k > from && k === st.length - 1) beginFrame();
+    screenFor(st[k].mode)?.draw(game);
+  }
   return true;
 }
