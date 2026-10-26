@@ -34,8 +34,8 @@ import { UI } from "../ui.js";
 import { mapView, tileAtCell, inspectAt, describeTile } from "../renderMap.js";
 import { emit } from "../events.js";
 import { aimTarget, REQUEST_RANGE } from "../abilities.js";
-import { flightOf } from "../throwing.js";
-import { hitChance, toHitMod, dvOf, critNat, weaponSpec, resistText } from "../combat.js";
+import { flightOf, THROW_AIM, THROW_RANGE, BOMB_RANGE, THROW_TIME, THROW_GRAVITY, throwSpeed, throwAt, finishFlight, ballisticFrom } from "../throwing.js";
+import { hitChance, toHitMod, dvOf, critNat, weaponSpec, resistText, thrownSpec } from "../combat.js";
 import { canTalk, ghostHidden, ghostOffMap, isFlat, typeOf, touchable } from "../creatures.js";
 import { attitude } from "../factions.js";
 import { itemName, withArticle } from "../items.js";
@@ -114,6 +114,22 @@ export function requestTarget(game, ability, done) {
   openTarget(game, { purpose: "ability", range: ability?.range || REQUEST_RANGE, verb: `use ${ability?.name || "it"}`,
                      done: (g, t) => done(t) });
 }
+
+// T on the map with the d20 set (throwing.js throwAtNearest calls it through THROW_AIM): the ready stack
+// at a target; the confirm throws it on its arc and passes the throw's time, then the flight's.
+THROW_AIM.aim = (game, stack) => {
+  const bomb = stack.kind === "bomb";
+  openTarget(game, {
+    purpose: "throw", item: stack, range: bomb ? BOMB_RANGE : THROW_RANGE,
+    verb: bomb ? "throw the bomb" : stack.kind === "potion" ? "throw the potion" : "throw",
+    spec: stack.kind === "knife" ? thrownSpec(game) : null,
+    flight: (g, to) => ({ ...stack, ...ballisticFrom(g, to, throwSpeed(stack), THROW_GRAVITY) }),
+    done(g, target) {
+      if (!target) return;
+      finishFlight(g, throwAt(g, stack, target), THROW_TIME);
+    },
+  });
+};
 
 // --- Acting on it ---------------------------------------------------------------------------------------
 function confirm(game, data) {

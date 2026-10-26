@@ -26,6 +26,7 @@ import { sfx } from "./sfx.js";
 import { combatRng } from "./combat.js";
 import { addStatus, registerStatus, statusFlag, cooldownLeft, startCooldown } from "./status.js";
 import { bind } from "./keys.js";
+import { registerHudSegment } from "./hud.js";
 
 registerStatus("pinned", { name: "pinned", color: [215, 205, 160], t: 2, stack: "max", flags: { noMove: true },
   hud: (s) => `PINNED ${Math.ceil(s.t)}s`, ended: "You pull yourself free." });
@@ -125,3 +126,13 @@ export function aimFire(game) {
 const canAct = (game) => !game.paused && !statusFlag(game.player, "noAct");
 bind("explore", "KeyV", (game) => { fire(game); }, { when: canAct, help: "fire missile weapon" });
 bind("map", "KeyV", (game) => { aimFire(game); }, { help: "fire missile weapon" });
+
+// The status line (hud.js, row 1 beside what T throws): what V fires, "V: bolt-bow x12" with its bolts, the
+// seconds of its reload while it lasts. Nothing while you carry no missile weapon.
+registerHudSegment("missile", { priority: 39, row: 1, parts(game, p) {
+  const launcher = readyLauncher(p);
+  if (!launcher) return null;
+  const m = MISSILES[launcher.id], ammo = ammoFor(p, launcher), left = cooldownLeft(p, "missile");
+  return { text: `V: ${m.name}${m.ammo ? ` x${ammo ? ammo.count : 0}` : ""}${left > 0 ? ` ${left.toFixed(1)}s` : ""}`,
+           color: m.ammo && !ammo ? [150, 150, 150] : [200, 165, 110] };
+} });

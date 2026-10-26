@@ -41,11 +41,14 @@ import { hasKey } from "./keyset.js";
 import { RULES } from "./rules.js";
 import { neighbourAddr, addZonePatch, PATCH_OPS } from "./zones.js";
 import { passTime, mapUseTime } from "./turns.js";
-import { openTarget } from "./screens/target.js";
 import { MISSILE_ART } from "./content/items/missiles.js";
 
 export const THROW_TIME = 0.5;
 export const THROW_RANGE = 10, BOMB_RANGE = 8;   // the map's target screen (tiles)
+// The map's aimed throw: screens/target.js fills it in when it loads (aim(game, stack) opens the screen; its
+// confirm calls throwAt and finishFlight). A hook rather than an import, so that hud.js, which reads
+// readyStack here, doesn't load the screens through this module.
+export const THROW_AIM = { aim: null };
 const SPEED = 15, GRAVITY = 12, SPLASH = 1.8;
 const FUSE = 2, BLAST = 2.3;
 
@@ -83,7 +86,7 @@ export function throwReady(game, stack = readyStack(game.player)) {
 export function throwAtNearest(game, stack = readyStack(game.player)) {
   const { zone, player: p } = game;
   if (!stack) { game.log("You have nothing to throw. (T in the inventory throws a potion.)", [170, 170, 170]); return false; }
-  if (RULES.combat === "d20") { aimThrow(game, stack); return false; }
+  if (RULES.combat === "d20" && THROW_AIM.aim) { THROW_AIM.aim(game, stack); return false; }
   if (stack.kind === "bomb") {
     p.ready = { kind: "bomb" };
     takeOne(p, stack);
@@ -118,7 +121,8 @@ export function aimPoint(game, target) {
   return { x: tx + 0.5, y: ty + 0.5, z: (s >= 0 ? s : target.point?.z ?? FLOOR_Z) + 0.3 };
 }
 // What it is thrown with: a bomb is lobbed (slower, so it arcs higher), the rest at full speed.
-const throwSpeed = (it) => (it.kind === "bomb" ? SPEED * 0.6 : SPEED);
+export const throwSpeed = (it) => (it.kind === "bomb" ? SPEED * 0.6 : SPEED);
+export const THROW_GRAVITY = GRAVITY;
 const ownFrom = (p) => ({ x: p.x, y: p.y, z: p.z + EYE - 0.2 });
 export function launch(game, it, from, to, { speed = throwSpeed(it), gravity = GRAVITY, extra = {} } = {}) {
   const v = ballistic(from.x, from.y, from.z, to.x, to.y, to.z, speed, gravity);
@@ -146,21 +150,6 @@ export function throwAt(game, stack, target) {
   if (it.kind === "bomb") game.log("You light the fuse and throw the bomb!", [255, 170, 70]);
   sfx("throw");
   return launch(game, it, ownFrom(p), to);
-}
-// The map: T opened the target screen for `stack`; its confirm throws and passes the time.
-function aimThrow(game, stack) {
-  const bomb = stack.kind === "bomb";
-  openTarget(game, {
-    purpose: "throw", item: stack, range: bomb ? BOMB_RANGE : THROW_RANGE,
-    verb: bomb ? "throw the bomb" : stack.kind === "potion" ? "throw the potion" : "throw",
-    spec: stack.kind === "knife" ? thrownSpec(game) : null,
-    flight: (g, to) => ({ ...stack, ...ballisticFrom(g, to, throwSpeed(stack), GRAVITY) }),
-    done(g, target) {
-      if (!target) return;
-      const pr = throwAt(g, stack, target);
-      finishFlight(g, pr, THROW_TIME);
-    },
-  });
 }
 // A pretend projectile for flightOf, from you at `to` (a target).
 export function ballisticFrom(game, target, speed, gravity) {
