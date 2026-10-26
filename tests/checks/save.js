@@ -35,7 +35,8 @@
 //      process and in a fresh one, canonical JSON identical, buildRun never called, ids above every loaded id.
 //   8. What the session doesn't reach, saved → loaded → identical: legacy level 15 after the Colossus has slammed
 //      and while its next slam is warned (both views: zone.slam and zone.slamDone hold Sets). Zones made and left
-//      after a save (written behind): the load's id counter is above every id in them.
+//      after a save (written behind): the load's id counter is above every id in them. Legacy level 10's Gloom
+//      Warden awake with its shades: its fight and their halved xp come back, and it doesn't wake again.
 //   6. The title screen at 100×30, through the real input handlers: with nothing saved only "New quick game";
 //      with a slot "Continue" too; each by keys (Enter, ↓ Enter, 2) and by a click on its line; New starts a
 //      run at the intro, Continue loads the newest slot; M still switches the music there.
@@ -516,6 +517,35 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
       if (!(back?.cells instanceof Set) || [...back.cells].sort((a, b) => a - b).join() !== cells || !(game.zone.slam?.cells instanceof Set))
         fail(`level 15 (${view}): the slam came back as ${JSON.stringify(back && { ...back, cells: [...back.cells || []].length })}`);
     }
+  }
+  // An awake guardian and its summons (legacy level 10, 3D): its fight (g) and the summons' halved xp come back,
+  // and it doesn't wake a second time.
+  {
+    let wakes = 0;
+    const off = on("guardian:wake", () => { wakes++; });
+    startRun(1234); game.pages = null; game.story.cube = true;
+    game.debug.enterZone("0,0,10", "down");
+    playing(game, "3d");
+    const zone = game.zone, w = zone.creatures.find((c) => c.guardian === "warden");
+    if (!w) fail("legacy level 10 has no Gloom Warden");
+    else {
+      near(zone, w);
+      w.state = "chase";
+      passTime("3d", () => zone.creatures.some((c) => c.type === "shade"));
+      const id = w.id, g = JSON.stringify(w.g), shades = zone.creatures.filter((c) => c.type === "shade");
+      const xp = shades.map((c) => `${c.id}:${c.xp}`).join();
+      if (!w.g || !shades.length || wakes !== 1) fail(`level 10: the Gloom Warden woke ${wakes} time(s), fight ${g}, ${shades.length} shades`);
+      else if (await roundTrip("level 10, the Gloom Warden awake with its shades (3d)")) {
+        const w2 = game.zone.creatures.find((c) => c.id === id);
+        const xp2 = game.zone.creatures.filter((c) => c.type === "shade").map((c) => `${c.id}:${c.xp}`).join();
+        if (JSON.stringify(w2?.g) !== g) fail(`level 10: the Gloom Warden's fight came back as ${JSON.stringify(w2?.g)} (saved ${g})`);
+        if (xp2 !== xp) fail(`level 10: the shades' xp came back as ${xp2} (saved ${xp}: summoned things are worth half)`);
+        game.debug.lockChange?.(true);
+        passTime("3d", () => false, 30);
+        if (wakes !== 1) fail(`level 10: after the load the Gloom Warden woke again (${wakes} wakes)`);
+      }
+    }
+    off();
   }
   // Zones made after the save and left (write-behind wrote them): a load sets the id counter above their ids too,
   // before any zone is read, so no id is handed out twice.

@@ -122,12 +122,14 @@ export const canonicalJson = (v) => JSON.stringify(sorted(JSON.parse(JSON.string
 // --- Creatures (§7.2: trimmed) ----------------------------------------------------------------------------
 // §7.2's whitelist, then the fields P0's creatures keep their state in under 0C's names: `state` (the brain's
 // "idle" | "wander" | "chase"), the Lich King's `phase`, the Flat Queen's `risen`, Rook's quarry (`bounty`),
-// the Gloom Warden's `lightBurn`, and `regenAcc` (regeneration owed). talk keeps state and met (and the
-// dialogue when it isn't the type's); vis only when it differs from the type's. Everything else (looks,
-// size, damage, speed, the cosmetic timers) spawnCreature rebuilds from the type, level and elite.
+// the Gloom Warden's `lightBurn`, `regenAcc` (regeneration owed), a guardian's fight (`g`: its timers, and
+// whether it has woken; guardians.js) and `xp` (a summoned creature is worth half its type's). talk keeps
+// state and met (and the dialogue when it isn't the type's); vis only when it differs from the type's.
+// Everything else (looks, size, damage, speed, the attack cooldown `cd` and the cosmetic timers, transient
+// like the player's attackCd, §2.4) spawnCreature rebuilds from the type, level and elite.
 export const CREATURE_FIELDS = ["id", "uid", "type", "elite", "tx", "ty", "z", "hp", "maxHp", "level", "brain", "status", "cooldowns",
   "inv", "body", "merchant", "faction", "name", "named", "flags",
-  "state", "phase", "risen", "bounty", "lightBurn", "regenAcc"];
+  "state", "phase", "risen", "bounty", "lightBurn", "regenAcc", "g", "xp"];
 export function registerCreatureField(name) { if (!CREATURE_FIELDS.includes(name)) CREATURE_FIELDS.push(name); }
 
 const typeVis = (t) => ({ flat: !!t?.flat, ghostly: !!t?.ghostly, statue: !!t?.statue });
