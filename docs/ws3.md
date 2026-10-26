@@ -157,4 +157,29 @@ function of its own): golden (b) and the screen frames are unchanged.
 
 ## Handoff
 
-(Written at the end of the workstream.)
+**State.** WS3 is done: tag `p1-ws3` on `ws/ws3` (from `p0-done`), run-all 37 of 37 there, every §8.3 "WS3"
+acceptance item with its numbers in `docs/sessions/ws3.md` §2, two independent reviews and a re-review fixed (§4,
+one commit each). Nothing is half finished; `ws/ws3` has no work past the tag.
+
+**For the integrator.**
+
+- WS3 changed only its own files (§8.4) and two P0 tests with approval (requests 1 and 2: confirm them at the
+  merge). Requests 3-12 are for other owners or the integrator; none blocks WS3's checks.
+- `node tools/check-perf.mjs` now runs `tests/checks/render.js` first with `--expose-gc` (its §12, the dormant zone's
+  arrays, runs only so) and compares with `p0-done` by default. Take its numbers on a quiet machine, alternating
+  with `p0-done`: under other sessions' load the outdoor frame reads 22-24 ms in both trees (verdict "the machine's").
+- After the merge, rerun golden (b), check-screen-frames (46 compared), check-hud (before and after request 3) and
+  check-perf; then browser-0d1 and browser-gate on the GPU (the swap frame, §2 of the notes).
+
+**Things that surprised, worth knowing before changing the renderer.**
+
+- V8 throws out `castFrame`'s optimized pixel loop when a new zone takes a branch the first one never did
+  ("insufficient type feedback"): a cold swap's draw went from 29 to 49 ms in Node that way. The hot paths
+  (`castRay`'s marking loop, the horizon plane's side, `sunlitGrid`, the edge clamp) compute every comparison on
+  every call, with `|`/`&` and `Math.min/max` instead of `if`s; keep it so, and keep `rayInfo` one shape. The swap
+  has no budget of its own: `check-perf` reports it beside `p0-done`'s (step + draw p50 23.5 ms against 55.8; the
+  draw alone 19-21 ms on a cold swap), so read that note after touching the renderer.
+- No new fields on a zone: the save codec refuses unknown typed arrays. Per-zone state (the bake, the apron's
+  layout, the lit mask's step) lives in WeakMaps keyed by `zone.skyLight`, so `dropDerived` frees it.
+- One world hour is 60 s of game time (`game.time`); the hour h of day 1 is `(h − 6) × 60`.
+- Dynamic half-column resolution is on in the pages and off in Node; checks that hash outdoor frames turn it off.
