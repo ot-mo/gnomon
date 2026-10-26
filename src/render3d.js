@@ -30,7 +30,7 @@ import { LIQUIDS } from "./content/liquids.js";
 
 const AMBIENT = [0.045, 0.045, 0.06];
 const SKY_COLOR = [0.55, 0.65, 0.85];
-const NIGHT_SKY = [0.05, 0.065, 0.12];   // moonlight: the sky term at night (§6.3's night floor)
+const NIGHT_SKY = [0.08, 0.1, 0.18];      // moonlight: the sky term at night (§6.3's night floor)
 const SUN_COLOR = [1.25, 1.12, 0.9];
 const LOW_SUN = [1.3, 0.72, 0.42];       // the sun near the horizon
 const LAMP_COLOR = [2.0, 1.35, 0.75];

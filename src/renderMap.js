@@ -356,12 +356,12 @@ function drawTerrainLegend(x, y, game) {
     ["~", [110, 190, 220], "shallow water"],
     ["~", [50, 80, 200], "deep water"],
     ["$", [255, 210, 70], "glim"],
-    ["! ?", [230, 60, 80], "potion, scroll"],
-    [") [", [205, 210, 225], "weapon, armour"],
+    ["! ?", [230, 60, 80], "potion/scroll"],
+    [") [", [205, 210, 225], "weapon/armour"],
     ["*", [90, 230, 255], "your marker"],
     ["@", [245, 230, 170], "someone"],
     ["r g", [200, 200, 200], "monster seen"],
-    ["f", [200, 170, 255], "flat: map only"],
+    ["f", [200, 170, 255], "flat (map)"],
   ];
   const lines = room - 2 - (legendHint ? 2 : 0);
   const rows = [...ground.slice(0, Math.max(2, lines - fixed.length)), ...fixed].slice(0, Math.max(0, lines));
