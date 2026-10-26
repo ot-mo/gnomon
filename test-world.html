@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>World checks</title>
+<style>
+  body { margin: 0; padding: 16px; background: #111; color: #ddd; font: 14px/1.5 monospace; }
+  .ok { color: #7d7; } .bad { color: #f77; } .dim { color: #888; }
+  iframe { width: 100%; height: 72px; border: 1px solid #333; background: #111; margin-top: 8px; }
+  canvas { display: none; }
+</style>
+</head>
+<body>
+<pre id="out">Running…</pre>
+<canvas id="screen"></canvas>
+<script type="module">
+// Runs the check modules of tests/checks/index.js in the browser (TECH_DESIGN §9 "test-world.html"), each in a
+// page of its own (an iframe of this page with ?check=<name>), as tools/run-all.mjs gives each its own Node
+// process. Every check gets the browser's env (tests/lib/browser-env.js): localStorage in memory and every sound
+// sent into a muted sink before the game loads. tools/browser-0d2.mjs drives it headless.
+//
+//   test-world.html                   every check but the slow ones and the Node-only ones (listed on the page)
+//   test-world.html?all=1             the slow ones too
+//   test-world.html?only=golden,hud   just these (slow ones included when named)
+//   other options pass on to the checks (?seeds=10 for dungeons, ?tiles=100 for landmarks, ?pairs=20 for edges…)
+//   test-world.html?check=<name>      one check, alone (what each iframe opens)
+// window.testResult, when done: { ok, passed, failed, skipped: [{ name, why }], results: [{ name, ok, secs, problems,
+// stats, notes, parts }], secs }; a single-check page sets it to { name, ok, secs, parts: [result] }.
+import { CHECKS } from "./tests/checks/index.js";
+import { installPageGuards, browserCheckEnv } from "./tests/lib/browser-env.js";
+
+const out = document.getElementById("out");
+const params = new URLSearchParams(location.search);
+const args = {};
+for (const [k, v] of params) if (!["check", "only", "all", "timeout"].includes(k)) args[k] = v === "" ? true : v;
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+const plain = (v) => JSON.parse(JSON.stringify(v ?? null));
+
+if (params.has("check")) runOne(params.get("check"));
+else runAll();
+
+// --- One check, in this page --------------------------------------------------------------------------------------
+async function runOne(name) {
+  const t0 = performance.now();
+  let parts, done = false;
+  const finish = (ok, parts) => {
+    if (done) return;
+    done = true;
+    const secs = +((performance.now() - t0) / 1000).toFixed(1);
+    window.testResult = { name, ok, secs, parts: plain(parts) };
+    out.innerHTML = parts.map((r) => `<span class="${r.ok ? "ok" : "bad"}">${r.ok ? "PASS" : "FAIL"}</span> ${esc(r.name)}`
+      + (r.problems || []).slice(0, 20).map((p) => `\n  ✗ ${esc(p)}`).join("")).join("\n") + `  <span class="dim">(${secs} s)</span>`;
+    if (parent !== window) parent.postMessage({ type: "gnomon-check", result: window.testResult }, location.origin);
+  };
+  const crash = (what) => finish(false, [{ name, ok: false, problems: [what], stats: {} }]);
+  addEventListener("error", (e) => crash(`uncaught: ${e.message} (${e.filename}:${e.lineno})`));
+  addEventListener("unhandledrejection", (e) => crash(`unhandled rejection: ${e.reason?.stack || e.reason}`));
+  const entry = CHECKS.find((c) => c.name === name);
+  out.textContent = `Running ${name}…`;
+  try {
+    if (!entry) throw new Error(`no check named ${name} in tests/checks/index.js`);
+    if (entry.node) throw new Error(`${name} runs only in Node (${entry.node}): node tools/check-${name}.mjs`);
+    installPageGuards();
+    const mod = await entry.load();
+    parts = [await mod.run(browserCheckEnv(args))].flat();
+    finish(parts.every((r) => r && r.ok), parts);
+  } catch (err) {
+    crash(`threw: ${err?.stack || err}`);
+  }
+}
+
+// --- Every check, one page each -----------------------------------------------------------------------------------
+async function runAll() {
+  const only = params.get("only")?.split(",").filter(Boolean) || null;
+  const all = params.has("all") && params.get("all") !== "0";
+  const timeout = (Number(params.get("timeout")) || 900) * 1000;
+  const skipped = [], queue = [];
+  for (const c of CHECKS) {
+    if (only && !only.includes(c.name)) continue;
+    if (c.node) skipped.push({ name: c.name, why: `Node only: ${c.node} (node tools/check-${c.name}.mjs)` });
+    else if (c.slow && !all && !only) skipped.push({ name: c.name, why: `slow: ${c.slow} (?all=1 or ?only=${c.name})` });
+    else queue.push(c);
+  }
+  if (only) for (const n of only) if (!CHECKS.some((c) => c.name === n)) skipped.push({ name: n, why: "no such check in tests/checks/index.js" });
+  const t0 = performance.now(), results = [];
+  const pass = new URLSearchParams(args).toString();
+  const show = (running) => {
+    const lines = results.map((r) => `<span class="${r.ok ? "ok" : "bad"}">${r.ok ? "PASS" : "FAIL"}</span>  ${r.name.padEnd(14)} ${String(r.secs).padStart(6)} s`
+      + (r.ok ? "" : r.problems.slice(0, 8).map((p) => `\n      ✗ ${esc(p)}`).join("")));
+    if (running) lines.push(`<span class="dim">….  ${running.padEnd(14)} running (${results.length + 1} of ${queue.length})</span>`);
+    out.innerHTML = lines.join("\n") + (skipped.length ? `\n\n<span class="dim">Left out:\n${skipped.map((s) => `  ${s.name}: ${esc(s.why)}`).join("\n")}</span>` : "");
+  };
+  for (const c of queue) {
+    show(c.name);
+    const r = await inFrame(c.name, pass, timeout);
+    const parts = r.parts || [];
+    results.push({ name: c.name, ok: !!r.ok, secs: r.secs, parts,
+      problems: parts.flatMap((p) => (p.problems || []).map((x) => (parts.length > 1 ? `${p.name}: ${x}` : x))),
+      stats: Object.assign({}, ...parts.map((p) => p.stats || {})), notes: parts.flatMap((p) => p.notes || []) });
+  }
+  const failed = results.filter((r) => !r.ok).length, secs = +((performance.now() - t0) / 1000).toFixed(1);
+  show(null);
+  out.innerHTML += `\n\n<span class="${failed ? "bad" : "ok"}">${failed ? `${failed} of ${results.length} checks failed` : `All ${results.length} checks passed`}</span> (${secs} s; ${skipped.length} left out).`;
+  window.testResult = { ok: failed === 0 && results.length > 0, passed: results.length - failed, failed, skipped, results, secs };
+}
+
+function inFrame(name, pass, timeout) {
+  return new Promise((resolve) => {
+    const frame = document.createElement("iframe");
+    let timer;
+    const done = (r) => { clearTimeout(timer); removeEventListener("message", onMessage); frame.remove(); resolve(r); };
+    const onMessage = (e) => {
+      if (e.source !== frame.contentWindow || e.data?.type !== "gnomon-check") return;
+      done(e.data.result);
+    };
+    addEventListener("message", onMessage);
+    timer = setTimeout(() => done({ name, ok: false, secs: timeout / 1000, parts: [{ name, ok: false, problems: [`no result within ${timeout / 1000} s`] }] }), timeout);
+    frame.src = `test-world.html?check=${encodeURIComponent(name)}${pass ? "&" + pass : ""}`;
+    document.body.append(frame);
+  });
+}
+</script>
+</body>
+</html>

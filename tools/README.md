@@ -82,6 +82,14 @@ Chromium shares Node's V8, and `browser-0d1.mjs` finds the 27 frames identical t
 
 ## Browser checks
 
+`test-world.html` (0D2) runs the check modules of `tests/checks/index.js` in the browser, each in an iframe of its own
+(`?check=<name>`, as `run-all` gives each its own process), with a summary and `window.testResult` (`{ ok, passed,
+failed, skipped, results, secs }`). It leaves out the Node-only ones (`save`, `stats`) and, unless asked for with `?all=1`
+or `?only=a,b`, the slow ones (`edges`, the longest at about 40 s, and `dungeons`, held to a p95 time budget); every
+other option passes on to the checks (`?seeds=10`). In 0D2 the default set ran in about 50 s headless, all 32 in 108 s,
+all passing. A check page gets no `AudioContext` (so no sound, and no sound effect draws from a seeded `Math.random`,
+as in Node) and an in-memory `localStorage` (`tests/lib/browser-env.js`).
+
 `test.html` runs the dungeon validation in the browser (`window.testResult`). Serve the repository root with
 `python -m http.server 8130` (or the `gnomon` preview config) and open `/test.html` or `/index.html?seed=N`. Before any
 key press or click, route the game's audio into a silent sink (an `AnalyserNode` followed by a zero-gain node) until
