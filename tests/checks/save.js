@@ -15,8 +15,8 @@
 //      before any zone and exceeds every id in the loaded zones. game.state, the player and the Run data hold
 //      no Set, Map, function or class instance (R5's walker), before and after. Record sizes are reported.
 //   2. The codec: every zone of the session (visited and prefetched) round-trips exactly, deflated and { raw };
-//      decoding doesn't move the id counter; creatures are trimmed to the whitelist and come back with their
-//      looks; projectiles are dropped; a zone field that isn't JSON is refused until it registers a codec;
+//      decoding doesn't move the id counter; creatures are trimmed to the whitelist and come back with every
+//      field it keeps (the check's own list) and their looks; projectiles are dropped; a zone field that isn't JSON is refused until it registers a codec;
 //      the walker catches each thing JSON can't carry; deflate is the zlib format and "deflate-raw" appears
 //      nowhere in src/.
 //   3. The store: copies in and out, a tx is all or nothing, a commit can be held open (latency), dump/from;
@@ -35,7 +35,9 @@
 //      process and in a fresh one, canonical JSON identical, buildRun never called, ids above every loaded id.
 //   8. What the session doesn't reach, saved → loaded → identical: legacy level 15 after the Colossus has slammed
 //      and while its next slam is warned (both views: zone.slam and zone.slamDone hold Sets). Zones made and left
-//      after a save (written behind): the load's id counter is above every id in them. Legacy level 10's Gloom
+//      after a save (written behind): the load's id counter is above every id in them. A busy state on level 20
+//      (a monster hurt, poisoned and chasing, the Lich King in phase 1, holeSeen, uids and zone patches, a person met),
+//      every kept creature field compared as well. Legacy level 10's Gloom
 //      Warden awake with its shades: its fight and their halved xp come back, and it doesn't wake again.
 //   6. The title screen at 100×30, through the real input handlers: with nothing saved only "New quick game";
 //      with a slot "Continue" too; each by keys (Enter, ↓ Enter, 2) and by a click on its line; New starts a
@@ -52,8 +54,14 @@ import { on } from "../../src/events.js";
 import { useStore, currentStore } from "../../src/save/store.js";
 import { openTitle } from "../../src/screens/title.js";
 import { B, FLOOR_Z } from "../../src/world.js";
+import { CREATURE_TYPES } from "../../src/creatures.js";
+import { addStatus } from "../../src/status.js";
+import { addZonePatch, claimUid } from "../../src/zones.js";
 
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
+// What a saved creature must keep (§7.2's whitelist, then 0C's state fields, then a guardian's fight and xp).
+const KEEP = ["id", "uid", "type", "elite", "tx", "ty", "z", "hp", "maxHp", "level", "brain", "status", "cooldowns", "inv", "body", "merchant",
+  "faction", "name", "named", "flags", "state", "phase", "risen", "bounty", "lightBurn", "regenAcc", "g", "xp"];
 
 export async function digestGame(game, keys) {
   const out = { state: canonicalJson(game.state), player: canonicalJson(encodePlayer(game.player)), run: canonicalJson(serializeRun(game.run)),
@@ -79,6 +87,15 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
     const bad = [...jsonProblems(game.state, "state"), ...jsonProblems(game.player, "player"), ...jsonProblems(serializeRun(game.run), "run")];
     if (bad.length) fail(`${what}: not plain JSON (R5): ${bad.slice(0, 4).join("; ")}`);
     return bad.length;
+  };
+  // A creature as it was and as a load rebuilt it: every field the whitelist keeps (§7.2's and the ones P0's
+  // creatures keep their state in; the check's own list, so dropping one from CREATURE_FIELDS shows), its looks'
+  // glyph and size, and talk's state and met.
+  const sameCreature = (what, o, c) => {
+    for (const f of new Set([...KEEP, ...CREATURE_FIELDS, "glyph", "w", "h"]))
+      if (JSON.stringify(o[f]) !== JSON.stringify(c[f])) fail(`${what} creature ${c.id} (${c.type}): ${f} ${JSON.stringify(o[f])} → ${JSON.stringify(c[f])}`);
+    const talk = (e) => JSON.stringify(e.talk ? { state: e.talk.state, met: e.talk.met } : null);
+    if (talk(o) !== talk(c)) fail(`${what} creature ${c.id} (${c.type}): talk ${talk(o)} → ${talk(c)}`);
   };
   const idsAbove = (what) => {
     const n = entityCounter();
@@ -159,8 +176,7 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
         for (const c of back.creatures) {
           const o = z.creatures.find((q) => q.id === c.id);
           if (!o) { fail(`${z.key}: creature ${c.id} came back but wasn't there`); continue; }
-          for (const f of ["uid", "type", "name", "glyph", "hp", "maxHp", "level", "elite", "xp", "w", "h", "tx", "ty", "z"])
-            if (JSON.stringify(o[f]) !== JSON.stringify(c[f])) fail(`${z.key} creature ${c.id} (${c.type}): ${f} ${JSON.stringify(o[f])} → ${JSON.stringify(c[f])}`);
+          sameCreature(z.key, o, c);
           if (JSON.stringify(o.color) !== JSON.stringify(c.color) || c.x !== c.tx + 0.5 || c.y !== c.ty + 0.5) fail(`${z.key} creature ${c.id}: colour or place`);
           creatures++;
         }
@@ -168,6 +184,8 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
       }
     }
     if (entityCounter() !== was) fail(`decoding moved the id counter ${was} → ${entityCounter()}`);
+    const dropped = KEEP.filter((f) => !CREATURE_FIELDS.includes(f));
+    if (dropped.length) fail(`CREATURE_FIELDS no longer keeps ${dropped.join(", ")}`);
     const allowed = new Set([...CREATURE_FIELDS, "talk", "vis"]);
     for (const z of sessionZones) for (const c of z.creatures) {
       const extra = Object.keys(trimCreature(c)).filter((k) => !allowed.has(k));
@@ -516,6 +534,40 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
       const back = game.zone.slamDone;
       if (!(back?.cells instanceof Set) || [...back.cells].sort((a, b) => a - b).join() !== cells || !(game.zone.slam?.cells instanceof Set))
         fail(`level 15 (${view}): the slam came back as ${JSON.stringify(back && { ...back, cells: [...back.cells || []].length })}`);
+    }
+  }
+  // A busy run state (the session leaves most of it empty): on legacy level 20 a monster hurt, poisoned and chasing
+  // you, the Lich King in its second phase, pits looked into (holeSeen); a zone patch applied there (its uid
+  // claimed) and one waiting for a level not made yet; the temple's person met.
+  {
+    startRun(1234); game.pages = null; game.story.cube = true;
+    const person = game.zone.creatures.find((c) => c.talk);
+    if (person) person.talk.met = true; else fail("the temple has no one to meet");
+    game.debug.enterZone("0,0,20", "down");
+    playing(game, "map");
+    const zone = game.zone, boss = zone.creatures.find((c) => CREATURE_TYPES[c.type]?.boss);
+    const m = zone.creatures.find((c) => !c.talk && c !== boss && c.maxHp > 2);
+    if (!boss || !m) fail(`level 20: boss ${boss?.type}, a monster ${m?.type}`);
+    else {
+      m.hp = m.maxHp - 2; m.state = "chase";
+      addStatus(game, m, "poisoned", { t: 30 });
+      boss.phase = 1; boss.hp = Math.floor(boss.maxHp * 0.6);
+      for (const k of [3, 50, 200, zone.w * 7 + 9]) zone.holeSeen[k] = 1;
+      addZonePatch(game, zone.key, { op: "spawnCreature", type: "goblin", uid: "check:here", relativeTo: "arrival" });
+      addZonePatch(game, "0,0,7", { op: "spawnCreature", type: "goblin", uid: "check:later", relativeTo: "arrival" });
+      claimUid(game, "check:claimed", zone.key);
+      const live = [...zone.creatures], st = game.state;
+      const busy = `${Object.keys(st.uids).length} uids, ${Object.keys(st.zonePatches).length} zone(s) with patches waiting, ${Object.keys(zone.appliedPatches).length} applied`;
+      if (!st.uids["check:here"] || !st.zonePatches["0,0,7"] || !m.status?.poisoned) fail(`level 20: the busy state wasn't made (${busy}, status ${JSON.stringify(m.status)})`);
+      if (await roundTrip(`level 20 busy (${busy}; a monster hurt, poisoned and chasing; the boss in phase 1; 4 pit cells; the temple's person met)`)) {
+        if (game.zone.key !== zone.key) fail(`the busy load is in ${game.zone.key}`);
+        for (const o of live) {
+          const c = game.zone.creatures.find((q) => q.id === o.id);
+          if (!c) fail(`level 20: creature ${o.id} (${o.type}) didn't come back`); else sameCreature("level 20 (busy)", o, c);
+        }
+        const back = (await getZone(game, "0,0,0")).creatures.find((c) => c.id === person?.id);
+        if (person && back?.talk?.met !== true) fail(`the temple's person came back with talk.met ${back?.talk?.met}`);
+      }
     }
   }
   // An awake guardian and its summons (legacy level 10, 3D): its fight (g) and the summons' halved xp come back,
