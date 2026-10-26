@@ -173,7 +173,7 @@ export function render3d(game) {
   for (const c of [...hostilesTo(game, player), ...talkersIn(zone)]) if (isFlat(c) && Math.hypot(c.x - player.x, c.y - player.y) < 20) shadows.push(c);
   setMaterialTime(game.time);   // water ripples move
   if (depth.length !== S.cols * S.rows) depth = new Float32Array(S.cols * S.rows);
-  torch.power = torchPower(player);
+  torch.power = torchPower(player, game.time);
   torch.range = torchRange(player);
   const seeRange = torch.range;
   // Runes glow and ghost planks show only in the dark (light.js inDark). Without sky that's your torch

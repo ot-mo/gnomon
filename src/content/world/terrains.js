@@ -10,6 +10,7 @@
 //   travelHours  world hours to cross one span (null: it can't be crossed on the world map)
 //   lostChance   per world-map move (0..1)
 //   tierMod      +1 in the Shade, the Lattice, the Teeth and on water (the tier formula, §4.5)
+//   dark         always dark, by day too (the Shade, bible §3.2): a lit torch burns glim there (torch.js)
 //
 // World-function parameters (TECH_DESIGN §5.3; P0 placeholders that WS2 tunes, C1 finalises):
 //   ground   the block on top of the ground (a key of blocks.js B)
@@ -62,6 +63,7 @@ export const TERRAINS = {
     name: "the Shade", glyph: "%", color: [40, 36, 56], palette: [[40, 36, 56], [24, 22, 34], [72, 62, 92]],
     travelHours: 12, lostChance: 0.20, tiers: [5, 8], enter: "map", tierMod: 1, villages: 1,
     ground: "ASH", relief: 0.4, cliffs: 0.2, trees: 0.05,
+    dark: true,   // dusk even at noon (bible §4.3): a lit torch burns glim here by day too (torch.js)
   },
   lattice: {
     name: "the Lattice", glyph: "*", color: [182, 222, 232], palette: [[182, 222, 232], [122, 162, 202], [232, 242, 250]],

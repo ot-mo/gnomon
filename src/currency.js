@@ -16,7 +16,7 @@
 //
 // Every place the parent game touched `gold` goes through these (0B). The counter backing keeps the
 // amount on the entity as `e.funds` and the purse's size as `e.purse`; WS6b registers an item backing.
-// Torch drain (1 glim per 4 world hours lit in darkness, DECISIONS) needs the time of day: clock.js, 0D2.
+// The torch's drain (1 glim per 4 world hours lit in darkness, DECISIONS) pays through pay(): torch.js.
 import { CURRENCY } from "./content/currency.js";
 import { RULES } from "./rules.js";
 import { priceMul, contentLevel } from "./stats.js";

@@ -12,6 +12,7 @@ import { CURRENCY, formatFunds } from "./currency.js";
 import { hitLabel, wrap } from "./ui.js";
 import { RULES } from "./rules.js";
 import { on } from "./events.js";
+import { torchGutters } from "./torch.js";
 
 // The HUD under every screen: the crosshair and [E] label in 3D (exploring, paused, or dead), the status
 // line, the toasts, the messages and the boss bar. The screens over it (pause, dead, won, levelup, the
@@ -257,7 +258,8 @@ registerHudSegment("defence", { priority: 50, row: 1, parts: (game, p) => ({
   text: RULES.combat === "d20" ? `AV ${av(p)} DV ${dv(p)}` : `ARM ${armourValue(p)}`, color: [175, 180, 200] }) });
 registerHudSegment("funds", { priority: 60, parts: (game, p) => ({ text: formatFunds(p), color: CURRENCY.color }) });
 registerHudSegment("keys", { priority: 45, row: 1, parts: (game, p) => ({ text: `k ${p.keys}`, color: [240, 200, 70] }) });
-registerHudSegment("torch", { priority: 40, row: 1, parts: (game, p) => ({ text: `torch ${p.torch ? "on" : "off"}`, color: p.torch ? [255, 200, 120] : [120, 120, 120] }) });
+registerHudSegment("torch", { priority: 40, row: 1, parts: (game, p) => (torchGutters(p) ? { text: "torch gutters", color: [200, 120, 60] }
+  : { text: `torch ${p.torch ? "on" : "off"}`, color: p.torch ? [255, 200, 120] : [120, 120, 120] }) });
 registerHudSegment("ready", { priority: 40, row: 1, parts(game, p) {   // what T throws
   const ready = readyStack(p);
   return ready && { text: `T: ${itemName(game, ready)} x${ready.count}`, color: itemGlyph(game, ready)[1] };

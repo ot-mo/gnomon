@@ -6,6 +6,8 @@ import { makeBody, wielded, worn } from "./body.js";
 import { RULES } from "./rules.js";
 import { CURRENCY } from "./currency.js";
 import { hasStatus, statusFlag, statusSpeed } from "./status.js";
+import { torchGutters } from "./torch.js";
+import { hashFloat } from "./rng.js";
 
 export const RADIUS = 0.3, HEIGHT = 1.6, EYE = 1.45;
 export const WALK = 4.2;           // blocks per second; also sets how long a step takes on the map
@@ -59,13 +61,17 @@ export const weaponReach = (p) => WEAPONS[wielded(p).id].reach + bonus(p, "reach
 export { av as armourValue } from "./stats.js";
 
 // Your torch: how far it lights things up for the auto-map, and how bright it is. With it out
-// you see nothing by it, unless something lets you see in the dark a little (darkSight).
+// you see nothing by it, unless something lets you see in the dark a little (darkSight). With an empty
+// purse it gutters (torch.js): a flicker RULES.torch.gutterRange tiles across, its strength jumping
+// about with time t (render3d passes game time).
 export function torchRange(p) {
   if (!p.torch) return Math.min(4, bonus(p, "darkSight") * 1.5);
+  if (torchGutters(p)) return RULES.torch.gutterRange;
   return 6 * (1 + bonus(p, "torch")) * (hasStatus(p, "darkened") ? 0.4 : 1);
 }
-export function torchPower(p) {
+export function torchPower(p, t = 0) {
   if (!p.torch) return Math.min(0.9, bonus(p, "darkSight") * 0.3);
+  if (torchGutters(p)) return RULES.torch.gutterPower * (0.6 + 0.4 * hashFloat(Math.floor(t * 9)));
   return 2.2 * (1 + bonus(p, "torch") * 1.2) * (hasStatus(p, "darkened") ? 0.3 : 1);
 }
 export { speedMul };
