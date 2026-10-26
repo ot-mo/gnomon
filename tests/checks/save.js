@@ -48,7 +48,7 @@ import { canonicalJson, encodeZone, decodeZone, encodePlayer, jsonProblems, snap
 import { memoryAdapter, idbAdapter } from "../../src/save/store.js";
 import { saveGame, loadGame, listSlots, deleteSlot, whenWritten, saveStatus, canSave } from "../../src/save/save.js";
 import { getZone, cachedZone, evictZone, evictDormant, ZONE_GENERATORS, ZONE_RULES, changeZone, neighbourAddr } from "../../src/zones.js";
-import { entityCounter, getIds } from "../../src/ids.js";
+import { entityCounter, getIds, setEntityCounter } from "../../src/ids.js";
 import { serializeRun, RUN_STATS } from "../../src/world/run.js";
 import { pushMode, popMode, screenFor } from "../../src/screens.js";
 import { on } from "../../src/events.js";
@@ -187,6 +187,18 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
       }
     }
     if (entityCounter() !== was) fail(`decoding moved the id counter ${was} → ${entityCounter()}`);
+    // Behind it, a creature rebuilt with an id at or past the counter moves the counter past it (rebuildCreature's
+    // own guard, beside loadGame's): the counter set to 1, a zone decoded, the counter above every id in it.
+    const topId = (z) => Math.max(0, ...z.creatures.map((c) => c.id));
+    const zc = sessionZones.reduce((a, z) => (!a || topId(z) > topId(a) ? z : a), null);
+    if (zc && topId(zc) > 1) {
+      const rec = await encodeZone(zc, { slot: "x", savedAt: 1 }, { deflate: false }), top = topId(zc);
+      setEntityCounter(1);
+      await decodeZone(JSON.parse(JSON.stringify(rec)));
+      const after = entityCounter();
+      setEntityCounter(was);
+      if (!(after > top)) fail(`${zc.key} decoded with the id counter at 1: the counter ${after}, the zone's ids up to ${top} (rebuildCreature)`);
+    }
     const dropped = KEEP.filter((f) => !CREATURE_FIELDS.includes(f));
     if (dropped.length) fail(`CREATURE_FIELDS no longer keeps ${dropped.join(", ")}`);
     const allowed = new Set([...CREATURE_FIELDS, "talk", "vis"]);
