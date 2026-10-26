@@ -48,6 +48,7 @@ import { setMode, pushMode, popMode, syncStack, dispatchMouse, dispatchHover, di
 import { bind, dispatchKey } from "./keys.js";
 import { beginFrame } from "./ui.js";
 import "./screens/index.js";   // every screen registers itself
+import "./save/index.js";      // saves: write-behind on zone:leave, waiting saves, zones.js's ZONE_LOADER (§7.3)
 import { update, checkFloorEvents, fallThrough, changeFloor, onCube, forceMapView, toggleMap, mapKey, mapClick, look, drawPlay } from "./screens/play.js";
 import { openInv, inventoryAction } from "./screens/inventory.js";
 import { checkLevelUp, choosePerk } from "./screens/levelup.js";
@@ -183,7 +184,10 @@ export function resetRuntime(game) {
   game.zone = null;
   game.zoneLru = [];
   game.zones = new Map();
-  game.zoneLoading = null;
+  game.zoneLoading = null;   // zones.js: a zone being read back from the save (and its promise), reads under way
+  game.zoneLoad = null;
+  game.zoneReads = null;
+  game.saving = null;        // save/save.js: the slot this run saves to (none until it is saved or loaded)
   game.messages = [];
   game.effects = [];
   game.travel = null;
@@ -195,6 +199,19 @@ export function resetRuntime(game) {
   game.prefetchJob = null;   // zones.js: a staged prefetch under way, and the zone it last saw
   game.prefetchSeen = null;
   game.modeStack = [];
+}
+
+// A saved run taken up again (save/save.js loadGame, TECH_DESIGN §7.3): its Run (restoreRun, never
+// buildRun), state, player and view; the caller sets the id counter and enters the zone.
+export function resumeRun(game, { seed, run, state, player, view }) {
+  game.seed = seed;
+  game.run = run;
+  attachState(game, state);
+  game.player = player;
+  runLooks(game, seed);
+  resetRuntime(game);
+  game.view = view === "map" ? "map" : "3d";
+  game.paused = false;
 }
 
 // A new game on `seed` (quick start: no character to make yet), at the world's start landmark.

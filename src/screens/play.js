@@ -340,7 +340,7 @@ export function mapClick(game, button, cell) {
 
 // --- The screens ------------------------------------------------------------------------------------
 registerScreen("explore", {
-  over: "none", pausesTime: false, pointer: "lock",
+  over: "none", pausesTime: false, pointer: "lock", saveable: true,   // (save/save.js: a save waits for one of the views)
   draw: drawPlay,
   update(game, dt) {
     if (game.paused) return;
@@ -360,7 +360,7 @@ registerScreen("explore", {
 const HEADER_KEYS = [["I: inventory", "KeyI"], ["J: journal", "KeyJ"], ["Tab: 3D", "Tab"], ["X: explore", "KeyX"], ["Space: wait", "Space"]];
 
 registerScreen("map", {
-  over: "none", pausesTime: false, pointer: "unlock",
+  over: "none", pausesTime: false, pointer: "unlock", saveable: true,
   draw(game) {
     drawPlay(game);
     for (const [label, key] of HEADER_KEYS) hitLabel(mapView.header, label, { key });

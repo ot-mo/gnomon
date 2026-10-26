@@ -7,7 +7,8 @@
 //
 // Where zones come from: ZONE_GENERATORS[type](game, addr) → Zone | null, registered by whoever
 // builds that kind of zone (today world/legacy.js; later the surface generator and dungeon sites).
-// A saved zone would come from ZONE_LOADER.load (WS9) before that.
+// A zone the save holds (ZONE_LOADER.has) is read back from it instead (ZONE_LOADER.load, save/save.js),
+// asynchronously: changeZone returns a promise then, and prefetch and edges read it ahead (readZone).
 //
 // The apron (§6.1): a surface zone you are in carries voxel bands of its neighbours beyond its open
 // sides (world.js). fillApron builds them on every entry, a band is rebuilt when its neighbour arrives
@@ -37,14 +38,19 @@ export const ZONE_STAGED = { surface: null, dungeon: null };
 // (run, zone, side, neighbour | null) → the band for zone.apron[side] (world.js; gen/surface.js
 // buildApronBand, registered by world/zonegen.js).
 export const APRON_BUILDERS = { surface: null };
-// WS9: async (game, key) → a stored Zone or null. While it is null, zones are only generated.
-export const ZONE_LOADER = { load: null };
+// The save's seam (save/save.js; WS9 keeps it):
+//   has(game, key) → bool          the store holds this zone (so it is read back, never generated again)
+//   load(game, key) → Promise<Zone | null>   read and decode it (not yet in game.zones)
+//   canEvict(game, key) → bool     may it leave memory? (its record has committed: write-behind, §7.3)
+// While has is null, or says no, zones are only generated, exactly as before saves existed.
+export const ZONE_LOADER = { load: null, has: null, canEvict: null };
 // Zone patch operations: op → (game, zone, patch, { at, arrival }) => void. See addZonePatch.
 export const PATCH_OPS = {};
 export const ZONE_RULES = {
   keepDerived: 2,       // zones that keep light/stand arrays (current + previous; the current one's neighbours too)
   prefetchNear: APRON,  // 3D: make an open side's neighbour once you are this many tiles from that edge
   walkOffPast: 0.5,     // 3D: you cross once the body's centre is this far past the edge
+  keepDormant: 24,      // zones kept in memory once saved (§2.2 RULES.zones.keep); older ones are evicted (evictDormant)
 };
 // What a solid edge says when you try it (once per visit and side); the world's own border has no terrain.
 export const EDGE_RULES = { border: "Nothing lies past this edge of the world.", shifted: "The ground shifts underfoot." };
@@ -78,9 +84,10 @@ export function makeZone(game, addr) {
 }
 
 // A newly made zone joins game.zones: sealed, and the band of your apron it borders rebuilt from it.
-function adoptZone(game, zone, key) {
+// (A zone read back from the save comes sealed, with its own dirty flag: seal = false.)
+function adoptZone(game, zone, key, { seal = true } = {}) {
   const { wx, wy, z } = parseKey(key);
-  zone.seal();
+  if (seal) zone.seal();
   (game.zones ||= new Map()).set(key, zone);
   // A neighbour of the zone you are in has just arrived in memory: its band of your apron becomes a copy.
   const cur = game.zone;
@@ -108,16 +115,56 @@ function stepZone(game, key) {
   return r.value ? adoptZone(game, r.value, job.key) : null;
 }
 
-// Memory first, then storage (WS9), then generation.
+// Memory first, then the save (ZONE_LOADER), then generation.
 export async function getZone(game, addr) {
   const key = keyOf(addr);
   const cached = cachedZone(game, key);
   if (cached) return cached;
-  if (ZONE_LOADER.load) {
-    const stored = await ZONE_LOADER.load(game, key);
-    if (stored) { game.zones.set(key, stored); return stored; }
+  if (ZONE_LOADER.has?.(game, key)) {
+    const stored = await readZone(game, key);
+    if (stored) return stored;
   }
   return makeZone(game, key);
+}
+
+// Read a stored zone into game.zones (once: a read under way is shared). → Promise<Zone | null>; null when
+// the store had none, or a new run started meanwhile.
+export function readZone(game, key) {
+  const reads = (game.zoneReads ||= new Map());
+  if (reads.has(key)) return reads.get(key);
+  const run = game.run;
+  const done = Promise.resolve(ZONE_LOADER.load(game, key)).then((zone) => {
+    reads.delete(key);
+    if (!zone || game.run !== run) return null;
+    return cachedZone(game, key) || adoptZone(game, zone, key, { seal: false });
+  }, (e) => { reads.delete(key); throw e; });
+  reads.set(key, done);
+  return done;
+}
+const readAhead = (game, key) => readZone(game, key).then((zone) => {
+  if (zone && zone !== game.zone && game.zone?.z === 0 && zone.z === 0) zone.ensureDerived();   // a neighbour: ready to cross into
+}).catch((e) => console.error(`reading zone ${key} from the save:`, e));
+
+// A dormant zone leaves memory (§2.2). Refused for the zone you are in, and unless the save says it may
+// (ZONE_LOADER.canEvict: its record has committed, write-behind §7.3); with no save at all, always (nothing
+// would bring it back as it was). → whether it left.
+export function evictZone(game, key) {
+  if (!game.zones?.has(key) || game.zone?.key === key) return false;
+  if (!ZONE_LOADER.load || !ZONE_LOADER.canEvict?.(game, key)) return false;
+  game.zones.delete(key);
+  const k = game.zoneLru?.indexOf(key) ?? -1;
+  if (k >= 0) game.zoneLru.splice(k, 1);
+  return true;
+}
+// Keep at most `keep` dormant zones that may leave: the ones left longest ago go first; the zone you are in
+// and its straight neighbours (prefetched for the edges) stay. → the keys evicted.
+export function evictDormant(game, keep = ZONE_RULES.keepDormant) {
+  const cur = game.zone, left = zoneState(game).zoneLeft;
+  const near = (z) => cur && z.z === 0 && cur.z === 0 && Math.abs(z.wx - cur.wx) + Math.abs(z.wy - cur.wy) === 1;
+  const dormant = [...(game.zones || new Map()).values()].filter((z) => z !== cur && !near(z) && ZONE_LOADER.canEvict?.(game, z.key));
+  if (dormant.length <= keep) return [];
+  dormant.sort((a, b) => (left[a.key] ?? -1) - (left[b.key] ?? -1));
+  return dormant.slice(0, dormant.length - keep).map((z) => z.key).filter((key) => evictZone(game, key));
 }
 
 // The level under / over a zone (same world tile), or null.
@@ -147,15 +194,19 @@ export function changeZone(game, addr, arrival = {}, message = "") {
     if (message) game.log(message, [255, 220, 140]);
     enterZone(game, zone, arrival);
   };
-  const now = cachedZone(game, key) || (ZONE_LOADER.load ? null : makeZone(game, key));
+  const cached = cachedZone(game, key), stored = !cached && !!ZONE_LOADER.has?.(game, key);
+  const now = cached || (stored ? null : makeZone(game, key));
   if (now) { go(now); return true; }
-  if (!ZONE_LOADER.load) return false;
+  if (!stored) return false;
+  if (game.zoneLoading === key && game.zoneLoad) return game.zoneLoad;   // (asked again while it is read)
+  const run = game.run;
   game.zoneLoading = key;
-  return getZone(game, key).then((zone) => {
-    game.zoneLoading = null;
-    if (zone) go(zone);
-    return !!zone;
-  });
+  return (game.zoneLoad = getZone(game, key).then((zone) => {
+    if (game.zoneLoading === key) { game.zoneLoading = null; game.zoneLoad = null; }
+    if (!zone || game.run !== run) return false;
+    go(zone);
+    return true;
+  }));
 }
 
 // Arrive in a zone: leave the old one, place the player, apply pending patches, and start afresh
@@ -188,7 +239,8 @@ export function enterZone(game, zone, arrival = {}) {
   game.effects = [];          // damage numbers and splashes belong to the zone you left
   game.confirmJump = -1;
   keepDerived(game, ZONE_RULES.keepDerived);
-  emit(game, "zone:enter", { zone, arrival: at, how, away, first: away === null && from !== zone, from: from?.key ?? null });
+  // (A load returns you to a zone you were in: never its first visit.)
+  emit(game, "zone:enter", { zone, arrival: at, how, away, first: how !== "load" && away === null && from !== zone, from: from?.key ?? null });
 }
 
 // Only the most recent zones keep their light/stand/kind/look arrays (about 0.2 MB each for a
@@ -245,6 +297,9 @@ export function tryWalkOff(game, side, along, opts = {}) {
   const zone = game.zone, p = game.player;
   if (!zone || zone.type !== "surface" || !MIRROR[side]) return false;
   const addr = neighbourAddr(game, zone, side);
+  // A neighbour the save holds is read first (a moment, asynchronously; prefetch usually has by now): until
+  // it is in memory you stay this side, and the next step or frame crosses.
+  if (addr && !cachedZone(game, addr.key) && ZONE_LOADER.has?.(game, addr.key)) { readAhead(game, addr.key); return false; }
   const target = addr && (cachedZone(game, addr.key) || makeZone(game, addr.key));
   if (!target) {
     const told = `${zone.key}:${side}`;
@@ -284,8 +339,8 @@ export function prefetchNeighbours(game) {
     const addr = neighbourAddr(game, zone, side);
     if (!addr || cachedZone(game, addr.key)) continue;
     const gap = side === "n" ? p.y : side === "s" ? zone.d - p.y : side === "w" ? p.x : zone.w - p.x;
+    if (ZONE_LOADER.has?.(game, addr.key)) { readAhead(game, addr.key); continue; }   // the save holds it: read it, never make it
     if (!map && gap > near) continue;
-    if (ZONE_LOADER.load) continue;   // WS9: read stored neighbours asynchronously instead
     if (map) { if (makeZone(game, addr.key)) made++; continue; }
     if (stepZone(game, addr.key)) made++;
     break;
