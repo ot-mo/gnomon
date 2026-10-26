@@ -95,9 +95,8 @@ tags; WS1, which builds on the most, last):
    this file. Its worktree stays until the integrator has merged it.
 
 **The integrator** (§8.5): one session in `gnomon-wt\integration` on branch `integration` from `p0-done`, started when
-the first `p1-*` tag is up. It first merges `main` (which moved past `p0-done` on docs alone: `4002a50`, DECISIONS'
-serve rule, so that `main` can fast-forward to the integrator's tags) and `wip/p1-plan` (this file; the two edits of
-this file merge without conflict), and folds `torch.js`, `keyset.js` and `tools/serve.mjs` into §8.4 (`0D2.md` §6).
+the first `p1-*` tag is up. It first merges `wip/p1-plan` (this file; it already holds `main`'s `4002a50`, DECISIONS'
+serve rule, so `main` can fast-forward to the integrator's tags; merge `main` too if it has moved since), and folds `torch.js`, `keyset.js` and `tools/serve.mjs` into §8.4 (`0D2.md` §6).
 Then, for each `p1-*` tag (in §8.5's order when several are ready): merge,
 apply that workstream's integration requests, rerun its dependency-table items against the real code, `run-all`, the
 bot and golden (b); tag `p2-<ws>` and fast-forward `main` to it (`git push origin p2-<ws>:main`, only as a
