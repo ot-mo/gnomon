@@ -236,8 +236,9 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles }) {
       keys.clear();
       if (!St.hasStatus(p, "drowning")) { exitedAt = game.time; exitTile = Math.floor(p.x); }
     }
-    const hits = hurtLog.filter((h) => h.source === "drowning").map((h) => +(h.t - tIn).toFixed(3));
-    return { tIn: tIn !== null, hits, damage: hurtLog.reduce((s, h) => s + h.dmg, 0), exited: exitedAt !== null, exitTile, x: +p.x.toFixed(2), mode: game.mode };
+    const drown = hurtLog.filter((h) => h.source === "drowning");
+    const hits = drown.map((h) => +(h.t - tIn).toFixed(3)), dmgs = drown.map((h) => h.dmg);
+    return { tIn: tIn !== null, hits, dmgs, damage: hurtLog.reduce((s, h) => s + h.dmg, 0), exited: exitedAt !== null, exitTile, x: +p.x.toFixed(2), mode: game.mode };
   };
   const onMap = drownTrace("map"), in3d = drownTrace("3d");
   const firstHit = RULES.drown.air + 1 / RULES.drown.dps;
@@ -251,6 +252,8 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles }) {
   if (mapHits.length !== hits3d.length) fail(`drowning damage in the first 15 s: map ${mapHits.length}, 3D ${hits3d.length}`);
   for (let k = 0; k < common; k++)
     if (Math.abs(mapHits[k] - hits3d[k]) > 2 * STEP) fail(`drowning hit ${k + 1}: map at ${mapHits[k]} s, 3D at ${hits3d[k]} s`);
+    else if (onMap.dmgs[k] !== in3d.dmgs[k]) fail(`drowning hit ${k + 1}: map ${onMap.dmgs[k]} damage, 3D ${in3d.dmgs[k]}`);
+  if (onMap.damage !== in3d.damage) fail(`drowning damage in all: map ${onMap.damage}, 3D ${in3d.damage}`);
   stats.drowning = { firstHitWant: firstHit, map: { hits: mapHits, damage: onMap.damage, exitTile: onMap.exitTile },
                      "3d": { hits: hits3d, damage: in3d.damage, exitTile: in3d.exitTile } };
   // A swimmer floats and doesn't drown; underground a non-swimmer still sinks (unchanged).
