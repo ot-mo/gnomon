@@ -21,7 +21,8 @@
 //      sun (east-south-east) throws an east-west wall's shadow north, the 16:00 one (north-north-east) south;
 //      the floor in the shadow draws darker; a new bucket keeps the old bake until its own is done.
 //   6. The map outdoors: a column shows its ground's look (a road "·", grass "." in its colour), the legend is
-//      the terrain one and says glim; underground the map is the parent's (golden (b), part 9). Water holding
+//      the terrain one and says glim; a pit not looked into, ghost planks and an unseen bridge draw as the ground
+//      around them; underground the map is the parent's (golden (b), part 9). Water holding
 //      another liquid takes its colour on the map and in 3D.
 //   7. Music: the temple keeps the temple mood, a flats span plays open by day and night at night, the Shade
 //      plays shade all night; every mood content/moods.js names is one music.js plays.
@@ -288,7 +289,25 @@ export async function checkRender(m) {
       expect(plain !== red && red.split(",").map(Number)[0] > 150 && plain3d !== red3d, `another liquid: map ${plain} → ${red}, 3D changed ${plain3d !== red3d}`);
       stats.liquid = { map: [plain, red] };
     } finally { delete liquids.LIQUIDS[KEY]; pool.liquid = "water"; }
-    stats.map = { road: rc, grass: gc, legend: "glim" };
+    // What the map shows as floor but isn't gives nothing away by its colour: a pit not yet looked into, ghost planks
+    // over a pit, planks over a pit (a bridge whose crossing isn't seen) all draw as the grass around them; a pit
+    // you've looked into is a pit.
+    const hidden = field("render-hidden", true, (z) => {
+      for (const [x, y] of [[5, 5], [7, 5], [9, 5]]) for (let k = 0; k < FLOOR_Z; k++) z.set(x, y, k, 0);
+      z.set(7, 5, FLOOR_Z - 1, B.GHOST); z.set(9, 5, FLOOR_Z - 1, B.PLANK);
+    });
+    zones.enterZone(game, hidden, { how: "start" });
+    hidden.seen.fill(1); hidden.holeSeen.fill(0);
+    stand(12.5, 12.5); p().torch = true;
+    game.view = "map"; game.mode = "map"; renderMap.renderMap(game); S.present();
+    const look = (x, y) => { const c = cellOf(x, y); return `${c.ch} ${c.rgb.join()}`; };
+    const disguised = { grass: look(4, 5), pit: look(5, 5), ghost: look(7, 5), bridge: look(9, 5) };
+    hidden.holeSeen[5 + 5 * hidden.w] = 1;
+    renderMap.renderMap(game); S.present();
+    disguised.pitLookedInto = look(5, 5);
+    expect(disguised.pit === disguised.grass && disguised.ghost === disguised.grass && disguised.bridge === disguised.grass &&
+           disguised.pitLookedInto.startsWith(":"), `the outdoor map gives away what it hides: ${JSON.stringify(disguised)}`);
+    stats.map = { road: rc, grass: gc, legend: "glim", disguised };
   }
 
   // --- 7. Music moods -------------------------------------------------------------------------------------------

@@ -75,13 +75,33 @@ export function toggleMapLegend() { legendMode = shownFor(legendMode, lastFits) 
 export const mapLegendShown = (game) => shownFor(legendMode, legendWidth(game.zone).fits);
 export function setLegendKeyHint(text) { legendHint = String(text || ""); }
 
-// Outdoors: how a column's ground and water show (null: the parent's glyph for its kind).
+// Outdoors: how a column's ground and water show (null: the parent's glyph for its kind). What the map shows as
+// floor but isn't (a pit or chasm you haven't looked into, ghost planks, a bridge whose crossing you haven't seen:
+// mapKind) takes the ground of a floor beside it, else the zone's commonest, so its colour gives nothing away.
 const dim = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
+const lookOf = (id) => { const b = BLOCKS[id]; return !id || !b ? null : b.map ? [b.map.glyph, b.map.color] : [".", dim(b.color || [125, 120, 110], 0.85)]; };
+const COMMON = new WeakMap();   // zone → { v: navVersion, id }: its commonest floor look
+function commonLook(zone) {
+  let c = COMMON.get(zone);
+  if (!c || c.v !== zone.navVersion) {
+    const n = new Map();
+    for (let i = 0; i < zone.w * zone.d; i++) if (zone.kind[i] === KIND.FLOOR && zone.look[i]) n.set(zone.look[i], (n.get(zone.look[i]) || 0) + 1);
+    let id = 0, best = 0;
+    for (const [k, v] of n) if (v > best || (v === best && k < id)) { id = k; best = v; }
+    COMMON.set(zone, (c = { v: zone.navVersion, id }));
+  }
+  return c.id;
+}
+const NEAR = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
 function groundLook(zone, i, kind) {
   if (kind === KIND.FLOOR) {
-    const id = zone.look[i], b = BLOCKS[id];
-    if (!id || !b) return null;
-    return b.map ? [b.map.glyph, b.map.color] : [".", dim(b.color || [125, 120, 110], 0.85)];
+    if (zone.kind[i] === KIND.FLOOR) return lookOf(zone.look[i]);
+    const x = i % zone.w, y = (i - x) / zone.w;
+    for (const [dx, dy] of NEAR) {
+      const nx = x + dx, ny = y + dy, j = nx + ny * zone.w;
+      if (nx >= 0 && ny >= 0 && nx < zone.w && ny < zone.d && zone.kind[j] === KIND.FLOOR && zone.look[j]) return lookOf(zone.look[j]);
+    }
+    return lookOf(commonLook(zone));
   }
   if (kind === KIND.SHALLOW || kind === KIND.DEEP) {
     const c = liquidColor(zone, i % zone.w, Math.floor(i / zone.w));
