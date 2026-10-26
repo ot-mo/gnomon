@@ -9,7 +9,7 @@
 //      be seen (no sprite) or talked to; at daylight 0 the plank is drawn and the ghost seen and talked to.
 //   3. The other dark-only rules under the sky: runes glow only in the dark (the frame at noon differs from
 //      the one at daylight 0, and underground daylight doesn't matter); the Gloom Warden can't be touched
-//      at noon and can at daylight 0; in a closed room at noon it's dark (deep shade); a goblin spots you
+//      at noon and can at daylight 0; a secret wall's crack light shows only at daylight 0; in a closed room at noon it's dark (deep shade); a goblin spots you
 //      at its full sight with your torch out at noon (daylight is light), at 0.55 of it at daylight 0
 //      and underground.
 //   4. lightAt: sky × daylight, lamps untouched.
@@ -165,6 +165,21 @@ export function checkLight({ game, startRun, render3d, frameHash, dungeonLevel }
     day(0); const underNight = frame();
     expect(underNoon === underNight, "underground, daylight changes how runes look");
 
+    // A secret wall's cracks: light shows through only in the dark. A thin stone wall three tiles ahead;
+    // marking it secret (no refresh) changes the frame only where the crack light is drawn.
+    const cracks = field("light-cracks", true, (z) => { for (let y = 8; y <= 12; y++) for (let k = FLOOR_Z; k < FLOOR_Z + 3; k++) z.set(13, y, k, B.STONE); });
+    enterZone(game, cracks, { how: "start" });
+    const crackFrames = {};
+    for (const dl of [1, 0]) {
+      day(dl);
+      stand(10.5, 10.5, 0, 0); p.torch = false;
+      cracks.secretWalls.add(13 + 10 * cracks.w);
+      const withCrack = frame();
+      cracks.secretWalls.clear();
+      crackFrames[dl] = withCrack !== frame();
+    }
+    expect(!crackFrames[1] && crackFrames[0], `a secret wall's crack light at noon ${crackFrames[1]}, at daylight 0 ${crackFrames[0]} (want only at daylight 0)`);
+
     // The Gloom Warden on the sky zone.
     enterZone(game, sky, { how: "start" });
     stand(10.5, 10.5);
@@ -201,7 +216,7 @@ export function checkLight({ game, startRun, render3d, frameHash, dungeonLevel }
     };
     seen.noon = spot(sky, 1); seen.night = spot(sky, 0); seen.under = spot(field("light-under2", false), 1);
     expect(seen.noon && !seen.night && !seen.under, `a goblin at 0.75 of its sight spots you (torch out): noon ${seen.noon}, night ${seen.night}, underground ${seen.under}`);
-    stats.rules = { runes: runeNoon !== runeNight, runesUnderground: underNoon === underNight, warden: { noon: touchNoon, night: touchNight }, shade: inside, perception: seen };
+    stats.rules = { cracks: crackFrames, runes: runeNoon !== runeNight, runesUnderground: underNoon === underNight, warden: { noon: touchNoon, night: touchNight }, shade: inside, perception: seen };
 
     // --- 4. lightAt -------------------------------------------------------------------------------------
     const lampZone = field("light-lamp", true, (z) => z.set(10, 10, FLOOR_Z + 3, B.LAMP));
