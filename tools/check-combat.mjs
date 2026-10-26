@@ -43,7 +43,7 @@ const parts = {
 let code = 0;
 for (const name of only) {
   const t0 = performance.now();
-  const result = parts[name]();
+  const result = await parts[name]();
   result.stats = { ...result.stats, seconds: +((performance.now() - t0) / 1000).toFixed(1) };
   code |= report(result);
 }

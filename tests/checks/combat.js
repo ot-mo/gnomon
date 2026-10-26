@@ -30,7 +30,7 @@
 //                        range), the interposed-creature rule (a follower too), throw and shot parity between
 //                        the views (same RNG, same results), missile weapons (ammo, reload, the pin), a knife
 //                        thrown over an open edge waiting in the next zone
-//   checkAiDepth(ctx)    followers and hunters over an edge in both views (and not into the record of the zone
+//   checkAiDepth(ctx)    (async) followers and hunters over an edge in both views (and not into the record of the zone
 //                        left), followers down the stairs, catch-up on re-entry, pressed flat (blows, arrows,
 //                        perception, moving in the Plane), wary, flee (and cornered), follow (and swap, and
 //                        Shift), AI ability use, the outdoor activity radius, the d20 log format
@@ -42,7 +42,7 @@
 // game/startRun: the real game (game.js). srcFiles: [{ file, text }] of every src/ module.
 import { Zone, B, FLOOR_Z } from "../../src/world.js";
 import { enterZone, changeZone, cachedZone, zoneState } from "../../src/zones.js";
-import { spawnCreature, addCreature, CREATURE_TYPES, pickCreatureType } from "../../src/creatures.js";
+import { spawnCreature, addCreature, CREATURE_TYPES, pickCreatureType, touchable } from "../../src/creatures.js";
 import { resolveAttack, rollToHit, hitChance, toHitMod, critNat, dvOf, weaponSpec, naturalSpec, playerMelee, bumpAttack, combatLine, thrownSpec } from "../../src/combat.js";
 import { guardianThink } from "../../src/guardians.js";
 import { mapStep, passTime, refreshView, startTravel, travelStep } from "../../src/turns.js";
@@ -59,6 +59,8 @@ import { registerFaction, FACTIONS } from "../../src/factions.js";
 import { registerAbility, ABILITIES } from "../../src/abilities.js";
 import { addStatus, hasStatus, tickStatuses } from "../../src/status.js";
 import { snapshotZone } from "../../src/save/codec.js";
+import { memoryAdapter } from "../../src/save/store.js";
+import { saveGame, whenWritten } from "../../src/save/save.js";
 import { throwReady, throwAt, updateProjectiles, THROW_TIME, landOutside } from "../../src/throwing.js";
 import { fire, fireAt, readyLauncher } from "../../src/missiles.js";
 import { requestTarget, cursorTarget, lineOfFire, targetText } from "../../src/screens/target.js";
@@ -775,7 +777,7 @@ export function checkTargeting(ctx) {
 }
 
 // --- Followers and hunters, catch-up, the Plane, wary, flee, follow, abilities, the radius, the log ---------
-export function checkAiDepth(ctx) {
+export async function checkAiDepth(ctx) {
   const { game } = ctx;
   const problems = [], stats = {};
   const expect = (ok, m) => { if (!ok) problems.push(m); return ok; };
@@ -1196,6 +1198,157 @@ export function checkAiDepth(ctx) {
       resolveAttack(game, p, g, weaponSpec(p), { view: "map", rng: NAT20 });
       expect(/^You slay the goblin \(x2, \d+\)\.$/.test(run.logged[n] || ""), `a killing crit is told as "${run.logged[n]}"`);
       stats.log = [...lines, run.logged[n]];
+      // The other lines: your armour turning a blow, your bolt by its noun, one creature slaying another.
+      const more = [];
+      p.innate = { armour: 1000 }; invalidateStats(p); p.hp = 1e6;
+      let k = run.logged.length; resolveAttack(game, g, p, naturalSpec(g), { view: "map", rng: () => 0.5 }); more.push(run.logged.slice(k).join(" | "));
+      delete p.innate; invalidateStats(p); p.hp = maxHp(p);
+      g.hp = 1e9;
+      k = run.logged.length; resolveAttack(game, p, g, { kind: "missile", dmg: [3, 3], acc: 0, ench: 0, material: 0, noun: "bolt" }, { view: "map", rng: () => 0.75, aimed: true }); more.push(run.logged.slice(k).join(" | "));
+      g.hp = 1;
+      k = run.logged.length; resolveAttack(game, o, g, naturalSpec(o), { view: "map", rng: () => 0.75 }); more.push(run.logged.slice(k).join(" | "));
+      const wantMore = [/^Your armour turns the goblin's blow\.$/, /^Your bolt hits the goblin for \d+\.$/, /^The orc slays the goblin \(\d+\)\.$/];
+      const badMore = wantMore.map((re, j) => (re.test(more[j]) ? null : `"${more[j]}"`)).filter(Boolean);
+      expect(!badMore.length, `the d20 log's other lines: ${badMore.join("; ")}`);
+      stats.log.push(...more);
+      run.restore(); run = null;
+    }
+
+    // --- 8. More teeth (the gate's verification found these claims unguarded) ----------------------------------
+    {
+      run = fresh(ctx, 4242);
+      const p = game.player;
+      // Write-behind: the record written for the zone you left over an edge doesn't hold your follower.
+      changeZone(game, "0,0,0", { how: "travel" });
+      const z0 = game.zone;
+      let y = -1;
+      for (let yy = 4; yy < z0.d - 4 && y < 0; yy++) if (z0.stand[z0.w - 1 + yy * z0.w] >= 0 && z0.stand[z0.w - 3 + yy * z0.w] >= 0) y = yy;
+      z0.creatures = z0.creatures.filter((c) => c.talk);
+      Object.assign(p, { x: z0.w - 0.5, y: y + 0.5, z: z0.stand[z0.w - 1 + y * z0.w], vz: 0 });
+      const f = recruit(game, addCreature(z0, spawnCreature("goblin", z0.w - 3, y, z0.stand[z0.w - 3 + y * z0.w], { rng: () => 0.5, level: 2 })));
+      onMap(game);
+      const store = memoryAdapter();
+      const slot = await saveGame(game, { store });
+      mapStep(game, 1, 0, { force: false });
+      await whenWritten(game);
+      const rec = await store.get("zones", [slot.id, "0,0,0"]);
+      expect(game.zone.key === "1,0,0" && rec && !rec.creatures.some((c) => c.id === f.id), `write-behind: the record of 0,0,0 ${rec ? (rec.creatures.some((c) => c.id === f.id) ? "holds the follower that left" : "is without it") : "wasn't written"}`);
+      // Coming back by a load (how "load") is no return trip: nothing catches up.
+      const hurt = addCreature(game.zone, spawnCreature("goblin", 10, 10, game.zone.stand[10 + 10 * game.zone.w] >= 0 ? game.zone.stand[10 + 10 * game.zone.w] : FLOOR_Z, { rng: () => 0.5, level: 3, state: "chase" }));
+      hurt.hp = 1;
+      zoneState(game).zoneLeft[game.zone.key] = game.time - 3600;
+      enterZone(game, game.zone, { how: "load" });
+      expect(hurt.hp === 1 && hurt.state === "chase", `a load: the goblin ${hurt.hp} HP, ${hurt.state} (want as it was: 1 HP, hunting)`);
+      run.restore(); run = null;
+    }
+    {
+      run = fresh(ctx, 98);
+      const p = game.player;
+      const z = arena("ws8-teeth", { w: 30, d: 14 });
+      // A deep pool at 9,5 (deep water to the floor) and a closed door at 11,5.
+      for (let k = 1; k < FLOOR_Z; k++) z.set(9, 5, k, B.WATER_DEEP);
+      z.set(11, 5, FLOOR_Z, B.DOOR); z.set(11, 5, FLOOR_Z + 1, B.DOOR);
+      z.refresh();
+      enterZone(game, z, { how: "start" }); z.seen.fill(1); onMap(game);
+      Object.assign(p, { x: 8.5, y: 5.5, z: FLOOR_Z });
+      addStatus(game, p, "flat", { t: 1e6 });
+      const overPool = mapStep(game, 1, 0, { force: false }) && Math.floor(p.x) === 9 && p.z === FLOOR_Z && !hasStatus(p, "drowning");
+      mapStep(game, 1, 0, { force: false });
+      const underDoor = mapStep(game, 1, 0, { force: false }) && Math.floor(p.x) === 11 && p.z === FLOOR_Z;
+      expect(overPool && underDoor, `flat: over deep water at your height ${overPool}; under the door at your height (not on top of it) ${underDoor} (z ${p.z})`);
+      delete p.status.flat;
+      Object.assign(p, { x: 3.5, y: 9.5, z: FLOOR_Z });
+      // The 3D hold-back lasts 2 s: a swing 3 s after holding back holds back again; one within it strikes.
+      const pal = recruit(game, dummy(z, "goblin", 4, 9));
+      delete pal.status.pinned;
+      in3d(game); Object.assign(p, { yaw: 0, pitch: 0, attackCd: 0 });
+      const first = playerMelee(game);
+      p.attackCd = 0; game.time += 3;
+      const late = playerMelee(game);
+      p.attackCd = 0; game.time += 0.5;
+      const soon = playerMelee(game);
+      expect(first === null && late === null && soon?.tgt === pal, `3D hold-back: first ${first ? "struck" : "held"}, 3 s later ${late ? "struck" : "held"}, 0.5 s after that ${soon ? "struck" : "held"} (want held, held, struck)`);
+      onMap(game);
+      // The look cursor: foes first, then the nearest; Shift+Tab goes back.
+      const foe = dummy(z, "rat", 12, 9), foe2 = dummy(z, "rat", 16, 9);
+      refreshView(game);
+      ctx.keys.delete("ShiftLeft");
+      ctx.inputHandlers.onKeyDown("KeyL", false, "l");
+      const startOn = cursorTarget(game)?.creature;
+      ctx.inputHandlers.onKeyDown("Tab", false, "");
+      const next = cursorTarget(game)?.creature;
+      ctx.keys.add("ShiftLeft"); ctx.inputHandlers.onKeyDown("Tab", false, ""); ctx.keys.delete("ShiftLeft");
+      const back = cursorTarget(game)?.creature;
+      ctx.inputHandlers.onKeyDown("Escape", false, "");
+      const tag = (c) => (c === foe ? "the near rat" : c === foe2 ? "the far rat" : c === pal ? "your follower" : c?.name);
+      expect(startOn === foe && next === foe2 && back === foe, `L: started on ${tag(startOn)} (want the near rat: foes first, though your follower is nearer), Tab → ${tag(next)} (want the far rat), Shift+Tab → ${tag(back)} (want the near rat)`);
+      z.creatures.splice(z.creatures.indexOf(foe2), 1);
+      // A creature still on its way in can't be touched.
+      foe.brain = { arriving: 1 };
+      expect(!touchable(game, foe), "a creature still arriving can be struck");
+      delete foe.brain;
+      // Under the legacy set nothing flees, out in the open either.
+      const undoLegacy = overrideRules("combat", "legacy");
+      const open = addCreature(z, spawnCreature("goblin", 20, 9, FLOOR_Z, { rng: () => 0.5, level: 3, state: "chase" }));
+      open.hp = 1; open.think = 0; open.cd = Infinity;
+      Object.assign(p, { x: 18.5, y: 9.5 });
+      for (let k = 0; k < 10; k++) updateCreatures(game, 1 / 20, Infinity);
+      undoLegacy();
+      expect(open.state === "chase", `legacy set, in the open: a goblin at 1 HP is ${open.state} (want chase)`);
+      // Healed (to half) while running, it stops running.
+      open.state = "chase"; open.think = 0;
+      for (let k = 0; k < 10; k++) updateCreatures(game, 1 / 20, Infinity);
+      const ran = open.state === "flee";
+      open.hp = open.maxHp; open.think = 0;
+      for (let k = 0; k < 10; k++) updateCreatures(game, 1 / 20, Infinity);
+      expect(ran && open.state !== "flee", `healed while fleeing: ${ran ? "it fled" : "it never fled"}, then ${open.state} (want it to stop)`);
+      // V on the map takes the reload's time (and then the flight's); bolts that don't break lie where they land.
+      for (const c of [open]) z.creatures.splice(z.creatures.indexOf(c), 1);
+      Object.assign(p, { x: 3.5, y: 2.5, z: FLOOR_Z });
+      const mark = dummy(z, "orc", 9, 2, 6);
+      p.inv = p.inv.filter((s) => !["missile", "ammo"].includes(s.kind));
+      p.inv.push({ kind: "missile", id: "boltBow", ench: 0 }, { kind: "ammo", effect: "bolt", count: 40 });
+      refreshView(game);
+      let spent = 0, dropped = 0;
+      for (let k = 0; k < 30; k++) {
+        p.cooldowns.missile = 0;
+        const t0 = game.time;
+        ctx.inputHandlers.onKeyDown("KeyV", false, "v");
+        if (game.mode !== "target") break;
+        game.modeStack[game.modeStack.length - 1].data.cursor = { x: 9, y: 2 };
+        ctx.inputHandlers.onKeyDown("Enter", false, "");
+        spent = Math.max(spent, game.time - t0);
+      }
+      dropped = z.items.filter((it) => it.kind === "ammo").reduce((s, it) => s + (it.count || 1), 0);
+      expect(spent >= MISSILES.boltBow.reload - 1e-6 && dropped > 5 && dropped < 30, `V on the map: ${spent.toFixed(2)} s a shot (want the reload, ${MISSILES.boltBow.reload} s, at least); ${dropped} of 30 bolts lie on the floor (want about 70%)`);
+      z.creatures.splice(z.creatures.indexOf(mark), 1);
+      // Past the range the line of fire says so.
+      p.inv.push({ kind: "knife", count: 5 });
+      ctx.inputHandlers.onKeyDown("KeyT", false, "t");
+      const data = game.modeStack[game.modeStack.length - 1].data;
+      data.cursor = { x: Math.floor(p.x) + 15, y: Math.floor(p.y) };
+      const lf = lineOfFire(game, data);
+      ctx.inputHandlers.onKeyDown("Escape", false, "");
+      expect(lf.end === "far" && lf.tiles.some((tt) => tt.state === "far"), `the line of fire 15 tiles out (a throw reaches 10): ${lf.end}`);
+      stats.teeth = { overPool, underDoor, holdBack: "2 s", lookFoesFirst: true, legacyOpenField: open.state !== "flee", vTime: +spent.toFixed(2), boltsDropped: dropped, lineFar: lf.end };
+      run.restore(); run = null;
+    }
+    {
+      // Over an edge: something wary of you, hunting or not, and a guardian stay behind.
+      run = fresh(ctx, 4242);
+      const p = game.player;
+      changeZone(game, "0,0,0", { how: "travel" });
+      const z0 = game.zone;
+      let y = -1;
+      for (let yy = 4; yy < z0.d - 4 && y < 0; yy++) if ([1, 2, 3].every((dx) => z0.stand[z0.w - dx + yy * z0.w] >= 0)) y = yy;
+      z0.creatures = z0.creatures.filter((c) => c.talk);
+      Object.assign(p, { x: z0.w - 0.5, y: y + 0.5, z: z0.stand[z0.w - 1 + y * z0.w], vz: 0 });
+      if (!FACTIONS.ws8Shy) { registerFaction("ws8Shy", { name: "Shy", temperament: "docile", startRep: -300 }); added.factions.push("ws8Shy"); }
+      const shy = addCreature(z0, spawnCreature("goblin", z0.w - 2, y, z0.stand[z0.w - 2 + y * z0.w], { rng: () => 0.5, level: 2, state: "chase" }));
+      shy.faction = { ws8Shy: 1 };
+      const warden = addCreature(z0, spawnCreature("warden", z0.w - 3, y, z0.stand[z0.w - 3 + y * z0.w], { rng: () => 0.5, level: 10, state: "chase" }));
+      onMap(game); mapStep(game, 1, 0, { force: false });
+      expect(game.zone.key === "1,0,0" && z0.creatures.includes(shy) && z0.creatures.includes(warden), `over the edge: the wary goblin ${z0.creatures.includes(shy) ? "stayed" : "came"}, the Gloom Warden ${z0.creatures.includes(warden) ? "stayed" : "came"} (want both to stay)`);
       run.restore(); run = null;
     }
   } finally {
@@ -1381,7 +1534,7 @@ export async function run(env) {
   const { game, startRun, inputHandlers } = await env.src("game.js");
   const { keys } = await env.src("input.js");
   const ctx = { game, startRun, inputHandlers, keys, seedRandom: env.seedRandom, restoreRandom: env.restoreRandom };
-  return [checkCombat({ game, startRun, srcFiles: await env.srcFiles() }), checkTargeting(ctx), checkAiDepth(ctx), checkArena(ctx), ttkTables(ctx)];
+  return [checkCombat({ game, startRun, srcFiles: await env.srcFiles() }), checkTargeting(ctx), await checkAiDepth(ctx), checkArena(ctx), ttkTables(ctx)];
 }
 
 // --- passTime with 60 creatures (Node only: tools/check-combat.mjs --perf) ----------------------------------------
