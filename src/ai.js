@@ -338,6 +338,7 @@ function perceive(game, m, t) {
     return;
   }
   const feel = attitude(game, m, player), hostile = feel === "hostile";
+  if (feel === "friendly" && m.state === "chase") m.state = "wander";   // (nothing on your side hunts you)
   const dist = Math.hypot(player.x - m.x, player.y - m.y);
   const hidden = statusFlag(player, "hidden");   // potion of shadows
   const shadow = statusFlag(player, "flat") && !isFlat(m);   // pressed flat: a shadow with nobody casting it

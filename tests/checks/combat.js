@@ -986,7 +986,17 @@ export function checkAiDepth(ctx) {
       const late = playerMelee(game);
       expect(first === null && second?.tgt === pal && late === null && run.logged.some((t) => /hold back/.test(t)), `3D at your follower: the first swing ${first ? "struck" : "held back"}, a second at 0.5 s ${second ? "struck" : "held back"}, another 3 s later ${late ? "struck" : "held back"} (want held, struck, held)`);
       onMap(game);
-      stats.follow = { whileWalking: +walking.toFixed(1), after4s: +lag.toFixed(1), foughtYourFoe: true, swap: swapped, shiftStrikes: true, secondSwingIn3d: true };
+      // Struck by you (a Shift + direction, knives thrown through it at a foe), it takes it and doesn't turn on you.
+      Object.assign(pal, { hp: 500, state: "wander" }); beside(); attacks.length = 0;
+      mapStep(game, 1, 0, { force: true });
+      const foe2 = dummy(fz, "goblin", Math.floor(p.x) + 5, Math.floor(p.y));
+      beside();
+      for (let k = 0; k < 3; k++) throwAt(game, p.inv.find((s) => s.kind === "knife") || (p.inv.push({ kind: "knife", count: 5 }), p.inv[p.inv.length - 1]), { creature: foe2, point: { x: foe2.x, y: foe2.y, z: foe2.z }, tile: { x: foe2.tx, y: foe2.ty }, dir: [1, 0, 0] });
+      for (let k = 0; k < 20; k++) passTime(game, 0.5);
+      const struckPal = attacks.filter((a) => a.att === p && a.tgt === pal).length, palStruck = attacks.filter((a) => a.att === pal && a.tgt === p).length;
+      expect(struckPal >= 2 && palStruck === 0 && pal.state !== "chase", `your follower struck by you ${struckPal} times struck back ${palStruck} times in 10 s (want 0; state ${pal.state})`);
+      fz.creatures.splice(fz.creatures.indexOf(foe2), 1);
+      stats.follow = { whileWalking: +walking.toFixed(1), after4s: +lag.toFixed(1), foughtYourFoe: true, swap: swapped, shiftStrikes: true, secondSwingIn3d: true, neverStrikesBack: true };
       run.restore(); run = null;
     }
 

@@ -166,7 +166,7 @@ function hurtCreature(game, m, dmg, label, color, src) {
     const brain = (m.brain ||= {});
     brain.hurtBy = src.id;
     (brain.grudges ||= {})[src.id] = 1;
-  }
+  } else if (src) turnOnYou(game, m, state, lost);
   emit(game, "hurt", { tgt: m, src: src || null, dmg });
 }
 
@@ -174,11 +174,20 @@ function hurtCreature(game, m, dmg, label, color, src) {
 // hurtCreature does (you: it hunts you; a creature: it bears that one a grudge).
 function noticeBlow(game, m, src) {
   if (isPlayer(game, m)) return;
-  if (isPlayer(game, src)) { m.state = "chase"; m.lost = 0; return; }
+  if (isPlayer(game, src)) { const state = m.state, lost = m.lost; m.state = "chase"; m.lost = 0; turnOnYou(game, m, state, lost); return; }
   if (m.state === "idle") m.state = "wander";
   const brain = (m.brain ||= {});
   brain.hurtBy = src.id;
   (brain.grudges ||= {})[src.id] = 1;
+}
+// Your blow on a creature that wasn't out for you: your friend (a follower) takes it and goes on as it was
+// (a shot of yours that hit it on the way, a slip); anything else holds it against you (a grudge: factions.js
+// attitude turns hostile) and hunts you. (Under the legacy set
+// every creature is out for you, so nothing here changes the parent's game.)
+function turnOnYou(game, m, state, lost) {
+  const feel = attitude(game, m, game.player);
+  if (feel === "friendly") { m.state = state; m.lost = lost; return; }
+  if (feel !== "hostile") ((m.brain ||= {}).grudges ||= {}).player = 1;
 }
 
 // Armoured elites shrug off part of every hit (never all of it): the legacy soak.
