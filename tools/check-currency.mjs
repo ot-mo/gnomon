@@ -8,7 +8,7 @@ import { report } from "./report.mjs";
 const env = await installNodeEnv();
 const { game, startRun } = await import("../src/game.js");
 const dialogue = await import("../src/dialogue.js");
-const npcs = await import("../src/npcs.js");
+const npcs = { ...await import("../src/content/legacy/encounters.js"), ...await import("../src/talk.js"), ...await import("../src/story/quests.js") };
 const creatures = await import("../src/creatures.js");
 const { checkCurrency } = await import("../tests/checks/currency.js");
 const srcFiles = fs.readdirSync(SRC, { recursive: true }).filter((f) => f.endsWith(".js"))

@@ -14,7 +14,9 @@
 // loot), "zone:enter" { zone, arrival, away, first } (after), "zone:leave" { zone, side, how, to };
 // since 0C "attack" { att, tgt, result } and "hurt" { tgt, src, dmg } (combat.js), "kill" { c, src, uid,
 // factions } (monsters.js killMonster; it replaced game.questEvent, game.onGuardianDies and game.win()),
-// "guardian:wake" { c } (guardians.js; it replaced game.onGuardianWakes).
+// "guardian:wake" { c } (guardians.js; it replaced game.onGuardianWakes), "quest:start", "quest:stage",
+// "quest:done" { q } (story/quests.js) and "quest:report" { id, quiet } (a giver says a quest is done:
+// story/quests.js finishQuest; a legacy one-stage quest finishes on it).
 const handlers = new Map();   // type → [{ fn, priority, order }]
 let order = 0;
 

@@ -22,7 +22,7 @@ import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../pathing.js";
 import { CREATURE_TYPES, spawnCreature, addCreature, pickCreatureType, rollElite, canTalk } from "../creatures.js";
 import { makeItem, randomPotion, randomScroll, randomEquipment, randomTreasure, randomJewel } from "../items.js";
 import { pickVault, stampVault, VAULTS } from "./vaults.js";
-import { planEncounters, peddlerStock, bountyTarget } from "../npcs.js";
+import { planEncounters, peddlerStock, bountyTarget } from "../content/legacy/encounters.js";
 import { layoutSpikes } from "../traps.js";
 
 // Room layout and corridor routing work on this fixed grid (the validated generator's home).
@@ -315,7 +315,7 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   // --- 10½. The site's gimmicks (none on the legacy stack).
   for (const id of p.gimmicks || []) GIMMICKS[id](f, rng, rooms, p);
 
-  // --- 11. The people of this level (the site plans who's where; for the legacy stack, npcs.js).
+  // --- 11. The people of this level (the site plans who's where; for the legacy stack, content/legacy/encounters.js planEncounters).
   placeEncounters(f, rng, cosmetic, rooms, start, depth, p.encounters || []);
 
   // --- 12. The Rune Lever room's record, in some other room.

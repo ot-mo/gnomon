@@ -4,8 +4,8 @@
 // (both views, the legacy and d20 sets) is combat.js.
 //
 //   killMonster(game, c, message, dropLoot = true, byPlayer = true, src) → emits "kill" { c, src, uid,
-//       factions } (events.js) last: npcs.js pays bounties from it, game.js opens a guardian's gate and
-//       wins the run when the boss falls. src: the killer (the player when byPlayer, else a creature or null).
+//       factions } (events.js) last: content/legacy/encounters.js logs Rook's quarry and story/quests.js
+//       routes it to his quest, game.js opens a guardian's gate and wins the run when the boss falls. src: the killer (the player when byPlayer, else a creature or null).
 import { DIRS8 } from "./pathing.js";
 import { makeItem, randomPotion, randomScroll, randomEquipment, randomJewel, awayFromWalls } from "./items.js";
 import { HEIGHT, RADIUS, moveAxis, bonus } from "./player.js";

@@ -314,6 +314,7 @@ export const LEGACY_PEOPLE = {
   maren: { name: "Maren", title: "the priestess", glyph: "@", color: [245, 230, 170], art: ROBE,
     palette: { h: [[235, 230, 215], 0.1], s: SKIN, e: EYES, m: MOUTH, r: [[225, 220, 205], 0.1], g: [[245, 200, 80], 0.5], b: [[215, 175, 60], 0], f: BOOTS } },
   pell: { name: "Pell", title: "the peddler", glyph: "@", color: [240, 190, 90], art: PEDDLER,
+    merchant: { services: ["uncurseWorn", "enchant", "forge", "identify", "namePotion", "uncurse"] },   // content/legacy/encounters.js
     palette: { h: [[120, 80, 45], 0], s: SKIN, e: EYES, m: MOUTH, d: [[170, 125, 80], 0], r: [[80, 125, 75], 0], b: [[60, 45, 30], 0], p: [[150, 105, 60], 0], f: BOOTS } },
   corwin: { name: "Sir Corwin", title: "a wounded knight", glyph: "@", color: [210, 210, 230], art: KNIGHT,
     palette: { h: [[160, 165, 180], 0], s: SKIN, e: EYES, c: [[170, 40, 45], 0], r: [[150, 155, 172], 0], x: [[160, 20, 20], 0], b: [[90, 60, 35], 0], f: BOOTS } },

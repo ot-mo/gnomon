@@ -9,12 +9,11 @@
 //   story:   Space / Enter / click turns the page
 import * as S from "./screen.js";
 import { lockPointer, unlockPointer } from "./input.js";
-import { talkTo, mapPercent } from "./npcs.js";
+import { talkTo, servicesFor, serviceDef } from "./talk.js";
+import { mapPercent } from "./story/quests.js";
 import { typeOf, talkersIn } from "./creatures.js";
-import { itemName, itemGlyph, itemInfo, itemPrice, addToInventory, isGear, ITEM_KINDS, ELEMENTS, RINGS, AMULETS, POTIONS } from "./items.js";
-import { funds, pay, receive, purseRoom, formatPrice, priceLevel, buyPrice, sellPrice, CURRENCY } from "./currency.js";
-import { worn, regear } from "./player.js";
-import { wielded, carried } from "./body.js";
+import { itemName, itemGlyph, itemInfo, itemPrice, addToInventory, ITEM_KINDS } from "./items.js";
+import { funds, pay, receive, purseRoom, formatPrice, buyPrice, sellPrice, CURRENCY } from "./currency.js";
 import { sfx, speakLetter } from "./sfx.js";
 
 // --- Text helpers ----------------------------------------------------------------------
@@ -159,45 +158,22 @@ export function drawTalk(game) {
 }
 
 // --- The shop -----------------------------------------------------------------------------------
-// Three tabs: buy, sell, and Pell's services (sharpening, reforging, identifying, lifting curses).
+// Three tabs: buy, sell, and the merchant's services (Pell's: sharpening, reforging, identifying,
+// lifting curses; registered in content/legacy/encounters.js through talk.js registerService).
 // Prices are set by the level when he's met (currency.js priceLevel); crystals get dearer every time
 // you buy one (in the whole run); the Haggler perk takes a fifth off (stats.js priceMul).
 const TABS = ["buy", "sell", "services"];
-const ELEMENT_WORDS = { fire: "flames", frost: "frost", shock: "lightning", holy: "holy light" };
 
 const haggle = (game, price) => buyPrice(game, game.player, price);
 
+// The services tab: one row per service and target (talk.js servicesFor).
 function services(game) {
-  const p = game.player, f = priceLevel(game.shop.npc.level), rows = [];
-  const cost = (n) => haggle(game, Math.round(n * f));
-  const jewelFixed = (it) => (it.kind === "ring" || it.kind === "amulet") && (it.kind === "ring" ? RINGS : AMULETS)[it.id].fixed;
-  for (const it of worn(p)) {
-    if (it.kind === "armour" && it.id === "clothes") continue;
-    if (it.ench < 0) rows.push({ label: `Lift the curse on your ${itemName(game, it)}`, glyph: ["+", [255, 245, 200]], price: cost(50),
-      info: "The item becomes plain (+0), and you can take it off again.",
-      act: () => regear(p, it, (o) => { o.ench = 0; o.known = true; }), done: `Pell mutters over your ${itemName(game, it)}. The curse lifts.` });
-    else if (!jewelFixed(it) && it.ench < 5) {
-      const verb = it.kind === "weapon" ? "Sharpen" : it.kind === "armour" ? "Reinforce" : "Polish";
-      rows.push({ label: `${verb} your ${itemName(game, it)} (+1)`, glyph: ["^", [255, 220, 120]], price: cost(60 * (Math.max(0, it.ench) + 2)),
-        info: "Makes it one better. Each time costs more than the last (up to +5).",
-        act: () => regear(p, it, (o) => { o.ench = Math.min(5, o.ench + 1); o.known = true; }), target: it });
-    }
-  }
-  const weapon = wielded(p);
-  for (const el of ["fire", "frost", "shock", "holy"])
-    if (weapon.element !== el && !weapon.relic)
-      rows.push({ label: `Forge ${ELEMENT_WORDS[el]} into your ${itemName(game, weapon)}`, glyph: [")", ELEMENTS[el].color], price: cost(150),
-        info: `Your weapon ${ELEMENTS[el].info}.${weapon.element ? ` (It stops being ${ELEMENTS[weapon.element].adj}.)` : ""}`,
-        act: () => { weapon.element = el; }, target: weapon });
-  for (const it of carried(p).slice(worn(p).length)) {   // the belt and the pack
-    if (isGear(it) && !it.known && !it.relic) rows.push({ label: `Identify the ${itemName(game, it)}`, glyph: itemGlyph(game, it), price: cost(25),
-      info: "Pell tells you how good it is, or whether it's cursed.", act: () => { it.known = true; }, target: it });
-    if (it.kind === "potion" && !game.knownPotions.has(it.effect)) rows.push({ label: `Name the ${itemName(game, it)}`, glyph: itemGlyph(game, it), price: cost(25),
-      info: "Pell sniffs it and tells you what it is.", act: () => { game.knownPotions.add(it.effect); }, done: `"That? That's a potion of ${POTIONS[it.effect].name}."` });
-    if (isGear(it) && it.known && it.ench < 0) rows.push({ label: `Lift the curse on the ${itemName(game, it)}`, glyph: ["+", [255, 245, 200]], price: cost(50),
-      info: "The item becomes plain (+0).", act: () => { it.ench = 0; }, target: it });
-  }
-  return rows;
+  const c = game.shop.npc;
+  return servicesFor(game, c).map(({ id, target }) => {
+    const s = serviceDef(id);
+    return { label: s.label(game, c, target), glyph: s.glyph?.(game, c, target), price: s.price(game, c, target),
+             info: s.info?.(game, c, target), service: s, target };
+  });
 }
 
 function shopRows(game) {
@@ -227,8 +203,8 @@ function trade(game, row) {
   if (sh.tab === "services") {
     if (!pay(game, p, row.price)) { game.log(`You can't afford that (${formatPrice(row.price)}).`, [255, 150, 120]); return; }
     sfx("gold");
-    row.act();
-    game.log(row.done || (row.target ? `Pell hands back your ${itemName(game, row.target)}. (${formatPrice(row.price)})` : `Done. (${formatPrice(row.price)})`), [255, 215, 90]);
+    row.service.run(game, sh.npc, row.target);
+    game.log(row.service.done?.(game, sh.npc, row.target, row.price) || `Done. (${formatPrice(row.price)})`, [255, 215, 90]);
     sh.sel = Math.max(0, Math.min(sh.sel, shopRows(game).length - 1));
     return;
   }
@@ -244,7 +220,7 @@ function trade(game, row) {
     }
     if (row.it.kind === "heart" || row.it.kind === "strength") game.crystalsBought = (game.crystalsBought || 0) + 1;
   } else {
-    if (row.price <= 0) { game.log(`Pell doesn't want the ${name}.`, [170, 170, 170]); return; }
+    if (row.price <= 0) { game.log(`${sh.npc.name} doesn't want the ${name}.`, [170, 170, 170]); return; }
     if (purseRoom(p) < row.price) { game.log(`Your purse can't hold another ${formatPrice(row.price)}.`, [255, 150, 120]); return; }
     receive(game, p, row.price);
     sfx("gold");
@@ -260,10 +236,10 @@ export function drawShop(game) {
   const x0 = (S.cols - w) >> 1, y0 = Math.max(1, (S.rows - h) >> 1);
   box(x0, y0, w, h, [200, 160, 60]);
   const tabs = TABS.map((t) => (t === sh.tab ? `[ ${t.toUpperCase()} ]` : `  ${t}  `)).join(" ");
-  S.text(x0 + 3, y0 + 1, `PELL'S PACK  · ${tabs}`, 255, 220, 120);
+  S.text(x0 + 3, y0 + 1, `${typeOf(sh.npc).name.toUpperCase()}'S PACK  · ${tabs}`, 255, 220, 120);
   const purse = `your ${CURRENCY.name}: ${funds(p)}`;
   S.text(x0 + w - purse.length - 3, y0 + 1, purse, ...CURRENCY.color);
-  const empty = { buy: "(sold out)", sell: "(you have nothing to sell)", services: "(nothing Pell can do for you right now)" }[sh.tab];
+  const empty = { buy: "(sold out)", sell: "(you have nothing to sell)", services: `(nothing ${sh.npc.name} can do for you right now)` }[sh.tab];
   if (!rows.length) S.text(x0 + 5, y0 + 3, empty, 130, 130, 130);
   rows.forEach((r, k) => {
     const y = y0 + 3 + k, sel = k === sh.sel;

@@ -1,7 +1,7 @@
 // Money (currency.js): TECH_DESIGN §2.10 and the 0B scope, with DECISIONS.md (glim, a counter, purses of
 // 200 / 500 / 1,000).
 //
-//   checkCurrency({ game, startRun, dialogue, npcs, creatures, srcFiles, capture }) → { name, ok, problems, stats }
+//   checkCurrency({ game, startRun, dialogue, npcs, creatures, srcFiles, capture })   (npcs: encounters.js, talk.js and story/quests.js) → { name, ok, problems, stats }
 //
 //   1. The API on a bare entity: funds, pay (all or nothing), receive (what fits; the overflow comes back),
 //      the purse sizes (setPurse refuses a size content doesn't list), formatPrice from CURRENCY, whole
@@ -200,7 +200,7 @@ export function checkCurrency({ game, startRun, dialogue, npcs, creatures, srcFi
     p.funds = 190;
     const rook = person("rook", { target: -1, targetName: "rat" });
     rook.talk.met = true;
-    npcs.addQuest(game, "rook", "Bounty", "test");
+    npcs.startQuest(game, "rook", { title: "Bounty", text: "test" });
     const items0 = game.zone.items.length;
     const take = npcs.talkTo(game, rook).options.find((o) => /bounty/.test(o.label));
     take?.go();

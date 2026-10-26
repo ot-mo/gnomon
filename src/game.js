@@ -48,6 +48,8 @@ import { unlockAudio, audioFrame } from "./audio.js";
 import { sfx, toggleSounds, setListener } from "./sfx.js";
 import { INTRO, CUBE_PAGES, TAUNTS, FINAL_PAGES, EPILOGUE, LICH_COLOR } from "./story/legacy.js";
 import { openCubeWall } from "./content/world/temple.js";
+import "./content/legacy/encounters.js";
+import { finishQuest, questOf } from "./story/quests.js";   // the parent game's people: dialogues, quests, Pell's services
 import { openTalk, talkKey, talkClick, talkHover, drawTalk, shopKey, drawShop, openJournal, journalKey, drawJournal,
          openStory, storyKey, nextPage, drawStory, updateTalk } from "./dialogue.js";
 import { maxHp } from "./stats.js";
@@ -209,9 +211,8 @@ export function startRun(seed, world = game.world) {
   });
 }
 
-function finishMainQuest() {
-  const q = game.quests.find((o) => o.id === "main");
-  if (q) q.done = true;
+function finishMainQuest() {   // quietly: the ending pages say it
+  if (questOf(game, "main")) finishQuest(game, "main", null, { quiet: true });
 }
 
 // Arriving in a zone (zones.js enterZone emits these). Before you're placed: treasure marked
