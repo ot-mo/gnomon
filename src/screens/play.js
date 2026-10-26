@@ -26,7 +26,8 @@ import { updateCreatures } from "../ai.js";
 import { creatureAt, hostilesTo, canTalk } from "../creatures.js";
 import { pickUpItems } from "../items.js";
 import { render3d } from "../render3d.js";
-import { renderMap, tileAtCell, mapView } from "../renderMap.js";
+import { renderMap, tileAtCell, mapView, hoverInspect } from "../renderMap.js";
+import { emit } from "../events.js";
 import { drawHud, layoutHud } from "../hud.js";
 import { interact, lookTarget } from "../interact.js";
 import { refreshView, mapStep, mapWait, mapUseTime, startTravel, startExplore, travelStep } from "../turns.js";
@@ -356,7 +357,8 @@ registerScreen("map", {
     drawPlay(game);
     for (const [label, key] of HEADER_KEYS) hitLabel(mapView.header, label, { key });
   },
-  update(game, dt) {   // walk a clicked route one turn at a time, visibly
+  update(game, dt) {   // a hover held on a tile inspects it; walk a clicked route one turn at a time, visibly
+    hoverInspect(game, dt, emit);
     if (!game.travel) return;
     game.travel.timer -= dt;
     if (game.travel.timer <= 0) { game.travel.timer = 0.07; travelStep(game); }
