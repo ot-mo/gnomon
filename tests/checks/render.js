@@ -35,6 +35,7 @@
 //  10. The victory card over the surface map (tests/checks/screen-frames.js no longer compares that frame with
 //      p0-0c's, since the map behind it is WS3's): in the same state, every line of the card centred in its box,
 //      its borders whole, its title in its colour, and every cell outside the box what the map draws without it.
+//  12. With --expose-gc (check-perf runs it so): a dormant zone's light arrays, bake and apron are freed after dropDerived.
 //  11. The Gnomon on the horizon (bible §4.12): from Hollowmere, facing its bearing, a dark needle stands over the
 //      sky and the horizon plane in the screen's middle columns, its tip glinting at noon but not at 09:00; facing
 //      away, none; behind a wall, none; at 23:00 nothing from the flats, a violet light from the Shade and from a Rust
@@ -85,6 +86,13 @@ export async function checkRender(m) {
     const dimDay = clock.daylight({ ...dial(15.5), zone: { wx: 23, wy: 10 } }), clearDay = clock.daylight({ ...dial(15.5), zone: { wx: 5, wy: 16 } });
     expect(hand.at23_10 && hand.at6_18 && !hand.short6_18 && !hand.night && !hand.noGnomon && dimDay <= clock.SHADE_LIGHT && clearDay === 1,
       `the Hand: ${JSON.stringify(hand)}, daylight under it ${dimDay}, beside it ${clearDay}`);
+    // Its length N × (1 + |h − 12| / 3) capped at 40, its hours 06:00-18:00, its width 0.5 spans (§15.6).
+    const handAtH = (n, h) => clock.handAt(dial(n, h), minute(h));
+    const r12 = handAtH(15.5, 12), nrm = [-r12.dy, r12.dx], off = (k, dd) => [37 + r12.dx * k + nrm[0] * dd, 3 + r12.dy * k + nrm[1] * dd];
+    const handRules = { at9: handAtH(15.5, 9)?.length, capped: handAtH(30, 6)?.length, before6: handAtH(15.5, 5.99), at6: !!handAtH(15.5, 6), at18: !!handAtH(15.5, 18),
+      after18: handAtH(15.5, 18.01), inside: clock.underHand(dial(15.5), ...off(5, 0.45)), outside: clock.underHand(dial(15.5), ...off(5, 0.55)) };
+    expect(Math.abs(handRules.at9 - 31) < 1e-9 && handRules.capped === 40 && handRules.before6 === null && handRules.at6 && handRules.at18 && handRules.after18 === null &&
+           handRules.inside && !handRules.outside, `the Hand's length, hours and width: ${JSON.stringify(handRules)}`);
     expect([0, 3, 21, 23].every((h) => sun(h)[2] < 0), "the sun is up at night");
     const sky = (h) => clock.skyColorsAt(minute(h));
     expect(sky(12).zenith.join() === "50,95,190" && sky(12).horizon.join() === "170,200,240", `the noon sky ${JSON.stringify(sky(12))}`);
@@ -118,6 +126,26 @@ export async function checkRender(m) {
     }
     return best;
   };
+
+  // --- 1 (cont.): the Shade's sky, which needs a run -----------------------------------------------------------
+  {
+    // The Shade's sky by the zone asked (not game.zone's), and its stars by the hour, not by its dimness.
+    fresh(4242, worldmap.REAL_WORLD);
+    const Wd = game.run.world;
+    let sk = null;
+    for (let y = 0; y < Wd.h && !sk; y++) for (let x = 0; x < Wd.w && !sk; x++) { const t = Wd.tileAt(x, y); if (t?.terrain === "shade" && t.travel !== "no" && !t.landmark) sk = [x, y]; }
+    const shadeZone = { wx: sk[0], wy: sk[1], hasSky: true }, flatsZone = { wx: 5, wy: 16, hasSky: true };
+    game.time = T(12);
+    const skyBy = { shade: clock.skyColors(game, shadeZone).zenith.join(), flats: clock.skyColors(game, flatsZone).zenith.join(),
+      hazeShade: clock.fogFor(game, shadeZone).density, hazeFlats: clock.fogFor(game, flatsZone).density };
+    game.debug.enterZone(`${sk[0]},${sk[1]},0`, "start");
+    const up = () => { const s = standNear(game.zone, game.zone.w >> 1, game.zone.d >> 1);
+      Object.assign(p(), { x: s.x + 0.5, y: s.y + 0.5, z: s.z, vz: 0, yaw: 0, pitch: 1.2 }); frame3d(); return render3d.lookState(); };
+    game.time = T(12); const noonLook = up();
+    game.time = T(23); const nightLook = up();
+    expect(skyBy.shade !== skyBy.flats && skyBy.hazeShade > skyBy.hazeFlats && noonLook.starK === 0 && noonLook.discVis > 0.5 && nightLook.starK > 0.9,
+      `the Shade's sky: ${JSON.stringify({ skyBy, noonLook, nightLook })}`);
+  }
 
   // --- 2. No black below the horizon at noon -----------------------------------------------------------------
   {
@@ -189,7 +217,26 @@ export async function checkRender(m) {
     let pitBlack = 0;
     for (let i = 0; i < capture.cols * capture.rows; i++) if (capture.chars[i] === " " || capture.colors[i * 3] + capture.colors[i * 3 + 1] + capture.colors[i * 3 + 2] < 8) pitBlack++;
     expect(pitBlack > 20, `a pit beyond the edge (in the apron band) isn't drawn as a pit: ${pitBlack} black cells`);
-    stats.horizon = { views, worstBlackBelow: worst, apronPitBlack: pitBlack };
+    // The plane takes the side a ray left by: near the east edge, 10 tiles from the north edge, facing south-south-east
+    // (more south than east), the level rays leave by the east; with east painted red and south blue, red wins.
+    fresh(4242);
+    const hz = game.zone;
+    for (const side of ["n", "e", "s", "w", "ne", "nw", "se", "sw"]) { const a = zones.neighbourAddr(game, hz, side); if (a && !zones.cachedZone(game, a.key)) zones.makeZone(game, a.key); }
+    zones.fillApron(game, hz);
+    game.time = T(12);
+    const sides = render3d.horizonOf(game, hz), was = [sides.e.color, sides.s.color];
+    sides.e.color = [255, 0, 0]; sides.s.color = [0, 0, 255];
+    const hs = standNear(hz, hz.w - 2, 10);
+    Object.assign(p(), { x: hs.x + 0.5, y: hs.y + 0.5, z: hs.z, vz: 0, yaw: 1.0, pitch: 0, torch: true });
+    frame3d();
+    let red = 0, blue = 0;
+    for (let i = (capture.rows >> 1) * capture.cols; i < capture.cols * capture.rows; i++) {
+      const r = capture.colors[i * 3], b = capture.colors[i * 3 + 2];
+      if (r > b + 60) red++; else if (b > r + 60) blue++;
+    }
+    [sides.e.color, sides.s.color] = was;
+    expect(red > blue && red > 20, `the horizon plane's side, leaving by the east while heading more south: red (east) ${red}, blue (south) ${blue}`);
+    stats.horizon = { views, worstBlackBelow: worst, apronPitBlack: pitBlack, sideByExit: { east: red, south: blue } };
   }
 
   // A 24×24 grass field (hasSky or not); build(z) adds blocks before the light is computed.
@@ -384,6 +431,17 @@ export async function checkRender(m) {
       east.liquid = "water";
       expect(before === null && after?.join() === "210,60,50" && inside === null, `the apron's water: ${JSON.stringify({ before, after, inside })}`);
       stats.liquid.apron = after;
+      // In a frame: water in the east band, the neighbour's liquid red; looked at across the edge, red cells (none plain).
+      const band = here.apron.e, bn = band.bw * band.bd;
+      for (let ly = 18; ly <= 30; ly++) for (let lx = 0; lx <= 8; lx++) { for (let k = 2; k < here.h; k++) band.blocks[lx + ly * band.bw + k * bn] = 0; band.blocks[lx + ly * band.bw + bn] = B.WATER_SHALLOW; }
+      const ws = standNear(here, here.w - 2, 24);
+      const reds = () => { Object.assign(p(), { x: ws.x + 0.5, y: ws.y + 0.5, z: ws.z, vz: 0, yaw: 0, pitch: -0.45, torch: true }); frame3d();
+        let k2 = 0; for (let i = 0; i < capture.cols * capture.rows; i++) { const r = capture.colors[i * 3], g = capture.colors[i * 3 + 1], b = capture.colors[i * 3 + 2]; if (r > g + 60 && r > b + 60) k2++; } return k2; };
+      game.time = T(12);
+      const plainReds = reds();
+      east.liquid = KEY; const apronReds = reds(); east.liquid = "water";
+      expect(plainReds === 0 && apronReds > 50, `the apron's water in a frame: red cells ${apronReds} (plain water ${plainReds})`);
+      stats.liquid.apronFrame = { plain: plainReds, red: apronReds };
     } finally { delete liquids.LIQUIDS[KEY]; }
     // What the map shows as floor but isn't gives nothing away by its colour: a pit not yet looked into, ghost planks
     // over a pit, planks over a pit (a bridge whose crossing isn't seen) all draw as the grass around them; a pit
@@ -409,6 +467,11 @@ export async function checkRender(m) {
     const pitRowUnseen = /chasm \/ pit/.test(legendText());
     hidden.holeSeen[5 + 5 * hidden.w] = 1; renderMap.renderMap(game); S.present();
     const pitRowSeen = /chasm \/ pit/.test(legendText());
+    // From above, the pit is dark (it goes down a floor): rays into it leave by the bottom inside the grid.
+    game.time = T(12); stand(5.5, 6.6, -Math.PI / 2, -1.3); p().torch = true; frame3d();
+    let pitDark = 0; for (let i = 0; i < capture.cols * capture.rows; i++) if (capture.chars[i] === " " || capture.colors[i * 3] + capture.colors[i * 3 + 1] + capture.colors[i * 3 + 2] < 8) pitDark++;
+    expect(pitDark > 5, `looking down into a pit under the sky: ${pitDark} black cells`);
+    game.view = "map"; game.mode = "map";
     expect(!pitRowUnseen && pitRowSeen, `the legend's pit row: before looking in ${pitRowUnseen}, after ${pitRowSeen}`);
     // A chasm's middle (the temple span's chasm room, 60 columns, nothing looked into) draws as the floor around it:
     // every unexplored hole looks like some true floor within 4 tiles, so the map shows neither its colour nor its shape.
@@ -427,7 +490,15 @@ export async function checkRender(m) {
       if (!near.has(drawn(x, y))) unlike++;
     }
     expect(holes > 20 && unlike === 0, `unexplored holes on the temple span unlike the floor around them: ${unlike} of ${holes}`);
-    stats.map = { road: rc, grass: gc, legend: "glim", disguised, chasm: { holes, unlike }, pitRow: { unseen: pitRowUnseen, seen: pitRowSeen } };
+    // toggleMapLegend(game) judges from your zone: after an 80-wide zone's map at 160 columns (no room), in a 24-wide
+    // zone (room) the legend shows, so a press hides it.
+    if (m.resize) {
+      m.resize(160, 56); renderMap.setMapLegendMode("auto"); renderMap.renderMap(game);
+      const pressed = renderMap.toggleMapLegend({ ...game, zone: hidden });
+      renderMap.setMapLegendMode("auto"); m.resize(180, 56);
+      expect(pressed === false, `toggleMapLegend in a zone where the legend fits (after a map where it didn't): turned it ${pressed ? "on" : "off"}`);
+    }
+    stats.map = { road: rc, grass: gc, legend: "glim", disguised, chasm: { holes, unlike }, pitRow: { unseen: pitRowUnseen, seen: pitRowSeen }, pitDark };
   }
 
   // --- 7. Music moods -------------------------------------------------------------------------------------------
@@ -607,6 +678,24 @@ export async function checkRender(m) {
            !gn.testWorld && !gn.underground, `the Gnomon on the horizon: ${JSON.stringify(gn)} (the Shade's span ${shadeKey})`);
     stats.gnomon = gn;
   }
+
+  // --- 12. A dormant zone frees its arrays (only with --expose-gc: tools/check-perf.mjs runs this check so) ----------
+  if (typeof globalThis.gc === "function") {
+    fresh(4242);
+    const z0 = game.zone;
+    for (const side of ["n", "e", "s", "w", "ne", "nw", "se", "sw"]) { const a = zones.neighbourAddr(game, z0, side); if (a && !zones.cachedZone(game, a.key)) zones.makeZone(game, a.key); }
+    zones.fillApron(game, z0);
+    game.time = T(12); stand(z0.spawn.x, z0.spawn.y); frame3d();
+    renderMap.renderMap(game);
+    const refs = { skyLight: new WeakRef(z0.skyLight), litMask: new WeakRef(z0.litMask), lampLight: new WeakRef(z0.lampLight), sunlit: new WeakRef(z0.sunlit),
+      apronE: new WeakRef(z0.apron.e.blocks) };
+    game.debug.enterZone("1,0,0", "start"); stand(game.zone.spawn.x, game.zone.spawn.y); frame3d();
+    z0.dropDerived();
+    for (let k = 0; k < 4; k++) { await new Promise((r) => setTimeout(r, 0)); globalThis.gc(); }
+    const kept = Object.entries(refs).filter(([, r]) => r.deref()).map(([k]) => k);
+    expect(!kept.length, `a dormant zone's arrays still reachable after dropDerived and gc: ${kept}`);
+    stats.memory = { freed: Object.keys(refs).length - kept.length, kept };
+  } else stats.memory = "not checked here (no --expose-gc; tools/check-perf.mjs runs this check with it)";
 
   // --- 9. Golden (b) --------------------------------------------------------------------------------------------
   if (m.golden) {

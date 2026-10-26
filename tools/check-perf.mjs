@@ -54,7 +54,8 @@ const pool = (runs) => {
 let renderCode = 0;
 if (!args["no-render"]) {
   renderCode = await new Promise((resolve) => {
-    const child = spawn(process.execPath, [path.join(ROOT, "tools", "run-check.mjs"), "render"], { cwd: ROOT, stdio: "inherit" });
+    // (--expose-gc: the render check then also checks that a dormant zone's arrays are freed)
+    const child = spawn(process.execPath, ["--expose-gc", path.join(ROOT, "tools", "run-check.mjs"), "render"], { cwd: ROOT, stdio: "inherit" });
     child.on("close", (status) => resolve(status === 0 ? 0 : 1));
   });
 }

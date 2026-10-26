@@ -79,6 +79,7 @@ export function toggleMapLegend(game = null) {
 }
 export const mapLegendShown = (game) => shownFor(legendMode, legendWidth(game.zone).fits);
 export function setLegendKeyHint(text) { legendHint = String(text || ""); }
+export function setMapLegendMode(mode) { if (mode === "auto" || mode === "on" || mode === "off") legendMode = mode; }   // (tests)
 
 // Outdoors: how a column's ground and water show (null: the parent's glyph for its kind). What the map shows as
 // floor but isn't (a pit or chasm you haven't looked into, ghost planks, a bridge whose crossing you haven't seen:

@@ -123,6 +123,8 @@ function frameNeighbours(game, zone) {
   });
 }
 
+// This frame's sky, for tests: { daylight, starK, discVis, sunOn }.
+export const lookState = () => ({ daylight: skyR, starK, discVis, sunOn });
 function frameLook(game, zone) {
   outdoor = !!zone.hasSky;
   if (!outdoor) {
