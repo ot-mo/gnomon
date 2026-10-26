@@ -5,16 +5,18 @@ import { armourValue } from "./player.js";
 import { WEAPONS, WEAPON_PALETTE, ELEMENTS, itemName, itemGlyph } from "./items.js";
 import { readyStack } from "./throwing.js";
 import { PERKS, xpToNext, perkLabel } from "./leveling.js";
-import { attr, maxHp } from "./stats.js";
+import { attr, maxHp, av, dv } from "./stats.js";
 import { wielded } from "./body.js";
 import { statusLine } from "./status.js";
 import { CURRENCY, formatFunds } from "./currency.js";
 import { hitLabel } from "./ui.js";
+import { RULES } from "./rules.js";
+import { on } from "./events.js";
 
 // The HUD under every screen: the crosshair and [E] label in 3D (exploring, paused, or dead), the status
 // line, the toasts, the messages and the boss bar. The screens over it (pause, dead, won, levelup, the
 // "DEPTH n" beat) draw themselves with the functions below (src/screens/).
-export function drawHud(game) {
+export function drawHud(game, layout = layoutHud(game)) {
   const p = game.player;
   const inMap = game.view === "map";
   const looking = game.mode === "explore" || game.mode === "pause";
@@ -27,10 +29,10 @@ export function drawHud(game) {
       S.text((S.cols - label.length) >> 1, (S.rows >> 1) + 2, label, 255, 230, 140);
     }
   }
-  drawStatus(game, p, inMap ? 1 : 0);
-  drawToasts(game, inMap ? 3 : 2);   // under the boss bar
+  const top = inMap ? 1 : 0, n = drawStatus(game, top, layout);
+  drawToasts(game, top + n + 1);   // under the boss bar
   drawMessages(game, inMap ? 1 : 0);
-  drawBossBar(game, inMap ? 2 : 1);
+  drawBossBar(game, top + n);
 }
 
 // The 3D view paused (pointer lock lost, or not yet taken): click to play.
@@ -94,6 +96,14 @@ export function drawTransition(game) {
 // Toasts (TECH_DESIGN §4.5): a line for 2 s under the status line, centred: a zone's name when you walk
 // into it over an edge, discoveries. game.toast(text, color) adds one (game.js).
 export const TOAST_TIME = 2;
+// A zone's name when you come into it without the "DEPTH n" beat (which says it itself): over an edge,
+// or put there directly. Stairs, holes and the run's start ("down", "up", "fall", "start") have the beat
+// or the intro. (game.toast is the game's; a bare game, as some checks build, logs the line.)
+export const TOAST_SILENT = new Set(["down", "up", "fall", "start"]);
+on("zone:enter", (game, { zone, how, from }) => {
+  if (TOAST_SILENT.has(how) || !zone.name || (from && from === zone.key)) return;
+  (game.toast || game.log).call(game, zone.name, [200, 220, 200]);
+});
 function drawToasts(game, y) {
   const live = (game.toasts || []).filter((t) => game.uiTime - t.time < TOAST_TIME && game.uiTime >= t.time);
   live.slice(-2).forEach((t, k) => {
@@ -141,33 +151,113 @@ export function levelUpClick(game, cell) {
   return k >= 0 && k < game.perkChoices.length ? k : -1;
 }
 
+// --- The status line: registered segments (TECH_DESIGN §4.5) ----------------------------------------
+//   registerHudSegment(id, { priority, row = 0, align = "left", split = false, parts(game, p) })
+//     parts → { text, color } | [{ text, color }] | null (nothing this frame). The segments stand in the
+//     order registered, two cells apart; `split`: each part may be dropped on its own (statuses);
+//     align "right": at the right end of the first row with room left, else dropped (fps). Registering an id again replaces it.
+//   layoutHud(game, cols = S.cols, rows = S.rows) → { rows: [[{ id, x, text, color }]], dropped: [ids] }
+//     Everything on row 0 if it fits. Otherwise the highest priorities first: on a screen of 40 or more
+//     rows on their preferred row, then the other; on a smaller one only row 0; what fits nowhere is dropped
+//     (the lowest priorities go first), so the line never runs off the screen.
+//   hudSegments() → [ids] in order; segmentDef(id) → the registered def
+//   hudRows(game) → 1 | 2                    how many rows the status line takes this frame
+const SEGMENTS = [];
+let segOrder = 0;
+export const HUD_GAP = 2;
+
+export function registerHudSegment(id, def) {
+  const k = SEGMENTS.findIndex((s) => s.id === id);
+  const seg = { id, priority: 0, row: 0, align: "left", split: false, ...def, order: k >= 0 ? SEGMENTS[k].order : segOrder++ };
+  if (k >= 0) SEGMENTS[k] = seg; else SEGMENTS.push(seg);
+  SEGMENTS.sort((a, b) => a.order - b.order);
+}
+export const hudSegments = () => SEGMENTS.map((s) => s.id);
+export const segmentDef = (id) => SEGMENTS.find((s) => s.id === id) || null;
+
+export function layoutHud(game, cols = S.cols, rows = S.rows) {
+  const p = game.player, left = [], right = [];
+  for (const seg of SEGMENTS) {
+    let parts = seg.parts(game, p);
+    if (!parts) continue;
+    parts = (Array.isArray(parts) ? parts : [parts]).filter((q) => q && q.text);
+    if (!parts.length) continue;
+    const pieces = seg.split ? parts.map((q, k) => ({ seg, k, parts: [q] })) : [{ seg, k: 0, parts }];
+    for (const piece of pieces) {
+      piece.w = piece.parts.reduce((n, q) => n + q.text.length, 0) + HUD_GAP * (piece.parts.length - 1);
+      (seg.align === "right" ? right : left).push(piece);
+    }
+  }
+  const room = cols - 1;   // a row starts at x = 1 and ends at least a cell short of the edge
+  const used = (list) => list.reduce((n, q) => n + q.w + HUD_GAP, 1) - HUD_GAP;
+  let placed;
+  if (used(left) <= room) placed = [left];
+  else {
+    const n = rows >= 40 ? 2 : 1;
+    placed = Array.from({ length: n }, () => []);
+    const byPriority = [...left].sort((a, b) => b.seg.priority - a.seg.priority || a.seg.order - b.seg.order || a.k - b.k);
+    for (const piece of byPriority) {
+      const pref = Math.min(n - 1, piece.seg.row);
+      for (const r of [pref, ...placed.keys()].filter((r, j, a) => a.indexOf(r) === j))
+        if (used([...placed[r], piece]) <= room) { placed[r].push(piece); break; }
+    }
+    for (const list of placed) list.sort((a, b) => a.seg.order - b.seg.order || a.k - b.k);
+    while (placed.length > 1 && !placed[placed.length - 1].length) placed.pop();
+  }
+  const out = placed.map((list) => {
+    const row = [];
+    let x = 1;
+    for (const piece of list) for (const q of piece.parts) { row.push({ id: piece.seg.id, x, text: q.text, color: q.color }); x += q.text.length + HUD_GAP; }
+    row.end = x;
+    return row;
+  });
+  for (const piece of right) {   // at the right of the first row with room left (the parent's: row 0)
+    const text = piece.parts.map((q) => q.text).join("  ");
+    const row = out.find((r) => r.end + text.length < cols);
+    if (row) { row.push({ id: piece.seg.id, x: cols - text.length - 1, text, color: piece.parts[0].color }); row.end = cols; }
+  }
+  const shown = new Set(out.flat().map((q) => q.id));
+  return { rows: out, dropped: SEGMENTS.filter((s) => !shown.has(s.id) && s.parts(game, p)).map((s) => s.id) };
+}
+
+export const hudRows = (game) => layoutHud(game).rows.length;
+
+function drawStatus(game, y, layout = layoutHud(game)) {
+  layout.rows.forEach((row, k) => {
+    S.blank(0, y + k, S.cols, 1);
+    for (const q of row) S.text(q.x, y + k, q.text, ...q.color);
+  });
+  return layout.rows.length;
+}
+
 // Where you are, for the status line: "DEPTH 3/20" in a dungeon, the zone's name on the surface.
 const zoneLabel = (zone) => (zone.type === "dungeon" ? `DEPTH ${zone.dungeonIndex}${zone.dungeonLevels ? `/${zone.dungeonLevels}` : ""}`
   : zone.name.toUpperCase().replace(/^THE /, ""));
 
-function drawStatus(game, p, y) {
-  S.blank(0, y, S.cols, 1);
-  let x = 1;
-  const seg = (str, c) => { S.text(x, y, str, ...c); x += str.length + 2; };
-  seg(zoneLabel(game.zone), [255, 230, 140]);
+// Phase 0's segments, in the order they stand (the parent's order). Later: ability cooldowns (WS4, 70)
+// and the clock (WS3, 30).
+registerHudSegment("location", { priority: 100, parts: (game) => ({ text: zoneLabel(game.zone), color: [255, 230, 140] }) });
+registerHudSegment("hp", { priority: 100, parts(game, p) {
   const n = 16, filled = Math.max(0, Math.min(n, Math.round((p.hp / maxHp(p)) * n)));
-  const hpFrac = p.hp / maxHp(p), hpColor = hpFrac > 0.5 ? [120, 230, 120] : hpFrac > 0.25 ? [240, 200, 80] : [255, 80, 80];
-  seg(`HP [${"#".repeat(filled)}${".".repeat(n - filled)}] ${p.hp}/${maxHp(p)}`, hpColor);
-  seg(`LV ${p.level} (${p.xp}/${xpToNext(p.level)} XP)`, [160, 230, 255]);
-  seg(`STR ${attr(p, "str")}`, [255, 170, 80]);
-  seg(`ARM ${armourValue(p)}`, [175, 180, 200]);
-  seg(formatFunds(p), CURRENCY.color);
-  seg(`k ${p.keys}`, [240, 200, 70]);
-  seg(`torch ${p.torch ? "on" : "off"}`, p.torch ? [255, 200, 120] : [120, 120, 120]);
-  const ready = readyStack(p);   // what T throws
-  if (ready) seg(`T: ${itemName(game, ready)} x${ready.count}`, itemGlyph(game, ready)[1]);
-  // Active statuses (status.js), each as its def draws it (flying blinks when about to run out).
-  for (const { text, color } of statusLine(game, p)) seg(text, color);
-  if (game.view === "3d") {
-    const perf = `${game.fps.toFixed(0)} fps · ${game.frameMs.toFixed(1)} ms`;
-    if (x + perf.length < S.cols) S.text(S.cols - perf.length - 1, y, perf, 90, 140, 90);   // only if there's room
-  }
-}
+  const hpFrac = p.hp / maxHp(p), color = hpFrac > 0.5 ? [120, 230, 120] : hpFrac > 0.25 ? [240, 200, 80] : [255, 80, 80];
+  return { text: `HP [${"#".repeat(filled)}${".".repeat(n - filled)}] ${p.hp}/${maxHp(p)}`, color };
+} });
+registerHudSegment("level", { priority: 50, parts: (game, p) => ({ text: `LV ${p.level} (${p.xp}/${xpToNext(p.level)} XP)`, color: [160, 230, 255] }) });
+registerHudSegment("strength", { priority: 50, row: 1, parts: (game, p) => ({ text: `STR ${attr(p, "str")}`, color: [255, 170, 80] }) });
+// AV/DV: the parent's armour value under its rules, the d20 pair under d20 combat (0C).
+registerHudSegment("defence", { priority: 50, row: 1, parts: (game, p) => ({
+  text: RULES.combat === "d20" ? `AV ${av(p)} DV ${dv(p)}` : `ARM ${armourValue(p)}`, color: [175, 180, 200] }) });
+registerHudSegment("funds", { priority: 60, parts: (game, p) => ({ text: formatFunds(p), color: CURRENCY.color }) });
+registerHudSegment("keys", { priority: 45, row: 1, parts: (game, p) => ({ text: `k ${p.keys}`, color: [240, 200, 70] }) });
+registerHudSegment("torch", { priority: 40, row: 1, parts: (game, p) => ({ text: `torch ${p.torch ? "on" : "off"}`, color: p.torch ? [255, 200, 120] : [120, 120, 120] }) });
+registerHudSegment("ready", { priority: 40, row: 1, parts(game, p) {   // what T throws
+  const ready = readyStack(p);
+  return ready && { text: `T: ${itemName(game, ready)} x${ready.count}`, color: itemGlyph(game, ready)[1] };
+} });
+// Active statuses (status.js), each as its def draws it (flying blinks when about to run out).
+registerHudSegment("statuses", { priority: 90, split: true, parts: (game, p) => statusLine(game, p) });
+registerHudSegment("fps", { priority: 0, align: "right", parts: (game) => game.view === "3d"
+  && { text: `${game.fps.toFixed(0)} fps · ${game.frameMs.toFixed(1)} ms`, color: [90, 140, 90] } });
 
 // Once the boss (or a guardian) has noticed you, its health runs across the top of the screen.
 function drawBossBar(game, y) {

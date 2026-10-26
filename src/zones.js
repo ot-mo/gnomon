@@ -156,7 +156,7 @@ export function enterZone(game, zone, arrival = {}) {
   game.effects = [];          // damage numbers and splashes belong to the zone you left
   game.confirmJump = -1;
   keepDerived(game, ZONE_RULES.keepDerived);
-  emit(game, "zone:enter", { zone, arrival: at, how, away, first: away === null && from !== zone });
+  emit(game, "zone:enter", { zone, arrival: at, how, away, first: away === null && from !== zone, from: from?.key ?? null });
 }
 
 // Only the most recent zones keep their light/stand/kind/look arrays (about 0.2 MB each for a
@@ -204,7 +204,7 @@ export function fillApron(game, zone, sides = APRON_SIDES) {
 
 // Walk off `side` of the surface zone you are in, `along` tiles along that edge (x for n and s, y for e
 // and w), standing at opts.fromStand (default: where you stand). An open edge takes you into the
-// neighbour at once, without the transition screen, and shows its name (game.toast, the HUD's); returns
+// neighbour at once, without the transition screen (the HUD toasts its name on zone:enter); returns
 // true. A solid edge or the world's border stays shut and says why, once per visit and side (the
 // neighbour terrain's edgeMessage); returns false. opts.exact = { x, y, z }: your exact point in the
 // neighbour's coordinates (3D), kept when it is within the rules (arrivalPoint "edge"); facing and
@@ -228,7 +228,6 @@ export function tryWalkOff(game, side, along, opts = {}) {
   const ok = changeZone(game, addr.key, { how: "edge", side, along, fromStand, exact: opts.exact || null,
                                           keepFacing: true, keepMotion: opts.keepMotion !== false });
   if (ok === true) {
-    (game.toast || game.log).call(game, target.name, [200, 220, 200]);   // the HUD toast (a log line in a bare game)
     if (game.arrival?.shifted) game.log(EDGE_RULES.shifted, [170, 170, 170]);   // §5.1: no tile within the rules
   }
   return ok === true;

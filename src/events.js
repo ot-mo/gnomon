@@ -11,7 +11,7 @@
 //   runUpdates(game, dt)              game.js calls this once per frame.
 //
 // Events so far: "zone:prepare" { zone, arrival, from } (before you're placed: open gates, resolve
-// loot), "zone:enter" { zone, arrival, away, first } (after), "zone:leave" { zone, side, how, to };
+// loot), "zone:enter" { zone, arrival, how, away, first, from /* the key of the zone you left, or null */ } (after), "zone:leave" { zone, side, how, to };
 // since 0C "attack" { att, tgt, result } and "hurt" { tgt, src, dmg } (combat.js), "kill" { c, src, uid,
 // factions } (monsters.js killMonster; it replaced game.questEvent, game.onGuardianDies and game.win()),
 // "guardian:wake" { c } (guardians.js; it replaced game.onGuardianWakes), "quest:start", "quest:stage",

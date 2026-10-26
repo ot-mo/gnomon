@@ -1,18 +1,20 @@
-// The HUD's status line as the player sees it: drawHud into the screen grid, then read that row back.
+// The HUD's status line as the player sees it: drawHud into the screen grid, then read its rows back.
 //
-//   hudRow(game, capture) → { text, find(str) → [{ at, color }] }   (capture: node-env's last presented frame)
+//   hudRow(game, capture) → { text, rows, find(str) → [{ at, color }] }   (capture: node-env's last presented frame)
 //
-// The row is 1 on the map and 0 in 3D, as hud.js draws it.
+// The line starts on row 1 on the map and row 0 in 3D, as hud.js draws it, and takes one row or two
+// (hud.js layoutHud); `text` is the rows one after another (a match never spans two).
 import * as S from "../../src/screen.js";
-import { drawHud } from "../../src/hud.js";
+import { drawHud, hudRows } from "../../src/hud.js";
 
 export function hudRow(game, capture) {
   S.clear();
+  const rows = hudRows(game);
   drawHud(game);
   S.present();
-  const y = game.view === "map" ? 1 : 0, w = capture.cols;
-  const text = capture.chars.slice(y * w, (y + 1) * w).join("");
-  const colorAt = (x) => [...capture.colors.slice((y * w + x) * 3, (y * w + x) * 3 + 3)];
+  const y0 = game.view === "map" ? 1 : 0, w = capture.cols;
+  const text = capture.chars.slice(y0 * w, (y0 + rows) * w).join("");
+  const colorAt = (x) => [...capture.colors.slice((y0 * w + x) * 3, (y0 * w + x) * 3 + 3)];
   // Every place the string stands in the row, each with the colour of its cells (null if they differ).
   const find = (str) => {
     const out = [];
@@ -23,5 +25,5 @@ export function hudRow(game, capture) {
     }
     return out;
   };
-  return { text, find };
+  return { text, rows, find };
 }

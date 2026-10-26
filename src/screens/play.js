@@ -27,7 +27,7 @@ import { creatureAt, hostilesTo, canTalk } from "../creatures.js";
 import { pickUpItems } from "../items.js";
 import { render3d } from "../render3d.js";
 import { renderMap, tileAtCell, mapView } from "../renderMap.js";
-import { drawHud } from "../hud.js";
+import { drawHud, layoutHud } from "../hud.js";
 import { interact, lookTarget } from "../interact.js";
 import { refreshView, mapStep, mapWait, mapUseTime, startTravel, startExplore, travelStep } from "../turns.js";
 import { drinkPotion, tickEffects } from "../effects.js";
@@ -50,10 +50,12 @@ import { openJournal } from "./journal.js";
 export const playMode = (game) => (game.view === "map" ? "map" : "explore");
 
 // The view, then the HUD. While the cube turns the view is always 3D.
+// On the map the tiles start under the status line, which takes one row or two (hud.js layoutHud).
 export function drawPlay(game) {
-  if (game.view === "map" && game.mode !== "rotate") renderMap(game);
+  const layout = layoutHud(game);
+  if (game.view === "map" && game.mode !== "rotate") { mapView.top = 1 + layout.rows.length; renderMap(game); }
   else render3d(game);
-  drawHud(game);
+  drawHud(game, layout);
 }
 
 // --- Zones: stairs, holes, deep water ---------------------------------------------------------------
