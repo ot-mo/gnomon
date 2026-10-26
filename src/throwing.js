@@ -10,7 +10,7 @@
 // too close, the splash reaches you too. Throwing a potion you don't know identifies it.
 // Bombs go off 2 s after they leave your hand (on the map you set them down at your feet):
 // they hurt everything close, smash crates, and open the thin walls of secret rooms.
-import { damageMonster, hitPlayer } from "./monsters.js";
+import { damageMonster, resolveAttack, thrownSpec } from "./combat.js";
 import { touchable, hostilesTo } from "./creatures.js";
 import { POTIONS, POTION_COLORS, FLOOR_ART, itemPalette, makeItem, awayFromWalls, takeOne } from "./items.js";
 import { B, FLOOR_Z } from "./world.js";
@@ -101,7 +101,7 @@ export function updateProjectiles(game, dt) {
       const bx = Math.floor(nx), by = Math.floor(ny), bz = Math.floor(nz);
       if (pr.hostile && Math.abs(nx - p.x) < RADIUS + 0.1 && Math.abs(ny - p.y) < RADIUS + 0.1 && nz > p.z && nz < p.z + HEIGHT) {
         const what = pr.kind === "bolt" ? "bolt" : "arrow";
-        hitPlayer(game, pr.from, pr.dmg, `the ${pr.from.name}'s ${what}`, `the ${what}`, true);
+        resolveAttack(game, pr.from, p, { kind: "missile", fixed: pr.dmg }, { aimed: true, ranged: true, source: `the ${pr.from.name}'s ${what}`, blocked: `the ${what}` });
         done = true;
       } else if (m) { impact(game, pr, nx, ny, nz, m); done = true; }
       else if (zone.solid(bx, by, bz) || zone.get(bx, by, bz) === B.WATER_DEEP || nz < -1 ||
@@ -126,13 +126,7 @@ function impact(game, it, x, y, z, m) {
     zone.bombs.push({ x: bx, y: by, z: ground, fuse: it.fuse ?? FUSE });
     return;
   }
-  if (m) {
-    const crit = Math.random() < 0.12;
-    const name = m.name;
-    const base = 2 + Math.floor(Math.random() * 3) + (game.player.perks.has("juggler") ? 2 : 0);
-    const dmg = damageMonster(game, m, base * (crit ? 2 : 1), crit ? [255, 220, 80] : [255, 255, 255]);
-    game.log(`Your knife ${crit ? "sinks deep into" : "hits"} the ${name} (${dmg}).`, [220, 220, 230]);
-  }
+  if (m) resolveAttack(game, game.player, m, thrownSpec(game), { aimed: true, ranged: true });   // it reached it: aimed, in both views
   // Where does it come to rest? On the ground under where it stopped — unless that's a
   // chasm or deep water, or it snapped (1 in 5).
   const tx = Math.floor(x), ty = Math.floor(y);

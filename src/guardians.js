@@ -16,9 +16,9 @@
 // Each is an AI hook (ai.js AI_HOOKS "guardian:flatqueen", "guardian:warden", "guardian:colossus"), run
 // every update before the usual AI: it shrugs off blindness and long stuns, then guardianThink(game, m,
 // dt, occ); returning true would skip the rest of that AI for this update.
-import { hitPlayer } from "./monsters.js";
+import { resolveAttack, naturalSpec } from "./combat.js";
 import { registerAIHook } from "./ai.js";
-import { CREATURE_TYPES, spawnCreature, addCreature, removeCreature } from "./creatures.js";
+import { spawnCreature, addCreature, removeCreature } from "./creatures.js";
 import { B, FLOOR_Z } from "./world.js";
 import { lightAt } from "./light.js";
 import { sfx } from "./sfx.js";
@@ -175,9 +175,7 @@ function colossus(game, m, dt) {
   if (g.windup > 0) {
     if ((g.windup -= dt) <= 0) {
       if (upClose) {
-        const t = CREATURE_TYPES[m.type];
-        const dmg = t.damage[0] + Math.floor(Math.random() * (t.damage[1] - t.damage[0] + 1)) + (m.bonus || 0);
-        hitPlayer(game, m, dmg, "the Colossus's sweeping arm", "its sweeping arm");
+        resolveAttack(game, m, p, naturalSpec(m), { source: "the Colossus's sweeping arm", blocked: "its sweeping arm" });
       } else game.log("The Colossus's arm sweeps through empty air.", [200, 200, 200]);
     }
   } else if (g.sweep <= 0 && upClose) {

@@ -26,7 +26,8 @@ import "./world/zonegen.js";   // the zone generators: surfaces, site dungeons, 
 import { buildRun } from "./world/run.js";
 import { TEST_WORLD } from "./content/world/test-world.js";
 import { makePlayer, clampPitch, updatePlayer, takeImpact, hasFeatherFall, bonus, bodyCollides, RADIUS } from "./player.js";
-import { pushPlayerOut, playerAttack } from "./monsters.js";
+import { pushPlayerOut } from "./monsters.js";
+import { playerMelee } from "./combat.js";
 import { updateCreatures } from "./ai.js";
 import { creatureAt, hostilesTo, canTalk } from "./creatures.js";
 import { pickUpItems, POTIONS, POTION_COLORS, scrollTitles, makeItem, makeRelic, pickRelic, randomEquipment, awayFromWalls, RELICS, RELIC_COLOR } from "./items.js";
@@ -625,7 +626,7 @@ export const inputHandlers = {
     if (code === "KeyI") { openInv(); return; }
     if (code === "KeyJ") { openJournal(game); return; }
     if (game.paused || statusFlag(game.player, "noAct")) return;
-    if (code === "Enter") playerAttack(game);   // for when a mouse button isn't handy
+    if (code === "Enter") playerMelee(game);   // for when a mouse button isn't handy
     if (code === "KeyE") interact(game);
     if (code === "KeyQ") quickHeal();
     if (code === "KeyT") throwReady(game);
@@ -643,7 +644,7 @@ export const inputHandlers = {
     if (game.mode !== "explore") return;
     if (!isLocked()) { lockPointer(); game.paused = false; return; }
     if (game.paused) { game.paused = false; return; }
-    if (button === 0) playerAttack(game);
+    if (button === 0) playerMelee(game);
     if (button === 2) throwReady(game);
   },
   onLook(dx, dy) {

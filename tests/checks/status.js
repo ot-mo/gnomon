@@ -34,7 +34,7 @@ import { enterZone } from "../../src/zones.js";
 import { keys } from "../../src/input.js";
 import { mapStep, mapWait, passTime } from "../../src/turns.js";
 import { tickEffects } from "../../src/effects.js";
-import { hitPlayer } from "../../src/monsters.js";
+import { hitPlayer } from "../../src/combat.js";
 import { spawnCreature, canTalk } from "../../src/creatures.js";
 // The parent game's spawnMonster(type, x, y, z, state, level, elite, rand), through spawnCreature (0C).
 const spawnMonster = (type, x, y, z, state, level, elite, rng) => spawnCreature(type, x, y, z, { rng, state, level, elite });

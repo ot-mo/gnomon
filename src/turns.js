@@ -10,7 +10,7 @@
 import { KIND, B, FLOOR_Z, solidFor as zoneSolidFor } from "./world.js";
 import { castRay, lineOfSight } from "./raycast.js";
 import { lightAt } from "./light.js";
-import { attackMonster } from "./monsters.js";
+import { bumpAttack } from "./combat.js";
 import { updateCreatures } from "./ai.js";
 import { creatureAt, talkerAt, hostilesTo, ghostHidden, canTalk } from "./creatures.js";
 import { pickUpItems } from "./items.js";
@@ -21,7 +21,6 @@ import { hasStatus, statusFlag, statusSpeed, updateDrowning } from "./status.js"
 import { updateClouds, updateProjectiles, updateBombs } from "./throwing.js";
 import { PLAYER_STEP_UP } from "./pathing.js";
 import { updateSpikes, nearSpikes, TICK } from "./traps.js";
-import { sfx } from "./sfx.js";
 import { tryWalkOff } from "./zones.js";
 
 export const STEP_TIME = 1 / WALK;   // ≈ 0.24 s per tile
@@ -152,8 +151,7 @@ export function mapStep(game, dx, dy) {
   }
   if (m) {
     if (Math.abs(m.z - p.z) > 1.5) { game.log(`You can't reach the ${m.name} from here.`, [170, 170, 170]); return false; }
-    sfx("swing");
-    attackMonster(game, m);
+    bumpAttack(game, m);
     passTime(game, attackTime(p));
     return true;
   }

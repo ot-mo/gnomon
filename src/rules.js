@@ -23,6 +23,14 @@ const CORE = {
   stats: "legacy",      // "legacy" | "attributes"
   combat: "legacy",     // "legacy" | "d20" (0C)
 
+  // The d20 set (DECISIONS; bible §10.6, §15.6; combat.js). To-hit: d20 + mods > DV; a natural 1 misses, a
+  // natural ≥ critNat hits and crits (× crit); critNat = 20 − round(20 × (bonus(crit) + critPerAgi × AGI mod)),
+  // never below minCritNat. Creatures: d20 + floor(level / hitPerLevels) vs your DV; their DV is creatureDv +
+  // floor(level / dvPerLevels) + the species' dv. aimed: a projectile that physically reached its target;
+  // reqPenalty per missing STR point of the wielded weapon, at most reqPenaltyMax.
+  d20: { die: 20, crit: 2, critPerAgi: 0.02, minCritNat: 2, highGround: 1, highGroundZ: 1, aimed: 3,
+         creatureDv: 5, dvPerLevels: 4, hitPerLevels: 3, reqPenalty: 2, reqPenaltyMax: 6 },
+
   // Attributes (bible §10.6): modifier = floor((score − center) / 2); everyone has `base` until WS4.
   attr: { list: ["str", "agi", "tou", "int", "wil", "ego"], base: 16, center: 16 },
 

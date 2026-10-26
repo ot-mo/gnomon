@@ -33,7 +33,8 @@ import { CREATURE_TYPES, spawnCreature, addCreature, isFlat, canTalk, creaturesN
 import { attitude } from "./factions.js";
 import { inDark } from "./light.js";
 import { distance } from "./rng.js";
-import { hitPlayer, killMonster, creatureHits } from "./monsters.js";
+import { killMonster } from "./monsters.js";
+import { resolveAttack, naturalSpec } from "./combat.js";
 
 // (Kept on a function so guardians.js can register while this module is still loading.)
 function hooks() { return (hooks.table ||= {}); }
@@ -136,17 +137,16 @@ export function updateCreatures(game, dt, radius = Infinity) {
         if (fd <= t.reach + foe.w * 0.4 && fz > -1.2 && fz < 1.3) {
           if (m.cd <= 0 && lineOfSight(zone, m.x, m.y, m.z + m.h * 0.7, foe.x, foe.y, foe.z + foe.h * 0.6)) {
             m.cd = t.cooldown * m.cdMul;
-            creatureHits(game, m, foe, t.damage[0] + Math.floor(Math.random() * (t.damage[1] - t.damage[0] + 1)) + (m.bonus || 0));
+            resolveAttack(game, m, foe, naturalSpec(m));
           }
         } else if (t.speed > 0) chooseStep(game, m, t, occ, ptx, pty, foe);
       } else if (m.state === "chase" && inReach) {
         if (m.cd <= 0 && lineOfSight(zone, m.x, m.y, m.z + m.h * 0.7, player.x, player.y, player.z + EYE * 0.6)) {
           m.cd = t.cooldown * m.cdMul;
-          const dmg = t.damage[0] + Math.floor(Math.random() * (t.damage[1] - t.damage[0] + 1)) + (m.bonus || 0);
           if (isFlat(m) && game.view !== "map") {   // bitten by something you can't see
-            hitPlayer(game, m, dmg, "something flat", "a bite from below");
+            resolveAttack(game, m, player, naturalSpec(m), { source: "something flat", blocked: "a bite from below" });
             game.hint?.("flat", "Something bit you from the floor, and there's nobody there: only a moving shadow. A flat being! Look at the world from above (Tab) to fight it.");
-          } else hitPlayer(game, m, dmg, `the ${m.name}`, `the ${m.name}'s blow`);
+          } else resolveAttack(game, m, player, naturalSpec(m));
         }
       } else if (m.state === "chase" && r && m.sees && flat <= r.range && flat > 1.6) {
         // In sight and in range: shoot, and stay back once close enough.

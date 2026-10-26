@@ -11,7 +11,7 @@
 // (In 3D you can also jump over a row. The map can't jump.)
 import { B, FLOOR_Z } from "./world.js";
 import { distance } from "./rng.js";
-import { damageMonster } from "./monsters.js";
+import { damageMonster } from "./combat.js";
 import { CREATURE_TYPES, canTalk } from "./creatures.js";
 import { statusFlag } from "./status.js";
 

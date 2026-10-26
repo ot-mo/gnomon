@@ -12,7 +12,7 @@ import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../../src/pathing.js";
 import { generateDungeonLevel, legacyParams } from "../../src/gen/dungeon.js";
 import { makeRng, noise2 } from "../../src/rng.js";
 import { mapStep } from "../../src/turns.js";
-import { damageMonster } from "../../src/monsters.js";
+import { damageMonster } from "../../src/combat.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
 
 // A rolling outdoor zone: grass hills 0-3 blocks over the datum, a pond of deep water (rock bottom),

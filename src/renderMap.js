@@ -10,7 +10,7 @@ import { planTravel } from "./turns.js";
 import { spikeState } from "./traps.js";
 import { talkersIn, typeOf } from "./creatures.js";
 import { slamState } from "./guardians.js";
-import { resistText } from "./monsters.js";
+import { resistText } from "./combat.js";
 
 export const mapView = { panX: 0, panY: 0, hover: null, tx0: 0, ty0: 0, top: 2 };
 
