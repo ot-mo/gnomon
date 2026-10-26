@@ -588,7 +588,20 @@ function place(game, zone, at, { c, dx, dy, delay }, how) {
 // It has caught up with you: it shows, and a hunter takes up the hunt where it left it.
 function arrive(game, m, occ) {
   delete m.brain.arriving;
-  occ[m.tx + m.ty * game.zone.w] = m.id;
+  // While it was on its way you (or someone) may have stepped onto its tile: it comes in beside it instead.
+  const zone = game.zone, { w, d, stand } = zone, p = game.player;
+  const taken = (x, y) => (x === Math.floor(p.x) && y === Math.floor(p.y)) || (occ[x + y * w] && occ[x + y * w] !== m.id);
+  if (taken(m.tx, m.ty)) {
+    let spot = null;
+    for (let r = 1; r <= 3 && !spot; r++)
+      for (let oy = -r; oy <= r && !spot; oy++)
+        for (let ox = -r; ox <= r && !spot; ox++) {
+          const x = m.tx + ox, y = m.ty + oy;
+          if (Math.max(Math.abs(ox), Math.abs(oy)) === r && x >= 0 && y >= 0 && x < w && y < d && stand[x + y * w] >= 0 && !taken(x, y)) spot = [x, y];
+        }
+    if (spot) Object.assign(m, { tx: spot[0], ty: spot[1], nx: spot[0], ny: spot[1], p: 0, x: spot[0] + 0.5, y: spot[1] + 0.5, z: stand[spot[0] + spot[1] * w] + (CREATURE_TYPES[m.type].hover || 0) });
+  }
+  occ[m.tx + m.ty * w] = m.id;
   if (m.state === "chase") { m.lost = 0; if (distance(game.player.x - m.x, game.player.y - m.y) < 14) game.log(`The ${m.name} comes after you!`, m.color); }
 }
 

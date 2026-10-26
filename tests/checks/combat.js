@@ -788,6 +788,16 @@ export function checkAiDepth(ctx) {
       if (view === "map") passTime(game, 3); else for (let k = 0; k < 180; k++) game.debug.update(1 / 60);
       expect(!follower.brain.arriving && !hunter.brain.arriving && distance(follower.x - p.x, follower.y - p.y) <= AI_RULES.follow.far + 1.5,
         `${view}: after 3 s: arriving ${follower.brain.arriving}/${hunter.brain.arriving}, follower ${distance(follower.x - p.x, follower.y - p.y).toFixed(1)} tiles from you`);
+      // On the map you may step onto the tile of one still on its way: it comes in beside you, not on you.
+      if (view === "map") {
+        const z1b = game.zone, lurker = addCreature(z1b, spawnCreature("rat", Math.floor(p.x) + 1, Math.floor(p.y), z1b.stand[Math.floor(p.x) + 1 + Math.floor(p.y) * z1b.w], { rng: () => 0.5, level: 1, state: "wander" }));
+        lurker.brain = { arriving: 0.5 };
+        const stepped = mapStep(game, 1, 0, { force: false });
+        passTime(game, 1);
+        const onYou = lurker.tx === Math.floor(p.x) && lurker.ty === Math.floor(p.y);
+        expect(stepped && !lurker.brain.arriving && !onYou, `a creature arriving where you stepped: stepped ${stepped}, arrived ${!lurker.brain.arriving}, on your tile ${onYou}`);
+        z1b.creatures.splice(z1b.creatures.indexOf(lurker), 1);
+      }
       edge[view] = { follower: "came", hunterAt4: "came", hunterAt11: "stayed", arrivedIn: "< 3 s" };
       run.restore(); run = null;
     }
