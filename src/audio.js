@@ -8,11 +8,18 @@
 // and when frames stop coming (a hidden tab, a minimised window) everything falls silent until
 // they return.
 //
+// Everything bound for the speakers connects to audioOut(ac), never to ac.destination itself. With
+// ?silent=1 (config.js FLAGS.silent; checks and browser tools) that is an AnalyserNode followed by a
+// zero-gain node, the only thing connected to the destination: a check can measure what would have
+// played (silentSink().analyser), and nothing reaches the speakers (TECH_DESIGN §9).
+//
+//   audioOut(ac) → AudioNode        ac.destination, or the silent sink's analyser
+//   silentSink() → { analyser, mute } | null
 //   savedSwitch(name) · saveSwitch(name, on)   a remembered "on" / "off" under storageKey(name); the
 //                                   parent game's key ("rotation-cube-<name>") is read when there is none
-import { storageKey } from "./config.js";
+import { FLAGS, storageKey } from "./config.js";
 
-let ctx = null, asleep = false, lastFrame = 0;
+let ctx = null, asleep = false, lastFrame = 0, sink = null;
 const ready = [];
 
 export const audioContext = () => ctx;
@@ -33,6 +40,18 @@ export function unlockAudio() {
     if (ctx.state === "running" && performance.now() - lastFrame > 500) { asleep = true; ctx.suspend(); }
   }, 100);
 }
+
+export function audioOut(ac) {
+  if (!FLAGS.silent) return ac.destination;
+  if (!sink || sink.analyser.context !== ac) {
+    const analyser = ac.createAnalyser(), mute = ac.createGain();
+    mute.gain.value = 0;
+    analyser.connect(mute).connect(ac.destination);
+    sink = { analyser, mute };
+  }
+  return sink.analyser;
+}
+export const silentSink = () => sink;
 
 export function audioFrame() {
   lastFrame = performance.now();

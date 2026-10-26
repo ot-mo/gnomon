@@ -3,7 +3,8 @@
 //   NODE_PATH=$(npm root -g) node tools/browser-gate.mjs [--seeds 1234,7] [--shots DIR]
 //
 // It serves the repository itself (a static server on a free port), and before any key press routes
-// every audio node bound for the speakers through an AnalyserNode and a zero-gain node (silent). Then,
+// every audio node bound for the speakers through an AnalyserNode and a zero-gain node (silent), and since 0D2 the page is opened with ?silent=1 (audio.js's own sink, proven by
+// browser-silent.mjs), so the init script is the second guard. Then,
 // per seed: the old game boots into its intro pages, Space pages through them to the map, arrow keys
 // walk; off the temple span's east edge in 3D (Tab, a click, W held; every frame is sampled at
 // present(): the zone, your point in the world, the black share of the cell buffer and whole black
@@ -66,7 +67,7 @@ async function gate(browser, seed) {
       return orig.call(this, dest, ...rest);
     };
   });
-  await page.goto(`${base}/index.html?seed=${seed}`);
+  await page.goto(`${base}/index.html?silent=1&seed=${seed}`);
   await page.waitForFunction(() => window.game && window.game.zone && window.game.mode);
   await page.waitForTimeout(500);
   // Helpers inside the page.

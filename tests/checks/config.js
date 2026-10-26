@@ -10,7 +10,8 @@
 //      key ("rotation-cube-<name>") only when there is none (so a choice made before 0D2 still counts),
 //      never writing it.
 //   4. The moves, by a scan of src/ (comments stripped): no "rotation-cube-" key outside audio.js's
-//      fallback; localStorage only in audio.js; the URL read only in config.js.
+//      fallback; localStorage only in audio.js; the URL read only in config.js; `.destination` (the
+//      speakers) only in audio.js, whose audioOut() everything else connects to.
 const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/.*$/gm, "$1");
 
 export function checkConfig({ config, audio, srcFiles, indexHtml }) {
@@ -71,6 +72,9 @@ export function checkConfig({ config, audio, srcFiles, indexHtml }) {
   only("a rotation-cube- storage key", /rotation-cube-/, ["audio.js"]);
   only("localStorage", /localStorage/, ["audio.js"]);
   only("the URL (location / URLSearchParams)", /\blocation\.search\b|URLSearchParams/, ["config.js"]);
+  only("the speakers (.destination)", /\.destination\b/, ["audio.js"]);
+  const outs = where(/audioOut\(/);
+  for (const f of ["music.js", "sfx.js"]) if (!outs.includes(f)) fail(`${f} doesn't connect through audioOut()`);
   stats.scanned = srcFiles.length;
 
   return { name: "config", ok: problems.length === 0, problems, stats };

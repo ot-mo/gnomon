@@ -17,7 +17,7 @@
 //
 // M toggles the music (remembered between visits). The audio context itself, and going quiet
 // when the game isn't on screen, are in audio.js.
-import { onAudioReady, savedSwitch, saveSwitch, impulse } from "./audio.js";
+import { onAudioReady, audioOut, savedSwitch, saveSwitch, impulse } from "./audio.js";
 
 const MOODS = {
   temple:  { bpm: 66,  root: 62, scale: [0, 2, 4, 6, 7, 9, 11], chords: [0, 4, 5, 3], pad: "triangle", pluck: "sine",     notes: 0.45, bass: "none",     drums: 0, cutoff: 2600 },
@@ -41,7 +41,7 @@ export const musicMuted = () => st.muted;
 // Once there's sound: build the band's sound chain and start the sequencer.
 onAudioReady((ac) => {
   ctx = ac;
-  out = buildGraph(ctx, ctx.destination);
+  out = buildGraph(ctx, audioOut(ctx));
   out.master.gain.value = st.muted ? 0 : VOLUME;
   setFlat(out, st.flat, 0.01);
   st.nextTime = ctx.currentTime + 0.1;

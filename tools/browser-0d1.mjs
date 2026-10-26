@@ -4,7 +4,8 @@
 //
 // It serves the repository (and, for the frame-time comparison, `git archive <against>` unpacked into a
 // temporary folder) on free ports, and before any page script routes every audio node bound for the
-// speakers through an AnalyserNode and a zero-gain node (silent). Then:
+// speakers through an AnalyserNode and a zero-gain node (silent), and since 0D2 the page is opened with ?silent=1 (audio.js's own sink, proven by
+// browser-silent.mjs), so the init script is the second guard. Then:
 //   1. Every mode by keys and by the mouse: tools/browser-shell.mjs, run against this server at 1280×720 and
 //      600×300 (100×30 cells): the intro, I, J, the cube, pause, Tab, Esc, Pell's talk and pack, a level
 //      gained, stairs, death; a text field takes "m", "Ö" and "M" from real keys without toggling the
@@ -88,7 +89,7 @@ async function openPage(base, width, height, seed = 1234) {
   page.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") errors.push(`${base === here.base ? "" : `${AGAINST}: `}${m.type()}: ${m.text()}`); });
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
   await page.addInitScript(silence);
-  await page.goto(`${base}/index.html?seed=${seed}`);
+  await page.goto(`${base}/index.html?silent=1&seed=${seed}`);
   await page.waitForFunction(() => window.game && window.game.zone && window.game.mode);
   return page;
 }

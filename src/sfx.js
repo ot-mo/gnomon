@@ -8,7 +8,7 @@
 //     that person's own voice. dialogue.js calls it as the words type out.
 //
 // N switches sounds and voices on and off (remembered between visits).
-import { onAudioReady, audioContext, savedSwitch, saveSwitch, impulse } from "./audio.js";
+import { onAudioReady, audioContext, audioOut, savedSwitch, saveSwitch, impulse } from "./audio.js";
 
 const VOLUME = 0.55;
 let out = null;   // { master, voices, echo }
@@ -30,7 +30,7 @@ onAudioReady((ac) => {
   master.gain.value = VOLUME;
   const comp = ac.createDynamicsCompressor();
   comp.threshold.value = -14; comp.ratio.value = 4;
-  master.connect(comp).connect(ac.destination);
+  master.connect(comp).connect(audioOut(ac));
   const voices = ac.createGain();
   voices.gain.value = 0.9;
   voices.connect(master);
