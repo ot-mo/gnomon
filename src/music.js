@@ -33,7 +33,7 @@ const CRUSH_DRIVE = 3.5, FLAT_LEVEL = 0.9;
 let ctx = null, out = null;   // see buildGraph
 const st = {
   mood: "temple", want: "temple", intensity: 0, flat: 1, depth: 0, silent: false,
-  muted: !savedSwitch("rotation-cube-music"), nextTime: 0, step: 0, last: 7,
+  muted: !savedSwitch("music"), nextTime: 0, step: 0, last: 7,
 };
 
 export const musicMuted = () => st.muted;
@@ -50,7 +50,7 @@ onAudioReady((ac) => {
 
 export function toggleMusic() {
   st.muted = !st.muted;
-  saveSwitch("rotation-cube-music", !st.muted);
+  saveSwitch("music", !st.muted);
   if (out) out.master.gain.setTargetAtTime(st.muted || st.silent ? 0 : VOLUME, ctx.currentTime, 0.2);
   return !st.muted;
 }

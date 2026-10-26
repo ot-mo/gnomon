@@ -7,6 +7,11 @@
 // Sound only plays while the game is actually on screen: audioFrame() is called every frame,
 // and when frames stop coming (a hidden tab, a minimised window) everything falls silent until
 // they return.
+//
+//   savedSwitch(name) · saveSwitch(name, on)   a remembered "on" / "off" under storageKey(name); the
+//                                   parent game's key ("rotation-cube-<name>") is read when there is none
+import { storageKey } from "./config.js";
+
 let ctx = null, asleep = false, lastFrame = 0;
 const ready = [];
 
@@ -34,12 +39,13 @@ export function audioFrame() {
   if (ctx && asleep) { asleep = false; ctx.resume(); }
 }
 
-// A preference remembered between visits ("on" / "off"), if the browser lets us store it.
-export function savedSwitch(key) {
-  try { return localStorage.getItem(key) !== "off"; } catch (e) { return true; }
+// A preference remembered between visits ("on" / "off"), if the browser lets us store it. Before 0D2 the
+// keys were the parent game's ("rotation-cube-music"); a choice made then still counts.
+export function savedSwitch(name) {
+  try { return (localStorage.getItem(storageKey(name)) ?? localStorage.getItem(`rotation-cube-${name}`)) !== "off"; } catch (e) { return true; }
 }
-export function saveSwitch(key, on) {
-  try { localStorage.setItem(key, on ? "on" : "off"); } catch (e) { /* fine */ }
+export function saveSwitch(name, on) {
+  try { localStorage.setItem(storageKey(name), on ? "on" : "off"); } catch (e) { /* fine */ }
 }
 
 // A reverb's echo: noise dying away over `seconds`, a little different in each ear.

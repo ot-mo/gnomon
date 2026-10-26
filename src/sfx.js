@@ -12,13 +12,13 @@ import { onAudioReady, audioContext, savedSwitch, saveSwitch, impulse } from "./
 
 const VOLUME = 0.55;
 let out = null;   // { master, voices, echo }
-let on = savedSwitch("rotation-cube-sounds");
+let on = savedSwitch("sounds");
 const ear = { x: 0, y: 0, yaw: 0, flat: true };   // where you're listening from
 
 export const soundsOn = () => on;
 export function toggleSounds() {
   on = !on;
-  saveSwitch("rotation-cube-sounds", on);
+  saveSwitch("sounds", on);
   return on;
 }
 
