@@ -128,7 +128,7 @@ export function removeCreature(zone, c) {
 export const talkerAt = (zone, x, y) => zone.creatures.find((c) => c.talk && c.tx === x && c.ty === y) || null;
 export function creatureAt(zone, x, y) {
   return talkerAt(zone, x, y) ||
-    zone.creatures.find((c) => !c.talk && ((c.tx === x && c.ty === y) || (c.nx === x && c.ny === y) ||
+    zone.creatures.find((c) => !c.talk && !(c.brain?.arriving > 0) && ((c.tx === x && c.ty === y) || (c.nx === x && c.ny === y) ||
       (Math.floor(c.x) === x && Math.floor(c.y) === y))) || null;
 }
 
@@ -147,7 +147,7 @@ export const ghostOffMap = (game, c) => isGhostly(c) && (!c.talk?.met || (!!game
 // Pressed flat yourself (status.js "flat", bible §10.2) you exist only in the Plane: you touch flat
 // things and nothing else, and only flat things touch you (touchesYou).
 export function touchable(game, target, attacker = game.player, { blade = false } = {}) {
-  if (canTalk(target)) return false;
+  if (canTalk(target) || target.brain?.arriving > 0) return false;   // (arriving: still on its way in, ai.js)
   if (attacker !== game.player) return true;
   if (ghostHidden(game, target)) return false;
   if (statusFlag(attacker, "flat")) return isFlat(target);
@@ -258,7 +258,7 @@ export function creaturesAlong(zone, x0, y0, z0, x1, y1, z1, { pad = 0.15, skip 
 // wader sinks a little; statuses tint it and elites glow. People: one picture, a ghost bobbing.
 // Nothing for flat beings (render3d draws their shadow) or for a ghost hidden by the light.
 export function creatureSprite(game, c) {
-  if (isFlat(c) || ghostHidden(game, c)) return null;
+  if (isFlat(c) || ghostHidden(game, c) || c.brain?.arriving > 0) return null;
   const t = typeOf(c);
   if (c.talk) {
     const bob = c.vis.ghostly ? 0.25 + Math.sin(game.time * 2 + c.id) * 0.08 : 0;
