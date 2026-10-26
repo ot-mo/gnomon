@@ -11,7 +11,8 @@
 //       over 17 ms for 2 s casts every other column and copies it to the next, until the full cast's cost
 //       (twice the halved one) is back under 12 ms for 2 s. On by default in a page, off in Node.
 //   horizonOf(game, zone) → { n, e, s, w: { z, color } }   the horizon plane's height and colour per side
-//   GNOMON, gnomonDrawn() → bool   the Gnomon on the horizon (bible §4.12) and whether the last frame showed it
+//   GNOMON, gnomonDrawn() → bool   the Gnomon on the horizon (bible §4.12) and whether the last frame showed it;
+//   gnomonLightSeen(game, zone) → bool   whether its violet light can be seen from where you stand (at night)
 //   CLOCK_SEGMENT              the HUD's clock segment (§4.5: "clock", WS3, priority 30): the day and the hour,
 //       coloured by the time of day, under the sky only. Not registered here: check-hud (P0) holds the 180-column
 //       status row to the parent's order; registering it (hud.registerHudSegment("clock", CLOCK_SEGMENT)) is an
@@ -381,45 +382,63 @@ function shadeHorizon(dx, dy, dz, tExit, time) {
 // --- The Gnomon on the horizon (bible §4.12, §1.3) -------------------------------------------------------
 // From every surface zone the Gnomon stands at its true bearing: a thin black needle on the north-east horizon,
 // leaning a little toward the Shade (west-south-west). It is a sky-layer billboard, never voxels: drawn only on
-// cells that show the sky or the horizon plane (nothing nearer in front of it), from its foot (the plane's height,
-// or the top of its 14-block voxel foot in its own zone) to its tip GNOMON.height tiles up. In the noon window the
-// sun stands on its tip and the tip glints; at night it is lost in the dark but for a single violet light at the
-// tip, seen only from the Shade and from the tops of the Rust Steps' mesas (standing GNOMON.mesaHeight above the
-// datum). gnomonDrawn() → whether it was on screen in the last 3D frame (the compass: WS1's "the Gnomon in sight").
-export const GNOMON = { height: 600, width: 6, lean: 0.06, foot: 14, mesaHeight: 4, steps: "steps" };
+// cells that show the sky or the horizon plane (nothing nearer in front of it), from its foot to its tip
+// GNOMON.height tiles up, cut where it passes behind you. Its foot is the plane's height, or in its own span the top of
+// whatever stands at the span's middle (the bible's 14-block voxel foot is content's; until it is built the needle
+// rises from the ground). In the noon window the sun stands on its tip and the tip glints. At night (the hour's
+// daylight under 0.3) it is lost in the dark, but for a single violet light at its tip, seen only from the Shade and
+// from the tops of the Rust Steps' mesas (standing GNOMON.mesaHeight above the datum). gnomonDrawn() → whether any
+// of it was in sight in the last 3D frame (the compass: WS1's "the Gnomon in sight").
+export const GNOMON = { height: 600, width: 6, lean: 0.06, mesaHeight: 4, steps: "steps", nightBelow: 0.3 };
 let gnomonShown = false;
 export const gnomonDrawn = () => gnomonShown;
+// Its light at night: seen from a span of the Shade, or standing on a Rust Steps mesa (GNOMON.mesaHeight up).
+export function gnomonLightSeen(game, zone = game.zone) {
+  if (!(daylightAt(minutes(game)) < GNOMON.nightBelow)) return false;
+  const span = spanOf(game, zone);
+  return !!span?.terrain?.dark || (span?.tile?.terrain === GNOMON.steps && game.player.z >= FLOOR_Z + GNOMON.mesaHeight);
+}
 function drawGnomon(game, zone) {
   gnomonShown = false;
   const g = outdoor && gnomonOf(game);
   if (!g) return;
   const own = g.wx === zone.wx && g.wy === zone.wy;
   const gx = (g.wx - zone.wx) * zone.w + zone.w / 2, gy = (g.wy - zone.wy) * zone.d + zone.d / 2;
-  const footZ = own ? FLOOR_Z + GNOMON.foot : FLOOR_Z, lean = GNOMON.height * GNOMON.lean;
-  const th = handAngle(12);   // the Shade's way: west-south-west
-  const tip = [gx - Math.cos(th) * lean, gy + Math.sin(th) * lean, footZ + GNOMON.height];
-  const project = (x, y, z) => {
-    const vx = x - cam.ex, vy = y - cam.ey, vz = z - cam.ez, zc = vx * cam.fX + vy * cam.fY + vz * cam.fZ;
-    if (zc < 0.5) return null;
-    return { x: ((vx * cam.rX + vy * cam.rY) / zc / cam.halfW + 1) * 0.5 * S.cols, y: (1 - (vx * cam.uX + vy * cam.uY + vz * cam.uZ) / zc / cam.halfH) * 0.5 * S.rows, zc };
-  };
-  const a = project(gx, gy, footZ), b = project(...tip);
-  if (!a || !b) return;
+  let footZ = FLOOR_Z;
+  if (own) {   // on whatever stands at the span's middle
+    const cx = Math.floor(gx), cy = Math.floor(gy);
+    for (let z = zone.h - 1; z >= 0; z--) if (zone.get(cx, cy, z)) { footZ = Math.max(FLOOR_Z, z + 1); break; }
+  }
+  const lean = GNOMON.height * GNOMON.lean, th = handAngle(12);   // the Shade's way: west-south-west
+  const foot = [gx, gy, footZ], tip = [gx - Math.cos(th) * lean, gy + Math.sin(th) * lean, footZ + GNOMON.height];
+  // Camera space; a point behind the near plane is moved along the needle to it.
+  const view = ([x, y, z]) => { const vx = x - cam.ex, vy = y - cam.ey, vz = z - cam.ez;
+    return { xc: vx * cam.rX + vy * cam.rY, yc: vx * cam.uX + vy * cam.uY + vz * cam.uZ, zc: vx * cam.fX + vy * cam.fY + vz * cam.fZ }; };
+  let A = view(foot), Bv = view(tip);
+  const NEAR = 0.5;
+  if (A.zc < NEAR && Bv.zc < NEAR) return;
+  const cut = (P, Q) => { const s = (NEAR - P.zc) / (Q.zc - P.zc); return { xc: P.xc + (Q.xc - P.xc) * s, yc: P.yc + (Q.yc - P.yc) * s, zc: NEAR }; };
+  const tipCut = Bv.zc < NEAR;
+  if (A.zc < NEAR) A = cut(A, Bv); else if (tipCut) Bv = cut(Bv, A);
+  const screen = (P) => ({ x: (P.xc / P.zc / cam.halfW + 1) * 0.5 * S.cols, y: (1 - P.yc / P.zc / cam.halfH) * 0.5 * S.rows, zc: P.zc });
+  const a = screen(A), b = screen(Bv);
+  const night = daylightAt(minutes(game)) < GNOMON.nightBelow, noon = inNoonWindow(game), violet = gnomonLightSeen(game, zone);
+  if (night && !violet) return;   // lost in the dark
   const dist = Math.hypot(gx - cam.ex, gy - cam.ey);
   const half = Math.max(0.5, (GNOMON.width / a.zc / cam.halfW) * 0.25 * S.cols);   // half its width, in cells (at least one cell)
   const y0 = Math.max(0, Math.floor(b.y)), y1 = Math.min(S.rows - 1, Math.floor(a.y));
+  const tipOn = !tipCut && b.y >= 0;
   // Black, a little hazed (it is far off, but it is the compass: the haze never takes it).
   const k = 0.1 + 0.2 * (1 - Math.exp(-dist / 2000));
   const col = [10 + (fogR - 10) * k, 10 + (fogG - 10) * k, 14 + (fogB - 14) * k];
-  const sky = daylightAt(minutes(game)), noon = inNoonWindow(game), span = spanOf(game, zone);
-  const violet = sky < 0.3 && (span?.terrain?.dark || (span?.tile?.terrain === GNOMON.steps && game.player.z >= FLOOR_Z + GNOMON.mesaHeight));
   for (let y = y0; y <= y1; y++) {
+    const atTip = tipOn && y === y0;
+    if (night && !atTip) continue;   // at night only its light
     const t = a.y === b.y ? 0 : (y + 0.5 - b.y) / (a.y - b.y), cx = b.x + (a.x - b.x) * Math.max(0, Math.min(1, t));
     for (let x = Math.max(0, Math.floor(cx - half + 0.5)); x <= Math.min(S.cols - 1, Math.floor(cx + half - 0.5)); x++) {
       if (depth[y * S.cols + x] !== Infinity) continue;   // something nearer is in front of it
-      const atTip = y === y0 && b.y >= 0;
-      if (atTip && noon && sky > 0.5) { const p = 0.75 + 0.25 * Math.sin(game.time * 4); S.put(x, y, "*", 255 * p, 245 * p, 200 * p); }
-      else if (atTip && violet) S.put(x, y, "*", 190, 110, 255);
+      if (atTip && violet) S.put(x, y, "*", 190, 110, 255);
+      else if (atTip && noon) { const p = 0.75 + 0.25 * Math.sin(game.time * 4); S.put(x, y, "*", 255 * p, 245 * p, 200 * p); }
       else S.put(x, y, "|", col[0], col[1], col[2]);
       gnomonShown = true;
     }

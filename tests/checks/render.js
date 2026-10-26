@@ -36,9 +36,10 @@
 //      p0-0c's, since the map behind it is WS3's): in the same state, every line of the card centred in its box,
 //      its borders whole, its title in its colour, and every cell outside the box what the map draws without it.
 //  11. The Gnomon on the horizon (bible §4.12): from Hollowmere, facing its bearing, a dark needle stands over the
-//      sky and the horizon plane in the screen's middle column, never on a nearer cell, its tip glinting at noon;
-//      facing away, none; at 23:00 no violet light from the flats, a violet light from the Shade; none in the test
-//      world (no Gnomon) or underground.
+//      sky and the horizon plane in the screen's middle columns, its tip glinting at noon but not at 09:00; facing
+//      away, none; behind a wall, none; at 23:00 nothing from the flats, a violet light from the Shade and from a Rust
+//      Steps mesa's top (not its foot), none from the Shade at noon; in its own span drawn from under its tip (cut
+//      where it passes behind you) and standing on the ground; none in the test world or underground.
 import { checkGolden } from "./golden.js";
 
 export async function checkRender(m) {
@@ -519,39 +520,73 @@ export async function checkRender(m) {
 
   // --- 11. The Gnomon on the horizon --------------------------------------------------------------------------
   {
-    const view = (key, h, away = false) => {
+    // A view of the Gnomon: at span `key`, from (x, y) (default: the floor nearest the middle), facing its foot, at hour
+    // h; build(zone) may add blocks first. → { drawn, needle (dark "|" cells in the middle columns), tip, lowest }
+    const view = (key, h, { away = false, at = null, pitch = 0.15, build = null, high = false } = {}) => {
       fresh(4242, worldmap.REAL_WORLD);
       if (key !== game.zone.key) game.debug.enterZone(key, "start");
       const z = game.zone, g = game.run.world.landmarks.get("gnomon");
       for (const side of ["n", "e", "s", "w", "ne", "nw", "se", "sw"]) { const a = zones.neighbourAddr(game, z, side); if (a && !zones.cachedZone(game, a.key)) zones.makeZone(game, a.key); }
       zones.fillApron(game, z);
-      const s = standNear(z, z.w >> 1, z.d >> 1);
+      let s = at ? { x: at[0], y: at[1], z: z.stand[at[0] + at[1] * z.w] } : standNear(z, z.w >> 1, z.d >> 1);
+      if (high) { let best = null; for (let i = 0; i < z.w * z.d; i++) if (z.stand[i] >= 0 && (!best || z.stand[i] > best.z)) best = { x: i % z.w, y: Math.floor(i / z.w), z: z.stand[i] }; s = best; }
+      build?.(z, s);
       const gx = (g.wx - z.wx) * z.w + z.w / 2, gy = (g.wy - z.wy) * z.d + z.d / 2, yaw = Math.atan2(gy - s.y - 0.5, gx - s.x - 0.5) + (away ? Math.PI : 0);
       game.time = T(h);
-      Object.assign(p(), { x: s.x + 0.5, y: s.y + 0.5, z: s.z, vz: 0, yaw, pitch: 0.15, torch: false });
+      Object.assign(p(), { x: s.x + 0.5, y: s.y + 0.5, z: s.z, vz: 0, yaw, pitch, torch: false });
       frame3d();
-      // The needle: dark "|" cells in the middle columns; its tip, the cell above the topmost of them.
-      const mid = capture.cols >> 1, out = { drawn: render3d.gnomonDrawn(), needle: 0, tip: null };
-      let top = null;
+      const mid = capture.cols >> 1, out = { drawn: render3d.gnomonDrawn(), needle: 0, tip: null, lowest: -1, standZ: s.z };
       for (let y = 0; y < capture.rows; y++) for (let x = mid - 3; x <= mid + 3; x++) {
-        const i = y * capture.cols + x;
-        if (capture.chars[i] === "|" && capture.colors[i * 3] + capture.colors[i * 3 + 1] + capture.colors[i * 3 + 2] < 250) { out.needle++; if (!top) top = { x, y }; }
-      }
-      if (top && top.y > 0) {
-        const i = (top.y - 1) * capture.cols + top.x, rgb = [0, 1, 2].map((k) => capture.colors[i * 3 + k]);
-        if (capture.chars[i] === "*") out.tip = rgb[1] < 150 && rgb[2] > 200 ? "violet" : rgb[0] > 150 && rgb[1] > 150 ? "glint" : "other";
+        const i = y * capture.cols + x, ch = capture.chars[i], r = capture.colors[i * 3], gg = capture.colors[i * 3 + 1], b = capture.colors[i * 3 + 2];
+        if (ch === "|" && r + gg + b < 250) { out.needle++; out.lowest = Math.max(out.lowest, y); }
+        if (ch === "*" && r > 150 && gg < 140 && b > 220) out.tip = "violet";
+        // The glint: a warm "*" (it pulses: 255, 245, 200 at full; a cloud's is cool) right above the needle.
+        else if (ch === "*" && !out.tip && r > 100 && r > b + 25 && y + 1 < capture.rows && capture.chars[i + capture.cols] === "|") out.tip = "glint";
       }
       return out;
     };
-    // The span of the Shade farthest from the Gnomon (from close by its tip is far above the screen).
-    const shadeKey = (() => { fresh(4242, worldmap.REAL_WORLD); const W = game.run.world, g = W.landmarks.get("gnomon"); let best = null;
-      for (let y = 0; y < W.h; y++) for (let x = 0; x < W.w; x++) { const t = W.tileAt(x, y), d = Math.hypot(x - g.wx, y - g.wy);
-        if (t?.terrain === "shade" && t.travel !== "no" && !t.landmark && (!best || d > best.d)) best = { key: `${x},${y},0`, d }; }
-      return best?.key ?? null; })();
-    const gn = { noon: view("5,16,0", 12), away: view("5,16,0", 12, true), night: view("5,16,0", 23), shadeNight: shadeKey && view(shadeKey, 23) };
+    // The span of the Shade farthest from the Gnomon (from close by its tip is far above the screen), and a Rust Steps
+    // span with a mesa (standable ground GNOMON.mesaHeight above the datum).
+    fresh(4242, worldmap.REAL_WORLD);
+    const W = game.run.world, gnom = W.landmarks.get("gnomon");
+    let shadeKey = null, shadeD = -1;
+    const steps = [];
+    for (let y = 0; y < W.h; y++) for (let x = 0; x < W.w; x++) {
+      const t = W.tileAt(x, y), d = Math.hypot(x - gnom.wx, y - gnom.wy);
+      if (!t || t.travel === "no" || t.landmark) continue;
+      if (t.terrain === "shade" && d > shadeD) { shadeKey = `${x},${y},0`; shadeD = d; }
+      if (t.terrain === render3d.GNOMON.steps && x >= 9 && steps.length < 6) steps.push(`${x},${y},0`);
+    }
+    const wall = (z, s) => {   // a tall wall 3 tiles ahead of you, toward the Gnomon, across the middle of the view
+      const yaw = Math.atan2((gnom.wy - z.wy) * z.d + z.d / 2 - s.y, (gnom.wx - z.wx) * z.w + z.w / 2 - s.x);
+      const cx = Math.round(s.x + 0.5 + Math.cos(yaw) * 3), cy = Math.round(s.y + 0.5 + Math.sin(yaw) * 3);
+      for (let k = -2; k <= 2; k++) for (let zz = FLOOR_Z; zz < z.h; zz++) z.set(cx - Math.round(Math.sin(yaw) * k), cy + Math.round(Math.cos(yaw) * k), zz, B.STONE);
+      z.refresh();
+    };
+    const gn = { noon: view("5,16,0", 12), morning: view("5,16,0", 9), away: view("5,16,0", 12, { away: true }), behindWall: view("5,16,0", 12, { build: wall }),
+      night: view("5,16,0", 23), shadeNight: view(shadeKey, 23), shadeNoon: view(shadeKey, 12) };
+    // A mesa: the first Rust Steps span with ground 4 above the datum; at night from on it, and from its foot.
+    for (const key of steps) {
+      const hi = view(key, 23, { high: true });
+      if (hi.standZ < FLOOR_Z + render3d.GNOMON.mesaHeight) continue;
+      gn.mesaTop = hi; gn.mesaFoot = view(key, 23); gn.mesaKey = key;
+      break;
+    }
+    // The light's rule itself (the mesa's foot can't see the Gnomon past the mesas, so a frame can't tell):
+    const lightAt = (key, h, z) => { fresh(4242, worldmap.REAL_WORLD); if (key !== game.zone.key) game.debug.enterZone(key, "start"); game.time = T(h); p().z = z; return render3d.gnomonLightSeen(game); };
+    gn.lightRule = gn.mesaKey && { mesaTop: lightAt(gn.mesaKey, 23, FLOOR_Z + 6), mesaFoot: lightAt(gn.mesaKey, 23, FLOOR_Z + 1), shade: lightAt(shadeKey, 23, FLOOR_Z),
+      shadeDay: lightAt(shadeKey, 12, FLOOR_Z), flats: lightAt("5,16,0", 23, FLOOR_Z + 6) };
+    // In its own span: from under its leaning tip, facing its foot at pitch 0, it is cut where it passes behind you,
+    // not lost; from 15 tiles off its foot is on the ground (its span has no voxel foot yet), not hanging in the sky.
+    gn.underTip = view(`${gnom.wx},${gnom.wy},0`, 12, { at: [7, 39], pitch: 0 });
+    gn.ownSpan = view(`${gnom.wx},${gnom.wy},0`, 12, { at: [25, 24], pitch: 0 });
     fresh(4242); game.time = T(12); frame3d(); gn.testWorld = render3d.gnomonDrawn();
     zones.changeZone(game, "0,0,3", { how: "down", rng: Math.random }); frame3d(); gn.underground = render3d.gnomonDrawn();
-    expect(gn.noon.drawn && gn.noon.needle >= 8 && gn.noon.tip === "glint" && !gn.away.drawn && gn.night.tip !== "violet" && gn.shadeNight?.tip === "violet" &&
+    const horizonRow = capture.rows >> 1;
+    expect(gn.noon.drawn && gn.noon.needle >= 8 && gn.noon.tip === "glint" && gn.morning.needle >= 8 && gn.morning.tip !== "glint" && !gn.away.drawn &&
+           gn.behindWall.needle === 0 && !gn.night.drawn && gn.shadeNight.tip === "violet" && gn.shadeNoon.tip !== "violet" &&
+           gn.mesaTop?.tip === "violet" && !gn.mesaFoot?.drawn && gn.lightRule?.mesaTop && !gn.lightRule.mesaFoot && gn.lightRule.shade &&
+           !gn.lightRule.shadeDay && !gn.lightRule.flats && gn.underTip.drawn && gn.ownSpan.drawn && gn.ownSpan.lowest >= horizonRow - 1 &&
            !gn.testWorld && !gn.underground, `the Gnomon on the horizon: ${JSON.stringify(gn)} (the Shade's span ${shadeKey})`);
     stats.gnomon = gn;
   }
