@@ -14,13 +14,15 @@ const NEIGHBOURS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0,
 // last saw; syncLight rebuilds it when daylight moves on (dusk, dawn).
 let maskDaylight = 1;
 // What light.js keeps per zone, out of the zone itself (a save writes a zone's own fields; only sunlit is
-// on the codec's list of rebuilt ones): `for`, the skyLight array it belongs to (a refresh makes a new one);
-// litKey, the daylight step the lit mask was built at; the baked sun's bucket, sun and slice in progress;
-// and the voxels a bake visits.
+// on the codec's list of rebuilt ones), keyed by the zone's skyLight array: a refresh makes a new one, and a
+// dormant zone drops it (dropDerived), and this with it. litKey, the daylight step the lit mask was built at; the
+// baked sun's bucket, sun, apron (rayInfo) and slice in progress; the voxels a bake visits.
 const STATE = new WeakMap();
+const NO_STATE = () => ({ litKey: null, sunBucket: null, sunDir: null, sunInfo: null, bake: null, cells: null });
 function stateOf(zone) {
-  let st = STATE.get(zone);
-  if (!st || st.for !== zone.skyLight) { st = { for: zone.skyLight, litKey: null, sunBucket: null, sunDir: null, bake: null, cells: null }; STATE.set(zone, st); }
+  if (!zone.skyLight) return NO_STATE();
+  let st = STATE.get(zone.skyLight);
+  if (!st) STATE.set(zone.skyLight, (st = NO_STATE()));
   return st;
 }
 function litMaskOf(zone, sky, lamp, dl) {

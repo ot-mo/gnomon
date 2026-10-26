@@ -24,6 +24,7 @@ export const hit = { t: 0, block: 0, nx: 0, ny: 0, nz: 0, x: 0, y: 0, z: 0, apro
 // the highest block of the zone and its bands. Under the sky a ray going up from there meets nothing, so it
 // stops (sky rays are half the screen). Rebuilt when a band is replaced or the zone refreshed (a new
 // skyLight). Dungeons (no sky) keep their height: nothing about their rays changes.
+// (Cached by the zone's skyLight array, so a dormant zone that drops it, dropDerived, frees all of this too.)
 const AP = new WeakMap(), TOPS = new WeakMap(), BANDS = new WeakMap();
 // A band as castRay reads it: always this shape, whoever built the band.
 const bandOf = (band) => {
@@ -47,22 +48,22 @@ function zoneTop(zone) {
   return 0;
 }
 export function rayInfo(zone) {
-  let r = AP.get(zone);
+  let r = zone.skyLight ? AP.get(zone.skyLight) : null;
   const ap = zone.apron;
-  if (r && r.sky === zone.skyLight && r.lit === zone.litMask && r.blocks === zone.blocks && r.ap === ap && (!ap || (r.raw[0] === ap.nw &&
+  if (r && r.lit === zone.litMask && r.blocks === zone.blocks && r.ap === ap && (!ap || (r.raw[0] === ap.nw &&
       r.raw[1] === ap.n && r.raw[2] === ap.ne && r.raw[3] === ap.w && r.raw[5] === ap.e && r.raw[6] === ap.sw && r.raw[7] === ap.s && r.raw[8] === ap.se))) return r;
   const raw = ap ? [ap.nw, ap.n, ap.ne, ap.w, null, ap.e, ap.sw, ap.s, ap.se] : null, g = raw ? raw.map(bandOf) : null;
   let top = zone.h;
-  if (zone.hasSky) {
+  if (zone.hasSky && zone.skyLight) {   // (a zone not refreshed yet, or dormant, keeps its height: nothing is cached for it)
     top = zoneTop(zone);
     if (raw) for (const band of raw) if (band) top = Math.max(top, bandTop(band, zone.h));
   }
   // The zone's sizes and arrays too: castRay reads only this object (always this shape), never the zone.
   // How far a ray may go outside the grid: the apron's reach on each open side.
   const W = zone.w, D = zone.d;
-  r = { sky: zone.skyLight, lit: zone.litMask, blocks: zone.blocks, w: W, d: zone.d, h: zone.h, ap, raw, g, top,
+  r = { lit: zone.litMask, blocks: zone.blocks, w: W, d: zone.d, h: zone.h, ap, raw, g, top,
         x0: ap?.w ? -APRON : 0, x1: ap?.e ? W + APRON : W, y0: ap?.n ? -APRON : 0, y1: ap?.s ? D + APRON : D };
-  AP.set(zone, r);
+  if (zone.skyLight) AP.set(zone.skyLight, r);
   return r;
 }
 

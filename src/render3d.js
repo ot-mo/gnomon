@@ -400,6 +400,7 @@ export function render3d(game) {
   if (player.hurt > 0) S.tint(1 + player.hurt * 1.6, 1 - player.hurt * 1.4, 1 - player.hurt * 1.4);
   // Sinking in deep water: everything goes murky blue.
   if (zone.get(Math.floor(cam.ex), Math.floor(cam.ey), Math.floor(cam.ez)) === B.WATER_DEEP) S.tint(0.3, 0.55, 1.1);
+  zBlocks = zSky = zLamp = zSun = zSecret = horizon = null;   // hold no zone's arrays between frames
 }
 
 // Every cell of the view: a ray each (every other column when halved). Its own function, reading nothing
