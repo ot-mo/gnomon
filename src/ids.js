@@ -8,6 +8,8 @@
 //
 //   nextEntityId() → number           entityCounter() → the next id that will be handed out
 //   setEntityCounter(n)               restoring a save (never lower than an id in a loaded zone)
+//   getIds() → { entity }             what a save keeps (§1.4, §7.4: the slot record's `ids`)
+//   setIds({ entity })                a load puts it back before any zone loads
 //   genUid(zone, tag = "c") → string  "<zone key>#<tag><n>": the n-th uid this zone's generation handed out
 let entity = 1;
 
@@ -17,6 +19,8 @@ export function setEntityCounter(n) {
   if (!Number.isInteger(n) || n < 1) throw new Error(`setEntityCounter: ${n} is not a positive integer`);
   entity = n;
 }
+export const getIds = () => ({ entity });
+export function setIds(ids) { setEntityCounter(ids?.entity); }
 
 // The same generation (same seed, same zone) hands out the same uids in the same order.
 export function genUid(zone, tag = "c") {
