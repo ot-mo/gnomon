@@ -11,6 +11,7 @@
 //       over 17 ms for 2 s casts every other column and copies it to the next, until the full cast's cost
 //       (twice the halved one) is back under 12 ms for 2 s. On by default in a page, off in Node.
 //   horizonOf(game, zone) → { n, e, s, w: { z, color } }   the horizon plane's height and colour per side
+//   GNOMON, gnomonDrawn() → bool   the Gnomon on the horizon (bible §4.12) and whether the last frame showed it
 //   CLOCK_SEGMENT              the HUD's clock segment (§4.5: "clock", WS3, priority 30): the day and the hour,
 //       coloured by the time of day, under the sky only. Not registered here: check-hud (P0) holds the 180-column
 //       status row to the parent's order; registering it (hud.registerHudSegment("clock", CLOCK_SEGMENT)) is an
@@ -19,7 +20,7 @@
 import * as S from "./screen.js";
 import { castRay, hit, setGhostVisible, rayInfo } from "./raycast.js";
 import { sampleGrid, inDark, zoneIsLightless, daylight, syncLight, sunState, sunlitGrid } from "./light.js";
-import { sunDir, skyColors, fogFor, spanOf, daylightAt, minutes, clockLabel, phase } from "./clock.js";
+import { sunDir, skyColors, fogFor, spanOf, daylightAt, minutes, clockLabel, phase, gnomonOf, handAngle, inNoonWindow } from "./clock.js";
 import { material, albedo, setMaterialTime, setDarkSight, DARK_SIGHT_BLOCKS } from "./materials.js";
 import { noise2, hash } from "./rng.js";
 import { creatureSprite, hostilesTo, talkersIn, isFlat } from "./creatures.js";
@@ -351,6 +352,54 @@ function shadeHorizon(dx, dy, dz, tExit, time) {
   return 0.55 + 0.45 * n;
 }
 
+// --- The Gnomon on the horizon (bible §4.12, §1.3) -------------------------------------------------------
+// From every surface zone the Gnomon stands at its true bearing: a thin black needle on the north-east horizon,
+// leaning a little toward the Shade (west-south-west). It is a sky-layer billboard, never voxels: drawn only on
+// cells that show the sky or the horizon plane (nothing nearer in front of it), from its foot (the plane's height,
+// or the top of its 14-block voxel foot in its own zone) to its tip GNOMON.height tiles up. In the noon window the
+// sun stands on its tip and the tip glints; at night it is lost in the dark but for a single violet light at the
+// tip, seen only from the Shade and from the tops of the Rust Steps' mesas (standing GNOMON.mesaHeight above the
+// datum). gnomonDrawn() → whether it was on screen in the last 3D frame (the compass: WS1's "the Gnomon in sight").
+export const GNOMON = { height: 600, width: 6, lean: 0.06, foot: 14, mesaHeight: 4, steps: "steps" };
+let gnomonShown = false;
+export const gnomonDrawn = () => gnomonShown;
+function drawGnomon(game, zone) {
+  gnomonShown = false;
+  const g = outdoor && gnomonOf(game);
+  if (!g) return;
+  const own = g.wx === zone.wx && g.wy === zone.wy;
+  const gx = (g.wx - zone.wx) * zone.w + zone.w / 2, gy = (g.wy - zone.wy) * zone.d + zone.d / 2;
+  const footZ = own ? FLOOR_Z + GNOMON.foot : FLOOR_Z, lean = GNOMON.height * GNOMON.lean;
+  const th = handAngle(12);   // the Shade's way: west-south-west
+  const tip = [gx - Math.cos(th) * lean, gy + Math.sin(th) * lean, footZ + GNOMON.height];
+  const project = (x, y, z) => {
+    const vx = x - cam.ex, vy = y - cam.ey, vz = z - cam.ez, zc = vx * cam.fX + vy * cam.fY + vz * cam.fZ;
+    if (zc < 0.5) return null;
+    return { x: ((vx * cam.rX + vy * cam.rY) / zc / cam.halfW + 1) * 0.5 * S.cols, y: (1 - (vx * cam.uX + vy * cam.uY + vz * cam.uZ) / zc / cam.halfH) * 0.5 * S.rows, zc };
+  };
+  const a = project(gx, gy, footZ), b = project(...tip);
+  if (!a || !b) return;
+  const dist = Math.hypot(gx - cam.ex, gy - cam.ey);
+  const half = Math.max(0.5, (GNOMON.width / a.zc / cam.halfW) * 0.25 * S.cols);   // half its width, in cells (at least one cell)
+  const y0 = Math.max(0, Math.floor(b.y)), y1 = Math.min(S.rows - 1, Math.floor(a.y));
+  // Black, a little hazed (it is far off, but it is the compass: the haze never takes it).
+  const k = 0.1 + 0.2 * (1 - Math.exp(-dist / 2000));
+  const col = [10 + (fogR - 10) * k, 10 + (fogG - 10) * k, 14 + (fogB - 14) * k];
+  const sky = daylightAt(minutes(game)), noon = inNoonWindow(game), span = spanOf(game, zone);
+  const violet = sky < 0.3 && (span?.terrain?.dark || (span?.tile?.terrain === GNOMON.steps && game.player.z >= FLOOR_Z + GNOMON.mesaHeight));
+  for (let y = y0; y <= y1; y++) {
+    const t = a.y === b.y ? 0 : (y + 0.5 - b.y) / (a.y - b.y), cx = b.x + (a.x - b.x) * Math.max(0, Math.min(1, t));
+    for (let x = Math.max(0, Math.floor(cx - half + 0.5)); x <= Math.min(S.cols - 1, Math.floor(cx + half - 0.5)); x++) {
+      if (depth[y * S.cols + x] !== Infinity) continue;   // something nearer is in front of it
+      const atTip = y === y0 && b.y >= 0;
+      if (atTip && noon && sky > 0.5) { const p = 0.75 + 0.25 * Math.sin(game.time * 4); S.put(x, y, "*", 255 * p, 245 * p, 200 * p); }
+      else if (atTip && violet) S.put(x, y, "*", 190, 110, 255);
+      else S.put(x, y, "|", col[0], col[1], col[2]);
+      gnomonShown = true;
+    }
+  }
+}
+
 // --- Dynamic resolution (§6.7) ----------------------------------------------------------------------
 const dyn = { on: typeof document !== "undefined", half: false, avg: 0, since: 0 };
 export function setDynamicResolution(on) { dyn.on = !!on; if (!on) dyn.half = false; }
@@ -400,6 +449,7 @@ export function render3d(game) {
   judgeFrame(performance.now() - t0, performance.now());
 
   setGhostVisible(false);          // everything else (sight lines, aiming…) sees straight through them
+  drawGnomon(game, zone);
   drawSprites(game);
   drawDamageNumbers(game);
   // A bomb going off close by: a flash of light.

@@ -34,6 +34,10 @@
 //  10. The victory card over the surface map (tests/checks/screen-frames.js no longer compares that frame with
 //      p0-0c's, since the map behind it is WS3's): in the same state, every line of the card centred in its box,
 //      its borders whole, its title in its colour, and every cell outside the box what the map draws without it.
+//  11. The Gnomon on the horizon (bible §4.12): from Hollowmere, facing its bearing, a dark needle stands over the
+//      sky and the horizon plane in the screen's middle column, never on a nearer cell, its tip glinting at noon;
+//      facing away, none; at 23:00 no violet light from the flats, a violet light from the Shade; none in the test
+//      world (no Gnomon) or underground.
 import { checkGolden } from "./golden.js";
 
 export async function checkRender(m) {
@@ -471,6 +475,45 @@ export async function checkRender(m) {
       stats.victory = { box: { x0, y0, w, h }, outsideCells: outside, outsideDiffer: differ };
     }
     expect(!bad.length, `the victory card: ${bad.slice(0, 4).join("; ")}`);
+  }
+
+  // --- 11. The Gnomon on the horizon --------------------------------------------------------------------------
+  {
+    const view = (key, h, away = false) => {
+      fresh(4242, worldmap.REAL_WORLD);
+      if (key !== game.zone.key) game.debug.enterZone(key, "start");
+      const z = game.zone, g = game.run.world.landmarks.get("gnomon");
+      for (const side of ["n", "e", "s", "w", "ne", "nw", "se", "sw"]) { const a = zones.neighbourAddr(game, z, side); if (a && !zones.cachedZone(game, a.key)) zones.makeZone(game, a.key); }
+      zones.fillApron(game, z);
+      const s = standNear(z, z.w >> 1, z.d >> 1);
+      const gx = (g.wx - z.wx) * z.w + z.w / 2, gy = (g.wy - z.wy) * z.d + z.d / 2, yaw = Math.atan2(gy - s.y - 0.5, gx - s.x - 0.5) + (away ? Math.PI : 0);
+      game.time = T(h);
+      Object.assign(p(), { x: s.x + 0.5, y: s.y + 0.5, z: s.z, vz: 0, yaw, pitch: 0.15, torch: false });
+      frame3d();
+      // The needle: dark "|" cells in the middle columns; its tip, the cell above the topmost of them.
+      const mid = capture.cols >> 1, out = { drawn: render3d.gnomonDrawn(), needle: 0, tip: null };
+      let top = null;
+      for (let y = 0; y < capture.rows; y++) for (let x = mid - 3; x <= mid + 3; x++) {
+        const i = y * capture.cols + x;
+        if (capture.chars[i] === "|" && capture.colors[i * 3] + capture.colors[i * 3 + 1] + capture.colors[i * 3 + 2] < 250) { out.needle++; if (!top) top = { x, y }; }
+      }
+      if (top && top.y > 0) {
+        const i = (top.y - 1) * capture.cols + top.x, rgb = [0, 1, 2].map((k) => capture.colors[i * 3 + k]);
+        if (capture.chars[i] === "*") out.tip = rgb[1] < 150 && rgb[2] > 200 ? "violet" : rgb[0] > 150 && rgb[1] > 150 ? "glint" : "other";
+      }
+      return out;
+    };
+    // The span of the Shade farthest from the Gnomon (from close by its tip is far above the screen).
+    const shadeKey = (() => { fresh(4242, worldmap.REAL_WORLD); const W = game.run.world, g = W.landmarks.get("gnomon"); let best = null;
+      for (let y = 0; y < W.h; y++) for (let x = 0; x < W.w; x++) { const t = W.tileAt(x, y), d = Math.hypot(x - g.wx, y - g.wy);
+        if (t?.terrain === "shade" && t.travel !== "no" && !t.landmark && (!best || d > best.d)) best = { key: `${x},${y},0`, d }; }
+      return best?.key ?? null; })();
+    const gn = { noon: view("5,16,0", 12), away: view("5,16,0", 12, true), night: view("5,16,0", 23), shadeNight: shadeKey && view(shadeKey, 23) };
+    fresh(4242); game.time = T(12); frame3d(); gn.testWorld = render3d.gnomonDrawn();
+    zones.changeZone(game, "0,0,3", { how: "down", rng: Math.random }); frame3d(); gn.underground = render3d.gnomonDrawn();
+    expect(gn.noon.drawn && gn.noon.needle >= 8 && gn.noon.tip === "glint" && !gn.away.drawn && gn.night.tip !== "violet" && gn.shadeNight?.tip === "violet" &&
+           !gn.testWorld && !gn.underground, `the Gnomon on the horizon: ${JSON.stringify(gn)} (the Shade's span ${shadeKey})`);
+    stats.gnomon = gn;
   }
 
   // --- 9. Golden (b) --------------------------------------------------------------------------------------------
