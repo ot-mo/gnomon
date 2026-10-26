@@ -9,6 +9,7 @@
 import { registerItemKind, strNeeded } from "../../items.js";
 import { raiseAttr, raiseMaxHp } from "../../stats.js";
 import { CURRENCY } from "../currency.js";
+import { RULES } from "../../rules.js";
 import { receive, formatPrice, purseRoom } from "../../currency.js";
 
 // --- Potions ----------------------------------------------------------------
@@ -129,8 +130,8 @@ export const ARMOURS = {
 //   crush (×2 against brittle monsters) · thorns (damage to whoever hits you) · ward (less from
 //   arrows and bolts) · regen (points: 1 HP every 12/points s) · str · maxHp · armour · speed ·
 //   torch (fraction brighter) · sense (tiles: monsters that close show on the map) · darkSight
-//   (see a little with your torch out) · stealth · firstBlock (the first blow on each floor
-//   misses) · jump (blocks higher) · featherFall · killHeal (HP per kill)
+//   (see a little with your torch out) · stealth · firstBlock (a blow misses you, at most once every
+//   RULES.cooldown.firstBlock s) · jump (blocks higher) · featherFall · killHeal (HP per kill)
 //
 // Properties: extra traits gear can come with. You can see them as soon as you see the item
 // (unlike its enchantment).
@@ -163,7 +164,7 @@ export const AMULETS = {
   life:    { name: "life",     info: (n) => `${n >= 0 ? "+" : ""}${5 * n} max HP`, bonus: (n) => ({ maxHp: 5 * n }) },
   sight:   { name: "sight",    info: (n) => (n > 0 ? "a brighter torch; monsters close by show on the map" : "a dimmer torch"), bonus: (n) => ({ torch: 0.25 * n, sense: Math.max(0, 5 * n) }) },
   dark:    { name: "the dark", info: (n) => (n > 0 ? "with your torch out you see a little, and hide better" : "monsters notice you sooner"), bonus: (n) => ({ darkSight: Math.max(0, n), stealth: 0.12 * n }) },
-  warding: { name: "warding",  fixed: true, info: () => "the first blow on each floor misses you", bonus: () => ({ firstBlock: 1 }) },
+  warding: { name: "warding",  fixed: true, info: () => `a blow misses you, at most once every ${RULES.cooldown.firstBlock / 60} minutes`, bonus: () => ({ firstBlock: 1 }) },
   climber: { name: "the climber", fixed: true, info: () => "you jump a block higher", bonus: () => ({ jump: 1 }) },
   feather: { name: "feathers", fixed: true, info: () => "falling never hurts you", bonus: () => ({ featherFall: 1 }) },
 };

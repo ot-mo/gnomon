@@ -4,7 +4,8 @@
 //
 //   1. Migration: no timer field of the parent game is left in src/ (the player's flyTime, hasteTime,
 //      shadowTime, poisonTime, paralyzed, darkTime, guardTime; the creatures' burn, chill, stun, blind,
-//      poison, haste; the per-floor flags secondWind, firstBlocked and foldReady).
+//      poison, haste; the per-floor flags secondWind, firstBlocked and foldReady), and no text that still
+//      says "once per floor" (Second wind, the warding amulet).
 //   2. skipTime(600) equals stepping 1/60 s at a time (effects.js tickEffects, as play does), within
 //      ±1 HP and ±0.1 s for every status and cooldown: poison with regeneration, poison and regeneration
 //      fighting at full health, a cursed ring that drains, the attribute formulas' natural regeneration
@@ -64,6 +65,9 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles, capture }
     for (const m of text.matchAll(OLD_FIELDS)) { left++; if (left <= 5) fail(`old timer field ${m[0]} in src/${file}`); }
   }
   stats.oldTimerFields = left;
+  // The per-floor rules became game-time cooldowns: no text may still promise "once per floor".
+  const perFloor = srcFiles.flatMap(({ file, text }) => [...text.replace(/\/\/.*$/gm, "").matchAll(/once per floor|first blow on each floor/gi)].map((m) => `${file}: ${m[0]}`));
+  if (perFloor.length) fail(`text still describes a per-floor rule: ${perFloor.join("; ")}`);
 
   // --- 2. skipTime(600) against 1/60 s stepping --------------------------------------------------
   startRun(4242);

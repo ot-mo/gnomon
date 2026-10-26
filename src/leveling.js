@@ -5,6 +5,7 @@
 // bonus(rank): what the perk adds to the stat bus (stats.js bonus(), the "powers" source).
 import { sfx } from "./sfx.js";
 import { invalidateStats, raiseAttr, raiseMaxHp } from "./stats.js";
+import { RULES } from "./rules.js";
 
 export const PERKS = {
   swimmer:      { name: "Swimmer",       info: "Deep water no longer drags you down: you can swim in it (slowly).", bonus: () => ({ swim: 1 }) },
@@ -29,7 +30,7 @@ export const PERKS = {
   thickBlood:   { name: "Thick blood",   info: "Poison hurts you only half as often." },
   nightEyes:    { name: "Night eyes",    info: "With your torch out you can still see a little way around you.", bonus: () => ({ darkSight: 2 }) },
   // Major perks: only offered at milestones (levels 5, 10, 15…).
-  secondWind:   { name: "Second wind",   info: "Once per floor, a blow that would kill you leaves you on 1 HP instead.", major: true },
+  secondWind:   { name: "Second wind",   get info() { return `A blow that would kill you leaves you on 1 HP instead (at most once every ${RULES.cooldown.secondWind / 60} minutes).`; }, major: true },
   lucky:        { name: "Lucky",         info: "Monsters drop loot twice as often, and the gear they drop is more often blessed.", major: true },
   foldingStrike:{ name: "Folding strike", info: "Turning the world (Tab) stuns every monster next to you for 2 s (every 10 s at most).", major: true },
   giantSlayer:  { name: "Giant slayer",  info: "+30% damage against elites, guardians and the Lich King.", major: true },
