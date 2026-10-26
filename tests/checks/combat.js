@@ -881,12 +881,16 @@ export function checkAiDepth(ctx) {
       const gs = z.creatures.filter((c) => !c.talk && c.maxHp >= 4 && distance(c.x - p.x, c.y - p.y) > 4).slice(0, 2);
       if (expect(gs.length === 2, "level 1 has no two creatures to leave behind")) {
         const [a, b] = gs;
+        const far = gs[1];
+        const lich = addCreature(z, spawnCreature("lich", far.tx, far.ty, z.stand[far.tx + far.ty * z.w], { rng: () => 0.5, level: 20, state: "chase" }));
+        lich.hp = 100;
         a.hp = 2; addStatus(game, a, "chilled", { t: 5 }); a.state = "chase";
         b.maxHp = 60; b.hp = 2; b.state = "chase";   // (60: 600 s heals a sixth, 10)
         changeZone(game, "0,0,2", { how: "down" });
         game.time += 600;
         changeZone(game, "0,0,1", { how: "up" });
         const partB = b.hp;
+        expect(lich.state === "chase" && lich.hp === 100, `600 s away: the Lich King ${lich.state}, HP 100 → ${lich.hp} (want still hunting you, unhealed: a set fight)`);
         expect(partB === Math.min(b.maxHp, 2 + Math.floor((b.maxHp * 600) / AI_RULES.heal.fullAfter)) && b.state !== "chase" && !hasStatus(a, "chilled"),
           `600 s away: hp 2 → ${partB} of ${b.maxHp} (want +${Math.floor((b.maxHp * 600) / 3600)}), still hunting ${b.state === "chase"}, still chilled ${hasStatus(a, "chilled")}`);
         changeZone(game, "0,0,2", { how: "down" });

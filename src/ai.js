@@ -49,7 +49,7 @@
 // zone:enter they come in at the border you crossed (the stairs: beside you), each `arriving` for as long
 // as its way to you took. On zone:enter, a zone you come back to catches up on the time you were away:
 // statuses run out (status.js catchUpStatuses), creatures heal (fully after RULES.ai.heal.fullAfter s),
-// hunts and grudges lapse, bombs and gas burn out.
+// hunts and grudges lapse (bosses and guardians: only their statuses run out; they neither heal nor forget), bombs and gas burn out.
 //
 // Creatures live on the tile grid: each one stands on a tile or is stepping to a neighbour.
 import { lineOfSight } from "./raycast.js";
@@ -617,6 +617,8 @@ function catchUpZone(game, zone, away) {
     if (canTalk(c)) continue;
     catchUpStatuses(game, c, away);
     if (!zone.creatures.includes(c) || c.hp <= 0) continue;
+    const t = CREATURE_TYPES[c.type];
+    if (t.boss || t.guardian) continue;   // a set fight: it neither heals nor forgets you (as perceive: bosses never forget)
     if (c.hp < c.maxHp) c.hp = Math.min(c.maxHp, c.hp + Math.floor((c.maxHp * away) / AI_RULES.heal.fullAfter));
     c.hurt = 0;
     if (away > 2) c.cd = 0;
