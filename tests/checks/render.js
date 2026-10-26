@@ -4,8 +4,9 @@
 //   checkRender(m) → { name, ok, problems, stats }      m: the modules and the screen (run(env) below)
 //
 //   1. The clock's looks: daylight 1 by day, 0 at night, rising through dawn and falling through dusk, at most
-//      SHADE_LIGHT (below the dark threshold) on the Shade; the sun a unit vector, up in the east at 05:30, south
-//      and highest at noon, down in the west at 18:30, below the horizon at night; the noon sky the parent's,
+//      SHADE_LIGHT (below the dark threshold) on the Shade; the sun a unit vector, up in the south-east at 06:00,
+//      over the Gnomon (north-east) and highest at noon, down in the north at 18:00, below the horizon at night, the
+//      shadows by day along the Hand; the Hand by the bible's cases, dimming the span under it to dusk; the noon sky the parent's,
 //      the night's dark, dusk's horizon warm; the haze the horizon's colour outdoors and the parent's dark fog
 //      (exactly) underground; one light bucket all night, a new one every 15 minutes by day.
 //   2. No black below the horizon: at noon on the test world's start span (three seeds) and the real world's,
@@ -16,9 +17,9 @@
 //      midnight; with the torch out at night the auto-map marks only what lamps light, by day much more, in 3D
 //      and on the map (refreshView); the Shade is dark by day.
 //   4. The edge clamp: on open ground the light at a zone's border is the light inside.
-//   5. The baked sun: behind a wall (from the sun) the voxels are in shade and the open ones in sun; a
-//      morning sun throws the shadow west, an afternoon one east; the floor in the shadow draws darker; a
-//      new bucket keeps the old bake until its own is done.
+//   5. The baked sun: behind a wall (from the sun) the voxels are in shade and the open ones in sun; the 08:00
+//      sun (east-south-east) throws an east-west wall's shadow north, the 16:00 one (north-north-east) south;
+//      the floor in the shadow draws darker; a new bucket keeps the old bake until its own is done.
 //   6. The map outdoors: a column shows its ground's look (a road "·", grass "." in its colour), the legend is
 //      the terrain one and says glim; underground the map is the parent's (golden (b), part 9). Water holding
 //      another liquid takes its colour on the map and in 3D.
@@ -58,11 +59,23 @@ export async function checkRender(m) {
     const shade = clock.daylight(shadeGame);
     expect(shade <= clock.SHADE_LIGHT && shade < rules.RULES.dark.threshold, `the Shade at noon: daylight ${shade}`);
     const sun = (h) => clock.sunAt(minute(h)), len = (v) => Math.hypot(...v);
-    const rise = sun((c.dawn + c.day) / 2), noon = sun(12), set = sun((c.dusk + c.night) / 2);
+    const rise = sun(c.day), noon = sun(12), set = sun(c.dusk);
     const units = [0, 3, 5.5, 9, 12, 15, 18.5, 21].every((h) => Math.abs(len(sun(h)) - 1) < 1e-9);
     expect(units, "the sun isn't a unit vector");
-    expect(rise[0] > 0.99 && Math.abs(rise[2]) < 1e-9 && set[0] < -0.99 && Math.abs(set[2]) < 1e-9, `rise ${rise}, set ${set}`);
-    expect(noon[1] > 0 && Math.abs(noon[0]) < 1e-9 && [6, 9, 15, 18].every((h) => sun(h)[2] < noon[2]), `noon ${noon}`);
+    // The Dial's sun (bible §1.3, §4.8): up in the south-east at 06:00, over the Gnomon in the north-east at noon, down in
+    // the north at 18:00; by day its bearing is the Hand's opposite, so the shadows point the Hand's way.
+    expect(rise[0] > 0.7 && rise[1] > 0.6 && Math.abs(rise[2]) < 1e-9 && set[1] < -0.99 && Math.abs(set[2]) < 1e-9, `rise ${rise}, set ${set}`);
+    expect(noon[0] > 0 && noon[1] < 0 && Math.abs(noon[2] - Math.sin(clock.SUN_NOON_HEIGHT)) < 1e-9 && [6, 9, 15, 18].every((h) => sun(h)[2] < noon[2]), `noon ${noon}`);
+    const handOff = [7, 9, 11, 12, 13, 15, 17].map((h) => { const s = sun(h), l = Math.hypot(s[0], s[1]), th = clock.handAngle(h);
+      return Math.hypot(-s[0] / l + Math.cos(th), -s[1] / l - Math.sin(th)); });
+    expect(handOff.every((d) => d < 1e-9), `the shadow's bearing isn't the Hand's: ${handOff}`);
+    // The Hand: the bible's own cases (§15.8 item 9) on a world with the Gnomon at (37, 3); none at night or without it.
+    const dial = (n, h = 12) => ({ time: T(h), zone: null, run: { world: { landmarks: new Map([["gnomon", { wx: 37, wy: 3 }]]), tileAt: () => ({ terrain: "flats" }), terrains: { flats: {} } } }, state: { noonLength: n } });
+    const hand = { at23_10: clock.underHand(dial(15.5), 23, 10), at6_18: clock.underHand(dial(34.5), 6, 18), short6_18: clock.underHand(dial(33), 6, 18),
+      night: clock.underHand(dial(15.5, 23), 23, 10), noGnomon: clock.underHand({ time: T(12), run: { world: { landmarks: new Map() } } }, 23, 10) };
+    const dimDay = clock.daylight({ ...dial(15.5), zone: { wx: 23, wy: 10 } }), clearDay = clock.daylight({ ...dial(15.5), zone: { wx: 5, wy: 16 } });
+    expect(hand.at23_10 && hand.at6_18 && !hand.short6_18 && !hand.night && !hand.noGnomon && dimDay <= clock.SHADE_LIGHT && clearDay === 1,
+      `the Hand: ${JSON.stringify(hand)}, daylight under it ${dimDay}, beside it ${clearDay}`);
     expect([0, 3, 21, 23].every((h) => sun(h)[2] < 0), "the sun is up at night");
     const sky = (h) => clock.skyColorsAt(minute(h));
     expect(sky(12).zenith.join() === "50,95,190" && sky(12).horizon.join() === "170,200,240", `the noon sky ${JSON.stringify(sky(12))}`);
@@ -201,26 +214,28 @@ export async function checkRender(m) {
 
   // --- 5. The baked sun ----------------------------------------------------------------------------------------
   {
-    // A wall 4 high along y = 6..17 at x = 12. Morning sun (east): its shadow falls west of it; afternoon: east.
-    const walled = field("render-sun", true, (z) => { for (let y = 6; y <= 17; y++) for (let k = FLOOR_Z; k < FLOOR_Z + 4; k++) z.set(12, y, k, B.STONE); });
-    const shadeOf = (h, x) => { light.bakeSun(walled, clock.lightBucketAt(minute(h))); return light.sunlitAt(walled, x, 12, FLOOR_Z - 1, 0, 0, 1, x + 0.5, 12.5, FLOOR_Z); };
-    const m = { westAm: shadeOf(8, 10), eastAm: shadeOf(8, 14), westPm: shadeOf(16, 10), eastPm: shadeOf(16, 14), farAm: shadeOf(8, 3) };
-    expect(m.westAm < 0.1 && m.eastAm > 0.9 && m.westPm > 0.9 && m.eastPm < 0.1 && m.farAm > 0.9, `the wall's shadow (1 = sun): ${JSON.stringify(m)}`);
-    // Drawn: the floor in the shadow (x 10.5) is darker than in the sun (x 3.5), seen from the south.
+    // A wall 4 high along x = 4..16 at y = 12. At 08:00 the sun stands east-south-east: the wall's shadow falls
+    // north of it; at 16:00 it stands north-north-east: the shadow falls south.
+    const walled = field("render-sun", true, (z) => { for (let x = 4; x <= 16; x++) for (let k = FLOOR_Z; k < FLOOR_Z + 4; k++) z.set(x, 12, k, B.STONE); });
+    const shadeOf = (h, y) => { light.bakeSun(walled, clock.lightBucketAt(minute(h))); return light.sunlitAt(walled, 10, y, FLOOR_Z - 1, 0, 0, 1, 10.5, y + 0.5, FLOOR_Z); };
+    const m = { northAm: shadeOf(8, 10), southAm: shadeOf(8, 14), northPm: shadeOf(16, 10), southPm: shadeOf(16, 14), farAm: shadeOf(8, 2) };
+    expect(m.northAm < 0.1 && m.southAm > 0.9 && m.northPm > 0.9 && m.southPm < 0.1 && m.farAm > 0.9, `the wall's shadow (1 = sun): ${JSON.stringify(m)}`);
+    // Drawn: at 08:00 the floor north of the wall (in its shadow) is darker than south of it, seen from beyond the
+    // wall's east end looking west along it.
     zones.enterZone(game, walled, { how: "start" });
-    game.time = T(8); stand(7, 23.5, -Math.PI / 2, -0.15); p().torch = false;
+    game.time = T(8); stand(22.5, 12.5, Math.PI, -0.15); p().torch = false;
     game.debug.step(0); frame3d();
     const lum = (sx, sy) => { const i = sy * capture.cols + sx; return capture.colors[i * 3] + capture.colors[i * 3 + 1] + capture.colors[i * 3 + 2]; };
     let shadowL = 0, sunL = 0;
     const st = light.sunState(walled);
     expect(st.bucket === clock.lightBucketAt(minute(8)) && st.sun, `the bake's bucket ${st.bucket} at 08:00`);
-    // Project the two floor points (y 12) to the screen.
+    // Project the two floor points (x 10.5; y 10.5 in the shadow, 14.5 in the sun) to the screen.
     const cam = render3d.cam, proj = (x, y, z) => {
       const vx = x - cam.ex, vy = y - cam.ey, vz = z - cam.ez, zc = vx * cam.fX + vy * cam.fY + vz * cam.fZ;
       return [Math.round(((vx * cam.rX + vy * cam.rY) / zc / cam.halfW + 1) * 0.5 * capture.cols - 0.5),
               Math.round((1 - (vx * cam.uX + vy * cam.uY + vz * cam.uZ) / zc / cam.halfH) * 0.5 * capture.rows - 0.5)];
     };
-    const [ax, ay] = proj(10.5, 12, FLOOR_Z), [bx, by] = proj(3.5, 12, FLOOR_Z);
+    const [ax, ay] = proj(10.5, 10.5, FLOOR_Z), [bx, by] = proj(10.5, 14.5, FLOOR_Z);
     shadowL = lum(ax, ay); sunL = lum(bx, by);
     expect(shadowL < sunL * 0.8, `the floor in the wall's shadow ${shadowL} vs in the sun ${sunL} (cells ${ax},${ay} and ${bx},${by})`);
     // A new bucket: the old bake stays until the new one is done.

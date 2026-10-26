@@ -15,7 +15,7 @@
 import * as S from "./screen.js";
 import { castRay, hit, setGhostVisible, rayInfo } from "./raycast.js";
 import { sampleGrid, inDark, zoneIsLightless, daylight, syncLight, sunState, sunlitGrid } from "./light.js";
-import { sunDir, skyColors, fogFor, spanOf } from "./clock.js";
+import { sunDir, skyColors, fogFor, spanOf, daylightAt, minutes } from "./clock.js";
 import { material, albedo, setMaterialTime, setDarkSight, DARK_SIGHT_BLOCKS } from "./materials.js";
 import { noise2, hash } from "./rng.js";
 import { creatureSprite, hostilesTo, talkersIn, isFlat } from "./creatures.js";
@@ -115,11 +115,12 @@ function frameLook(game, zone) {
   }
   maxDist = MAX_DIST_OUT;
   syncLight(game, zone);   // the lit mask and the baked sun up to the clock
-  const dl = daylight(game), nd = 1 - dl;
+  // dl: the ground's daylight (dimmed on the Shade and under the Hand); sky: the hour's, for what is in the sky.
+  const dl = daylight(game), nd = 1 - dl, sky = daylightAt(minutes(game)), nsky = 1 - sky;
   skyR = SKY_COLOR[0] * dl + NIGHT_SKY[0] * nd; skyG = SKY_COLOR[1] * dl + NIGHT_SKY[1] * nd; skyB = SKY_COLOR[2] * dl + NIGHT_SKY[2] * nd;
   const fog = fogFor(game, zone);
   [fogR, fogG, fogB] = fog.color; fogD = fog.density;
-  ({ zenith: zen, horizon: hor } = skyColors(game));
+  ({ zenith: zen, horizon: hor } = skyColors(game, zone));
   // The faces' sun is the one the zone was baked for, so lit faces and shadows agree.
   const real = sunDir(game), baked = sunState(zone).sun || real;
   [sunX, sunY, sunZ] = baked;
@@ -131,12 +132,13 @@ function frameLook(game, zone) {
   // The disc in the sky follows the real sun; it reddens and dims as it sets, and is gone below the horizon.
   [discX, discY, discZ] = real;
   const dwarm = smooth(discZ / 0.4);
-  discVis = smooth((discZ + 0.03) / 0.08) * (0.35 + 0.65 * dl);
+  discVis = smooth((discZ + 0.03) / 0.08) * (0.35 + 0.65 * sky);
   discR = 255; discG = 175 + 75 * dwarm; discB = 105 + 110 * dwarm;
-  // Clouds: white by day, taking the horizon's colour at dusk and dawn, dark at night. Stars as daylight goes.
-  const tw = 0.55 * smooth(nd * 2) * (dl > 0 ? 1 : 0);
-  cloudR = (245 + (hor[0] - 245) * tw) * dl + 26 * nd; cloudG = (245 + (hor[1] - 245) * tw) * dl + 28 * nd; cloudB = (250 + (hor[2] - 250) * tw) * dl + 40 * nd;
-  starK = smooth((0.55 - dl) / 0.4);
+  // Clouds: white by day, taking the horizon's colour at dusk and dawn, dark at night. Stars as the hour's daylight goes
+  // (not the Shade's or the Hand's dimness: their sky is a day sky).
+  const tw = 0.55 * smooth(nsky * 2) * (sky > 0 ? 1 : 0);
+  cloudR = (245 + (hor[0] - 245) * tw) * sky + 26 * nsky; cloudG = (245 + (hor[1] - 245) * tw) * sky + 28 * nsky; cloudB = (250 + (hor[2] - 250) * tw) * sky + 40 * nsky;
+  starK = smooth((0.55 - sky) / 0.4);
   horizon = horizonOf(game, zone);
 }
 
