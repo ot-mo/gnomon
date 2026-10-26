@@ -8,7 +8,8 @@
 // walk; off the temple span's east edge in 3D (Tab, a click, W held; every frame is sampled at
 // present(): the zone, your point in the world, the black share of the cell buffer and whole black
 // rows) with the neighbour prefetched, no transition screen, no darker frame at the swap and no camera
-// jump; back west on the map (arrow keys) onto the mirrored tile; the ruin's dungeon (game.debug puts
+// jump (judged per unit of frame time since 0D1: the swap frame's speed, its distance over the change in
+// game.uiTime, against the typical speed before it; the frame gaps at the swap and the prefetch are reported); back west on the map (arrow keys) onto the mirrored tile; the ruin's dungeon (game.debug puts
 // you on its span) down 2 levels and back up, each arrival beside the right stairs and the last one
 // beside the entrance; every sinkhole of the ruin's span walked into, landing right under it on level
 // 1; and no console error or warning anywhere. Exits non-zero on any failure.
@@ -89,7 +90,7 @@ async function gate(browser, seed) {
       }
       const z = game.zone, p = game.player;
       H.frames.push({ key: z.key, gx: z.wx * z.w + p.x, gy: z.wy * z.d + p.y, z: p.z, yaw: p.yaw, pitch: p.pitch, black: black / n, blackRows,
-                      mode: game.mode, prefetched: !!Z.cachedZone(game, "1,0,0"), t: performance.now() });
+                      mode: game.mode, prefetched: !!Z.cachedZone(game, "1,0,0"), zones: game.zones.size, zkeys: [...game.zones.keys()].join(" "), ui: game.uiTime, t: performance.now() });
     };
     H.tile = () => [Math.floor(game.player.x), Math.floor(game.player.y)];
     H.route = (goal, avoidHoles = true) => {
@@ -219,20 +220,32 @@ async function gate(browser, seed) {
   const frames = await ev(() => { window.__smoke.record = false; return window.__smoke.frames; });
   const swap = frames.findIndex((f) => f.key === "1,0,0");
   if (swap > 0) {
-    const steps = frames.slice(1).map((f, i) => dist(f.gx - frames[i].gx, f.gy - frames[i].gy));
-    const jumps = frames.slice(1).map((f, i) => ({ d: dist(f.gx - frames[i].gx, f.gy - frames[i].gy), dz: f.z - frames[i].z,
-      dyaw: f.yaw - frames[i].yaw, dpitch: f.pitch - frames[i].pitch }));
-    const around = frames.slice(Math.max(0, swap - 5), swap + 6);
-    const typical = steps.slice(0, swap - 1).sort((a, b) => a - b)[Math.floor((swap - 1) / 2)];
+    // The camera's movement judged per unit of game time: each frame's dt is the change in game.uiTime
+    // between two presents (step adds the frame's dt before it is drawn), so a long frame (the swap's own
+    // work, or the browser's rAF jitter) moves you further without counting as a pop.
+    const jumps = frames.slice(1).map((f, i) => {
+      const dt = f.ui - frames[i].ui, d = dist(f.gx - frames[i].gx, f.gy - frames[i].gy);
+      return { d, dt, v: dt > 0 ? d / dt : d > 1e-9 ? Infinity : 0, dz: f.z - frames[i].z, dyaw: f.yaw - frames[i].yaw, dpitch: f.pitch - frames[i].pitch };
+    });
+    const median = (a) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor((s.length - 1) / 2)] : 0; };
+    const typical = median(jumps.slice(0, swap - 1).map((j) => j.d));
+    // Moving frames before the swap (W held: the first few accelerate from standing).
+    const typicalSpeed = median(jumps.slice(0, swap - 1).filter((j) => j.d > 1e-6).map((j) => j.v));
+    const gap = (k) => frames[k].t - frames[k - 1].t;
+    const prefetchFrames = frames.map((f, k) => (k > 0 && f.zones > frames[k - 1].zones ? k : -1)).filter((k) => k > 0);
     results.edge3d = { ...results.edge3d, crossed: true, framesRecorded: frames.length, swapFrame: swap,
       prefetchedBeforeSwap: frames[swap - 1].prefetched, modes: [...new Set(frames.map((f) => f.mode))],
-      blackMaxAroundSwap: +Math.max(...around.map((f) => f.black)).toFixed(3), blackBefore: +frames[swap - 1].black.toFixed(3),
+      blackMaxAroundSwap: +Math.max(...frames.slice(Math.max(0, swap - 5), swap + 6).map((f) => f.black)).toFixed(3), blackBefore: +frames[swap - 1].black.toFixed(3),
       blackAtSwap: +frames[swap].black.toFixed(3), blackMaxAll: +Math.max(...frames.map((f) => f.black)).toFixed(3),
       allBlackRowsMax: Math.max(...frames.map((f) => f.blackRows)),
       moveAtSwap: +jumps[swap - 1].d.toFixed(3), dzAtSwap: +jumps[swap - 1].dz.toFixed(3), typicalMove: +typical.toFixed(3),
-      maxMove: +Math.max(...steps).toFixed(3), maxDz: +Math.max(...jumps.map((j) => Math.abs(j.dz))).toFixed(3),
+      dtAtSwap: +jumps[swap - 1].dt.toFixed(4), speedAtSwap: +jumps[swap - 1].v.toFixed(3), typicalSpeed: +typicalSpeed.toFixed(3),
+      maxSpeed: +Math.max(...jumps.map((j) => j.v)).toFixed(3),
+      maxMove: +Math.max(...jumps.map((j) => j.d)).toFixed(3), maxDz: +Math.max(...jumps.map((j) => Math.abs(j.dz))).toFixed(3),
       maxTurn: +Math.max(...jumps.map((j) => Math.abs(j.dyaw) + Math.abs(j.dpitch))).toFixed(4),
-      swapFrameGapMs: +(frames[swap].t - frames[swap - 1].t).toFixed(1),
+      swapFrameGapMs: +gap(swap).toFixed(1), afterSwapGapMs: swap + 1 < frames.length ? +gap(swap + 1).toFixed(1) : null,
+      prefetchFrames, prefetchGapMs: prefetchFrames.map((k) => +gap(k).toFixed(1)), prefetched: prefetchFrames.map((k) => frames[k].zkeys.split(" ").filter((z) => !frames[k - 1].zkeys.split(" ").includes(z)).join("+")),
+      medianFrameGapMs: +median(frames.slice(1).map((f, i) => f.t - frames[i].t)).toFixed(1),
       maxFrameGapMs: +Math.max(...frames.slice(1).map((f, i) => f.t - frames[i].t)).toFixed(1),
       maxGapAtFrame: 1 + frames.slice(1).reduce((b, f, i, a) => (f.t - frames[i].t > a[b].t - frames[b].t ? i : b), 0) };
   } else results.edge3d = { ...results.edge3d, crossed: false, framesRecorded: frames.length, last: await state() };
@@ -324,7 +337,10 @@ function verdict(r) {
     if (!e.prefetchedBeforeSwap) p.push("3D: the neighbour was not prefetched");
     if (e.modes.some((x) => x !== "explore")) p.push(`3D: modes ${e.modes} (a transition screen?)`);
     if (e.blackAtSwap > e.blackBefore + 0.05 || e.blackAtSwap > 0.5) p.push(`3D: a black frame at the swap (${e.blackBefore} → ${e.blackAtSwap})`);
-    if (e.moveAtSwap > 2 * e.typicalMove + 0.05 || Math.abs(e.dzAtSwap) > 1 || e.maxTurn > 0.001) p.push(`3D: the camera popped (${e.moveAtSwap} vs ${e.typicalMove}, dz ${e.dzAtSwap})`);
+    // Per unit of frame time (0D1): a pop is a speed, not a distance; walking (and sprinting) stays
+    // within 1.5× the typical speed, and a pop of a tile or more in one 1/60 s frame is 60 tiles/s.
+    if (!(e.speedAtSwap <= 1.5 * e.typicalSpeed + 0.5) || Math.abs(e.dzAtSwap) > 1 || e.maxTurn > 0.001)
+      p.push(`3D: the camera popped (${e.speedAtSwap} tiles/s at the swap vs typical ${e.typicalSpeed}; ${e.moveAtSwap} in ${e.dtAtSwap} s, dz ${e.dzAtSwap})`);
   }
   if (m.to !== "0,0,0" || !m.onEastBorder || Math.abs(m.zDiff) > 1 || m.mode !== "map") p.push(`map west: ${JSON.stringify(m)}`);
   const want = ["20,8,1", "20,8,2", "20,8,1", "20,8,0"];
@@ -343,7 +359,8 @@ try {
     const r = await gate(browser, seed), problems = verdict(r), e = r.edge3d;
     console.log(`${problems.length ? "FAIL" : "PASS"} browser gate, seed ${seed}`);
     console.log(`  boot: ${r.boot.introKeyPresses} intro pages, then ${r.boot.after}`);
-    if (e.crossed) console.log(`  3D east edge: swap at frame ${e.swapFrame}, prefetched ${e.prefetchedBeforeSwap}, black ${e.blackBefore} → ${e.blackAtSwap} (max ${e.blackMaxAll}, whole black rows ≤ ${e.allBlackRowsMax}), move at swap ${e.moveAtSwap} (typical ${e.typicalMove}), dz ${e.dzAtSwap}, frame gap at swap ${e.swapFrameGapMs} ms (max ${e.maxFrameGapMs} at frame ${e.maxGapAtFrame})`);
+    if (e.crossed) console.log(`  3D east edge: swap at frame ${e.swapFrame}, prefetched ${e.prefetchedBeforeSwap}, black ${e.blackBefore} → ${e.blackAtSwap} (max ${e.blackMaxAll}, whole black rows ≤ ${e.allBlackRowsMax}), speed at swap ${e.speedAtSwap} tiles/s (typical ${e.typicalSpeed}; moved ${e.moveAtSwap} in ${e.dtAtSwap} s), dz ${e.dzAtSwap}`);
+    if (e.crossed) console.log(`  frame gaps: median ${e.medianFrameGapMs} ms, swap ${e.swapFrameGapMs} (next ${e.afterSwapGapMs}), prefetch frame(s) ${e.prefetchFrames} (${e.prefetched}) at ${e.prefetchGapMs} ms, max ${e.maxFrameGapMs} at frame ${e.maxGapAtFrame}`);
     console.log(`  map west: ${r.mapWest.from} → ${r.mapWest.to} at (${r.mapWest.tile}), ${r.mapWest.presses} press(es)`);
     console.log(`  ruin: ${r.ruinDungeon.map((s) => s.at).join(" → ")}`);
     console.log(`  sinkholes: ${r.sinkhole.falls.map((f) => `(${f.hole}) → (${f.tile}) off by ${f.offBy}`).join(", ")}`);
