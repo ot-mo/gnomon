@@ -46,7 +46,7 @@
 import { canonicalJson, encodeZone, decodeZone, encodePlayer, jsonProblems, snapshotZone, trimCreature, CREATURE_FIELDS,
          CODEC, DEFLATE_AVAILABLE, registerZoneField, packBytes, fromB64 } from "../../src/save/codec.js";
 import { memoryAdapter, idbAdapter } from "../../src/save/store.js";
-import { saveGame, loadGame, listSlots, deleteSlot, whenWritten, saveStatus, canSave } from "../../src/save/save.js";
+import { saveGame, loadGame, listSlots, deleteSlot, whenWritten, saveStatus, canSave, SAVE_RULES } from "../../src/save/save.js";
 import { getZone, cachedZone, evictZone, evictDormant, ZONE_GENERATORS, ZONE_RULES, changeZone, neighbourAddr } from "../../src/zones.js";
 import { entityCounter, getIds, setEntityCounter } from "../../src/ids.js";
 import { serializeRun, RUN_STATS } from "../../src/world/run.js";
@@ -69,14 +69,21 @@ export async function digestGame(game, keys) {
                 ids: canonicalJson(getIds()), zones: {} };
   for (const key of keys) {
     const z = cachedZone(game, key) || await getZone(game, key);
-    out.zones[key] = z ? canonicalJson({ ...(await encodeZone(z, {}, { deflate: false })), slot: null, savedAt: 0, ids: null }) : null;
+    out.zones[key] = z ? canonicalJson({ ...(await encodeZone(z, {}, { deflate: false })), slot: null, savedAt: 0, ids: null, cp: null, v: null }) : null;
   }
   return out;
 }
 const visitedKeys = (game) => [...game.zones.keys()].filter((k) => k === game.zone.key || game.state.zoneLeft[k] !== undefined).sort();
 const playing = (game, view = game.view) => { game.view = view; game.mode = view === "map" ? "map" : "explore"; game.paused = false; game.modeStack = []; };
 
-export async function checkSave({ game, startRun, inputHandlers, runSession, fresh, screen, root, seeds = [1, 7] }) {
+// Sections 1-8 hold Phase 0's saves, asked for by hand (the automatic ones off); 9-18 are WS9's (ws9Sections).
+export async function checkSave(opts) {
+  const autoWas = SAVE_RULES.auto;
+  SAVE_RULES.auto = false;
+  try { return await checkSections(opts); } finally { SAVE_RULES.auto = autoWas; useStore(null); }
+}
+
+async function checkSections({ game, startRun, inputHandlers, runSession, fresh, screen, root, seeds = [1, 7], v1 = null, child = null }) {
   const problems = [], stats = {}, notes = [];
   const fail = (m) => problems.push(m);
   const compare = (what, a, b) => {
@@ -330,9 +337,10 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
     if (readBack.zones[A] !== atLeave.zones[A]) fail(`${A} read back from the store differs from the zone you left`);
     if (gens.n) fail(`reading ${A} back generated ${gens.n} zone(s)`);
     // Order: the first write slow, the second fast; the second must still land last.
-    const base = memoryAdapter(), delays = [60, 0];
-    const ordered = { ...base, put: async (st, v) => { await tick(delays.shift() ?? 0); return base.put(st, v); } };
+    const base = memoryAdapter(), delays = [];
+    const ordered = { ...base, writeNow: (ops) => { const d = delays.shift() ?? 0; return tick(d).then(() => base.writeNow(ops)); } };
     await saveGame(game, { store: ordered });
+    delays.push(60, 0);   // (the two write-behinds below: the first slow, the second fast)
     const L2 = game.zone.key;
     game.zone.markers.push({ x: 1, y: 1 });
     game.debug.enterZone(A, "up"); playing(game, "map");   // write 1 (slow): one marker
@@ -680,5 +688,579 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
   }
   stats.hardCases = hard.join("; ");
 
+  await ws9Sections({ game, startRun, inputHandlers, runSession, fresh, screen, v1, child, fail, stats, notes, compare, walk, idsAbove, sameCreature, problems });
   return { name: "save", ok: problems.length === 0, problems, stats, notes };
+}
+
+// --- WS9 (TECH_DESIGN §8.3 "WS9"): sections 9-18 -----------------------------------------------------------
+//   9. The gate after the bot's 30-zone session: save → load identical in this process and a fresh one, buildRun
+//      never called, ids above every loaded one, R5's walker clean; the records' sizes, projected for 300 zones (≤ 3 MB).
+//  10. Migrations (§7.6): a v1 save made by p0-done's own code (child.v1: git archive) loads here unchanged, and through
+//      a v1 → v2 migration (the slot's and every zone record's, as each is read) comes back with exactly that change;
+//      a chain runs in order; a missing step and a newer save are refused.
+//  11. The Continue hazard: an item dropped after a save, the zone left, then a load: Phase 0 (no automatic saves)
+//      has it twice; the save when the zone change completes leaves one.
+//  12. The automatic saves: 120 s of play, 10 s of the world map (a stand-in "world" screen), back on the page;
+//      prefetch reads a stored neighbour through the loader in both views, never generating it.
+//  13. The unload save: a simulated `hidden` (and `pagehide`) commits the slot (live cleared) and the zone you are in,
+//      uncompressed, with the zone you had just left written ahead of them, in the one transaction opened in the
+//      handler; a load gives back that moment.
+//  14. live and unclean: a load after a session that never saved cleanly counts it (and writes it back), a clean
+//      save doesn't; One Wick's "death" rule ends that life instead (the slot gone, a grave), and only One Wick's.
+//  15. Death: One Wick's slot and its rows go, with a grave; no save after. The Commons Lamp: checkpoints at the
+//      run's start and on leaving the settlement (one slot record, no copies), copy on write over 5 zone changes,
+//      then death and C: exactly the checkpoint's state, the zones first saved after it gone; and again.
+//  16. Export → import into another store → load identical; the same file twice gets a new id; bad files refused;
+//      a slot moved to another store with its checkpoint, and a save to another store with one up, restore there;
+//      a run on the real world loads by state.world.id while new runs are built on the test world; an unknown
+//      world is refused.
+//  17. The shell at 100×30 through the real input: the title's mode, seed, Load a save (export, delete twice),
+//      warnings; Esc on the pause card to the options (field of view kept in the store, the keys of both views),
+//      save and quit (a clean slot) and Continue to the same tile; the line under the pause card after its beat
+//      (not before); the message log on H (more than 40 messages, scrolling, both views); the death recap after
+//      its beat (cause, damage, what the mode does), R keeping the mode, C waking a Commons Lamp life.
+//  18. The HUD at 100×30: the hotbar's ready ability while something hunts you (not otherwise, not while it
+//      cools), on one row with everything showing and dropped by priority; ?debug=1's line (child.debug).
+async function ws9Sections(ctx) {
+  const { game, startRun, inputHandlers, runSession, fresh, screen, child, fail, stats, notes, compare, walk, idsAbove, problems } = ctx;
+  const save = await import("../../src/save/save.js");
+  const { SAVE_RULES: RULES, SAVE_STATS, SESSION, listenPage, unloadSave, pageShown, wakeAtCheckpoint, exportSlot, importSlot, moveSlot,
+          graveyard, migrate } = save;
+  const { SCREENS, registerScreen } = await import("../../src/screens.js");
+  const { prefetchNeighbours } = await import("../../src/zones.js");
+  const { startCooldown, addStatus: addStatusTo } = await import("../../src/status.js");
+  const hud = await import("../../src/hud.js");
+  const frames = (n, dt = 1 / 60) => { for (let k = 0; k < n; k++) game.debug.step(dt); };
+  const settle = async () => { frames(40); await whenWritten(game); await tick(0); await whenWritten(game); };
+  const freshRun = (seed, { mode = "oneWick", store = null, view = "map", world } = {}) => {
+    startRun(seed, world);
+    game.pages = null; game.pendingPages = null; game.story.cube = true;
+    game.state.mode = mode;
+    playing(game, view);
+    useStore(store);
+  };
+  const strip = (json, drop) => { const v = JSON.parse(json); drop(v); return canonicalJson(v); };
+  const bombs = (list) => (list || []).filter((it) => it.kind === "bomb").reduce((n, it) => n + (it.count || 1), 0);
+  const slotOf = (st, id) => st.get("slots", id);
+  const rowsOf = async (st, id, name = "zones") => (await st.list(name, { slot: id })).map((r) => r.key).sort();
+
+  // --- 9. The gate after 30 zones -------------------------------------------------------------------------
+  {
+    RULES.auto = false; useStore(null);
+    const s = await runSession({ seed: 1234, zones: 30 });
+    if (!s.ok) fail(`the 30-zone session: ${s.problems.join("; ")}`);
+    const ks = visitedKeys(game), n0 = problems.length;
+    if (ks.length < 30) fail(`the 30-zone session visited ${ks.length} zones, not 30`);
+    walk("after the 30-zone session");
+    const st = memoryAdapter(), a = await digestGame(game, ks);
+    const t0 = performance.now(), pending = saveGame(game, { store: st, reason: "gate" }), snapMs = performance.now() - t0;
+    const m = await pending, allMs = performance.now() - t0;
+    const dump = st.dump(), slotB = JSON.stringify(dump.slots[0]).length, zoneB = dump.zones.map((r) => JSON.stringify(r).length);
+    const zonesB = zoneB.reduce((x, y) => x + y, 0), per = zonesB / Math.max(1, zoneB.length), projected = slotB + per * 300;
+    if (dump.zones.length !== ks.length) fail(`30 zones: ${dump.zones.length} zone records for ${ks.length} visited`);
+    if (projected > 3 * 1024 * 1024) fail(`30 zones: 300 projected at ${(projected / 1048576).toFixed(2)} MB (§8.3: ≤ 3 MB)`);
+    startRun(4321); game.pages = null;
+    const b0 = RUN_STATS.builds;
+    await loadGame(m.id, { store: st });
+    if (RUN_STATS.builds !== b0) fail(`30 zones: loadGame called buildRun ${RUN_STATS.builds - b0} time(s)`);
+    compare("30 zones, loaded in this process", a, await digestGame(game, ks));
+    idsAbove("30 zones");
+    walk("30 zones, after the load");
+    let freshly = "not run";
+    if (fresh) {
+      try {
+        const o = await fresh(dump, m.id, ks), n1 = problems.length;
+        compare("30 zones, loaded in a fresh process", a, o);
+        if (o.builds !== 0) fail(`30 zones: the fresh process called buildRun ${o.builds} time(s)`);
+        if (o.idProblems?.length) fail(`30 zones, fresh process: ${o.idProblems.slice(0, 3).join("; ")}`);
+        freshly = problems.length === n1 ? "identical" : "DIFFERS";
+      } catch (e) { fail(`30 zones, the fresh process: ${String(e.message || e).slice(0, 300)}`); }
+    }
+    stats.gate30 = `${s.steps[0]} · save → load ${problems.length === n0 ? "identical" : "DIFFERS"} in this process, ${freshly} in a fresh one; buildRun on load 0; R5 walker clean`;
+    stats.sizes30 = `slot ${slotB} B; ${zoneB.length} zone records ${Math.min(...zoneB)}-${Math.max(...zoneB)} B, ${zonesB} B in all (${per.toFixed(0)} B a zone); ` +
+      `300 zones projected ${(projected / 1048576).toFixed(2)} MB (≤ 3 MB); the save's snapshot ${snapMs.toFixed(1)} ms (synchronous), written ${allMs.toFixed(1)} ms`;
+  }
+
+  // --- 10. Migrations, and p0-done's v1 save ------------------------------------------------------------------
+  {
+    let fx = null;
+    if (child?.v1) { try { fx = await child.v1(); } catch (e) { fail(`the v1 save made by p0-done's code: ${String(e.message || e).slice(0, 300)}`); } }
+    else notes.push("10: no v1 save from p0-done (child.v1 not given)");
+    if (fx) {
+      const n0 = problems.length;
+      startRun(4321); game.pages = null;
+      await loadGame(fx.slotId, { store: memoryAdapter({ from: fx.dump }) });
+      compare("p0-done's v1 save, loaded here", fx.digest, await digestGame(game, fx.keys));
+      const asIs = problems.length === n0;
+      const M = { 1: { slot: (r) => ({ ...r, state: { ...r.state, migratedFrom: r.version } }), zone: (z) => ({ ...z, migratedZone: z.v ?? 1 }) } };
+      startRun(4321); game.pages = null;
+      await loadGame(fx.slotId, { store: memoryAdapter({ from: fx.dump }), version: 2, migrations: M });
+      const got = await digestGame(game, fx.keys);
+      if (game.state.migratedFrom !== 1) fail(`v1 → v2: state.migratedFrom ${game.state.migratedFrom}`);
+      const unmigrated = { ...got, state: strip(got.state, (v) => delete v.migratedFrom), zones: {} };
+      for (const [k, z] of Object.entries(got.zones)) {
+        if (JSON.parse(z).migratedZone !== 1) fail(`v1 → v2: zone ${k} wasn't migrated as it was read`);
+        unmigrated.zones[k] = strip(z, (v) => delete v.migratedZone);
+      }
+      const n1 = problems.length;
+      compare("v1 → v2, everything but the migration's change", fx.digest, unmigrated);
+      const chain = migrate({ id: "c", version: 1 }, [{ key: "k" }], { to: 3, migrations: {
+        1: { slot: (r) => ({ ...r, steps: [...(r.steps || []), 1] }), zone: (z) => ({ ...z, steps: [1] }) }, 2: { slot: (r) => ({ ...r, steps: [...r.steps, 2] }) } } });
+      if (JSON.stringify(chain.slot.steps) !== "[1,2]" || chain.slot.version !== 3 || chain.zones[0].v !== 3 || JSON.stringify(chain.zones[0].steps) !== "[1]")
+        fail(`a v1 → v3 chain: ${JSON.stringify(chain)}`);
+      const refused = (f) => { try { f(); return ""; } catch (e) { return e.message; } };
+      if (!/no migration from 2/.test(refused(() => migrate({ id: "c", version: 1 }, [], { to: 3, migrations: { 1: { slot: (r) => r } } }))))
+        fail("a chain with a step missing wasn't refused");
+      if (!/newer/.test(refused(() => migrate({ id: "c", version: 3 }, [], { to: 2 })))) fail("a save from a newer game wasn't refused");
+      stats.migration = `p0-done's v1 save (${fx.keys.join(" ")}; made by that tree's code) loads here ${asIs ? "identical" : "DIFFERENT"}; ` +
+        `v1 → v2 (state and every zone record, each as read) ${problems.length === n1 ? "identical but for the change" : "DIFFERS"}; a v1 → v3 chain in order; a missing step and a newer save refused`;
+    }
+  }
+
+  // --- 11. The Continue hazard ---------------------------------------------------------------------------------
+  {
+    const out = [];
+    for (const auto of [false, true]) {
+      RULES.auto = auto;
+      const st = memoryAdapter();
+      freshRun(1234, { store: auto ? st : null });
+      game.debug.enterZone("0,0,1", "down"); playing(game, "map");
+      const m = await saveGame(game, { store: st });   // the save you will continue from
+      await whenWritten(game);
+      const L1 = game.zone.key, p = game.player, before = bombs(p.inv) + bombs(game.zone.items);
+      game.debug.openInv();
+      game.invSel = p.inv.findIndex((it) => it.kind === "bomb");
+      inputHandlers.onKeyDown("KeyX", false, "x");   // drop it (the inventory's X)
+      inputHandlers.onKeyDown("Escape", false, "Escape");
+      playing(game, "map");
+      if (bombs(game.zone.items) <= bombs((await st.get("zones", [m.id, L1]))?.items)) fail(`hazard (${auto ? "WS9" : "P0"}): the bomb wasn't dropped`);
+      game.debug.enterZone("0,0,2", "down"); playing(game, "map");
+      await settle();
+      startRun(4321); game.pages = null;   // the page dies with nothing more written; then Continue
+      await loadGame(m.id, { store: st });
+      const n = bombs(game.player.inv) + bombs((await getZone(game, L1)).items);
+      out.push(`${auto ? "with the save on a completed zone change" : "P0 (no automatic saves)"}: ${n} bombs after the load, ${before} before the drop (loaded in ${game.zone.key})`);
+      if (auto && n !== before) fail(`the Continue hazard: ${n} bombs after the load, ${before} before the drop`);
+      if (!auto && n === before) notes.push("11: the hazard didn't show without the automatic saves (the check's premise)");
+    }
+    stats.continueHazard = `${out.join("; ")}. Left: the moment between leaving a zone and its change's save landing (${RULES.afterChange} s, then the write); the unload save covers a page that is closed in it`;
+    RULES.auto = true;
+  }
+
+  // --- 12. The automatic saves; prefetch through the loader -------------------------------------------------
+  {
+    RULES.auto = true;
+    const st = memoryAdapter();
+    freshRun(77, { store: st });
+    await settle();
+    const reasons = () => game.saving?.last?.reason;
+    if (!game.saving || reasons() !== "zone") fail(`the run's first save: ${JSON.stringify(game.saving?.last)}`);
+    const s0 = SAVE_STATS.saves;
+    frames(119, 1);   // 119 s of play on the map
+    const early = SAVE_STATS.saves - s0;
+    frames(2, 1); await whenWritten(game);
+    const periodic = reasons(), s1 = SAVE_STATS.saves;
+    if (early || periodic !== "periodic" || s1 !== s0 + 1) fail(`120 s of play: ${early} early saves, then ${s1 - s0} (${periodic})`);
+    const had = SCREENS.has("world");
+    if (!had) registerScreen("world", { over: "none", saveable: true, draw() {} });
+    game.mode = "world"; game.modeStack = [];
+    frames(9, 1); const early2 = SAVE_STATS.saves - s1;
+    frames(2, 1); await whenWritten(game);
+    const travel = reasons();
+    if (!had) SCREENS.delete("world");
+    playing(game, "map");
+    if (early2 || travel !== "travel") fail(`10 s of the world map: ${early2} early saves, then ${travel}`);
+    unloadSave(game); await whenWritten(game);
+    const liveHidden = (await slotOf(st, game.saving.slotId)).live;
+    pageShown(game); frames(2); await whenWritten(game);
+    const back = reasons(), liveBack = (await slotOf(st, game.saving.slotId)).live;
+    if (liveHidden !== null || back !== "back" || liveBack !== SESSION) fail(`hidden then back: live ${liveHidden} → ${liveBack}, the save ${back}`);
+    stats.autoSaves = `the run's first (${RULES.afterChange} s after its start); none in 119 s of play, one at 120 (periodic); none in 9 s of the world map, one at 10 (travel); back on the page (live set again)`;
+    // Prefetch: a stored span next door is read, never made.
+    RULES.auto = false;
+    freshRun(1234, { store: null });
+    await changeZone(game, "1,0,0", { how: "travel" }); playing(game, "map");
+    await changeZone(game, "0,0,0", { how: "travel" }); playing(game, "map");
+    const ps = memoryAdapter(), pm = await saveGame(game, { store: ps });
+    const res = [];
+    for (const view of ["map", "3d"]) {
+      startRun(4321); game.pages = null;
+      await loadGame(pm.id, { store: ps });
+      playing(game, view);
+      if (cachedZone(game, "1,0,0")) { fail("prefetch: the stored neighbour was in memory right after the load"); continue; }
+      const gens = [], real = ZONE_GENERATORS.surface;
+      ZONE_GENERATORS.surface = (g, a) => { gens.push(a.key); return real(g, a); };
+      const p = game.player;
+      if (view === "3d") Object.assign(p, { x: game.zone.w - 3.5, y: 24.5 });   // near the east edge
+      try {
+        for (let k = 0; k < 6 && !cachedZone(game, "1,0,0"); k++) { prefetchNeighbours(game); await tick(5); }
+      } finally { ZONE_GENERATORS.surface = real; }
+      const read = !!cachedZone(game, "1,0,0");
+      if (!read || gens.includes("1,0,0")) fail(`prefetch (${view}): the stored 1,0,0 ${read ? "read" : "not read"}, generated ${gens.includes("1,0,0")}`);
+      res.push(`${view}: read back, ${gens.length} other neighbour(s) made`);
+    }
+    stats.prefetch = `a loaded game's stored neighbour 1,0,0 through the loader (ZONE_LOADER.load): ${res.join("; ")}; 1,0,0 never generated`;
+  }
+
+  // --- 13. The unload save --------------------------------------------------------------------------------
+  {
+    RULES.auto = true;
+    const held = memoryAdapter({ latency: 30 });
+    let opened = 0;
+    const realNow = held.writeNow;
+    held.writeNow = (ops) => { opened++; return realNow(ops); };
+    freshRun(1234, { store: held });
+    await settle();
+    game.debug.enterZone("0,0,1", "down"); playing(game, "map");   // the temple written behind, not yet begun
+    for (const k of ["KeyD", "KeyD", "KeyS"]) game.debug.mapKey(k);
+    const L0 = "0,0,0", L1 = game.zone.key, id = game.saving.slotId, o0 = opened;
+    const doc = new EventTarget(), win = new EventTarget();
+    doc.visibilityState = "visible";
+    const off = listenPage(doc, win, game);
+    doc.visibilityState = "hidden";
+    doc.dispatchEvent(new Event("visibilitychange"));
+    const inHandler = opened - o0;
+    const atHide = await digestGame(game, [L0, L1]), pos = { x: game.player.x, y: game.player.y, z: game.player.z };
+    await whenWritten(game); await tick(40);
+    const slot = await slotOf(held, id), z1 = await held.get("zones", [id, L1]), z0 = await held.get("zones", [id, L0]);
+    if (inHandler !== 1 || opened - o0 !== 1) fail(`the unload save opened ${inHandler} transaction(s) in the handler, ${opened - o0} in all (one, with the write-behind in it)`);
+    if (slot?.live !== null || slot?.where?.zoneKey !== L1 || slot?.player?.x !== pos.x || slot?.player?.y !== pos.y) fail(`the unload's slot: ${JSON.stringify(slot && { live: slot.live, where: slot.where, x: slot.player.x })}`);
+    if (typeof z1?.blocks?.raw !== "string" || !z0) fail(`the unload's zones: ${L1} ${typeof z1?.blocks}, ${L0} ${z0 ? "written" : "missing"}`);
+    startRun(4321); game.pages = null;
+    await loadGame(id, { store: held });
+    const n0 = problems.length;
+    compare("loaded after the unload save", atHide, await digestGame(game, [L0, L1]));
+    if (saveStatus(game).unclean !== 0) fail(`a load after the unload save counted ${saveStatus(game).unclean} unclean exit(s)`);
+    playing(game, "map");
+    doc.visibilityState = "visible"; doc.dispatchEvent(new Event("visibilitychange"));
+    frames(2); await whenWritten(game); await tick(40);
+    const liveBack = (await slotOf(held, id)).live;
+    win.dispatchEvent(new Event("pagehide"));
+    await whenWritten(game); await tick(40);
+    const liveGone = (await slotOf(held, id)).live;
+    off();
+    if (liveBack !== SESSION || liveGone !== null) fail(`visible: live ${liveBack}; pagehide: live ${liveGone}`);
+    stats.unload = `hidden: 1 transaction opened in the handler (the temple's write-behind, then the slot with live cleared and ${L1} uncompressed); ` +
+      `loaded back ${problems.length === n0 ? "identical" : "DIFFERENT"} with 0 unclean; visible sets live again; pagehide clears it`;
+  }
+
+  // --- 14. live and unclean -------------------------------------------------------------------------------
+  {
+    RULES.auto = false;
+    const st = memoryAdapter();
+    freshRun(1234, { store: null });
+    const m = await saveGame(game, { store: st });
+    const live0 = (await slotOf(st, m.id)).live;
+    startRun(4321); game.pages = null;   // the session ended without a clean save
+    await loadGame(m.id, { store: st }); await whenWritten(game);
+    const s1 = await slotOf(st, m.id);
+    playing(game, "map");
+    await saveGame(game, { clean: true });
+    const liveClean = (await slotOf(st, m.id)).live;
+    startRun(4321); game.pages = null;
+    await loadGame(m.id, { store: st }); await whenWritten(game);
+    const s2 = await slotOf(st, m.id), listed = (await listSlots({ store: st }))[0];
+    if (live0 !== SESSION || s1.unclean !== 1 || s1.live !== SESSION || liveClean !== null || s2.unclean !== 1 || listed.unclean !== 1)
+      fail(`unclean: live ${live0}; after a load ${s1.unclean} (live ${s1.live}); a clean save's live ${liveClean}; the next load ${s2.unclean}; listed ${listed.unclean}`);
+    RULES.oneWick.unclean = "death";
+    let code = "";
+    const g0 = (await graveyard({ store: st })).length;
+    startRun(4321); game.pages = null;
+    try { await loadGame(m.id, { store: st }); } catch (e) { code = e.code || e.message; }
+    const gone = !(await slotOf(st, m.id)), graves = await graveyard({ store: st });
+    // A Commons Lamp life left the same way loads (the rule is One Wick's).
+    freshRun(99, { mode: "commonsLamp", store: null });
+    const mc = await saveGame(game, { store: st });
+    startRun(4321); game.pages = null;
+    let lamp = "loaded";
+    try { await loadGame(mc.id, { store: st }); } catch (e) { lamp = e.message; }
+    RULES.oneWick.unclean = "warn";
+    if (code !== "unclean" || !gone || graves.length !== g0 + 1 || !/without a save/.test(graves[graves.length - 1]?.cause) || lamp !== "loaded")
+      fail(`One Wick's unclean death: ${code}, slot gone ${gone}, graves ${g0} → ${graves.length} (${graves[graves.length - 1]?.cause}); a Commons Lamp slot ${lamp}`);
+    stats.unclean = "a load after a session with no clean save counts 1 (written back at once, live this session's); a clean save clears live and the next load counts nothing; " +
+      `One Wick's "death" rule: the load refused (code unclean), the slot gone, a grave ("${graves[graves.length - 1]?.cause}"); a Commons Lamp life loads under it`;
+  }
+
+  // --- 15. Death and checkpoints ----------------------------------------------------------------------------
+  {
+    RULES.auto = true;
+    const st = memoryAdapter();
+    freshRun(1234, { store: st, mode: "oneWick" });
+    await settle();
+    game.debug.enterZone("0,0,1", "down"); playing(game, "map");
+    await settle();
+    const id = game.saving.slotId, g0 = (await graveyard({ store: st })).length;
+    game.hurtPlayer(99999, "a test");
+    await whenWritten(game); await tick(0); await whenWritten(game);
+    const graves = await graveyard({ store: st }), s0 = SAVE_STATS.saves;
+    frames(90);
+    const afterDeath = SAVE_STATS.saves - s0, unload = unloadSave(game);
+    if (game.mode !== "dead" || (await slotOf(st, id)) || (await rowsOf(st, id)).length || graves.length !== g0 + 1 || graves[graves.length - 1].cause !== "a test"
+        || afterDeath || unload !== null)
+      fail(`One Wick's death: mode ${game.mode}, slot ${(await slotOf(st, id)) ? "kept" : "gone"}, rows ${(await rowsOf(st, id)).length}, graves ${g0} → ${graves.length}, saves after ${afterDeath}, unload ${unload}`);
+    // The Commons Lamp.
+    const cs = memoryAdapter();
+    freshRun(1234, { store: cs, mode: "commonsLamp" });
+    await settle();
+    const cp1 = game.saving?.cp;
+    const b = { ...cs.stats.byStore };
+    game.debug.enterZone("0,0,1", "down"); playing(game, "map");   // leaving the temple, a settlement
+    await settle();
+    const wrote = Object.fromEntries(Object.keys(b).map((k) => [k, cs.stats.byStore[k] - b[k]]));
+    const cid = game.saving.slotId, cp2 = game.saving.cp, kept2 = (await rowsOf(cs, cid, "checkpointZones")).length;
+    if (cp1 !== 1 || cp2 !== 2 || wrote.slots !== 1 || kept2 !== 0) fail(`checkpoints: at the start ${cp1}, on leaving the temple ${cp2}; it wrote ${JSON.stringify(wrote)}, ${kept2} copies kept after it`);
+    const atCp = await digestGame(game, ["0,0,0", "0,0,1"]);
+    const route = [["0,0,2", "down"], ["0,0,3", "down"], ["0,0,2", "up"], ["0,0,1", "up"], ["0,0,2", "down"]];
+    for (const [key, how] of route) {
+      const z = game.zone;
+      z.creatures = z.creatures.filter((c) => c.talk);   // every hostile here killed
+      game.player.hp = Math.max(1, game.player.hp - 1);
+      game.debug.enterZone(key, how); playing(game, "map");
+      await settle();
+    }
+    const rows = await rowsOf(cs, cid), copies = await rowsOf(cs, cid, "checkpointZones");
+    if (game.saving.cp !== 2 || copies.join() !== "0,0,1" || rows.join() !== "0,0,0,0,0,1,0,0,2,0,0,3")
+      fail(`after 5 zone changes: checkpoint ${game.saving.cp}, rows ${rows.join(" ")}, copies ${copies.join(" ")} (want 0,0,1: written before the checkpoint, overwritten after)`);
+    const wakes = [];
+    for (let k = 0; k < 2; k++) {
+      game.hurtPlayer(99999, "a test");
+      await game.saving.restoring;
+      const after = await rowsOf(cs, cid), left = await rowsOf(cs, cid, "checkpointZones");
+      await wakeAtCheckpoint(game);
+      const n0 = problems.length;
+      compare(`woken at the checkpoint (${k + 1})`, atCp, await digestGame(game, ["0,0,0", "0,0,1"]));
+      if (after.join() !== "0,0,0,0,0,1" || left.length || game.zone.key !== "0,0,1") fail(`the restore (${k + 1}): rows ${after.join(" ")}, copies ${left.join(" ")}, woke in ${game.zone.key}`);
+      wakes.push(problems.length === n0 ? "identical" : "DIFFERS");
+      playing(game, "map");
+      game.debug.enterZone("0,0,2", "down"); playing(game, "map");
+      await settle();
+    }
+    stats.checkpoints = `One Wick: death took the slot and its rows, a grave written ("a test"), no save after (90 frames, the unload refused). ` +
+      `The Commons Lamp: checkpoint 1 at the run's start, 2 on leaving the temple (the visit wrote ${wrote.slots} slot record and ${wrote.zones} zone rows: the temple written behind, which kept ${wrote.checkpointZones} copy for checkpoint 1, and level 1; the checkpoint then dropped checkpoint 1's copies: ${kept2} left); ` +
+      `5 zone changes (hostiles killed, hp lost): rows ${rows.join(" ")}, copies ${copies.join(" ")}; death → C ×2: ${wakes.join(", ")} to the checkpoint, 0,0,2 and 0,0,3 gone from the store`;
+  }
+
+  // --- 16. Export and import, other stores, the world by id -----------------------------------------------------
+  {
+    RULES.auto = false;
+    const st = memoryAdapter();
+    freshRun(1234, { store: null });
+    game.debug.enterZone("0,0,1", "down"); playing(game, "map");
+    const m = await saveGame(game, { store: st }), ks = visitedKeys(game), a = await digestGame(game, ks);
+    const text = JSON.stringify(await exportSlot(m.id, { store: st }));
+    const other = memoryAdapter(), id2 = await importSlot(text, { store: other });
+    startRun(4321); game.pages = null;
+    await loadGame(id2, { store: other });
+    const n0 = problems.length;
+    compare("exported, imported into another store, loaded", a, await digestGame(game, ks));
+    const id3 = await importSlot(text, { store: other });
+    if (id3 === id2 || (await listSlots({ store: other })).length !== 2) fail(`the same file imported twice: ids ${id2}, ${id3}`);
+    const bad = [];
+    for (const [what, f, re] of [["another game's", (d) => ({ ...d, game: "other" }), /isn't a GNOMON save/], ["a newer game's", (d) => ({ ...d, slot: { ...d.slot, version: 99 } }), /newer/],
+                                 ["one without the zone you were in", (d) => ({ ...d, zones: d.zones.filter((r) => r.key !== d.slot.where.zoneKey) }), /no record/]]) {
+      let msg = "";
+      try { await importSlot(f(JSON.parse(text)), { store: other }); } catch (e) { msg = e.message; }
+      if (!re.test(msg)) fail(`importing ${what} file: ${msg || "accepted"}`); else bad.push(what);
+    }
+    let notJson = "";
+    try { await importSlot("{ not json", { store: other }); } catch (e) { notJson = e.message; }
+    if (!notJson) fail("a file that isn't JSON was imported");
+    // A slot moved to another store with its checkpoint, and a save to another store with one up.
+    RULES.auto = true;
+    const res = [];
+    for (const how of ["moveSlot", "saveGame to another store"]) {
+      const A = memoryAdapter(), B = memoryAdapter();
+      freshRun(1234, { store: A, mode: "commonsLamp" });
+      await settle();
+      game.debug.enterZone("0,0,1", "down"); playing(game, "map");
+      await settle();
+      const atCp = await digestGame(game, ["0,0,0", "0,0,1"]);
+      for (const [key, hw] of [["0,0,2", "down"], ["0,0,1", "up"]]) { game.zone.creatures = game.zone.creatures.filter((c) => c.talk); game.debug.enterZone(key, hw); playing(game, "map"); await settle(); }
+      if (how === "moveSlot") await moveSlot(game, B); else await saveGame(game, { store: B });
+      useStore(B);
+      const sid = game.saving.slotId;
+      const copies = await rowsOf(B, sid, "checkpointZones"), rows = await rowsOf(B, sid);
+      game.hurtPlayer(99999, "a test");
+      await game.saving.restoring;
+      await wakeAtCheckpoint(game);
+      const n1 = problems.length;
+      compare(`${how}, then death and C in the new store`, atCp, await digestGame(game, ["0,0,0", "0,0,1"]));
+      res.push(`${how}: rows ${rows.join(" ")}, copies ${copies.join(" ") || "none"}, woke ${problems.length === n1 ? "identical" : "DIFFERENT"}`);
+    }
+    RULES.auto = false;
+    // A run on the real world, loaded while new runs are built on the test world.
+    const { REAL_WORLD } = await import("../../src/content/world/worldmap.js");
+    const testWorld = game.world;
+    freshRun(1234, { store: null, world: REAL_WORLD });
+    const rw = memoryAdapter(), mr = await saveGame(game, { store: rw }), rks = visitedKeys(game), ar = await digestGame(game, rks);
+    startRun(4321); game.pages = null;
+    await loadGame(mr.id, { store: rw });
+    const n2 = problems.length;
+    compare("a run on the real world, loaded", ar, await digestGame(game, rks));
+    if (game.run.world.id !== "gnomon" || game.world !== testWorld) fail(`the real world's run loaded on ${game.run.world.id}; new runs on ${game.world?.world?.id}`);
+    const nowhere = { ...(await slotOf(rw, mr.id)), id: "nowhere" };
+    nowhere.state = { ...nowhere.state, world: { id: "nowhere", version: 1 } };
+    await rw.put("slots", nowhere);
+    for (const r of await rw.list("zones", { slot: mr.id })) await rw.put("zones", { ...r, slot: "nowhere" });
+    let unknown = "";
+    try { await loadGame("nowhere", { store: rw }); } catch (e) { unknown = e.message; }
+    if (!/world "nowhere"/.test(unknown)) fail(`a save of an unknown world: ${unknown || "loaded"}`);
+    stats.exportImport = `export → import → load ${problems.length === n0 ? "identical" : "DIFFERENT"}; the same file twice: 2 slots; refused: ${bad.join(", ")} and a file that isn't JSON`;
+    stats.acrossStores = res.join("; ");
+    stats.worlds = `the real world's run (${rks.join(" ")}) loaded ${problems.length === n2 ? "identical" : "DIFFERENT"} on "${game.run.world.id}" with new runs still on "${testWorld.world.id}"; an unknown world refused`;
+  }
+
+  // --- 17. The shell at 100×30 -----------------------------------------------------------------------------
+  if (screen) {
+    const env = await screen(100, 30);
+    const text = () => { game.debug.draw(); return env.frameText(); };
+    const key = (code, k = code) => inputHandlers.onKeyDown(code, false, k);
+    const title = await import("../../src/screens/title.js");
+    const log = await import("../../src/screens/log.js"), dead = await import("../../src/screens/dead.js"), pause = await import("../../src/screens/pause.js");
+    const out = [];
+    RULES.auto = false;
+    const st = useStore(memoryAdapter());
+    // The selected line, and moving the selection to a line of the title (or of a screen over it).
+    const selected = () => { const l = text().split("\n").find((r) => /> \S/.test(r)); return l ? l.slice(l.indexOf("> ") + 2).trim() : ""; };
+    const pick = (label) => { for (let k = 0; k < 14 && !selected().startsWith(label); k++) key("ArrowDown"); if (!selected().startsWith(label)) fail(`no line "${label}" to choose (at "${selected()}")`); };
+    // The title: the mode and the seed of the next game.
+    await title.openTitle(game);
+    pick("Mode:"); key("ArrowRight");
+    const modeLine = text().includes("Mode: Commons Lamp") && title.titleState().mode === "commonsLamp";
+    pick("Seed:"); key("Enter");
+    const m0 = game.messages.length;
+    for (const c of ["4", "2", "m", "4", "2"]) key(c === "m" ? "KeyM" : `Digit${c}`, c);
+    key("Enter");
+    const seedOk = title.titleState().seed === "4242" && game.messages.length === m0;
+    key("Home"); key("Enter");
+    if (!modeLine || !seedOk || game.seed !== 4242 || game.state?.mode !== "commonsLamp" || game.mode !== "story")
+      fail(`the title's mode and seed: mode line ${modeLine}, seed ${title.titleState().seed} (M typed nothing: ${game.messages.length === m0}); the game: seed ${game.seed}, ${game.state?.mode}, ${game.mode}`);
+    out.push("the mode (→ Commons Lamp) and a typed seed (4242; M typed into it did nothing) made the game");
+    // Two slots, the Load list: export, delete twice; warnings.
+    game.pages = null; playing(game, "map");
+    await saveGame(game, {});
+    freshRun(55, { store: st });
+    const second = await saveGame(game, {});
+    const s2 = await st.get("slots", second.id);
+    await st.put("slots", { ...s2, unclean: 2, genVersion: 0 });   // an unclean exit twice, an older generator
+    await title.openTitle(game);
+    const warned = title.titleState().warnings.join(" ");
+    if (!/last session ended without a save \(2 times\)/.test(warned) || !/older version/.test(warned)) fail(`the title's warnings: ${warned}`);
+    pick("Load a save"); key("Enter");
+    let t = text();
+    if (title.titleState().view !== "load" || !t.includes("seed 55") || !t.includes("seed 4242")) fail(`Load a save: ${t.replace(/\s+/g, " ").slice(0, 160)}`);
+    key("KeyX", "x"); await tick(5);
+    const exported = /Exported/.test(title.titleState().busy);
+    key("Delete"); const armed = text().includes("Delete again");
+    key("ArrowDown"); const disarmed = !text().includes("Delete again");
+    key("ArrowUp"); key("Delete"); key("Delete"); await tick(5); await tick(5);
+    const left = (await listSlots({ store: st })).map((s) => s.seed);
+    if (!exported || !armed || !disarmed || left.length !== 1) fail(`the Load list: exported ${exported}, armed ${armed}, disarmed by another key ${disarmed}, slots left ${left.join(" ")}`);
+    key("Escape");
+    out.push(`the warnings (unclean twice, an older generator); Load a save: X exported, Delete once asked, another key kept it, twice deleted (seed ${left[0]} left)`);
+    // The pause card, its line after the beat, Esc to the options.
+    freshRun(1234, { store: st, view: "3d" });
+    game.debug.enterZone("0,0,1", "down"); playing(game, "3d");
+    await saveGame(game, {});
+    inputHandlers.onLockChange(false);
+    const noLine = !text().includes("Esc: options");
+    frames(Math.ceil(pause.HINT_AFTER * 60) + 2);
+    const line = text().includes("Esc: options");
+    key("Escape");
+    const inOptions = game.mode === "options" && text().includes("Field of view: 75");
+    pick("Field of view"); key("ArrowRight");
+    await tick(2);
+    const kept = (await st.get("meta", "settings"))?.fov;
+    pick("Keys"); key("Enter");
+    t = text();
+    const keysView = t.includes("1-9  abilities (hotbar)") && t.includes("H  message log") && t.includes("In 3D") && t.includes("On the map");
+    key("Escape");
+    if (!noLine || !line || !inOptions || game.fov !== 80 || kept !== 80 || !keysView) fail(`the pause card and options: line before the beat ${!noLine}, after ${line}; options ${inOptions}; fov ${game.fov}, kept ${kept}; keys ${keysView}`);
+    out.push(`the pause card's line only after its ${pause.HINT_AFTER} s; Esc → options; the field of view 75 → 80, kept in the store's meta; the keys of both views (1-9 the hotbar, H the log)`);
+    // Save and quit, then Continue to the same tile.
+    const at = { key: game.zone.key, x: game.player.x, y: game.player.y };
+    pick("Save and quit"); key("Enter");
+    for (let k = 0; k < 50 && game.mode !== "title"; k++) await tick(5);
+    const quitSlot = await st.get("slots", game.saving.slotId);
+    await tick(5);
+    pick("Continue"); key("Enter");
+    for (let k = 0; k < 100 && (game.mode === "title" || !game.zone); k++) await tick(5);
+    if (quitSlot?.live !== null || game.zone?.key !== at.key || game.player.x !== at.x || game.player.y !== at.y || saveStatus(game).unclean !== 0)
+      fail(`save and quit, Continue: live ${quitSlot?.live}; back in ${game.zone?.key} at ${game.player?.x},${game.player?.y} (left ${at.key} at ${at.x},${at.y}); unclean ${saveStatus(game)?.unclean}`);
+    out.push("save and quit: a clean slot (live null), the title; Continue: the same tile, 0 unclean");
+    // The message log.
+    playing(game, "map");
+    for (let k = 1; k <= 60; k++) { game.log(`Log line ${k}.`); if (k % 7 === 0) game.debug.step(1 / 60); }
+    key("KeyH");
+    t = text();
+    const shows = game.mode === "log" && t.includes("Log line 60.") && !t.includes("Log line 1.");
+    key("Home"); t = text();
+    const top = t.includes("Log line 1.") && t.includes("Messages (");
+    key("KeyH");
+    const closed = game.mode;
+    playing(game, "3d"); key("KeyH"); const in3d = game.mode === "log"; key("Escape");
+    if (!shows || !top || closed !== "map" || game.mode !== "explore" || !in3d || log.logHistory(game).length < 60)
+      fail(`the log: newest ${shows}, scrolled to the first ${top}, closed to ${closed}, in 3D ${in3d} (then ${game.mode}), ${log.logHistory(game).length} lines kept`);
+    out.push("the log on H: 60 lines kept (game.messages keeps 40), the newest shown, Home scrolls to the first; H and Esc close; in both views");
+    // The recap; R keeps the mode; C wakes a Commons Lamp life.
+    RULES.auto = true;
+    freshRun(1234, { store: st, mode: "commonsLamp" });
+    await settle();
+    game.debug.enterZone("0,0,1", "down"); playing(game, "map");
+    await settle();
+    game.hurtPlayer(5, "a rat"); game.hurtPlayer(99999, "a test");
+    const card = text();
+    frames(Math.ceil(dead.RECAP_AFTER * 60) + 2);
+    await game.saving.restoring; frames(1);
+    t = text();
+    const recapOk = card.includes("YOU DIED") && !card.includes("Damage taken") && t.includes("Damage taken: a test") && t.includes("a rat 5") && t.includes("C to wake");
+    key("KeyC");
+    for (let k = 0; k < 100 && game.mode !== "map"; k++) await tick(5);
+    const woke = game.mode === "map" && game.zone?.key === "0,0,1";
+    game.hurtPlayer(99999, "a test"); frames(70); await game.saving.restoring;
+    key("KeyR");
+    const kept2 = game.state.mode === "commonsLamp" && game.mode === "story";
+    if (!recapOk || !woke || !kept2) fail(`the recap: card first ${card.includes("YOU DIED")}, recap after its beat ${t.includes("Damage taken")} ("${t.replace(/\s+/g, " ").slice(0, 200)}"); C woke ${woke} (${game.zone?.key}); R kept the mode ${kept2}`);
+    out.push(`the death card, then after ${dead.RECAP_AFTER} s the recap (cause, damage by source, C to wake); C woke at the checkpoint; R started a new Commons Lamp run`);
+    stats.shell = out.join("; ");
+    useStore(null);
+  }
+
+  // --- 18. The HUD at 100×30 ----------------------------------------------------------------------------------
+  if (screen) {
+    await screen(100, 30);
+    RULES.auto = false;
+    freshRun(7, { store: null });
+    game.debug.enterZone("0,0,1", "down"); playing(game, "map");
+    const p = game.player, foe = game.zone.creatures.find((c) => !c.talk);
+    p.torch = true; p.keys = 3;
+    const shownWith = () => hud.layoutHud(game).rows.flat().map((q) => q.text).join(" | ");
+    const quiet = shownWith();
+    Object.assign(foe, { state: "chase", x: p.x + 4, y: p.y });
+    const H = hud.layoutHud(game), hunted = H.rows.flat().map((q) => q.text).join(" | "), pr = (id) => hud.segmentDef(id)?.priority ?? -1;
+    foe.x = p.x + 30;
+    const far = shownWith();
+    foe.x = p.x + 4;
+    startCooldown(p, "foldStep", 12);
+    const cooling = shownWith();
+    p.cooldowns = {};
+    // With every status on as well: one row, the lowest priorities dropped first.
+    for (const id of ["flying", "hasted", "shadowed", "poisoned", "darkened", "burning", "blinded"]) addStatusTo(game, p, id, { t: 30 });
+    const L = hud.layoutHud(game);
+    const inverted = L.dropped.filter((id) => L.rows.flat().some((q) => pr(q.id) < pr(id)));
+    const invertedH = H.dropped.filter((id) => H.rows.flat().some((q) => pr(q.id) < pr(id)));
+    if (quiet.includes("1 Fold Step") || !hunted.includes("1 Fold Step") || H.rows.length !== 1 || invertedH.length || far.includes("1 Fold Step")
+        || !/1 Fold Step 1[12]s/.test(cooling) || /1 Fold Step( \||$)/.test(cooling) || L.rows.length !== 1 || inverted.length)
+      fail(`the hotbar segment: quiet "${quiet}"; hunted "${hunted}" (${H.rows.length} rows, dropped ${H.dropped.join(",")}); 30 tiles off "${far}"; cooling "${cooling}"; ` +
+           `every status on: ${L.rows.length} rows, dropped ${L.dropped.join(",")}, inverted ${inverted.join(",")}`);
+    stats.hud = `100×30: "1 Fold Step" (priority ${pr("hotbar")}) only while a hostile hunts within ${hud.HOTBAR_NEAR} tiles (one row, dropping ${H.dropped.join(", ") || "nothing"} below it; not at 30 tiles; while it cools "1 Fold Step 12s" instead); ` +
+      `with every status on as well, one row, dropped ${L.dropped.join(", ") || "nothing"} (by priority, none inverted)`;
+    if (child?.debug) {
+      try {
+        const d = await child.debug();
+        if (!d.ids.includes("debug") || !/0,0,0 .* · no slot/.test(d.text) || d.off.includes("debug")) fail(`?debug=1: ${JSON.stringify(d)}`);
+        stats.debugFlag = `?debug=1 registers the "debug" segment ("${d.text}"); without it none`;
+      } catch (e) { fail(`?debug=1's child: ${String(e.message || e).slice(0, 200)}`); }
+    }
+  }
 }
