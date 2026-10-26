@@ -10,7 +10,7 @@ export const browserInput = {
   lock() {
     try {
       const p = canvas.requestPointerLock();
-      if (p && p.catch) p.catch(() => {});   // refused (e.g. too soon after Esc): the next click retries
+      if (p && p.catch) p.catch(() => {});   // refused: pointerlockerror follows (init), and the next click retries
     } catch (e) { /* not supported here: keyboard look still works */ }
   },
 
@@ -32,5 +32,9 @@ export const browserInput = {
     });
     addEventListener("wheel", (e) => handlers.onWheel?.(Math.sign(e.deltaY)), { passive: true });
     document.addEventListener("pointerlockchange", () => handlers.onLockChange?.(isLocked()));
+    // A refused request is the lock still lost: Esc closing a screen over 3D asks for the lock again, and a
+    // browser refuses it once the player took the lock away (Escape is not a user activation), so 3D would
+    // run with no mouse look and no card.
+    document.addEventListener("pointerlockerror", () => handlers.onLockChange?.(isLocked()));
   },
 };

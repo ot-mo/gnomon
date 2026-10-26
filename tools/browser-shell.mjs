@@ -1,6 +1,6 @@
 // The 0D1 shell in headless Chromium, with real key presses and real mouse clicks (not a check-*: it needs
 // Playwright).
-//   python3 -m http.server 8642 &        (from the repository root), then
+//   node tools/serve.mjs 8642 &           (from the repository root; Python's http.server drops requests on Windows), then
 //   NODE_PATH=$(npm root -g) node tools/browser-shell.mjs [--port 8642] [--seed 1234] [--sizes 1280x720,600x300]
 //
 // Before any page script, every audio node bound for the speakers is routed through an AnalyserNode and a
@@ -9,7 +9,7 @@
 // then by clicks; on the map I and J by keys and by clicks on their words in the header, closed by Esc / J
 // and by "I close" / a click; the cube (game.onCube) and its pages; the pause card under them, closed by a
 // click (which takes the pointer lock); losing the lock (document.exitPointerLock) opens pause, and I, J
-// and Tab work from it; Tab and Esc between the views, "Tab: 3D" clicked; Pell by keys (his pack, Esc
+// and Tab work from it; so does a lock request refused (Esc closing the inventory over 3D); Tab and Esc between the views, "Tab: 3D" clicked; Pell by keys (his pack, Esc
 // back, Esc out) and by clicks (an answer, the services tab, "Esc back", "Esc to leave"); a level gained
 // (1, and a click on a perk); stairs (the "DEPTH n" beat); death (R, and a click on "Press R…"). Also a text
 // field pushed for the test takes "m", "Ö" and "M" from real keys without toggling the music. Fails on any
@@ -141,6 +141,20 @@ try {
     await page.evaluate(() => { if (document.pointerLockElement) document.exitPointerLock(); });
     await frames(5);
     if ((await mode()) !== "pause") await page.evaluate(() => window.game.debug.lockChange(false));
+    // The lock request refused (a real browser refuses the one Esc makes closing a screen once the player took
+    // the lock away: Escape is not a user activation; headless grants every request, so the refusal is
+    // played here as Chrome does it, a rejected promise and pointerlockerror): the pause card, not 3D running.
+    await click("I inventory"); await expect("inventory", "clicking \"I inventory\" on the pause card");
+    await page.evaluate(() => {
+      const c = document.getElementById("screen");
+      c.__request = c.requestPointerLock;
+      c.requestPointerLock = () => {
+        setTimeout(() => document.dispatchEvent(new Event("pointerlockerror")));
+        return Promise.reject(new DOMException("The user has exited the lock", "NotAllowedError"));
+      };
+    });
+    await key("Escape"); await frames(3); await expect("pause", "Esc in the inventory over 3D, the lock request refused");
+    await page.evaluate(() => { const c = document.getElementById("screen"); c.requestPointerLock = c.__request; delete c.__request; });
     await key("Tab"); await expect("map", "Tab from the pause card");
     await click("Tab: 3D"); await expect("explore", "clicking Tab: 3D");
     await key("Tab"); await expect("map", "Tab in 3D");

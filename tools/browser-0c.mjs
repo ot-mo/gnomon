@@ -1,5 +1,5 @@
 // The 0C browser smoke, in headless Chromium with real key presses (not a check-*: it needs Playwright).
-//   python3 -m http.server 8642 &        (from the repository root), then
+//   node tools/serve.mjs 8642 &           (from the repository root; Python's http.server drops requests on Windows), then
 //   node tools/browser-0c.mjs [--port 8642] [--seeds 1234,7]
 //
 // Before any page script, every audio node bound for the speakers is routed through an AnalyserNode and a

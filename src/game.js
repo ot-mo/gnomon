@@ -279,8 +279,8 @@ export const inputHandlers = {
     dispatchHover(game, mapView.hover);
   },
   onWheel(sign) { dispatchWheel(game, sign); },
-  // Esc under pointer lock never reaches keydown: losing the lock in 3D opens the pause card; getting it
-  // back (a click) closes it.
+  // Esc under pointer lock never reaches keydown: losing the lock in 3D (or a request for it refused:
+  // input-browser.js) opens the pause card; getting it back (a click) closes it.
   onLockChange(locked) {
     if (locked) { if (game.mode === "pause") popMode(game, undefined, { pointer: false }); game.paused = false; }
     else if (game.mode === "explore") pushMode(game, "pause");
