@@ -213,7 +213,8 @@ export function creaturesNear(zone, x, y, r) {
 // witnessesOf(game, e, r = 12) → every creature, people included, within r tiles that sees e: who saw it.
 // creaturesAlong(zone, x0, y0, z0, x1, y1, z1, { pad = 0.15, skip }) → [{ c, t }]: the creatures whose
 //     bodies the segment passes through, nearest first (t: 0..1 along it). skip(c) → true leaves one out.
-//     What a shot would hit on its way (the target screen's interposed creature).
+//     What stands on a straight line (a beam, a charge, who is between two people). (A thrown or fired thing
+//     falls on an arc: throwing.js flightOf follows that, and the target screen draws it.)
 export function nearestCreature(zone, x, y, r, ok = () => true) {
   let best = null, bestD = Infinity;
   for (const c of creaturesNear(zone, x, y, r)) {

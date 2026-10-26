@@ -42,7 +42,7 @@
 // game/startRun: the real game (game.js). srcFiles: [{ file, text }] of every src/ module.
 import { Zone, B, FLOOR_Z } from "../../src/world.js";
 import { enterZone, changeZone, cachedZone, zoneState } from "../../src/zones.js";
-import { spawnCreature, addCreature, CREATURE_TYPES, pickCreatureType, touchable } from "../../src/creatures.js";
+import { spawnCreature, addCreature, CREATURE_TYPES, pickCreatureType, touchable, nearestCreature, witnessesOf, creaturesAlong } from "../../src/creatures.js";
 import { resolveAttack, rollToHit, hitChance, toHitMod, critNat, dvOf, weaponSpec, naturalSpec, playerMelee, bumpAttack, combatLine, thrownSpec } from "../../src/combat.js";
 import { guardianThink } from "../../src/guardians.js";
 import { mapStep, passTime, refreshView, startTravel, travelStep } from "../../src/turns.js";
@@ -1211,6 +1211,34 @@ export async function checkAiDepth(ctx) {
       const badMore = wantMore.map((re, j) => (re.test(more[j]) ? null : `"${more[j]}"`)).filter(Boolean);
       expect(!badMore.length, `the d20 log's other lines: ${badMore.join("; ")}`);
       stats.log.push(...more);
+      run.restore(); run = null;
+    }
+
+    // --- 7b. The spatial queries WS6a builds on: nearestCreature, sees and witnessesOf, creaturesAlong ------------
+    {
+      run = fresh(ctx, 99);
+      const p = game.player;
+      const z = arena("ws8-queries", { w: 30, d: 14 });
+      for (let k = FLOOR_Z; k < FLOOR_Z + 3; k++) for (let y = 0; y < 14; y++) z.set(15, y, k, B.STONE);   // a wall across x 15
+      z.refresh();
+      enterZone(game, z, { how: "start" }); onMap(game);
+      Object.assign(p, { x: 5.5, y: 6.5, z: FLOOR_Z });
+      const at = (type, x, y, opts = {}) => addCreature(z, spawnCreature(type, x, y, FLOOR_Z, { rng: () => 0.5, level: 3, ...opts }));
+      const r3 = at("rat", 8, 6), r5a = at("rat", 10, 6), r5b = at("rat", 5, 11), behind = at("goblin", 20, 6), flat = at("flatling", 7, 8), maren = at("maren", 5, 4);
+      const near = nearestCreature(z, p.x, p.y, 20), nearRat5 = nearestCreature(z, p.x, p.y, 20, (c) => c !== r3 && c.type === "rat");
+      const q = { nearest: near === flat || near === maren || near === r3, filtered: nearRat5 === (r5a.id < r5b.id ? r5a : r5b) };
+      const w = witnessesOf(game, p, 20);
+      q.witnesses = w.includes(r3) && w.includes(maren) && w.includes(flat) && !w.includes(behind);
+      addStatus(game, p, "flat", { t: 1e6 });
+      const wFlat = witnessesOf(game, p, 20);
+      q.flatWitnesses = wFlat.includes(flat) && !wFlat.includes(r3) && !wFlat.includes(maren);
+      delete p.status.flat;
+      const line = creaturesAlong(z, p.x, p.y, FLOOR_Z + 0.3, 12.5, 6.5, FLOOR_Z + 0.3).map((e) => e.c);   // (a rat is short)
+      const over = creaturesAlong(z, p.x, p.y, FLOOR_Z + 1.5, 12.5, 6.5, FLOOR_Z + 1.5).map((e) => e.c);
+      const skipped = creaturesAlong(z, p.x, p.y, FLOOR_Z + 0.3, 12.5, 6.5, FLOOR_Z + 0.3, { skip: (c) => c === r3 }).map((e) => e.c);
+      q.along = line[0] === r3 && line[1] === r5a && line.length === 2 && !over.includes(r3) && skipped[0] === r5a;
+      expect(Object.values(q).every(Boolean), `spatial queries: ${JSON.stringify(q)}`);
+      stats.queries = q;
       run.restore(); run = null;
     }
 

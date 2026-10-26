@@ -50,7 +50,8 @@ sees(game, c, e) → bool                             // c sees e (you or a crea
                                                     // (light.js inDark), and pressed flat you're seen only by flat things;
                                                     // ghosts the light hides and things across the plane are never seen
 witnessesOf(game, e, r = 12) → c[]                  // everyone (people too) within r who sees e
-creaturesAlong(zone, x0, y0, z0, x1, y1, z1, { pad = 0.15, skip }) → [{ c, t }]   // bodies a segment passes, nearest first
+creaturesAlong(zone, x0, y0, z0, x1, y1, z1, { pad = 0.15, skip }) → [{ c, t }]   // bodies a straight segment passes,
+                                                    // nearest first (a thrown thing's arc: throwing.js flightOf)
 eyesOf(e), bodyMid(e) → z
 touchesYou(game, attacker) → bool                   // not while you're flat and it isn't (blows, arrows, splashes)
 ```
