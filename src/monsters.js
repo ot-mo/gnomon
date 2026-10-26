@@ -13,6 +13,7 @@ import { attr, maxHp } from "./stats.js";
 import { wielded } from "./body.js";
 import { addStatus, removeStatus, capStatus, hasStatus, statusFlag, tickStatuses, cooldownLeft, startCooldown, setStatusHarm, STATUS_DEFS } from "./status.js";
 import { RULES } from "./rules.js";
+import { uidWhere, killUid } from "./zones.js";
 import { CREATURE_TYPES, spawnCreature, addCreature, removeCreature, touchable, isFlat, ghostHidden, canTalk } from "./creatures.js";
 
 // How an element fares against a monster: "resist", "weak" or null.
@@ -302,6 +303,7 @@ function killMonster(game, m, message, dropLoot = true, byPlayer = true) {
   const t = CREATURE_TYPES[m.type];
   removeCreature(zone, m);
   zone.sightings.delete(m.id);
+  if (m.uid && uidWhere(game, m.uid)) killUid(game, m.uid);   // a claimed uid (a quest's, a legend's) stays dead
   if (Math.hypot(game.player.x - m.x, game.player.y - m.y) < 14) { game.log(message, [230, 230, 230]); sfx("kill", { at: m }); }
   if (byPlayer && m.xp > 0) {
     game.effects.push({ kind: "damage", x: m.x, y: m.y, z: m.z + m.h + 0.5, text: `+${m.xp} XP`, color: [160, 230, 255], time: game.time });

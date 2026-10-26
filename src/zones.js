@@ -18,7 +18,8 @@
 import { B, FLOOR_Z, APRON, APRON_SIDES, standWith } from "./world.js";
 import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "./pathing.js";
 import { emit, registerUpdate } from "./events.js";
-import { hash, distance } from "./rng.js";
+import { hash, distance, makeRng } from "./rng.js";
+import { spawnCreature, addCreature } from "./creatures.js";
 
 export const zoneKey = (wx, wy, z) => `${wx},${wy},${z}`;
 export function parseKey(key) {
@@ -450,6 +451,14 @@ function patchSpot(zone, p, arrival) {
 const patchSalt = (p) => [...String(p.id)].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 7);
 
 PATCH_OPS.setFlag = (game, zone, p) => { zone.flags[p.flag] = p.value ?? true; };
+// { op: "spawnCreature", type, uid?, state?, level? (the zone's), elite?, name?, talk?: { dialogue, state }, position }
+// Its looks come from a stream seeded by the zone and the patch id, so the same patch spawns the same creature.
+PATCH_OPS.spawnCreature = (game, zone, p, { at }) => {
+  if (!at) return;
+  const rng = makeRng((zone.seed ^ patchSalt(p)) >>> 0);
+  addCreature(zone, spawnCreature(p.type, at.x, at.y, at.z, { rng, uid: p.uid ?? null, state: p.state, level: p.level ?? zone.level,
+                                                             elite: p.elite ?? null, name: p.name, talk: p.talk }));
+};
 PATCH_OPS.removeUid = (game, zone, p) => {
   zone.creatures = zone.creatures.filter((c) => c.uid !== p.uid);
   zone.items = zone.items.filter((it) => it.uid !== p.uid);

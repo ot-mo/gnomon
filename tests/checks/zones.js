@@ -12,6 +12,7 @@ import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../../src/pathing.js";
 import { generateDungeonLevel, legacyParams } from "../../src/gen/dungeon.js";
 import { makeRng, noise2 } from "../../src/rng.js";
 import { mapStep } from "../../src/turns.js";
+import { damageMonster } from "../../src/monsters.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
 
 // A rolling outdoor zone: grass hills 0-3 blocks over the datum, a pond of deep water (rock bottom),
@@ -211,6 +212,28 @@ export function checkZones({ game, startRun }) {
   addZonePatch(game, "0,0,3", { op: "setFlag", flag: "now" });
   expect(game.zone.flags.now === true, "a patch for the zone you're in applies at once");
   delete PATCH_OPS.testMark;
+  // spawnCreature (0C): a creature with the patch's uid, placed as asked, the same one every time; it dies for good.
+  addZonePatch(game, "0,0,5", { op: "spawnCreature", type: "goblin", uid: "test:goblin", state: "wander", relativeTo: "arrival", dist: [8, 12] });
+  addZonePatch(game, "0,0,5", { op: "spawnCreature", type: "pell", uid: "test:pell", relativeTo: "entrance", talk: { state: { stock: [] } } });
+  changeZone(game, "0,0,4", { how: "down" });
+  changeZone(game, "0,0,5", { how: "down" });
+  const z5 = game.zone, gob = z5.creatures.find((c) => c.uid === "test:goblin"), pell = z5.creatures.find((c) => c.uid === "test:pell");
+  expect(gob && gob.type === "goblin" && gob.state === "wander" && gob.level === z5.level && !gob.talk && uidWhere(game, "test:goblin") === "0,0,5",
+         `a spawnCreature patch spawns its creature with its uid (got ${gob ? `${gob.type} ${gob.state} level ${gob.level}` : "nothing"})`);
+  expect(pell?.talk?.dialogue === "pell" && Array.isArray(pell.talk.state.stock), "a spawnCreature patch can spawn a talker with its talk state");
+  if (gob) {
+    const d = Math.hypot(gob.tx - Math.floor(p.x), gob.ty - Math.floor(p.y));
+    expect(d >= 8 && d <= 12, `the patch's goblin is ${d.toFixed(1)} tiles from the arrival (want 8-12)`);
+    const twin = { creatures: [], seed: z5.seed, level: z5.level, sealed: true }, gobId = Object.keys(z5.appliedPatches)[0];   // its patch, run again
+    PATCH_OPS.spawnCreature(game, twin, { op: "spawnCreature", id: gobId, type: "goblin", uid: "test:goblin", state: "wander" },
+                            { at: { x: gob.tx, y: gob.ty, z: z5.stand[gob.tx + gob.ty * z5.w] } });
+    expect(twin.creatures[0] && twin.creatures[0].anim === gob.anim && twin.creatures[0].pause === gob.pause, "the same patch gives the creature the same looks");
+    const was3d = game.view;
+    game.view = "3d";
+    damageMonster(game, gob, 9999, [255, 255, 255]);
+    game.view = was3d;
+    expect(!z5.creatures.includes(gob) && uidWhere(game, "test:goblin") === "dead", `a claimed uid dies with its creature (${uidWhere(game, "test:goblin")})`);
+  }
 
   // --- Derived arrays: only the two most recent zones keep them -------------------------------------
   const withDerived = [...game.zones.values()].filter((z) => z.hasDerived).map((z) => z.key);
