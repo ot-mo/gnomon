@@ -412,19 +412,29 @@ function planExplore(game) {
   return findRoute(game, (x, y) => hasItem(x, y) || frontier(x, y), (x, y) => routable(game, x, y));
 }
 
+// What you see now that is out for you (sighted this moment): a click-travel or an explore stops when one
+// comes into view that wasn't there when it began. Your followers coming and going don't stop it.
+function foesInView(game) {
+  const { zone, player: p } = game, out = new Set();
+  for (const [id, s] of zone.sightings) {
+    if (s.time !== game.time) continue;
+    const c = zone.creatures.find((o) => o.id === id);
+    if (!c || attitude(game, c, p) === "hostile") out.add(id);
+  }
+  return out;
+}
+
 export function startExplore(game) {
   const path = planExplore(game);
   if (!path) { game.log("Nothing left to explore that you can walk to from here.", [170, 170, 170]); return false; }
-  const visible = new Set([...game.zone.sightings].filter(([, s]) => s.time === game.time).map(([id]) => id));
-  game.travel = { path, visible, hp: game.player.hp, timer: 0, explore: true };
+  game.travel = { path, visible: foesInView(game), hp: game.player.hp, timer: 0, explore: true };
   return true;
 }
 
 export function startTravel(game, gx, gy) {
   const path = planTravel(game, gx, gy);
   if (!path) return false;
-  const visible = new Set([...game.zone.sightings].filter(([, s]) => s.time === game.time).map(([id]) => id));
-  game.travel = { path, visible, hp: game.player.hp, timer: 0 };
+  game.travel = { path, visible: foesInView(game), hp: game.player.hp, timer: 0 };
   return true;
 }
 
@@ -439,7 +449,7 @@ export function travelStep(game) {
   if (Math.abs(dx) > 1 || Math.abs(dy) > 1 || !mapStep(game, dx, dy, { force: false }) || attacking) { game.travel = null; return; }
   if (game.mode !== "map") { game.travel = null; return; }
   if (Math.floor(p.x) === x && Math.floor(p.y) === y) tr.path.shift();   // (opening a door doesn't move you)
-  const newcomer = [...game.zone.sightings].some(([id, s]) => s.time === game.time && !tr.visible.has(id));
+  const newcomer = [...foesInView(game)].some((id) => !tr.visible.has(id));
   if (p.hp < tr.hp || newcomer) { game.travel = null; return; }
   if (!tr.path.length) {
     if (!tr.explore) { game.travel = null; stepOutward(game, dx, dy); return; }

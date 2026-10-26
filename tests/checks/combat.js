@@ -45,7 +45,7 @@ import { enterZone, changeZone, cachedZone, zoneState } from "../../src/zones.js
 import { spawnCreature, addCreature, CREATURE_TYPES, pickCreatureType } from "../../src/creatures.js";
 import { resolveAttack, rollToHit, hitChance, toHitMod, critNat, dvOf, weaponSpec, naturalSpec, playerMelee, bumpAttack, combatLine, thrownSpec } from "../../src/combat.js";
 import { guardianThink } from "../../src/guardians.js";
-import { mapStep, passTime, refreshView } from "../../src/turns.js";
+import { mapStep, passTime, refreshView, startTravel, travelStep } from "../../src/turns.js";
 import { overrideRules, RULES } from "../../src/rules.js";
 import { invalidateStats, mod, maxHp, av as armourValue } from "../../src/stats.js";
 import { makeBody } from "../../src/body.js";
@@ -1069,6 +1069,22 @@ export function checkAiDepth(ctx) {
       const arrowed = attacks.some((a) => a.att === archer && a.tgt === pal) && !attacks.some((a) => a.att === archer && a.tgt === p);
       expect(blasted && arrowed, `your follower: in your bomb's blast hurt ${blasted}; an arrow at you through it hit it ${arrowed}`);
       fz.creatures.splice(fz.creatures.indexOf(archer), 1); p.hp = maxHp(p);
+      // A click-travel goes on when a follower comes into view (a new foe still stops it).
+      { const tz = arena("ws8-travel", { w: 40, d: 12 });
+        enterZone(game, tz, { how: "start" }); tz.seen.fill(1); onMap(game);
+        Object.assign(p, { x: 3.5, y: 5.5, z: FLOOR_Z }); refreshView(game);
+        startTravel(game, 20, 5);
+        travelStep(game); travelStep(game);
+        recruit(game, addCreature(tz, spawnCreature("goblin", 6, 9, FLOOR_Z, { rng: () => 0.5, level: 3 })));
+        for (let k = 0; k < 40 && game.travel; k++) travelStep(game);
+        const reached = Math.floor(p.x) === 20;
+        startTravel(game, 30, 5);
+        travelStep(game);
+        addCreature(tz, spawnCreature("goblin", Math.floor(p.x) + 3, 8, FLOOR_Z, { rng: () => 0.5, level: 3, state: "wander" }));
+        for (let k = 0; k < 40 && game.travel; k++) travelStep(game);
+        const stopped = Math.floor(p.x) < 29;
+        expect(reached && stopped, `click-travel: with a follower coming into view it reached x 20 ${reached}; a goblin coming into view stopped it ${stopped}`);
+        game.travel = null; }
       stats.follow = { whileWalking: +walking.toFixed(1), after4s: +lag.toFixed(1), foughtYourFoe: true, swap: swapped, shiftStrikes: true, secondSwingIn3d: true, neverStrikesBack: true, bombAndArrowsReachIt: true };
       run.restore(); run = null;
     }
