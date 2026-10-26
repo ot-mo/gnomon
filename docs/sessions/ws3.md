@@ -15,6 +15,7 @@ dropped). The public API, the integration requests and the handoff are in `docs/
 | `b267794` `87a902c` `19b7776` | The two P0 test changes the session that started WS3 approved (clock §5 as a seam; the victory card not compared, its make-up check) and their listing |
 | `b17d715` … `a7c08bd` | The verification's fixes and additions (§4) |
 | `dcbaa72` … `cc9ef9e` | The recheck's fix (the swap frame on the GPU) and the re-review's fixes and tests (§4) |
+| `c8f2273` | 3D draws every creature whatever its attitude (WS8's request 12; §4) |
 | `fd86970` and these notes | `docs/ws3.md` and `docs/sessions/ws3.md` |
 
 ## 1. What was built
@@ -24,14 +25,14 @@ dropped). The public API, the integration requests and the handoff are in `docs/
 | The Dial's sun (up in the south-east at 06:00, over the Gnomon at noon, down in the north at 18:00, its shadows along the Hand), daylight with dusk and dawn ramps, the Shade's and the Hand's dimming, the Hand itself, sky colours by the hour, the haze, light buckets | `clock.js` |
 | Daylight from the clock in `lightAt`/`naturalLight`/`inDark`; the lit mask following daylight (the auto-map's night rule), synced on entering a zone; the edge clamp; the baked sun (`zone.sunlit`, a slice a frame, neighbours ahead, again when the apron changes); state kept by the zone's `skyLight` | `light.js` |
 | The apron in a 3 × 3 band grid; above the zone's top rays only mark the auto-map; the in-grid test first; how a miss left | `raycast.js` |
-| Sky light × daylight with a moonlit floor; the sun's colour by height; shadows from the bake; sky gradient, sun disc, clouds, stars; haze; 48-tile reach; the apron lit as open ground; the horizon plane on the side a ray left by; the Gnomon on the horizon; liquid tints (also underground and beyond an edge); dynamic half-column rendering; a pixel loop that survives zone changes; the HUD's clock segment for the integrator | `render3d.js` |
+| Sky light × daylight with a moonlit floor; the sun's colour by height; shadows from the bake; sky gradient, sun disc, clouds, stars; haze; 48-tile reach; the apron lit as open ground; the horizon plane on the side a ray left by; the Gnomon on the horizon; liquid tints (also underground and beyond an edge); dynamic half-column rendering; a pixel loop that survives zone changes; every creature drawn whatever its attitude; the HUD's clock segment for the integrator | `render3d.js` |
 | Ground looks outdoors, disguised pits and bridges, the narrow terrain legend (glim; the features seen), liquid colours in any zone, `toggleMapLegend(game)` | `renderMap.js` |
 | Surface moods by landmark, region, terrain and night; voice objects for `speakLetter` | `music.js`, `content/moods.js`, `sfx.js` |
-| The render check (12 parts; its memory part with `--expose-gc`, as `check-perf` runs it) and the perf items (noon, dusk, night, the bake, the swap) | `tests/checks/render.js`, `tests/checks/perf.js`, `tools/check-perf.mjs` |
+| The render check (13 parts; its memory part with `--expose-gc`, as `check-perf` runs it) and the perf items (noon, dusk, night, the bake, the swap) | `tests/checks/render.js`, `tests/checks/perf.js`, `tools/check-perf.mjs` |
 
 ## 2. Gate (TECH_DESIGN §8.3 "WS3" acceptance)
 
-**`node tools/run-all.mjs`**: 37 of 37 at `238fd92` (110.9 s, 11 at a time, the machine quiet), with the two P0 test
+**`node tools/run-all.mjs`**: 37 of 37 at `c8f2273`, the code tagged (114.5 s, 11 at a time; at `238fd92` 110.9 s), with the two P0 test
 changes the session that started WS3 approved (`b267794` clock §5 as a seam check; `87a902c` the victory card drawn but
 not compared): the other 46 screen frames and golden (b)'s 27 frames still match.
 
@@ -45,7 +46,7 @@ east edge, the apron filled, the camera turning a full circle; p50 of 144 frames
 | `p0-done` (draws noon at every hour) | 22.55 | 22.47 | 22.43 | 11.64 |
 | ratio | ×0.71 | ×0.65 | ×0.66 | ×0.89 |
 
-Inside run-all (check-perf alone, this tree only): 15.77 / 14.76 / 14.75 / 10.29 ms. render3d alone at noon, three
+Inside run-all at `c8f2273` (this tree only): 15.96 / 14.80 / 14.72 / 10.52 ms. render3d alone at noon, three
 alternating rounds: 15.56 / 15.67 / 15.62 ms against 22.19 / 22.46 / 22.83. Under the other sessions' load (99% CPU)
 the same item read 22.56 against 24.02 (×0.94, "the machine's"). The rest of §6.7 against `p0-done` in the same run:
 refresh 7.74 ms (×1.03), apron 0.16 (×1.00), surface generation p95 30.0 (×1.08) and max 126 (×1.06), dungeon
@@ -165,6 +166,7 @@ by putting the old code back), and the affected checks rerun before every commit
 | (re-review, minor) The Gnomon vanished from under its tip in its own span; hung 14 blocks up over a span without its foot; was "in sight" all night | Cut at the near plane; on whatever stands at its span's middle; at night only its violet light, where it can be seen (`gnomonLightSeen`); render.js §11 pins each rule | `be6b9ea` |
 | (re-review, note) A neighbour's pit seen across the edge drew as the horizon plane | A pit inside the grid or an apron band; the plane only where no band is; render.js §2 | `264ffc4` |
 | (re-review, note) `voiceOf`: `wave: undefined`, `pitch: Infinity`, an inherited pitch | Own keys only, each checked | `87243f3` |
+| (WS8's request 12, after the re-review) 3D drew only the creatures hostile to you: a follower (`brain.leader`), or a beast a faction makes wary or neutral, was there but unseen in 3D, and a flat one cast no shadow | Every creature but the people, in the zone's order (under the parent's attitudes exactly the hostile ones: golden (b) 27 of 27, screen frames 46 of 46); render.js §13 (a follower drawn, a flat follower's shadow; each fails with its old loop back) | `c8f2273` |
 | (re-review, minor) 20 of the reviewer's 33 mutations passed the render check | It now checks the Hand's length, cap, hours and width, the plane's side, the Shade's sky and stars, the apron's water in a frame, a pit from above, `toggleMapLegend(game)`, and (with `--expose-gc`) a dormant zone's arrays freed; each fails with its mutation | `cc9ef9e` |
 
 Left as they are, with reasons:
@@ -182,9 +184,10 @@ Left as they are, with reasons:
 
 At `238fd92`, the machine quiet (no other session's checks running), one at a time:
 
-- `node tools/run-all.mjs`: 37 of 37 (110.9 s); check-perf alone inside it within every budget.
+- `node tools/run-all.mjs`: 37 of 37 (110.9 s); check-perf inside it within every budget. Again at `c8f2273` (WS8's
+  request 12 taken after this recheck): 37 of 37 (114.5 s), golden (b) 27 of 27, screen frames 46 of 46 compared.
 - `node tools/check-perf.mjs --against p0-done`: every item within budget (§2's table); the render check alone with
-  `--expose-gc`: 12 parts pass, the dormant zone's five arrays freed.
+  `--expose-gc`: 12 parts pass, the dormant zone's five arrays freed (13 at `c8f2273`, §13 added).
 - Browser: browser-0d1 against `p0-done` and browser-gate on the GPU pass (§2; run at `dcbaa72`, the renderer unchanged
   since but for the Gnomon's rules, the apron's pits and the test hooks), the screenshots at `238fd92` (§2). Every
   browser closed, every server stopped (no browser process left).

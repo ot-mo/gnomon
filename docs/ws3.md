@@ -164,7 +164,8 @@ one commit each). Nothing is half finished; `ws/ws3` has no work past the tag.
 **For the integrator.**
 
 - WS3 changed only its own files (§8.4) and two P0 tests with approval (requests 1 and 2: confirm them at the
-  merge). Requests 3-12 are for other owners or the integrator; none blocks WS3's checks.
+  merge). Requests 3-12 are for other owners or the integrator; none blocks WS3's checks. WS8's request 12 (3D draws every
+  creature, not only the hostile ones; `docs/ws8.md` on `ws/ws8`) is in `p1-ws3` (`c8f2273`): drop it at the merge.
 - `node tools/check-perf.mjs` now runs `tests/checks/render.js` first with `--expose-gc` (its §12, the dormant zone's
   arrays, runs only so) and compares with `p0-done` by default. Take its numbers on a quiet machine, alternating
   with `p0-done`: under other sessions' load the outdoor frame reads 22-24 ms in both trees (verdict "the machine's").
