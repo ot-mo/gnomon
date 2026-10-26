@@ -7,6 +7,14 @@
 //   dungeon – minor, sparse plucks over a drone
 //   deep    – floors 12 and down: Phrygian, slower, darker
 //   boss    – the Lich King is after you: faster, a bass ostinato, drums
+// and on the surface (WS3: content/moods.js says which plays where, by landmark, region and terrain):
+//   open    – plains and downs: Mixolydian, unhurried, a soft bass
+//   wood    – the woods: Dorian, close and round
+//   waste   – salt, stone and the Teeth: a sparse minor pentatonic, no bass
+//   shore   – water: Ionian, lilting
+//   shade   – the Shade: Locrian, slow and low
+//   lattice – the crystal grid: whole-tone, glassy
+//   night   – any open span at night: quiet Aeolian, few notes
 // Monsters hunting you bring in a bass pulse and hi-hats.
 //
 // The view changes the music completely. On the map (and before you've found the cube) the
@@ -18,13 +26,34 @@
 // M toggles the music (remembered between visits). The audio context itself, and going quiet
 // when the game isn't on screen, are in audio.js.
 import { onAudioReady, audioOut, savedSwitch, saveSwitch, impulse } from "./audio.js";
+import { MOODS as MOOD_TABLE } from "./content/moods.js";
+import { spanOf, isNight } from "./clock.js";
 
 const MOODS = {
   temple:  { bpm: 66,  root: 62, scale: [0, 2, 4, 6, 7, 9, 11], chords: [0, 4, 5, 3], pad: "triangle", pluck: "sine",     notes: 0.45, bass: "none",     drums: 0, cutoff: 2600 },
   dungeon: { bpm: 72,  root: 57, scale: [0, 2, 3, 5, 7, 8, 10], chords: [0, 5, 3, 4], pad: "sawtooth", pluck: "triangle", notes: 0.32, bass: "slow",     drums: 0, cutoff: 1500 },
   deep:    { bpm: 64,  root: 52, scale: [0, 1, 3, 5, 7, 8, 10], chords: [0, 1, 0, 6], pad: "sawtooth", pluck: "triangle", notes: 0.24, bass: "slow",     drums: 0, cutoff: 1000 },
   boss:    { bpm: 104, root: 50, scale: [0, 2, 3, 5, 7, 8, 11], chords: [0, 0, 5, 4], pad: "sawtooth", pluck: "square",   notes: 0.6,  bass: "ostinato", drums: 1, cutoff: 3200 },
+  open:    { bpm: 70,  root: 60, scale: [0, 2, 4, 5, 7, 9, 10], chords: [0, 3, 6, 4], pad: "triangle", pluck: "sine",     notes: 0.36, bass: "slow",     drums: 0, cutoff: 2400 },
+  wood:    { bpm: 66,  root: 57, scale: [0, 2, 3, 5, 7, 9, 10], chords: [0, 3, 0, 4], pad: "triangle", pluck: "triangle", notes: 0.34, bass: "slow",     drums: 0, cutoff: 1800 },
+  waste:   { bpm: 60,  root: 55, scale: [0, 3, 5, 7, 10],       chords: [0, 3, 2, 0], pad: "sine",     pluck: "sine",     notes: 0.2,  bass: "none",     drums: 0, cutoff: 1400 },
+  shore:   { bpm: 64,  root: 64, scale: [0, 2, 4, 5, 7, 9, 11], chords: [0, 5, 3, 4], pad: "sine",     pluck: "sine",     notes: 0.3,  bass: "slow",     drums: 0, cutoff: 2000 },
+  shade:   { bpm: 56,  root: 49, scale: [0, 1, 3, 5, 6, 8, 10], chords: [0, 1, 4, 0], pad: "sawtooth", pluck: "triangle", notes: 0.18, bass: "slow",     drums: 0, cutoff: 900 },
+  lattice: { bpm: 62,  root: 66, scale: [0, 2, 4, 6, 8, 10],    chords: [0, 1, 2, 1], pad: "sine",     pluck: "sine",     notes: 0.28, bass: "none",     drums: 0, cutoff: 3000 },
+  night:   { bpm: 56,  root: 57, scale: [0, 2, 3, 5, 7, 8, 10], chords: [0, 5, 3, 6], pad: "sine",     pluck: "sine",     notes: 0.16, bass: "none",     drums: 0, cutoff: 1100 },
 };
+
+export const moodNames = () => Object.keys(MOODS);
+
+// The surface's mood (content/moods.js): the landmark's, the region's music, the terrain's, else the surface
+// one; at night the night one, unless the place's mood plays all night. → a key of MOODS.
+export function surfaceMood(game, zone = game.zone) {
+  const T = MOOD_TABLE, span = spanOf(game, zone);
+  let m = (zone?.landmarkId && T.landmarks?.[zone.landmarkId]) || span?.region?.music || T.terrains?.[span?.tile?.terrain] || T.surface;
+  if (!MOODS[m]) m = MOODS[T.surface] ? T.surface : "temple";
+  if (isNight(game) && !(T.allNight || []).includes(m) && MOODS[T.night]) m = T.night;
+  return m;
+}
 const VOLUME = 0.6;
 // The flat path pushes the band into the crusher hard (or the quiet notes would round down to
 // nothing), then turns the result back down to sit about as loud as the deep sound.
@@ -64,9 +93,9 @@ export function updateMusic(game) {
     chasing++;
     if (m.type === "lich" || m.guardian) bossAwake = true;   // the Lich King, or a guardian
   }
-  // The surface (the temple, for now) plays the temple mood; deep levels sound murkier. WS3: moods by region.
+  // The surface plays its place's mood (surfaceMood); deep levels sound murkier.
   const surface = !f || f.type === "surface", level = f ? f.level : 0;
-  st.want = game.mode === "won" || surface ? "temple" : bossAwake ? "boss" : level >= 12 ? "deep" : "dungeon";
+  st.want = game.mode === "won" || !f ? "temple" : surface ? surfaceMood(game, f) : bossAwake ? "boss" : level >= 12 ? "deep" : "dungeon";
   st.intensity += ((Math.min(1, chasing / 3)) - st.intensity) * 0.02;
   st.depth = surface ? 0 : level;
   const flat = !game.story.cube || game.view === "map" ? 1 : 0;

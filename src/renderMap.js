@@ -3,6 +3,16 @@
 // floor mosaics read clearly, where you can see a spike trap's rhythm coming, and where the
 // flat beings of the Plane show at all.
 // Row 0: controls · row 1: status bar (hud.js) · then the map · last row: tile inspector.
+//
+// Outdoors (a zone with sky; TECH_DESIGN §6.5, WS3) a floor shows its ground: the block under where you'd
+// stand (zone.look) by its `map` look (blocks.js), else a "." in that block's colour; water takes the
+// colour of the liquid it holds; and the legend is the terrain one (the looks you have seen here, then the
+// things that matter outdoors), narrow enough to sit beside an 80-wide zone at 180 columns. Underground the
+// map is the parent game's, legend and all (golden (b)).
+//   toggleMapLegend() → bool         show or hide the legend (for a key to bind; shown where it doesn't fit,
+//                                    the map's view narrows and follows you); mapLegendShown(game) → bool
+//   setLegendKeyHint(text)           the key's label, shown at the foot of the outdoor legend once one is bound
+//   liquidColor(zone, x, y) → [r, g, b] | null   the colour of a column's water when it holds another liquid
 import * as S from "./screen.js";
 import { BLOCKS, KIND, FLOOR_Z } from "./world.js";
 import { itemGlyph, itemName, withArticle } from "./items.js";
@@ -11,11 +21,14 @@ import { spikeState } from "./traps.js";
 import { talkersIn, typeOf, ghostOffMap } from "./creatures.js";
 import { slamState } from "./guardians.js";
 import { resistText } from "./combat.js";
+import { liquidAt } from "./social/liquids.js";
+import { LIQUIDS } from "./content/liquids.js";
 
 export const mapView = { panX: 0, panY: 0, hover: null, tx0: 0, ty0: 0, top: 2 };
 
 const TILE_W = 2;   // characters per tile (cells are ~2× taller than wide)
 const LEGEND_W = 30;
+const LEGEND_NARROW = 18;   // outdoors: beside an 80-wide zone at 180 columns
 const ARROWS = [">", "\\", "v", "/", "<", "\\", "^", "/"];
 
 const GLYPHS = {
@@ -50,12 +63,46 @@ function mapKind(zone, x, y) {
   return k;
 }
 
+// The legend: "auto" shows it where it fits beside the whole zone; "on" always (the view narrows); "off".
+let legendMode = "auto", legendHint = "";
+const shownFor = (mode, fits) => mode === "on" || (mode === "auto" && fits);
+function legendWidth(zone) {
+  if (!zone.hasSky) return { w: LEGEND_W, fits: S.cols >= zone.w * TILE_W + LEGEND_W + 4 };
+  return { w: LEGEND_NARROW, fits: S.cols >= zone.w * TILE_W + LEGEND_NARROW + 2 };
+}
+let lastFits = true;
+export function toggleMapLegend() { legendMode = shownFor(legendMode, lastFits) ? "off" : "on"; return legendMode === "on"; }
+export const mapLegendShown = (game) => shownFor(legendMode, legendWidth(game.zone).fits);
+export function setLegendKeyHint(text) { legendHint = String(text || ""); }
+
+// Outdoors: how a column's ground and water show (null: the parent's glyph for its kind).
+const dim = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
+function groundLook(zone, i, kind) {
+  if (kind === KIND.FLOOR) {
+    const id = zone.look[i], b = BLOCKS[id];
+    if (!id || !b) return null;
+    return b.map ? [b.map.glyph, b.map.color] : [".", dim(b.color || [125, 120, 110], 0.85)];
+  }
+  if (kind === KIND.SHALLOW || kind === KIND.DEEP) {
+    const c = liquidColor(zone, i % zone.w, Math.floor(i / zone.w));
+    if (c) return ["~", kind === KIND.DEEP ? dim(c, 0.6) : c];
+  }
+  return null;
+}
+export function liquidColor(zone, x, y) {
+  if ((zone.liquid || "water") === "water" && !Object.keys(zone.liquids || {}).length) return null;
+  const id = liquidAt(zone, x, y);
+  return id !== "water" ? LIQUIDS[id]?.color || null : null;
+}
+
 export function renderMap(game) {
   S.clear();
   const { zone, player } = game;
   const top = mapView.top;
-  const legend = S.cols >= zone.w * TILE_W + LEGEND_W + 4;
-  const viewW = Math.floor((S.cols - (legend ? LEGEND_W : 0)) / TILE_W);
+  const lw = legendWidth(zone);
+  lastFits = lw.fits;
+  const legend = shownFor(legendMode, lw.fits);
+  const viewW = Math.floor((S.cols - (legend ? lw.w : 0)) / TILE_W);
   const viewH = S.rows - top - 2;
 
   // Which tile sits at the top-left of the view: centred if the map fits, else follow the player.
@@ -89,7 +136,7 @@ export function renderMap(game) {
         else if (st === "warn") S.put(sx, sy, "^", 255, 170, 60);
         else S.put(sx, sy, ",", 130, 110, 100);
       } else {
-        const [ch, c] = GLYPHS[kind] || GLYPHS[KIND.FLOOR];
+        const [ch, c] = (zone.hasSky && groundLook(zone, i, kind)) || GLYPHS[kind] || GLYPHS[KIND.FLOOR];
         S.put(sx, sy, ch, ...c);
       }
     }
@@ -108,7 +155,7 @@ export function renderMap(game) {
       : " WASD: step, bump to talk · click: walk · X: explore · Space: wait · I: inventory · J: journal ";
   mapView.header = { x: 1, y: 0, text: header.slice(0, S.cols - 2) };   // the map screen makes its keys clickable
   S.text(1, 0, mapView.header.text, 255, 255, 255);
-  if (legend) drawLegend(S.cols - LEGEND_W + 1, top, game);
+  if (legend) { if (zone.hasSky) drawTerrainLegend(S.cols - lw.w + 1, top, game); else drawLegend(S.cols - LEGEND_W + 1, top, game); }
   S.text(1, S.rows - 1, " " + describeTile(game, hoveredTile()) + " ", 200, 200, 200);
 }
 
@@ -288,6 +335,42 @@ function drawLegend(x, y, game) {
     "looked down into them in 3D.",
   ];
   notes.forEach((t, k) => y + rows.length + 4 + k < S.rows - 2 && S.text(x, y + rows.length + 4 + k, t, 120, 120, 120));
+}
+
+// The legend outdoors: the ground looks you have seen here (the commonest first), then what matters outdoors.
+function drawTerrainLegend(x, y, game) {
+  const { zone } = game, room = S.rows - 2 - y, width = LEGEND_NARROW - 5;
+  const counts = new Map();
+  for (let i = 0; i < zone.w * zone.d; i++) {
+    if (!zone.seen[i] || zone.kind[i] !== KIND.FLOOR || mapKind(zone, i % zone.w, Math.floor(i / zone.w)) !== KIND.FLOOR) continue;
+    const look = groundLook(zone, i, KIND.FLOOR);
+    if (!look) continue;
+    const name = BLOCKS[zone.look[i]].name, key = look[0] + name;
+    const e = counts.get(key) || { glyph: look[0], color: look[1], name, n: 0 };
+    e.n++; counts.set(key, e);
+  }
+  const ground = [...counts.values()].sort((a, b) => b.n - a.n).map((e) => [e.glyph, e.color, e.name]);
+  const fixed = [
+    ["@", [255, 230, 80], "you"],
+    ["#", [140, 140, 150], "wall, tree"],
+    ["~", [110, 190, 220], "shallow water"],
+    ["~", [50, 80, 200], "deep water"],
+    ["$", [255, 210, 70], "glim"],
+    ["! ?", [230, 60, 80], "potion, scroll"],
+    [") [", [205, 210, 225], "weapon, armour"],
+    ["*", [90, 230, 255], "your marker"],
+    ["@", [245, 230, 170], "someone"],
+    ["r g", [200, 200, 200], "monster seen"],
+    ["f", [200, 170, 255], "flat: map only"],
+  ];
+  const lines = room - 2 - (legendHint ? 2 : 0);
+  const rows = [...ground.slice(0, Math.max(2, lines - fixed.length)), ...fixed].slice(0, Math.max(0, lines));
+  S.text(x, y, "LEGEND", 255, 255, 255);
+  rows.forEach(([g, c, label], k) => {
+    S.text(x, y + 2 + k, g, ...c);
+    S.text(x + 4, y + 2 + k, label.slice(0, width), 170, 170, 170);
+  });
+  if (legendHint) S.text(x, S.rows - 3, `${legendHint}: legend`.slice(0, LEGEND_NARROW - 1), 120, 120, 120);
 }
 
 // Map a screen cell to the tile under it.

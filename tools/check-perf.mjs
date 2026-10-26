@@ -1,9 +1,11 @@
-// Performance against TECH_DESIGN §6.7's budgets (0D2 skeleton → WS3; see tests/checks/perf.js): frames at 180×56
-// outdoors (apron included) and underground, refresh and the apron, generation, buildRun/restoreRun, passTime per
-// simulated second with 60 creatures, a map step, skipTime over 8 game hours; p50/p95/max each.
-//   node tools/check-perf.mjs [--against p0-0d1 | none] [--rounds 1] [--frames 72]
+// WS3's Node runner: first the render check (tests/checks/render.js: the outdoor look, the clock's looks, the
+// dark-only rules by the clock, the map outdoors, golden (b)'s frames), in a process of its own; then performance
+// against TECH_DESIGN §6.7's budgets (tests/checks/perf.js): frames at 180×56 outdoors (apron included; noon, dusk,
+// night) and underground, the sun bake, refresh and the apron, generation, buildRun/restoreRun, passTime per
+// simulated second with 60 creatures, a map step, skipTime over 8 game hours; p50/p95/max each; the edge swap.
+//   node tools/check-perf.mjs [--against p0-done | none] [--rounds 1] [--frames 72] [--no-render]
 // Each measurement runs in a Node process of its own (a fresh JIT, as run-all gives each check). When an item is over
-// budget (or --against is given), the reference tree (default p0-0d1, `git archive` unpacked into a temporary folder,
+// budget (or --against is given), the reference tree (default p0-done, `git archive` unpacked into a temporary folder,
 // removed afterwards) is measured as many times as this one, alternately (this, ref, this, ref…: --rounds + 1 each),
 // and an item over budget here but at most 15% slower than there is the machine's: reported, not failed
 // (tests/checks/perf.js; its verdictProblems() is run first, on synthetic numbers).
@@ -48,9 +50,18 @@ const pool = (runs) => {
   return { samples, info: runs[0].info };
 };
 
+// The render check, in its own process (tools/run-check.mjs prints its report).
+let renderCode = 0;
+if (!args["no-render"]) {
+  renderCode = await new Promise((resolve) => {
+    const child = spawn(process.execPath, [path.join(ROOT, "tools", "run-check.mjs"), "render"], { cwd: ROOT, stdio: "inherit" });
+    child.on("close", (status) => resolve(status === 0 ? 0 : 1));
+  });
+}
+
 const t0 = performance.now();
 const heads = [await measure(SRC)];
-const against = args.against === undefined ? "p0-0d1" : String(args.against);
+const against = args.against === undefined ? "p0-done" : String(args.against);
 const over = overBudget(pool(heads));
 let ref = null, refDir = null;
 const refs = [];
@@ -72,4 +83,4 @@ const verdict = verdictProblems();
 if (verdict.length) { result.ok = false; result.problems.push(...verdict); }
 result.stats.runs = `${heads.length} of this tree${ref ? `, ${refs.length} of ${against} (alternating: this, ${against}, this…)` : ""}` +
   `${over.length ? `; over budget in the first: ${over.join(", ")}` : ""}; ${((performance.now() - t0) / 1000).toFixed(1)} s; the verdict's own test ${verdict.length ? "FAILED" : "passed (6 cases)"}`;
-process.exit(report(result));
+process.exit(report(result) || renderCode);

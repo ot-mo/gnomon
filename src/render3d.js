@@ -11,6 +11,7 @@
 //       over 17 ms for 2 s casts every other column and copies it to the next, until the full cast's cost
 //       (twice the halved one) is back under 12 ms for 2 s. On by default in a page, off in Node.
 //   horizonOf(game, zone) → { n, e, s, w: { z, color } }   the horizon plane's height and colour per side
+//   judgeFrame(ms, now)       one frame's cast time (ms) at time now (ms) for dynamic resolution (render3d calls it)
 import * as S from "./screen.js";
 import { castRay, hit, setGhostVisible, rayInfo } from "./raycast.js";
 import { sampleGrid, inDark, zoneIsLightless, daylight, syncLight, sunState, sunlitGrid } from "./light.js";
@@ -344,7 +345,7 @@ function shadeHorizon(dx, dy, dz, tExit, time) {
 const dyn = { on: typeof document !== "undefined", half: false, avg: 0, since: 0 };
 export function setDynamicResolution(on) { dyn.on = !!on; if (!on) dyn.half = false; }
 export const dynamicResolution = () => ({ on: dyn.on, half: dyn.half });
-function judgeFrame(ms, now) {
+export function judgeFrame(ms, now) {
   if (!dyn.on || !outdoor) { dyn.half = false; dyn.since = 0; return; }
   const full = dyn.half ? ms * 2 : ms;   // the full cast's cost
   dyn.avg = dyn.avg ? dyn.avg + (full - dyn.avg) * 0.1 : full;
