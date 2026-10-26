@@ -68,10 +68,11 @@ export function resistText(m) {
 
 // --- Specs ------------------------------------------------------------------------------------------
 // The wielded weapon (bonus maxDmg widens the top of the range). Material: bible §13.1, 0 until items
-// carry one.
+// carry one. Bare hands (fists): req 0 for the legacy set and the to-hit; d20 damage counts STR over
+// RULES.d20.fistReq instead.
 export function weaponSpec(e) {
   const it = wielded(e), w = it && WEAPONS[it.id];
-  if (!w) return { kind: "melee", weapon: null, dmg: [1, 2 + bonus(e, "maxDmg")], ench: 0, element: null, req: 0, acc: 0, material: 0 };
+  if (!w) return { kind: "melee", weapon: null, dmg: [1, 2 + bonus(e, "maxDmg")], ench: 0, element: null, req: 0, acc: 0, material: 0, fists: true };
   return { kind: "melee", weapon: it, dmg: [w.dmg[0], w.dmg[1] + bonus(e, "maxDmg")], ench: it.ench || 0, element: it.element || null,
            req: strNeeded(it), acc: w.acc || 0, material: it.material || 0 };
 }
@@ -339,7 +340,7 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
   // 3 Damage: the range, + material, + STR over the requirement, + enchantment (yours); a creature's
   // level bonus; then the multipliers and the crit.
   let dmg = spec.fixed ?? roll(rng, spec.dmg[0], spec.dmg[1]) + (spec.plus || 0);
-  if (you && spec.kind === "melee") dmg += (spec.material || 0) + Math.floor((attr(p, "str") - spec.req) / 2) + spec.ench;
+  if (you && spec.kind === "melee") dmg += (spec.material || 0) + Math.floor((attr(p, "str") - (spec.fists ? D.fistReq : spec.req)) / 2) + spec.ench;
   dmg = Math.max(1, dmg);
   if (onYou) {
     if (crit) dmg *= D.crit;

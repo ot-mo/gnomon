@@ -11,7 +11,7 @@
 //      also goes through the whole resolveAttack (10⁵ blows on a goblin that can't die). A natural 20
 //      hits a DV no roll can beat (5% of rolls, each a natural-20 crit), through rollToHit and resolveAttack.
 //   2b. Damage and soak (d20): your blade's mean (range + material + floor((STR − req)/2) + enchantment)
-//      and ×crit; a creature's armour soaks 0..AV uniformly; a creature's blow on you (range + level
+//      and ×crit; a creature's armour soaks 0..AV uniformly; bare hands below a dagger; a creature's blow on you (range + level
 //      bonus, ×crit), and your armour's soak 0..AV, uniformly.
 //   3. Both views, one resolution: a bump duel on the map and a swing duel in 3D with the same combat RNG
 //      give identical result sequences (hit, crit, natural, total, DV, damage, soak).
@@ -34,6 +34,7 @@ import { overrideRules, RULES } from "../../src/rules.js";
 import { invalidateStats, mod, maxHp, av as armourValue } from "../../src/stats.js";
 import { makeBody } from "../../src/body.js";
 import { makeRng } from "../../src/rng.js";
+import { WEAPONS } from "../../src/items.js";
 import { on } from "../../src/events.js";
 import { setDaylight } from "../../src/light.js";
 
@@ -216,7 +217,17 @@ export function checkCombat({ game, startRun, srcFiles }) {
         `a creature's AV 4 soaks ${counts.map((c) => c.toFixed(3))} of 0..4 (mean ${mean(soaks).toFixed(3)}), want 0.2 each, mean 2`);
       expect(landed.every((x) => x.dmg + x.soaked >= 6), "a blow on an armoured creature lost more than its soak");
       dummy.armour = 0;
-      stats.damage = { yours: { plain: +plain.toFixed(3), crit: +crits.toFixed(3), want: wantPlain }, creatureSoak: counts.map((c) => +c.toFixed(3)) };
+      // Bare hands never outdo a weapon: fists (1-2, STR over RULES.d20.fistReq) below the dagger.
+      const heldBody = p.body;
+      p.body = makeBody(p.body?.plan || "humanoid"); invalidateStats(p);
+      const fistSpec = weaponSpec(p);
+      p.body = heldBody; invalidateStats(p);
+      const dagger = { kind: "melee", weapon: null, dmg: [...WEAPONS.dagger.dmg], ench: 0, element: null, req: WEAPONS.dagger.str, acc: 0, material: 0 };
+      const fistMean = mean(blows(dummy, fistSpec, 20000).filter((x) => !x.crit).map((x) => x.dmg));
+      const daggerMean = mean(blows(dummy, dagger, 20000).filter((x) => !x.crit).map((x) => x.dmg));
+      expect(fistSpec.fists && fistMean < daggerMean, `bare hands mean ${fistMean.toFixed(3)} against the dagger's ${daggerMean.toFixed(3)} (want less)`);
+      stats.damage = { yours: { plain: +plain.toFixed(3), crit: +crits.toFixed(3), want: wantPlain }, creatureSoak: counts.map((c) => +c.toFixed(3)),
+                       fists: +fistMean.toFixed(3), dagger: +daggerMean.toFixed(3) };
       // A creature's blow on you (goblin level 5: 2-4 + 1). First with no armour, then with AV 4.
       const biter = mk("goblin", 5);
       const wantBite = 3 + 1;
