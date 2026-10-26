@@ -7,6 +7,7 @@
 //        creature it places one (genUid); history and quests name theirs ("legend:lich", "village:12:elder").
 //
 //   nextEntityId() → number           entityCounter() → the next id that will be handed out
+//   nextId() → number                 the same (§1.4's name for it)
 //   setEntityCounter(n)               restoring a save (never lower than an id in a loaded zone)
 //   getIds() → { entity }             what a save keeps (§1.4, §7.4: the slot record's `ids`)
 //   setIds({ entity })                a load puts it back before any zone loads
@@ -14,6 +15,7 @@
 let entity = 1;
 
 export const nextEntityId = () => entity++;
+export const nextId = nextEntityId;
 export const entityCounter = () => entity;
 export function setEntityCounter(n) {
   if (!Number.isInteger(n) || n < 1) throw new Error(`setEntityCounter: ${n} is not a positive integer`);
