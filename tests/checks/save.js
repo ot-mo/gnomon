@@ -1007,8 +1007,8 @@ async function ws9Sections(ctx) {
     game.debug.enterZone("0,0,1", "down"); playing(game, "map");   // leaving the temple, a settlement
     await settle();
     const wrote = Object.fromEntries(Object.keys(b).map((k) => [k, cs.stats.byStore[k] - b[k]]));
-    const cid = game.saving.slotId, cp2 = game.saving.cp, kept2 = (await rowsOf(cs, cid, "checkpointZones")).length;
-    if (cp1 !== 1 || cp2 !== 2 || wrote.slots !== 1 || kept2 !== 0) fail(`checkpoints: at the start ${cp1}, on leaving the temple ${cp2}; it wrote ${JSON.stringify(wrote)}, ${kept2} copies kept after it`);
+    const cid = game.saving.slotId, cp2 = game.saving.cp, kept2 = (await rowsOf(cs, cid, "checkpointZones")).join(" ");
+    if (cp1 !== 1 || cp2 !== 2 || wrote.slots !== 1 || kept2 !== "0,0,1") fail(`checkpoints: at the start ${cp1}, on leaving the temple ${cp2}; it wrote ${JSON.stringify(wrote)}; copies after it: ${kept2 || "none"} (want 0,0,1, the zone it was made in)`);
     const atCp = await digestGame(game, ["0,0,0", "0,0,1"]);
     const route = [["0,0,2", "down"], ["0,0,3", "down"], ["0,0,2", "up"], ["0,0,1", "up"], ["0,0,2", "down"]];
     for (const [key, how] of route) {
@@ -1036,7 +1036,7 @@ async function ws9Sections(ctx) {
       await settle();
     }
     stats.checkpoints = `One Wick: death took the slot and its rows, a grave written ("a test"), no save after (90 frames, the unload refused). ` +
-      `The Commons Lamp: checkpoint 1 at the run's start, 2 on leaving the temple (the visit wrote ${wrote.slots} slot record and ${wrote.zones} zone rows: the temple written behind, which kept ${wrote.checkpointZones} copy for checkpoint 1, and level 1; the checkpoint then dropped checkpoint 1's copies: ${kept2} left); ` +
+      `The Commons Lamp: checkpoint 1 at the run's start, 2 on leaving the temple (the visit wrote ${wrote.slots} slot record and ${wrote.zones} zone rows, the temple written behind and level 1, the zone it was made in; the checkpoint dropped checkpoint 1's copies and kept its own zone's at once: copies ${kept2}); ` +
       `5 zone changes (hostiles killed, hp lost): rows ${rows.join(" ")}, copies ${copies.join(" ")}; death → C ×2: ${wakes.join(", ")} to the checkpoint, 0,0,2 and 0,0,3 gone from the store`;
   }
 
