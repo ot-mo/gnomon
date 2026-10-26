@@ -14,7 +14,7 @@
 //      and corner from 6 tiles and 1 tile in, no cell of the 3D view below the horizon is black (a blank character
 //      or a colour under 8); nor, at 180×55 (an odd row count), the level row at pitch 0. p0-done drew a 6-row band.
 //   3. The dark-only rules by the clock (not setDaylight): on a sky-lit field with your torch out a ghost plank
-//      is not drawn at noon and is at midnight (never with the torch lit); runes look different at noon and
+//      is not drawn at noon and is at midnight (never with the torch lit); runes don't glow at noon and do at
 //      midnight; with the torch out at night the auto-map marks only what lamps light, by day much more, in 3D
 //      and on the map (refreshView); the Shade is dark by day.
 //   4. The edge clamp: on open ground the light at a zone's border is the light inside.
@@ -197,9 +197,13 @@ export async function checkRender(m) {
     const runes = field("render-runes", true, (z) => { for (let y = 8; y <= 12; y++) for (let k = FLOOR_Z; k < FLOOR_Z + 3; k++) z.set(13, y, k, B.RUNE); });
     zones.enterZone(game, runes, { how: "start" });
     stand(10.5, 10.5, 0, 0); p().torch = false;
-    game.time = T(12); const runeNoon = frame3d();
-    game.time = T(24); const runeNight = frame3d();
-    expect(runeNoon !== runeNight, "runes look the same at noon and at midnight with the torch out");
+    // Glowing strokes are bright cyan (materials.js: 90, 220, 255 with a glow); worn scratches are the stone's grey.
+    const glowing = () => { let n = 0; for (let i = 0; i < capture.cols * capture.rows; i++) {
+      const r = capture.colors[i * 3], g = capture.colors[i * 3 + 1], b = capture.colors[i * 3 + 2];
+      if (b > 180 && b > r + 80 && g > r + 60) n++; } return n; };
+    game.time = T(12); frame3d(); const runeNoon = glowing();
+    game.time = T(24); frame3d(); const runeNight = glowing();
+    expect(runeNoon === 0 && runeNight > 20, `glowing rune cells with the torch out: noon ${runeNoon}, midnight ${runeNight} (want none at noon)`);
     // The auto-map, torch out: by day the sky lights the field, at night nothing does (the map still marks the 3 × 3
     // around you); a lit torch marks what it reaches, and a lamp what it lights.
     const lit = field("render-seen", true);
@@ -233,7 +237,7 @@ export async function checkRender(m) {
     let lateSeen = 0; for (let i = 0; i < late.seen.length; i++) lateSeen += late.seen[i];
     expect(lateSeen <= 9, `a zone entered at midnight, the map looking before any frame: ${lateSeen} columns seen (want the 3 × 3 around you)`);
     seen.enteredAtNight = lateSeen;
-    stats.dark = { plank: drawn, runesDifferNoonMidnight: runeNoon !== runeNight, seen };
+    stats.dark = { plank: drawn, runeGlowCells: { noon: runeNoon, midnight: runeNight }, seen };
   }
 
   // --- 4. The edge clamp ---------------------------------------------------------------------------------------
