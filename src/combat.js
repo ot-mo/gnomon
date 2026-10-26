@@ -30,6 +30,7 @@
 //   combatRng(game)          game.combatRng if a test set one, else Math.random
 // Events (events.js): "attack" { att, tgt, result } after every resolution; "hurt" { tgt, src, dmg }.
 import { lineOfSight } from "./raycast.js";
+import { solidFor } from "./world.js";
 import { strNeeded, WEAPONS, ELEMENTS } from "./items.js";
 import { colossusCore } from "./guardians.js";
 import { EYE, attackTime, armourValue, weaponReach } from "./player.js";
@@ -100,10 +101,20 @@ export function critNat(att) {
   const chance = bonus(att, "crit") + (att.attrs ? D.critPerAgi * Math.max(0, mod(att, "agi")) : 0);
   return Math.max(D.minCritNat, Math.min(D.die, D.die - Math.round(D.die * chance)));
 }
+// The ground an entity stands on, for high ground (TECH_DESIGN §3.2 "standing"): yours is the first solid
+// block below your feet, so a jump in 3D gives no bonus the map can't have; a creature's is its z
+// without its hover.
+function groundOf(game, e) {
+  if (!isPlayer(game, e) && !e.attrs) return e.z - (CREATURE_TYPES[e.type]?.hover || 0);
+  const solid = solidFor(game.zone, e), x = Math.floor(e.x), y = Math.floor(e.y);
+  let k = Math.floor(e.z + 1e-6);
+  while (k > 0 && !solid(x, y, k - 1)) k--;
+  return k;
+}
 export function toHitMod(game, att, tgt, spec = {}, ctx = {}) {
   const D = RULES.d20;
   let m = (spec.acc || 0) + bonus(att, "toHit") + (ctx.aimed ? D.aimed : 0);
-  if (att.z - tgt.z >= D.highGroundZ) m += D.highGround;   // standing a block or more above it
+  if (groundOf(game, att) - groundOf(game, tgt) >= D.highGroundZ) m += D.highGround;   // standing a block or more above it
   if (att.attrs) {
     m += mod(att, "agi");
     if (spec.req) m -= Math.min(D.reqPenaltyMax, D.reqPenalty * Math.max(0, spec.req - attr(att, "str")));

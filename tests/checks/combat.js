@@ -6,7 +6,7 @@
 //   1. The move: no penetration dice and no `pv` key anywhere; monsters.js no longer lands blows; nothing
 //      calls game.win, game.onGuardianWakes/Dies or game.questEvent, and the game object has none of them.
 //   2. Hit-chance tables (d20): rollToHit over 10⁵ rolls per row against hitChance() (the analytic value),
-//      within ±0.02, for you (AGI, accuracy, high ground, aimed, a weapon too heavy, a widened crit range)
+//      within ±0.02, for you (AGI, accuracy, high ground (and none in mid-jump), aimed, a weapon too heavy, a widened crit range)
 //      against creatures of several levels, and for creatures against your DV. Crit rates too. One row
 //      also goes through the whole resolveAttack (10⁵ blows on a goblin that can't die). A natural 20
 //      hits a DV no roll can beat (5% of rolls, each a natural-20 crit), through rollToHit and resolveAttack.
@@ -126,9 +126,15 @@ export function checkCombat({ game, startRun, srcFiles }) {
     setAgi(16);
     r = row("you aimed knife vs goblin L8", p, gob8, { kind: "thrown", dmg: [2, 4] }, { aimed: true });
     expect(r.m === RULES.d20.aimed, `an aimed throw adds ${r.m}, want +${RULES.d20.aimed}`);
+    field.set(5, 5, FLOOR_Z, B.STONE);   // a block to stand on
     stand(5.5, 5.5, FLOOR_Z + 1);
     r = row("you on high ground vs goblin L8", p, gob8, sword, {});
     expect(r.m === RULES.d20.highGround, `high ground adds ${r.m}, want +${RULES.d20.highGround}`);
+    field.set(5, 5, FLOOR_Z, B.AIR);
+    // In mid-jump over the same floor you stand no higher: +0 (the map can't jump).
+    stand(5.5, 5.5, FLOOR_Z + 1.2); p.vz = 3;
+    const jumpMod = toHitMod(game, p, gob8, sword, {});
+    expect(jumpMod === 0, `in mid-jump over flat ground the to-hit is ${jumpMod}, want +0 (no high ground)`);
     stand(5.5, 5.5);
     r = row("you, weapon 2 STR too heavy", p, gob8, { ...sword, req: 12 }, {});   // STR reads 10 in the legacy stat set
     expect(r.m === -4, `a weapon 2 STR too heavy gives ${r.m}, want −4`);
