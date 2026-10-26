@@ -191,13 +191,14 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
     // own guard, beside loadGame's): the counter set to 1, a zone decoded, the counter above every id in it.
     const topId = (z) => Math.max(0, ...z.creatures.map((c) => c.id));
     const zc = sessionZones.reduce((a, z) => (!a || topId(z) > topId(a) ? z : a), null);
-    if (zc && topId(zc) > 1) {
+    if (!zc || topId(zc) <= 1) fail("no session zone holds a creature id above 1 to rebuild (rebuildCreature's guard untested)");
+    else {
       const rec = await encodeZone(zc, { slot: "x", savedAt: 1 }, { deflate: false }), top = topId(zc);
-      setEntityCounter(1);
-      await decodeZone(JSON.parse(JSON.stringify(rec)));
-      const after = entityCounter();
-      setEntityCounter(was);
+      let after;
+      try { setEntityCounter(1); await decodeZone(JSON.parse(JSON.stringify(rec))); after = entityCounter(); }
+      finally { setEntityCounter(was); }
       if (!(after > top)) fail(`${zc.key} decoded with the id counter at 1: the counter ${after}, the zone's ids up to ${top} (rebuildCreature)`);
+      stats.rebuildGuard = `${zc.key} (ids up to ${top}) decoded with the counter at 1: ${after} after`;
     }
     const dropped = KEEP.filter((f) => !CREATURE_FIELDS.includes(f));
     if (dropped.length) fail(`CREATURE_FIELDS no longer keeps ${dropped.join(", ")}`);
