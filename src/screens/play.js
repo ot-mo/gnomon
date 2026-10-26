@@ -49,6 +49,7 @@ import { RULES } from "../rules.js";
 import { startTransition } from "./transition.js";
 import { openInv } from "./inventory.js";
 import { openJournal } from "./journal.js";
+import { hasKey } from "../keyset.js";
 
 export const playMode = (game) => (game.view === "map" ? "map" : "explore");
 
@@ -225,7 +226,7 @@ function foldPowers(game) {
   const p = game.player;
   const guard = bonus(p, "foldGuard");
   if (guard > 0) addStatus(game, p, "guarded", { t: guard, stack: "refresh" });
-  if (p.perks.has("foldingStrike") && !(cooldownLeft(p, "foldingStrike") > 0)) {
+  if (hasKey(p.perks, "foldingStrike") && !(cooldownLeft(p, "foldingStrike") > 0)) {
     const near = hostilesTo(game, p).filter((m) => Math.hypot(m.x - p.x, m.y - p.y) < 1.9 && !m.guardian);
     if (near.length) {
       for (const m of near) addStatus(game, m, "stunned", { t: 2, stack: "max" });

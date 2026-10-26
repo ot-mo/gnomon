@@ -57,7 +57,7 @@ function expectedBonus(e, statusBonus) {
   const out = {};
   const add = (b) => { for (const k in b) out[k] = (out[k] || 0) + b[k]; };
   for (const it of onBody(e)) add(itemBonuses(it));
-  for (const k of e.perks || []) if (PERKS[k].bonus) add(PERKS[k].bonus(perkRank(e, k)));
+  for (const k of e.perks instanceof Set ? e.perks : Object.keys(e.perks || {})) if (PERKS[k].bonus) add(PERKS[k].bonus(perkRank(e, k)));
   for (const id in e.status || {}) add(statusBonus(id, e.status[id]) || {});
   return out;
 }

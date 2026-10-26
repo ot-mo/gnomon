@@ -33,6 +33,7 @@
 import { RULES } from "./rules.js";
 import { invalidateStats, setStatusBonus, dv } from "./stats.js";
 import { B } from "./world.js";
+import { hasKey } from "./keyset.js";
 
 export const STATUS_DEFS = {};
 export function registerStatus(id, def) {
@@ -193,7 +194,7 @@ registerStatus("shadowed", { color: [150, 140, 190], kind: "good", t: 30, flags:
 // Poison: 1 damage every 1/mag seconds (the player's potion 1 s, a gas cloud on a creature 0.5 s);
 // Thick blood halves it.
 registerStatus("poisoned", { color: [150, 210, 80], t: 6, stack: "max", flags: { noRegen: legacyRegen },
-  period: (e, s) => (1 / s.mag) * (e.perks?.has?.("thickBlood") ? 2 : 1), cause: "poison",
+  period: (e, s) => (1 / s.mag) * (hasKey(e.perks, "thickBlood") ? 2 : 1), cause: "poison",
   hud: () => "POISONED", ended: "The sickness passes.", killed: (e) => `The ${e.name} chokes on the poison.` });
 registerStatus("paralyzed", { color: [200, 120, 255], t: 5, stack: "max", flags: { noAct: true, noMove: true },
   hud: (s) => `PARALYZED ${secs(s)}s`, ended: "You can move again." });

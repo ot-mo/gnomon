@@ -43,6 +43,7 @@ import { emit } from "./events.js";
 import { distance } from "./rng.js";
 import { CREATURE_TYPES, touchable, isFlat } from "./creatures.js";
 import { killMonster } from "./monsters.js";
+import { hasKey } from "./keyset.js";
 
 const legacy = () => RULES.combat === "legacy";
 export const combatRng = (game) => game.combatRng || Math.random;
@@ -83,7 +84,7 @@ export function naturalSpec(c) {
   return { kind: "natural", dmg: t.damage, plus: c.bonus || 0, acc: t.acc || 0 };
 }
 export function thrownSpec(game) {
-  return { kind: "thrown", dmg: [2, 4], plus: game.player.perks?.has("juggler") ? 2 : 0, acc: 0 };
+  return { kind: "thrown", dmg: [2, 4], plus: hasKey(game.player.perks, "juggler") ? 2 : 0, acc: 0 };
 }
 
 // --- The d20 numbers --------------------------------------------------------------------------------
@@ -262,8 +263,8 @@ function yourMultipliers(game, p, m, dmg, el, vs) {
   if (vs === "resist") dmg = Math.max(1, Math.round(dmg * 0.6));
   if (t.brittle && bonus(p, "crush") > 0) dmg *= 2;
   if (hasStatus(m, "burning") && bonus(p, "burnBonus") > 0) dmg = Math.ceil(dmg * (1 + bonus(p, "burnBonus")));
-  if (m.hp < m.maxHp * 0.25 && p.perks.has("executioner")) dmg = Math.ceil(dmg * 1.5);
-  if ((m.elite || t.guardian || t.boss) && p.perks.has("giantSlayer")) dmg = Math.ceil(dmg * 1.3);
+  if (m.hp < m.maxHp * 0.25 && hasKey(p.perks, "executioner")) dmg = Math.ceil(dmg * 1.5);
+  if ((m.elite || t.guardian || t.boss) && hasKey(p.perks, "giantSlayer")) dmg = Math.ceil(dmg * 1.3);
   return dmg;
 }
 

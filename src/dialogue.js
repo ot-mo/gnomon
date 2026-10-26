@@ -164,7 +164,7 @@ function shopRows(game) {
   const sh = game.shop, p = game.player;
   if (sh.tab === "buy") return sh.npc.talk.state.stock.filter((s) => s.count > 0).map((s) => {
     let price = s.price;
-    if (s.item.kind === "heart" || s.item.kind === "strength") price = Math.round(price * 1.5 ** (game.crystalsBought || 0));
+    if (s.item.kind === "heart" || s.item.kind === "strength") price = Math.round(price * 1.5 ** (game.state.merchants.crystalsBought || 0));
     return { it: s.item, price: haggle(game, price), count: s.count, stock: s };
   });
   if (sh.tab === "services") return services(game);
@@ -202,7 +202,7 @@ function trade(game, row) {
       addToInventory(p, { ...row.it, count: 1 });
       game.log(`You buy the ${name} for ${formatPrice(row.price)}.`, [255, 215, 90]);
     }
-    if (row.it.kind === "heart" || row.it.kind === "strength") game.crystalsBought = (game.crystalsBought || 0) + 1;
+    if (row.it.kind === "heart" || row.it.kind === "strength") game.state.merchants.crystalsBought = (game.state.merchants.crystalsBought || 0) + 1;   // (game.js attachState)
   } else {
     if (row.price <= 0) { game.log(`${sh.npc.name} doesn't want the ${name}.`, [170, 170, 170]); return; }
     if (purseRoom(p) < row.price) { game.log(`Your purse can't hold another ${formatPrice(row.price)}.`, [255, 150, 120]); return; }

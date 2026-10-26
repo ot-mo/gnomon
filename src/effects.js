@@ -9,6 +9,7 @@ import { FLOOR_Z } from "./world.js";
 import { sfx } from "./sfx.js";
 import { spawnCreature, addCreature, pickCreatureType, hostilesTo, canTalk } from "./creatures.js";
 import { arrivalPoint } from "./zones.js";
+import { hasKey } from "./keyset.js";
 
 export function drinkPotion(game, effect) {
   const p = game.player;
@@ -20,7 +21,7 @@ export function drinkPotion(game, effect) {
 
   switch (effect) {
     case "healing": {
-      const heal = p.perks.has("alchemist") ? 18 : 12;
+      const heal = hasKey(p.perks, "alchemist") ? 18 : 12;
       p.hp = Math.min(maxHp(p), p.hp + heal);
       game.log(`Warmth spreads through you. (+${heal} HP)`, [230, 90, 110]);
       break;

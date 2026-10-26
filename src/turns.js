@@ -22,6 +22,7 @@ import { updateClouds, updateProjectiles, updateBombs } from "./throwing.js";
 import { PLAYER_STEP_UP } from "./pathing.js";
 import { updateSpikes, nearSpikes, TICK } from "./traps.js";
 import { tryWalkOff } from "./zones.js";
+import { hasKey } from "./keyset.js";
 
 export const STEP_TIME = 1 / WALK;   // ≈ 0.24 s per tile
 const USE_TIME = 0.5;                // pulling a lever, opening a door
@@ -89,7 +90,7 @@ export function refreshView(game) {
   const { zone, player: p } = game;
   const ex = p.x, ey = p.y, ez = p.z + EYE;
   const torch = torchRange(p);
-  const holes = p.perks.has("cartographer") ? zone.holeSeen : null;
+  const holes = hasKey(p.perks, "cartographer") ? zone.holeSeen : null;
   const tx = Math.floor(p.x), ty = Math.floor(p.y);
   for (let y = ty - 1; y <= ty + 1; y++)
     for (let x = tx - 1; x <= tx + 1; x++)

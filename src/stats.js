@@ -36,6 +36,7 @@ import { RULES } from "./rules.js";
 import { itemBonuses, ITEM_KINDS } from "./items.js";
 import { worn } from "./body.js";
 import { PERKS, perkRank } from "./leveling.js";
+import { hasKey, keysOf } from "./keyset.js";
 
 export const ATTRS = ["str", "agi", "tou", "int", "wil", "ego"];
 export const BONUS_KEYS = ["crit", "swing", "reach", "maxDmg", "leech", "crush", "thorns", "ward", "regen", "darkRegen",
@@ -62,7 +63,7 @@ export const bonusSources = () => SOURCES.map((s) => s.name);
 registerBonusSource("gear", (e) => worn(e).map(itemBonuses));
 registerBonusSource("powers", function* (e) {
   if (!e.perks) return;
-  for (const k of e.perks) { const b = PERKS[k]?.bonus; if (b) yield b(perkRank(e, k)); }
+  for (const k of keysOf(e.perks)) { const b = PERKS[k]?.bonus; if (b) yield b(perkRank(e, k)); }
 });
 let statusBonus = () => null;
 export function setStatusBonus(fn) { statusBonus = fn || (() => null); cacheEpoch++; }
@@ -149,7 +150,7 @@ export function regenEvery(e) {
 // Price multipliers on an item's value: { buy, sell }. `step` is the reputation step with the trader's
 // faction (bible §15.6: Warm +0.1, Bright +0.2, Cold −0.1); 0 until factions exist (WS6a).
 export function priceMul(game, e, trader = null) {
-  if (legacy()) return { buy: e.perks?.has("haggler") ? RULES.legacy.haggle : 1, sell: RULES.legacy.sellShare };
+  if (legacy()) return { buy: hasKey(e.perks, "haggler") ? RULES.legacy.haggle : 1, sell: RULES.legacy.sellShare };
   const P = RULES.price, m = mod(e, "ego") + bonus(e, "price"), step = trader?.repStep || 0;
   const sell = Math.max(0, P.sell + P.sellPerMod * m + step / 2);
   return { buy: Math.max(P.minBuy, sell, P.buy - P.buyPerMod * m - step), sell };

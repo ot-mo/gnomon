@@ -4,6 +4,7 @@
 // (render3d.js, player.js). zones.js keeps track of which zones exist and moves you between them.
 import { computeLight } from "./light.js";
 import { BLOCKS, B, KIND } from "./blocks.js";
+import { hasKey } from "./keyset.js";
 export { BLOCKS, B, KIND };
 
 export const FLOOR_Z = 2;      // the datum: feet height on ordinary floor, z = 0..1 is solid ground
@@ -233,7 +234,7 @@ export function standWith(zone, doors) {
 // Whether a body floats on deep water instead of sinking: swimmers (the Swimmer perk; 0B reads
 // bonus(e, "swim") instead), and on the surface every body (surface water has a rock bottom and
 // never drops you a level, TECH_DESIGN §5.3; non-swimmers drown there from 0B).
-export const floatsOn = (zone, e) => zone.type === "surface" || !!e?.perks?.has?.("swimmer");
+export const floatsOn = (zone, e) => zone.type === "surface" || hasKey(e?.perks, "swimmer");
 
 // What's solid for this body: the zone's blocks, plus deep water if it floats there.
 // One rule for both views (player.js collision, turns.js standing heights).

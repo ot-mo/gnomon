@@ -88,7 +88,7 @@ export async function currentApi(env, seedRandom) {
         gear: { weapon: body.wielded(p), armour: body.wornOn(p, "body"), ring: body.wornOn(p, "finger_r"),   // the body (0B)
                 amulet: body.wornOn(p, "neck"), sidearm: body.belt(p) },
         inv: p.inv, keys: p.keys, gold: currency.funds(p), torch: p.torch,   // the purse (0B)
-        perks: [...p.perks].map((k) => [k, leveling.perkRank(p, k)]),
+        perks: Object.keys(p.perks).map((k) => [k, leveling.perkRank(p, k)]),   // a { id: 1 } map since 0D2 (R5)
         known: { potions: game.knownPotions, scrolls: game.knownScrolls, auras: game.auraKnown },
       };
     },

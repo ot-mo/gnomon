@@ -52,6 +52,7 @@ import { update, checkFloorEvents, fallThrough, changeFloor, onCube, forceMapVie
 import { openInv, inventoryAction } from "./screens/inventory.js";
 import { checkLevelUp, choosePerk } from "./screens/levelup.js";
 import { TOAST_TIME } from "./hud.js";
+import { hasKey, keySet } from "./keyset.js";
 import "./content/legacy/story-hooks.js";   // last, so its bus handlers run after the others' (as in the parent)
 
 export const game = {
@@ -108,7 +109,7 @@ export const game = {
     p.hp -= dmg;
     // Second wind: a killing blow leaves you on 1 HP, then not again for RULES.cooldown.secondWind
     // seconds of game time (it was once per floor; TECH_DESIGN §2.4).
-    if (p.hp <= 0 && p.perks.has("secondWind") && !(cooldownLeft(p, "secondWind") > 0)) {
+    if (p.hp <= 0 && hasKey(p.perks, "secondWind") && !(cooldownLeft(p, "secondWind") > 0)) {
       startCooldown(p, "secondWind", RULES.cooldown.secondWind);
       p.hp = 1;
       this.log("Everything goes grey... and you get up again. (Second wind!)", [255, 230, 140]);
@@ -137,48 +138,76 @@ export const randomSeed = () => 1 + Math.floor(Math.random() * 999999);
 // the property reads and writes game.time, a plain field because hot code reads it every frame (an
 // accessor on the game object made every access to it 10-100× slower), so the two are always the same
 // number, and JSON.stringify(state) saves it. The clock's events count from that moment on.
+// The parent game's run state lives in it too, as plain JSON (R5), and the game's fields are views of it
+// (the same objects, or keyset.js views for what the parent kept in Sets):
+//   game.story      = state.story                      { cube }: how far the story has got
+//   game.quests     = state.quests                     story/quests.js
+//   game.knownPotions, game.knownScrolls, game.auraKnown   over state.ident.known.potion / .scroll, state.ident.aura
+//   game.hints      over state.hints                   tips already shown (game.hint)
+//   game.relicsFound over state.relics                  relics already found (or dropped): each turns up once
+//   state.merchants.crystalsBought                     crystals bought from Pell (each makes the next dearer)
 export function attachState(game, state) {
   const t = Number(state.time) || 0;
   delete state.time;
   Object.defineProperty(state, "time", { get: () => game.time, set: (v) => { game.time = v; }, enumerable: true, configurable: true });
+  state.ident ||= { known: { potion: {}, scroll: {} }, aura: {} };
+  state.story ||= { cube: false };
+  state.quests ||= [];
+  state.hints ||= {};
+  state.relics ||= {};
+  state.merchants ||= {};
   game.state = state;
+  game.story = state.story;
+  game.quests = state.quests;
+  game.knownPotions = keySet(state.ident.known.potion);
+  game.knownScrolls = keySet(state.ident.known.scroll);
+  game.auraKnown = keySet(state.ident.aura);
+  game.hints = keySet(state.hints);
+  game.relicsFound = keySet(state.relics);
   game.time = t;
   game.clockSeen = t;   // clock.js: its events have fired up to here
   return state;
 }
 
-// A new game on `seed` (quick start: no character to make yet), at the world's start landmark.
-export function startRun(seed, world = game.world) {
-  game.seed = seed;
-  game.run = buildRun(seed, world);
-  attachState(game, { seed, time: 0, world: { id: game.run.world.id, version: game.run.world.version }, uids: {}, zonePatches: {}, zoneLeft: {} });   // day 1, 06:00
+// Which colour is which potion, and what each scroll's title is: shuffled for every run from its seed,
+// never saved (TECH_DESIGN §7.1: a load rebuilds them).
+export function runLooks(game, seed) {
+  const colors = makeRng(seed ^ 0x5eed).shuffle([...POTION_COLORS.keys()]);
+  game.potionColor = Object.fromEntries(Object.keys(POTIONS).map((effect, k) => [effect, colors[k]]));
+  game.scrollTitle = scrollTitles(makeRng(seed ^ 0x5c011));
+}
+
+// What a run starts without, new or loaded: no zones yet (the first changeZone brings one), no messages,
+// no screens on the stack. None of it is saved.
+export function resetRuntime(game) {
   game.zone = null;
   game.zoneLru = [];
-  game.player = makePlayer();
-  if (world.startPurse) setPurse(game.player, world.startPurse);
+  game.zones = new Map();
+  game.zoneLoading = null;
   game.messages = [];
   game.effects = [];
   game.travel = null;
-  // Which colour is which potion is shuffled for every run. You start knowing healing.
-  const colors = makeRng(seed ^ 0x5eed).shuffle([...POTION_COLORS.keys()]);
-  game.potionColor = Object.fromEntries(Object.keys(POTIONS).map((effect, k) => [effect, colors[k]]));
-  game.knownPotions = new Set(["healing"]);
-  game.scrollTitle = scrollTitles(makeRng(seed ^ 0x5c011));   // and scroll titles too
-  game.knownScrolls = new Set();
-  game.auraKnown = new Set();
+  game.flow = null;
   game.invSel = 0;
-  game.zones = new Map();
-  game.story = { cube: false };
-  game.quests = [];
-  game.hints = new Set();
-  game.relicsFound = new Set();   // relics already found (or dropped) this run: each turns up once
-  game.crystalsBought = 0;        // crystals bought from Pell (each makes the next dearer)
   game.cam = null;
   game.pendingPages = null;
   game.toasts = [];
   game.prefetchJob = null;   // zones.js: a staged prefetch under way, and the zone it last saw
   game.prefetchSeen = null;
   game.modeStack = [];
+}
+
+// A new game on `seed` (quick start: no character to make yet), at the world's start landmark.
+export function startRun(seed, world = game.world) {
+  game.seed = seed;
+  game.run = buildRun(seed, world);
+  // Day 1, 06:00; you start knowing the potion of healing.
+  attachState(game, { seed, time: 0, world: { id: game.run.world.id, version: game.run.world.version }, uids: {}, zonePatches: {}, zoneLeft: {},
+                      ident: { known: { potion: { healing: 1 }, scroll: {} }, aura: {} } });
+  game.player = makePlayer();
+  if (world.startPurse) setPurse(game.player, world.startPurse);
+  runLooks(game, seed);
+  resetRuntime(game);
   const start = game.run.world.start;
   changeZone(game, zoneKey(start.wx, start.wy, 0), { how: "start" });   // the test world's: the temple, over the legacy stack
   game.view = "map";

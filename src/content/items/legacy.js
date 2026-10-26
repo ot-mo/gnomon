@@ -11,6 +11,7 @@ import { raiseAttr, raiseMaxHp } from "../../stats.js";
 import { CURRENCY } from "../currency.js";
 import { RULES } from "../../rules.js";
 import { receive, formatPrice, purseRoom } from "../../currency.js";
+import { hasKey } from "../../keyset.js";
 
 // --- Potions ----------------------------------------------------------------
 // Each run shuffles which colour is which effect. Drinking one tells you, for the rest of the run.
@@ -289,7 +290,7 @@ registerItemKind("scroll", {
   glyph: () => ["?", [235, 220, 175]],
   info: (game, it) => (game.knownScrolls.has(it.effect) ? SCROLLS[it.effect].info : "Unknown. Read it to find out what it does."),
   price: () => 30,
-  aura: (game, it) => (game.knownScrolls.has(it.effect) || game.auraKnown.has(`scroll:${it.effect}`) || game.player?.perks.has("scholar") ? SCROLLS[it.effect].aura : null),
+  aura: (game, it) => (game.knownScrolls.has(it.effect) || game.auraKnown.has(`scroll:${it.effect}`) || hasKey(game.player?.perks, "scholar") ? SCROLLS[it.effect].aura : null),
   art: FLOOR_ART.scroll,
   palette: () => ({ p: [[190, 165, 120], 0.1], P: [[235, 220, 180], 0.15] }),
   use: "read",

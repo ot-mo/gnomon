@@ -19,6 +19,7 @@ import { noise2 } from "./rng.js";
 import { sfx } from "./sfx.js";
 import { maxHp } from "./stats.js";
 import { addStatus, hasStatus, statusFlag } from "./status.js";
+import { hasKey } from "./keyset.js";
 
 export const THROW_TIME = 0.5;
 const SPEED = 15, GRAVITY = 12, SPLASH = 1.8;
@@ -47,7 +48,7 @@ export function throwReady(game, stack = readyStack(game.player)) {
     fuse: bomb ? FUSE : undefined,
   });
   if (bomb) game.log("You light the fuse and throw the bomb!", [255, 170, 70]);
-  p.throwCd = p.perks.has("juggler") && it.kind === "knife" ? 0.2 : 0.4;
+  p.throwCd = hasKey(p.perks, "juggler") && it.kind === "knife" ? 0.2 : 0.4;
   sfx("throw");
   return true;
 }
@@ -214,7 +215,7 @@ function explode(game, x, y, z) {
   game.effects.push({ kind: "boom", x, y, z, time: game.time });
   game.log("BOOM!", [255, 170, 60]);
   sfx("boom", { at: { x, y } });
-  const demo = p.perks.has("demolitionist"), blast = demo ? BLAST * 1.4 : BLAST;   // the Demolitionist perk
+  const demo = hasKey(p.perks, "demolitionist"), blast = demo ? BLAST * 1.4 : BLAST;   // the Demolitionist perk
   for (const o of zone.bombs) if (Math.hypot(o.x - x, o.y - y) < blast) o.fuse = Math.min(o.fuse, 0.15);
   for (const m of hostilesTo(game, p))
     if (Math.hypot(m.x - x, m.y - y) <= blast && Math.abs(m.z + m.h / 2 - z) < 2.5)

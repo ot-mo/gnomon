@@ -147,17 +147,17 @@ export function checkCurrency({ game, startRun, dialogue, npcs, creatures, srcFi
     const paid = 900 - C.funds(p);
     if (paid !== base || stock0.count !== count0 - 1 || things() !== packBefore + 1) fail(`buying at ${base}: paid ${paid}, stock ${count0} → ${stock0.count}, pack ${packBefore} → ${things()}`);
     // The Haggler: a fifth off (stats.js priceMul, the legacy haggle).
-    p.perks.add("haggler");
+    p.perks.haggler = 1;   // (a { id: 1 } map, keyset.js)
     St.invalidateStats(p);
     const heartRow = pell.talk.state.stock.length - 1, heart = pell.talk.state.stock[heartRow];
-    const want = Math.round(Math.round(heart.price * 1.5 ** (game.crystalsBought || 0)) * RULES.legacy.haggle);
+    const want = Math.round(Math.round(heart.price * 1.5 ** (game.state.merchants.crystalsBought || 0)) * RULES.legacy.haggle);
     const hp0 = St.maxHp(p), f0 = C.funds(p);
     open("buy");
     const rows = pell.talk.state.stock.filter((s) => s.count > 0);
     for (let k = 0; k < rows.indexOf(heart); k++) press("ArrowDown");
     press("Enter");
     if (f0 - C.funds(p) !== want || St.maxHp(p) !== hp0 + 5 || p.inv.some((it) => it.kind === "heart")) fail(`a heart crystal with the Haggler: paid ${f0 - C.funds(p)} (want ${want}), max HP ${hp0} → ${St.maxHp(p)}`);
-    p.perks.delete("haggler");
+    delete p.perks.haggler;
     St.invalidateStats(p);
     // Selling: floor(value × 0.3); refused when the purse can't hold it.
     const ware = { kind: "weapon", id: "mace", ench: 2, known: true };

@@ -24,7 +24,7 @@ export function makePlayer() {
     x: 0, y: 0, z: FLOOR_Z, vz: 0, onGround: false, yaw: 0, pitch: 0,
     hp: 20, keys: 0, funds: 0, purse: CURRENCY.startPurse, torch: true,   // funds, purse: currency.js (the counter)
     attrs: makeAttrs(), maxHpGain: 0,   // base fields: max HP, STR and the rest are derived (stats.js)
-    level: 1, xp: 0, perks: new Set(), pendingLevels: 0, bonusPerks: 0,   // bonusPerks: gifts from people, not levels
+    level: 1, xp: 0, perks: {}, pendingLevels: 0, bonusPerks: 0,   // perks: { id: 1 } (keyset.js); bonusPerks: gifts from people, not levels
     // What you're holding and wearing (body.js): parts of a humanoid body, each with an item
     // { kind, id, ench (+blessed / −cursed), known, element? }, and a second weapon on the belt (R swaps).
     body: makeBody("humanoid"),

@@ -6,6 +6,7 @@
 import { sfx } from "./sfx.js";
 import { invalidateStats, raiseAttr, raiseMaxHp } from "./stats.js";
 import { RULES } from "./rules.js";
+import { hasKey, addKey } from "./keyset.js";
 
 export const PERKS = {
   swimmer:      { name: "Swimmer",       info: "Deep water no longer drags you down: you can swim in it (slowly).", bonus: () => ({ swim: 1 }) },
@@ -37,7 +38,7 @@ export const PERKS = {
 };
 
 const ROMAN = ["", "", " II", " III", " IV"];
-export const perkRank = (p, key) => p.perkRank?.[key] || (p.perks.has(key) ? 1 : 0);
+export const perkRank = (p, key) => p.perkRank?.[key] || (hasKey(p.perks, key) ? 1 : 0);
 export const perkLabel = (p, key) => PERKS[key].name + ROMAN[perkRank(p, key) + 1];   // the name of the rank you'd get next
 
 // XP needed to go from this level to the next: 20, 50, 100, 170, 260, … — each level takes
@@ -71,7 +72,7 @@ export function offerPerks(p, milestone = false) {
 export function takePerk(game, key) {
   const p = game.player;
   const r = perkRank(p, key) + 1;
-  p.perks.add(key);
+  addKey(p.perks, key);
   (p.perkRank ||= {})[key] = r;
   invalidateStats(p);
   if (key === "tough") { raiseMaxHp(p, 8); p.hp += 8; }
