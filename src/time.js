@@ -4,9 +4,9 @@
 //
 // Advances the one clock (game.time; state.time once 0D2's save codec has it) by `seconds` of game time,
 // and everything that runs on it catches up exactly, as if the time had been played out:
-//   - the player's statuses, cooldowns and regeneration, in chunks of RULES.time.chunk seconds
-//     (status.js catchUpStatuses and effects.js regenerate are exact for any dt; the chunk only bounds
-//     how their interplay rounds, e.g. poison and regeneration fighting at full health);
+//   - the player's statuses, cooldowns and regeneration, stepping from one HP change (a poison tick, a
+//     heal) or status end to the next (status.js catchUpStatuses and effects.js regenerate are exact for
+//     any dt in between), so poison and regeneration fighting at full health come out as when played;
 //   - the creatures' statuses (fire and poison can kill them), their regeneration and attack cooldowns,
 //     in one bulk step at the end: idle creatures stay where they are and don't act;
 //   - poison clouds thin out.
@@ -20,7 +20,7 @@
 // dark needs the clock (surface night), so 0D2 adds it with clock.js, from this event and per frame.
 import { RULES } from "./rules.js";
 import { catchUpStatuses, statusLeft, clearCooldown, STATUS_DEFS } from "./status.js";
-import { regenerate } from "./effects.js";
+import { regenerate, nextRegenEvent } from "./effects.js";
 import { MONSTER_TYPES } from "./monsters.js";
 import { emit } from "./events.js";
 
@@ -42,6 +42,21 @@ function noRegenLeft(m) {
   return t;
 }
 
+// How far the player can go in one exact step: to the next moment anything changes your HP (a poison
+// or fire tick, a heal, a drain) or a status ends. Between those moments nothing depends on how the
+// time is cut. A status with its own tick (drowning) goes by RULES.time.chunk; `until` is asked at
+// least once a game minute.
+function nextEvent(p, until) {
+  let t = until ? 60 * RULES.time.chunk : Infinity;
+  for (const id in p.status || {}) {
+    const s = p.status[id], def = STATUS_DEFS[id];
+    if (def?.tick) t = Math.min(t, RULES.time.chunk);
+    if (def?.period) t = Math.min(t, def.period(p, s) - s.acc);
+    t = Math.min(t, s.t);
+  }
+  return Math.max(1e-6, Math.min(t, nextRegenEvent(p)));
+}
+
 export function skipTime(game, seconds, { interruptible = true, reason = "wait", until } = {}) {
   const p = game.player, t0 = game.time;
   let elapsed = 0, why = null;
@@ -49,11 +64,13 @@ export function skipTime(game, seconds, { interruptible = true, reason = "wait",
     if (game.mode === "dead") { why = "dead"; break; }
     if (until?.(game)) { why = "until"; break; }
     if (interruptible && (why = threat(game))) break;
-    const dt = Math.min(RULES.time.chunk, seconds - elapsed);
+    const dt = Math.min(seconds - elapsed, nextEvent(p, until));
     game.time += dt;
     elapsed += dt;
+    // HP is constant inside the step, so regeneration first (it ran, or didn't, the whole step), then
+    // the statuses (whose ticks land at its end).
+    regenerate(game, p, dt);
     catchUpStatuses(game, p, dt);
-    if (game.mode !== "dead") regenerate(game, p, dt);
   }
   if (!why && game.mode === "dead") why = "dead";
   for (const k of ["attackCd", "throwCd", "hurt", "swing"]) if (p[k] > 0) p[k] = Math.max(0, p[k] - elapsed);

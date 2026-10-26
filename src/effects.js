@@ -167,6 +167,20 @@ export function regenerate(game, p, dt) {
   heal("naturalTick", regenEvery(p));
 }
 
+// Seconds until regenerate() next changes your HP (Infinity if it won't): skipTime steps from event to
+// event, so poison and healing interleave exactly as when the time is played out.
+export function nextRegenEvent(p) {
+  const regen = bonus(p, "regen") + (p.torch ? 0 : bonus(p, "darkRegen"));
+  let t = Infinity;
+  if (regen < 0) t = 12 / -regen - (p.regenTick || 0);
+  else if (!statusFlag(p, "noRegen") && p.hp < maxHp(p)) {
+    if (regen > 0) t = 12 / regen - (p.regenTick || 0);
+    const every = regenEvery(p);
+    if (every < Infinity) t = Math.min(t, every - (p.naturalTick || 0));
+  }
+  return Math.max(0, t);
+}
+
 // Potion of seeing, part 1: every open space on the floor (and the walls around it) appears
 // on the map, and every monster is shown where it stands right now. Chasms still look like floor.
 export function revealFloor(game) {

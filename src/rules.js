@@ -43,9 +43,8 @@ const CORE = {
   regen: { base: 60 },                                 // attribute set: 1 HP per base / (1 + 0.1 (TOU mod + WIL mod)) s
   haste: 1.6,                                          // speed (and action time) while hasted
   drown: { air: 10, dps: 1, speed: 0.4 },              // TECH_DESIGN §2.7: breath in s, then damage per s; speed ×0.4
-  // skipTime (time.js): the player catches up in chunks this long (statuses, regen and cooldowns are exact
-  // within a chunk; the chunk only bounds how their interplay at full HP rounds); hostiles awake within
-  // activeRadius tiles interrupt.
+  // skipTime (time.js): a status with its own tick (drowning) catches up in chunks this long, and until()
+  // is asked at least every 60 chunks; hostiles awake within activeRadius tiles interrupt.
   time: { chunk: 1, activeRadius: 12 },
 
   // Levels (DECISIONS: surface zone level = 3 × tier − 1; legacy tables read min(level, 20) until C3).
