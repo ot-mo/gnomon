@@ -8,7 +8,8 @@
 //   2. Hit-chance tables (d20): rollToHit over 10⁵ rolls per row against hitChance() (the analytic value),
 //      within ±0.02, for you (AGI, accuracy, high ground, aimed, a weapon too heavy, a widened crit range)
 //      against creatures of several levels, and for creatures against your DV. Crit rates too. One row
-//      also goes through the whole resolveAttack (10⁵ blows on a goblin that can't die).
+//      also goes through the whole resolveAttack (10⁵ blows on a goblin that can't die). A natural 20
+//      hits a DV no roll can beat (5% of rolls, each a natural-20 crit), through rollToHit and resolveAttack.
 //   3. Both views, one resolution: a bump duel on the map and a swing duel in 3D with the same combat RNG
 //      give identical result sequences (hit, crit, natural, total, DV, damage, soak).
 //   4. The planes, the dark and the core: a flatling is struck on the map and never in 3D (the bump lands,
@@ -153,6 +154,31 @@ export function checkCombat({ game, startRun, srcFiles }) {
     stats.table = table.map((t) => `${t.label}: mod ${t.mod} DV ${t.dv} crit≥${t.critNat} → ${t.got} (want ${t.want}), crit ${t.crit}`);
     stats.resolveAttack = { blows: ROLLS, landed: landed / ROLLS, want: wantFull };
     game.effects.length = 0;
+
+    // A natural 20 hits whatever the DV: a creature far out of reach (DV 5 + 2 + 20) is hit 5% of the
+    // time through rollToHit and the whole resolution, and every hit is a natural 20 and a crit.
+    {
+      setAgi(10);
+      const far = mk("goblin", 8);
+      far.innate = { dv: 20 }; invalidateStats(far);
+      far.hp = far.maxHp = 1e9;
+      expect(toHitMod(game, p, far, sword, {}) + 19 <= dvOf(game, far), `the out-of-reach row isn't out of reach: mod ${toHitMod(game, p, far, sword, {})}, DV ${dvOf(game, far)}`);
+      const rng = makeRng(77);
+      let hits = 0, odd = 0;
+      for (let k = 0; k < ROLLS; k++) { const r = rollToHit(game, p, far, sword, {}, rng); if (r.hit) { hits++; if (r.nat !== 20 || !r.crit) odd++; } }
+      game.combatRng = makeRng(78);
+      let full = 0, fullOdd = 0;
+      for (let k = 0; k < 20000; k++) {
+        const res = resolveAttack(game, p, far, sword, { view: "map" });
+        if (res.hit) { full++; if (res.nat !== 20 || !res.crit) fullOdd++; }
+        if ((k & 1023) === 0) { game.effects.length = 0; logged.length = 0; }
+      }
+      expect(Math.abs(hits / ROLLS - 0.05) <= 0.005 && odd === 0, `a natural 20 against DV ${dvOf(game, far)}: hit ${hits / ROLLS} (want 0.05), ${odd} hits that weren't a natural-20 crit`);
+      expect(Math.abs(full / 20000 - 0.05) <= 0.008 && fullOdd === 0, `resolveAttack against DV ${dvOf(game, far)}: hit ${full / 20000} (want 0.05), ${fullOdd} not a natural-20 crit`);
+      stats.natural20 = { dv: dvOf(game, far), rollToHit: hits / ROLLS, resolveAttack: full / 20000 };
+      setAgi(16);
+      game.effects.length = 0;
+    }
     field.creatures.length = 0;
 
     // --- 3. Both views ------------------------------------------------------------------------------------
