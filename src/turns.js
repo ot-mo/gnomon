@@ -170,8 +170,10 @@ export function mapStep(game, dx, dy) {
   if (kind === KIND.WALL) return false;
 
   // A chasm you've seen, or deep water: ask before going in (step the same way again to do it).
+  // Already in deep water (swimming, drowning): no asking, every press swims on.
   const target = nx + ny * zone.w;
-  const drop = !flying && ((kind === KIND.HOLE && zone.holeSeen[target]) || (kind === KIND.DEEP && !swimmer));
+  const inDeep = zone.kind[tx + ty * zone.w] === KIND.DEEP || hasStatus(p, "drowning");
+  const drop = !flying && ((kind === KIND.HOLE && zone.holeSeen[target]) || (kind === KIND.DEEP && !swimmer && !inDeep));
   if (drop && game.confirmJump !== target) {
     game.confirmJump = target;
     game.log(kind === KIND.DEEP ? "The water is deep. Step that way again to dive in."

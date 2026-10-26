@@ -13,7 +13,8 @@
 //      hour clears the second-wind and first-block cooldowns; 8 game hours take ≤ 20 ms.
 //   4. Drowning: a non-swimmer stepping into surface deep water on the map and walking into it in 3D
 //      gets the same timer (RULES.drown.air s of breath), the same damage at the same moments, and
-//      the status ends when the feet leave the water, in both views. A swimmer doesn't drown.
+//      the status ends when the feet leave the water, in both views. A swimmer doesn't drown. On the
+//      map only the first step in from dry ground asks; a step inside the water just swims.
 //   5. Flat: the map view is forced, Tab is locked until it ends, the HUD shows it. Escape (the map's
 //      other way of turning) is locked too, and no fold power fires (Folding strike, a rat next to you).
 //
@@ -256,6 +257,17 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles }) {
   if (onMap.damage !== in3d.damage) fail(`drowning damage in all: map ${onMap.damage}, 3D ${in3d.damage}`);
   stats.drowning = { firstHitWant: firstHit, map: { hits: mapHits, damage: onMap.damage, exitTile: onMap.exitTile },
                      "3d": { hits: hits3d, damage: in3d.damage, exitTile: in3d.exitTile } };
+  // Inside deep water (drowning) every press on the map swims on: only the first step in asks.
+  freshPlayer(); enter();
+  Object.assign(game.player, { x: 29.5, y: 24.5, z: FLOOR_Z });
+  game.mode = "map"; game.view = "map";
+  mapStep(game, 1, 0); mapStep(game, 1, 0);
+  {
+    const p = game.player, yIn = p.y;
+    if (!St.hasStatus(p, "drowning")) fail("map: two steps into deep water and no drowning status");
+    else if (!mapStep(game, 0, 1) || p.y !== yIn + 1 || !mapStep(game, 1, 0) || Math.floor(p.x) !== 31)
+      fail(`map: a swimming step inside deep water was refused or asked again (at ${p.x}, ${p.y})`);
+  }
   // A swimmer floats and doesn't drown; underground a non-swimmer still sinks (unchanged).
   freshPlayer(); enter();
   game.player.perks = new Set(["swimmer"]); invalidateStats(game.player);
