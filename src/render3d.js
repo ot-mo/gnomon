@@ -1,27 +1,45 @@
 // The first-person view (learn/05 §9–10) plus sprites for monsters, items and map markers.
+//
+// Outdoors (a zone with sky; TECH_DESIGN §6, WS3) the look follows the clock (clock.js): sky light ×
+// daylight with a moonlit floor at night, the sun's colour and strength by its height, the baked sun for
+// shadows (light.js zone.sunlit), the sky's gradient with the sun's disc, clouds and stars, haze in the
+// horizon's colour, rays out to MAX_DIST_OUT, the apron lit like open ground, and beyond it the horizon
+// plane: a ray that leaves the voxels going down meets a plane at the apron's far height, in that side's
+// ground colour. A zone without sky (every dungeon level) draws exactly as the parent game did (golden (b)).
+//   render3d(game)
+//   setDynamicResolution(on) · dynamicResolution() → { on, half }   §6.7: outdoors, a cast that averages
+//       over 17 ms for 2 s casts every other column and copies it to the next, until the full cast's cost
+//       (twice the halved one) is back under 12 ms for 2 s. On by default in a page, off in Node.
+//   horizonOf(game, zone) → { n, e, s, w: { z, color } }   the horizon plane's height and colour per side
 import * as S from "./screen.js";
-import { castRay, hit, setGhostVisible } from "./raycast.js";
-import { sampleLight, inDark, zoneIsLightless } from "./light.js";
+import { castRay, hit, setGhostVisible, rayInfo } from "./raycast.js";
+import { sampleLight, inDark, zoneIsLightless, daylight, syncLight, sunState, sunlitAt } from "./light.js";
+import { sunDir, skyColors, fogFor, spanOf } from "./clock.js";
 import { material, albedo, setMaterialTime, setDarkSight, DARK_SIGHT_BLOCKS } from "./materials.js";
-import { noise2 } from "./rng.js";
+import { noise2, hash } from "./rng.js";
 import { creatureSprite, hostilesTo, talkersIn, isFlat } from "./creatures.js";
 import { guardianSprites } from "./guardians.js";
 import { spikeSprites } from "./traps.js";
 import { itemSprite } from "./items.js";
 import { projectileSprites } from "./throwing.js";
 import { EYE, torchRange, torchPower } from "./player.js";
-import { FLOOR_Z, B } from "./world.js";
+import { FLOOR_Z, B, BLOCKS } from "./world.js";
+import { liquidAt } from "./social/liquids.js";
+import { LIQUIDS } from "./content/liquids.js";
 
 const AMBIENT = [0.045, 0.045, 0.06];
 const SKY_COLOR = [0.55, 0.65, 0.85];
+const NIGHT_SKY = [0.05, 0.065, 0.12];   // moonlight: the sky term at night (§6.3's night floor)
 const SUN_COLOR = [1.25, 1.12, 0.9];
+const LOW_SUN = [1.3, 0.72, 0.42];       // the sun near the horizon
 const LAMP_COLOR = [2.0, 1.35, 0.75];
 const TORCH_COLOR = [1.0, 0.82, 0.55];
 const FOG = [4, 5, 9];             // the dark swallows distant things
 const FOG_DENSITY = 0.05;
 const EXPOSURE = 1.8;
 const MAX_DIST = 32;
-const SUN = (() => { const v = [-0.3, 0.35, 0.89], l = Math.hypot(...v); return v.map((c) => c / l); })();
+const MAX_DIST_OUT = 48;           // outdoors: far enough to cross the apron (§6.2)
+const smooth = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
 // The camera, shared with sprites.
 export const cam = { ex: 0, ey: 0, ez: 0, fX: 1, fY: 0, fZ: 0, rX: 0, rY: 1, uX: 0, uY: 0, uZ: 1, halfW: 1, halfH: 1 };
@@ -42,20 +60,81 @@ function setCamera(player, fovDeg, override) {
   cam.ez = player.z + EYE - 0.35 * (player.wade || 0) + (override?.lift || 0);   // knee-deep in water: your view dips
 }
 
-// Tone-map the current colour, then let its brightness pick the character.
+// Tone-map the current colour, then let its brightness pick the character. The last cell plotted is kept
+// (plotCh, plotR…) so a halved frame can copy it to the next column.
+// Outdoors the curve is read from a table (TONE, a step of 1/TONE_STEP, linear between), which is within a
+// hundredth of a colour step of the exact one; underground it is computed exactly, as the parent game did.
+let plotCh = " ", plotR = 0, plotG = 0, plotB = 0;
+const TONE_STEP = 4, TONE_MAX = 1024, TONE = new Float64Array(TONE_MAX * TONE_STEP + 2);
+for (let k = 0; k < TONE.length; k++) TONE[k] = 255 * (1 - Math.exp((-(k / TONE_STEP) / 255) * EXPOSURE));
+const toneOf = (v) => {
+  if (!(v > 0)) return v === 0 ? 0 : 255 * (1 - Math.exp((-v / 255) * EXPOSURE));
+  if (v >= TONE_MAX) return 255 * (1 - Math.exp((-v / 255) * EXPOSURE));
+  const f = v * TONE_STEP, k = f | 0;
+  return TONE[k] + (TONE[k + 1] - TONE[k]) * (f - k);
+};
 function plot(cx, cy, density = 1) {
-  outR = 255 * (1 - Math.exp((-outR / 255) * EXPOSURE));
-  outG = 255 * (1 - Math.exp((-outG / 255) * EXPOSURE));
-  outB = 255 * (1 - Math.exp((-outB / 255) * EXPOSURE));
+  if (outdoor) { outR = toneOf(outR); outG = toneOf(outG); outB = toneOf(outB); }
+  else {
+    outR = 255 * (1 - Math.exp((-outR / 255) * EXPOSURE));
+    outG = 255 * (1 - Math.exp((-outG / 255) * EXPOSURE));
+    outB = 255 * (1 - Math.exp((-outB / 255) * EXPOSURE));
+  }
   const L = Math.max(outR, outG, outB) / 255;
-  S.put(cx, cy, S.rampChar(L * density), outR, outG, outB);
+  plotCh = S.rampChar(L * density); plotR = outR; plotG = outG; plotB = outB;
+  S.put(cx, cy, plotCh, outR, outG, outB);
+}
+
+// --- This frame's look (frameLook) ---------------------------------------------------------------
+// Underground every value is the parent game's constant, so its frames don't change by a bit.
+let outdoor = false, maxDist = MAX_DIST;
+let skyR = SKY_COLOR[0], skyG = SKY_COLOR[1], skyB = SKY_COLOR[2];            // sky light's colour × daylight
+let fogR = FOG[0], fogG = FOG[1], fogB = FOG[2], fogD = FOG_DENSITY;
+let sunOn = false, sunX = 0, sunY = 0, sunZ = 1, sunR = 0, sunG = 0, sunB = 0;  // the faces' sun (the bake's)
+let zen = [50, 95, 190], hor = [170, 200, 240];                                // the sky's gradient
+let discX = 0, discY = 0, discZ = 1, discVis = 0, discR = 255, discG = 250, discB = 215;
+let cloudR = 245, cloudG = 245, cloudB = 250, starK = 0, horizon = null;
+
+function frameLook(game, zone) {
+  outdoor = !!zone.hasSky;
+  if (!outdoor) {
+    maxDist = MAX_DIST; sunOn = false; horizon = null;
+    skyR = SKY_COLOR[0]; skyG = SKY_COLOR[1]; skyB = SKY_COLOR[2];
+    fogR = FOG[0]; fogG = FOG[1]; fogB = FOG[2]; fogD = FOG_DENSITY;
+    return;
+  }
+  maxDist = MAX_DIST_OUT;
+  syncLight(game, zone);   // the lit mask and the baked sun up to the clock
+  const dl = daylight(game), nd = 1 - dl;
+  skyR = SKY_COLOR[0] * dl + NIGHT_SKY[0] * nd; skyG = SKY_COLOR[1] * dl + NIGHT_SKY[1] * nd; skyB = SKY_COLOR[2] * dl + NIGHT_SKY[2] * nd;
+  const fog = fogFor(game, zone);
+  [fogR, fogG, fogB] = fog.color; fogD = fog.density;
+  ({ zenith: zen, horizon: hor } = skyColors(game));
+  // The faces' sun is the one the zone was baked for, so lit faces and shadows agree.
+  const real = sunDir(game), baked = sunState(zone).sun || real;
+  [sunX, sunY, sunZ] = baked;
+  const k = dl * smooth(sunZ / 0.25), warm = smooth(sunZ / 0.5);
+  sunR = (LOW_SUN[0] + (SUN_COLOR[0] - LOW_SUN[0]) * warm) * k;
+  sunG = (LOW_SUN[1] + (SUN_COLOR[1] - LOW_SUN[1]) * warm) * k;
+  sunB = (LOW_SUN[2] + (SUN_COLOR[2] - LOW_SUN[2]) * warm) * k;
+  sunOn = k > 0.001;
+  // The disc in the sky follows the real sun; it reddens and dims as it sets, and is gone below the horizon.
+  [discX, discY, discZ] = real;
+  const dwarm = smooth(discZ / 0.4);
+  discVis = smooth((discZ + 0.03) / 0.08) * (0.35 + 0.65 * dl);
+  discR = 255; discG = 175 + 75 * dwarm; discB = 105 + 110 * dwarm;
+  // Clouds: white by day, taking the horizon's colour at dusk and dawn, dark at night. Stars as daylight goes.
+  const tw = 0.55 * smooth(nd * 2) * (dl > 0 ? 1 : 0);
+  cloudR = (245 + (hor[0] - 245) * tw) * dl + 26 * nd; cloudG = (245 + (hor[1] - 245) * tw) * dl + 28 * nd; cloudB = (250 + (hor[2] - 250) * tw) * dl + 40 * nd;
+  starK = smooth((0.55 - dl) / 0.4);
+  horizon = horizonOf(game, zone);
 }
 
 function applyFog(t) {
-  const f = 1 - Math.exp(-t * FOG_DENSITY);
-  outR += (FOG[0] - outR) * f;
-  outG += (FOG[1] - outG) * f;
-  outB += (FOG[2] - outB) * f;
+  const f = 1 - Math.exp(-t * fogD);
+  outR += (fogR - outR) * f;
+  outG += (fogG - outG) * f;
+  outB += (fogB - outB) * f;
 }
 
 // Light arriving at a point from sky wells and lamps (no direction needed).
@@ -64,14 +143,15 @@ function ambientAt(zone, x, y, z, airOnly = false) {
   const sky = sampleLight(zone, zone.skyLight, x, y, z, airOnly);
   const lamp = sampleLight(zone, zone.lampLight, x, y, z, airOnly);
   const lamp2 = lamp * Math.sqrt(lamp);   // lamp^1.5: bright near the lamp, a soft edge further out
-  lightR = AMBIENT[0] + SKY_COLOR[0] * sky + LAMP_COLOR[0] * lamp2;
-  lightG = AMBIENT[1] + SKY_COLOR[1] * sky + LAMP_COLOR[1] * lamp2;
-  lightB = AMBIENT[2] + SKY_COLOR[2] * sky + LAMP_COLOR[2] * lamp2;
+  lightR = AMBIENT[0] + skyR * sky + LAMP_COLOR[0] * lamp2;
+  lightG = AMBIENT[1] + skyG * sky + LAMP_COLOR[1] * lamp2;
+  lightB = AMBIENT[2] + skyB * sky + LAMP_COLOR[2] * lamp2;
   return sky;
 }
 
+// The apron and the horizon plane: open ground under the sky (no lamps, no shadows).
 function openSky() {
-  lightR = AMBIENT[0] + SKY_COLOR[0]; lightG = AMBIENT[1] + SKY_COLOR[1]; lightB = AMBIENT[2] + SKY_COLOR[2];
+  lightR = AMBIENT[0] + skyR; lightG = AMBIENT[1] + skyG; lightB = AMBIENT[2] + skyB;
   return 1;
 }
 
@@ -87,12 +167,25 @@ function torchAt(dx, dy, dz, t, facing) {
   lightR += TORCH_COLOR[0] * k; lightG += TORCH_COLOR[1] * k; lightB += TORCH_COLOR[2] * k;
 }
 
+// What water holds, when it isn't water (the zone's liquid, or its column's: social/liquids.js liquidAt):
+// the liquid's colour, or null.
+function liquidTint(zone, x, y) {
+  if (zone.liquid === "water" && !Object.keys(zone.liquids || {}).length) return null;
+  const id = liquidAt(zone, x, y);
+  return id !== "water" ? LIQUIDS[id]?.color || null : null;
+}
+
 function shadeHit(game, zone, player, dx, dy, dz) {
   const t = hit.t, block = hit.block, nx = hit.nx, ny = hit.ny, nz = hit.nz;
   const px = cam.ex + dx * t, py = cam.ey + dy * t, pz = cam.ez + dz * t;
   // Under the sky, whether runes glow is asked where they are (the air in front of the face).
   if (darkPerHit && DARK_SIGHT_BLOCKS.has(block)) setDarkSight(inDark(game, zone, px + nx * 0.5, py + ny * 0.5, pz + nz * 0.5));
   material(block, nx !== 0 ? py : px, nz !== 0 ? py : pz, nz > 0);
+  const water = block === B.WATER_SHALLOW || block === B.WATER_DEEP;
+  if (water && outdoor && !hit.apron) {
+    const tint = liquidTint(zone, hit.x, hit.y);
+    if (tint) { const k = (albedo.r + albedo.g + albedo.b) / 3 / 160; albedo.r = tint[0] * k; albedo.g = tint[1] * k; albedo.b = tint[2] * k; }
+  }
   // A flat being here? On the floor there's a shadow with nobody casting it.
   if (nz > 0 && shadows.length) {
     for (const s of shadows) {
@@ -109,19 +202,20 @@ function shadeHit(game, zone, player, dx, dy, dz) {
     crackLight(nx !== 0 ? py : px, pz - FLOOR_Z, t);
   const ar = albedo.r, ag = albedo.g, ab = albedo.b, glow = albedo.glow;
 
-  // The apron (the next zone's ground beyond an open edge) has no light arrays of its own: it gets the
-  // open sky's light, so it doesn't draw dark (its real shading is WS3's, TECH_DESIGN §6.1).
+  // The apron (the next zone's ground beyond an open edge) has no light arrays of its own: it is lit as open
+  // ground, sky × daylight and the sun without shadows (TECH_DESIGN §6.1: cheap, and inside the haze).
   const sky = hit.apron ? openSky() : ambientAt(zone, px + nx * 0.5, py + ny * 0.5, pz + nz * 0.5);
-  if (zone.hasSky && sky > 0.05) {
-    const facing = nx * SUN[0] + ny * SUN[1] + nz * SUN[2];
-    if (facing > 0 && !castRay(zone, px + nx * 0.001, py + ny * 0.001, pz + nz * 0.001, SUN[0], SUN[1], SUN[2], 40)) {
-      lightR += SUN_COLOR[0] * facing; lightG += SUN_COLOR[1] * facing; lightB += SUN_COLOR[2] * facing;
+  if (outdoor && sunOn && sky > 0.05) {
+    const facing = nx * sunX + ny * sunY + nz * sunZ;
+    if (facing > 0) {
+      const k = hit.apron ? facing : facing * sunlitAt(zone, hit.x, hit.y, hit.z, nx, ny, nz, px, py, pz);
+      lightR += sunR * k; lightG += sunG * k; lightB += sunB * k;
     }
   }
   torchAt(dx, dy, dz, t, Math.max(0, -(nx * dx + ny * dy + nz * dz)));
 
   outR = ar * (lightR + glow); outG = ag * (lightG + glow); outB = ab * (lightB + glow);
-  if (block === B.WATER_SHALLOW || block === B.WATER_DEEP) {
+  if (water) {
     // Water reflects the light around it, more and more as you look across it at a low angle.
     const sheen = 0.1 + 0.9 * Math.pow(1 - Math.abs(dz), 4);
     outR += lightR * sheen * 90; outG += lightG * sheen * 120; outB += lightB * sheen * 150;
@@ -141,23 +235,114 @@ function crackLight(u, v, t) {
   albedo.glow = 0.25 + 0.9 * k;
 }
 
+// The sky: the horizon colour blending into the zenith's as the ray climbs, the sun's disc and glow,
+// clouds drifting at height 40, and stars once daylight goes (fixed to the sky: hashed by direction).
 function shadeSky(dx, dy, dz, time) {
   const h = Math.sqrt(Math.max(0, dz));
-  outR = 170 - 120 * h; outG = 200 - 105 * h; outB = 240 - 50 * h;
-  const s = dx * SUN[0] + dy * SUN[1] + dz * SUN[2];
-  if (s > 0.9985) { outR = 255; outG = 250; outB = 215; return 1; }
-  const glow = Math.pow(Math.max(0, s), 60) * 120;
-  outR += glow; outG += glow * 0.9; outB += glow * 0.6;
-  let density = 0.45;
+  outR = hor[0] + (zen[0] - hor[0]) * h; outG = hor[1] + (zen[1] - hor[1]) * h; outB = hor[2] + (zen[2] - hor[2]) * h;
+  const s = dx * discX + dy * discY + dz * discZ;
+  if (discVis > 0.02 && s > 0.9985) {
+    outR += (discR - outR) * discVis; outG += (discG - outG) * discVis; outB += (discB - outB) * discVis;
+    return 1;
+  }
+  const glow = Math.pow(Math.max(0, s), 60) * 120 * discVis;
+  outR += glow; outG += glow * (0.55 + 0.35 * discG / 250); outB += glow * 0.6 * discB / 215;
+  let density = 0.45, c = 0;
   if (dz > 0.02) {
     const k = (40 - cam.ez) / dz;
     const cx = (cam.ex + dx * k) * 0.025 + time * 0.02, cy = (cam.ey + dy * k) * 0.025;
     const n = noise2(cx, cy) * 0.65 + noise2(cx * 2.3, cy * 2.3) * 0.35;
-    const c = Math.min(1, Math.max(0, (n - 0.56) / 0.2)) * Math.min(1, dz * 5);
-    outR += (245 - outR) * c; outG += (245 - outG) * c; outB += (250 - outB) * c;
+    c = Math.min(1, Math.max(0, (n - 0.56) / 0.2)) * Math.min(1, dz * 5);
+    outR += (cloudR - outR) * c; outG += (cloudG - outG) * c; outB += (cloudB - outB) * c;
     density += 0.45 * c;
   }
+  if (starK > 0 && dz > 0.04 && c < 0.6) {
+    const q = 70, hs = hash(Math.floor(dx * q), Math.floor(dy * q), Math.floor(dz * q));
+    if (hs > 0.993) {
+      const b = (0.45 + 0.55 * (hs - 0.993) / 0.007) * starK * (1 - c) * (0.8 + 0.2 * Math.sin(time * 3 + hs * 900));
+      outR += 210 * b; outG += 215 * b; outB += 230 * b;
+      density = Math.max(density, 0.5 + 0.5 * b);
+    }
+  }
   return density;
+}
+
+// --- The horizon plane (TECH_DESIGN §6.1, "beyond the apron") -----------------------------------------
+// Per side: the mean height of the apron band's far row (the top of its ground) and its mean ground colour.
+// A side with no band (a shut edge) takes its own edge row's height and, when the world knows it, the ground
+// of the terrain beyond (else its own edge's). Cached per zone and apron (raycast.js rayInfo is rebuilt
+// when a band is replaced or the zone refreshed).
+const HORIZONS = new WeakMap();
+function columnTop(blocks, i, step, h) {
+  for (let z = h - 1; z >= 0; z--) { const b = blocks[i + z * step]; if (b) return [z + 1, b]; }
+  return [0, 0];
+}
+function rowLook(cells) {   // [[top, block]…] → { z, color }
+  let zs = 0, r = 0, g = 0, b = 0, n = 0;
+  for (const [top, block] of cells) {
+    if (!block) continue;
+    const c = BLOCKS[block].color || [120, 120, 120];
+    zs += top; r += c[0]; g += c[1]; b += c[2]; n++;
+  }
+  return n ? { z: zs / n, color: [r / n, g / n, b / n] } : null;
+}
+export function horizonOf(game, zone) {
+  const info = rayInfo(zone);
+  let out = HORIZONS.get(info);
+  if (out) return out;
+  const { w, d, h, blocks } = zone, wd = w * d, ap = zone.apron || {};
+  out = {};
+  for (const side of ["n", "e", "s", "w"]) {
+    const band = ap[side], cells = [];
+    if (band) {
+      const n = band.bw * band.bd;
+      const far = side === "n" ? 0 : side === "s" ? band.bd - 1 : side === "w" ? 0 : band.bw - 1;
+      if (side === "n" || side === "s") for (let lx = 0; lx < band.bw; lx++) cells.push(columnTop(band.blocks, lx + far * band.bw, n, h));
+      else for (let ly = 0; ly < band.bd; ly++) cells.push(columnTop(band.blocks, far + ly * band.bw, n, h));
+    } else if (side === "n" || side === "s") for (let x = 0; x < w; x++) cells.push(columnTop(blocks, x + (side === "n" ? 0 : d - 1) * w, wd, h));
+    else for (let y = 0; y < d; y++) cells.push(columnTop(blocks, (side === "w" ? 0 : w - 1) + y * w, wd, h));
+    const look = rowLook(cells) || { z: FLOOR_Z, color: [90, 110, 70] };
+    if (!band) {   // a shut edge: the terrain beyond, when the world knows it
+      const [sx, sy] = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] }[side];
+      const beyond = spanOf(game, { wx: zone.wx + sx, wy: zone.wy + sy });
+      const ground = beyond?.terrain?.ground, id = ground !== undefined ? B[ground] : undefined;
+      if (beyond?.terrain?.enter === "never" && !id) look.color = BLOCKS[B.WATER_DEEP].color;
+      else if (id) look.color = BLOCKS[id].color;
+    }
+    out[side] = look;
+  }
+  HORIZONS.set(info, out);
+  return out;
+}
+
+// A ray that left the voxels going down (dz < 0) without hitting: the plane at its side's height, from
+// where the ray left (tExit) at the nearest; lit as open ground, a noise texture for its characters, hazed.
+function shadeHorizon(dx, dy, dz, tExit, time) {
+  const side = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? horizon.e : horizon.w) : (dy > 0 ? horizon.s : horizon.n);
+  let t = (side.z - cam.ez) / dz;
+  if (!(t > tExit)) t = tExit;
+  const px = cam.ex + dx * t, py = cam.ey + dy * t;
+  const n = noise2(px * 0.31, py * 0.31);
+  openSky();
+  if (sunOn && sunZ > 0) { lightR += sunR * sunZ; lightG += sunG * sunZ; lightB += sunB * sunZ; }
+  const k = 0.78 + 0.32 * n, c = side.color;
+  outR = c[0] * k * lightR; outG = c[1] * k * lightG; outB = c[2] * k * lightB;
+  applyFog(t);
+  return 0.55 + 0.45 * n;
+}
+
+// --- Dynamic resolution (§6.7) ----------------------------------------------------------------------
+const dyn = { on: typeof document !== "undefined", half: false, avg: 0, since: 0 };
+export function setDynamicResolution(on) { dyn.on = !!on; if (!on) dyn.half = false; }
+export const dynamicResolution = () => ({ on: dyn.on, half: dyn.half });
+function judgeFrame(ms, now) {
+  if (!dyn.on || !outdoor) { dyn.half = false; dyn.since = 0; return; }
+  const full = dyn.half ? ms * 2 : ms;   // the full cast's cost
+  dyn.avg = dyn.avg ? dyn.avg + (full - dyn.avg) * 0.1 : full;
+  const leave = dyn.half ? dyn.avg < 12 : dyn.avg > 17;
+  if (!leave) { dyn.since = 0; return; }
+  if (!dyn.since) dyn.since = now;
+  else if (now - dyn.since >= 2000) { dyn.half = !dyn.half; dyn.since = 0; }
 }
 
 // This frame is under the sky with your torch out: the dark-only things ask light.js where they are.
@@ -176,35 +361,40 @@ export function render3d(game) {
   torch.power = torchPower(player, game.time);
   torch.range = torchRange(player);
   const seeRange = torch.range;
+  frameLook(game, zone);
   // Runes glow and ghost planks show only in the dark (light.js inDark). Without sky that's your torch
   // alone, decided once for the frame; under the sky it's asked at each ghost block or rune a ray meets.
   darkPerHit = !zoneIsLightless(zone) && !player.torch;
   setDarkSight(!player.torch && !darkPerHit);
   setGhostVisible(!darkPerHit ? !player.torch : (x, y, z) => inDark(game, zone, x, y, z));
 
+  const t0 = performance.now(), half = dyn.half && outdoor, info = rayInfo(zone);
   for (let cy = 0; cy < S.rows; cy++) {
     const v = (1 - (2 * (cy + 0.5)) / S.rows) * cam.halfH;
     for (let cx = 0; cx < S.cols; cx++) {
+      const i = cy * S.cols + cx;
+      if (half && cx & 1) { S.put(cx, cy, plotCh, plotR, plotG, plotB); depth[i] = depth[i - 1]; continue; }
       const u = ((2 * (cx + 0.5)) / S.cols - 1) * cam.halfW;
       let dx = cam.fX + u * cam.rX + v * cam.uX;
       let dy = cam.fY + u * cam.rY + v * cam.uY;
       let dz = cam.fZ + v * cam.uZ;
-      const len = Math.hypot(dx, dy, dz);
+      const len = outdoor ? Math.sqrt(dx * dx + dy * dy + dz * dz) : Math.hypot(dx, dy, dz);
       dx /= len; dy /= len; dz /= len;
 
-      const i = cy * S.cols + cx;
       let density = 1;
-      if (castRay(zone, cam.ex, cam.ey, cam.ez, dx, dy, dz, MAX_DIST, zone.seen, seeRange, zone.holeSeen)) {
+      if (castRay(zone, cam.ex, cam.ey, cam.ez, dx, dy, dz, maxDist, zone.seen, seeRange, zone.holeSeen, info)) {
         shadeHit(game, zone, player, dx, dy, dz);
         depth[i] = hit.t;
       } else {
         depth[i] = Infinity;
         if (dz > 0 && zone.hasSky) density = shadeSky(dx, dy, dz, game.time);
+        else if (outdoor && dz < 0 && hit.out !== 2) density = shadeHorizon(dx, dy, dz, hit.missT, game.time);
         else outR = outG = outB = 0;        // looking into a bottomless pit, or into the far dark
       }
       plot(cx, cy, density);
     }
   }
+  judgeFrame(performance.now() - t0, performance.now());
 
   setGhostVisible(false);          // everything else (sight lines, aiming…) sees straight through them
   drawSprites(game);
