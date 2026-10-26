@@ -96,6 +96,40 @@ export function checkHud({ game, startRun, inputHandlers, hud, renderMap, events
     }
     stats.layout = sizes;
     resize(100, 30);
+
+    // Ordinary states, not only everything on: 0-7 statuses (every subset), keys on and off, levels 1-20,
+    // both views, at 100×30. Nothing dropped outranks something shown (unless it alone wouldn't fit), and
+    // `dropped` lists only segments with something to show.
+    const all = ["flying", "hasted", "shadowed", "poisoned", "darkened", "burning", "blinded"];
+    let layouts = 0, inversions = 0;
+    const firstBad = [];
+    for (let mask = 0; mask < 1 << all.length; mask++)
+      for (const keys of [0, 3])
+        for (const level of [1, 9, 20]) {
+          if ((mask + keys + level) % 3 && mask % 7) continue;   // a spread, not the full product
+          fresh();
+          const p = game.player;
+          all.forEach((id, k) => { if (mask & (1 << k)) status.addStatus(game, p, id, { t: 30 }); });
+          p.keys = keys; p.level = level; p.xp = level * 38;
+          for (const view of ["map", "3d"]) {
+            game.view = view; game.mode = view === "map" ? "map" : "explore";
+            const L = hud.layoutHud(game, 100, 30);
+            layouts++;
+            const shownIds = new Set(L.rows.flat().map((q) => q.id));
+            for (const id of L.dropped) {
+              const d = hud.segmentDef(id), parts = [d.parts(game, p)].flat().filter((q) => q && q.text);
+              if (!parts.length) { inversions++; if (firstBad.length < 3) firstBad.push(`"${id}" listed as dropped with nothing to show`); continue; }
+              const w = parts.reduce((n, q) => n + q.text.length + 2, 0);
+              for (const s of [...shownIds].map(hud.segmentDef))
+                if (d.priority > s.priority && s.align !== "right" && w <= 98) {
+                  inversions++;
+                  if (firstBad.length < 3) firstBad.push(`"${id}" (${d.priority}) dropped while "${s.id}" (${s.priority}) shows (statuses ${mask.toString(2)}, keys ${keys}, level ${level}, ${view})`);
+                }
+            }
+          }
+        }
+    if (inversions) fail(`100×30, ordinary states: ${inversions} priority inversion(s) in ${layouts} layouts, e.g. ${firstBad.join("; ")}`);
+    stats.sweep = `${layouts} layouts at 100×30, ${inversions} inversions`;
   }
 
   // --- 2. Toasts ----------------------------------------------------------------------------------------

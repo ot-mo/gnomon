@@ -153,8 +153,10 @@ export function levelUpClick(game, cell) {
 //     align "right": at the right end of the first row with room left, else dropped (fps). Registering an id again replaces it.
 //   layoutHud(game, cols = S.cols, rows = S.rows) → { rows: [[{ id, x, text, color }]], dropped: [ids] }
 //     Everything on row 0 if it fits. Otherwise the highest priorities first: on a screen of 40 or more
-//     rows on their preferred row, then the other; on a smaller one only row 0; what fits nowhere is dropped
-//     (the lowest priorities go first), so the line never runs off the screen.
+//     rows on their preferred row, then the other; on a smaller one only row 0; what fits nowhere is dropped,
+//     and with it everything of a lower priority (the lowest priorities go first; a piece wider than a row
+//     on its own doesn't hold the others back), so the line never runs off the screen. `dropped`: segments
+//     with something to show that weren't placed.
 //   hudSegments() → [ids] in order; segmentDef(id) → the registered def
 //   hudRows(game) → 1 | 2                    how many rows the status line takes this frame
 const SEGMENTS = [];
@@ -170,13 +172,18 @@ export function registerHudSegment(id, def) {
 export const hudSegments = () => SEGMENTS.map((s) => s.id);
 export const segmentDef = (id) => SEGMENTS.find((s) => s.id === id) || null;
 
+// What a segment shows this frame: its parts with text (none: the segment isn't there, not dropped).
+function partsOf(seg, game, p) {
+  const parts = seg.parts(game, p);
+  return parts ? (Array.isArray(parts) ? parts : [parts]).filter((q) => q && q.text) : [];
+}
+
 export function layoutHud(game, cols = S.cols, rows = S.rows) {
-  const p = game.player, left = [], right = [];
+  const p = game.player, left = [], right = [], showing = [];
   for (const seg of SEGMENTS) {
-    let parts = seg.parts(game, p);
-    if (!parts) continue;
-    parts = (Array.isArray(parts) ? parts : [parts]).filter((q) => q && q.text);
+    const parts = partsOf(seg, game, p);
     if (!parts.length) continue;
+    showing.push(seg);
     const pieces = seg.split ? parts.map((q, k) => ({ seg, k, parts: [q] })) : [{ seg, k: 0, parts }];
     for (const piece of pieces) {
       piece.w = piece.parts.reduce((n, q) => n + q.text.length, 0) + HUD_GAP * (piece.parts.length - 1);
@@ -191,10 +198,17 @@ export function layoutHud(game, cols = S.cols, rows = S.rows) {
     const n = rows >= 40 ? 2 : 1;
     placed = Array.from({ length: n }, () => []);
     const byPriority = [...left].sort((a, b) => b.seg.priority - a.seg.priority || a.seg.order - b.seg.order || a.k - b.k);
+    // Dropped by priority, not first-fit: once a piece that would fit a row on its own finds no room,
+    // nothing of a lower priority is placed after it (no smaller "keys" in the gap a dropped "LV" left),
+    // nor the later parts of the same segment (statuses drop from the end).
+    let below = -Infinity, cutSeg = null;
     for (const piece of byPriority) {
+      if (piece.seg.priority < below || piece.seg === cutSeg) continue;
       const pref = Math.min(n - 1, piece.seg.row);
+      let ok = false;
       for (const r of [pref, ...placed.keys()].filter((r, j, a) => a.indexOf(r) === j))
-        if (used([...placed[r], piece]) <= room) { placed[r].push(piece); break; }
+        if (used([...placed[r], piece]) <= room) { placed[r].push(piece); ok = true; break; }
+      if (!ok && piece.w + 1 <= room) { below = piece.seg.priority; cutSeg = piece.seg; }
     }
     for (const list of placed) list.sort((a, b) => a.seg.order - b.seg.order || a.k - b.k);
     while (placed.length > 1 && !placed[placed.length - 1].length) placed.pop();
@@ -212,7 +226,7 @@ export function layoutHud(game, cols = S.cols, rows = S.rows) {
     if (row) { row.push({ id: piece.seg.id, x: cols - text.length - 1, text, color: piece.parts[0].color }); row.end = cols; }
   }
   const shown = new Set(out.flat().map((q) => q.id));
-  return { rows: out, dropped: SEGMENTS.filter((s) => !shown.has(s.id) && s.parts(game, p)).map((s) => s.id) };
+  return { rows: out, dropped: showing.filter((s) => !shown.has(s.id)).map((s) => s.id) };
 }
 
 export const hudRows = (game) => layoutHud(game).rows.length;
