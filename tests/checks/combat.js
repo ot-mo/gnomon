@@ -967,7 +967,17 @@ export function checkAiDepth(ctx) {
       beside();
       mapStep(game, 1, 0, { force: true });
       expect(swapped && attacks.some((a) => a.att === p && a.tgt === pal), `follow: a bump swaps places ${swapped}; Shift + direction struck it ${attacks.some((a) => a.att === p && a.tgt === pal)}`);
-      stats.follow = { whileWalking: +walking.toFixed(1), after4s: +lag.toFixed(1), foughtYourFoe: true, swap: swapped, shiftStrikes: true };
+      // In 3D the first swing at it holds back, a second within 2 s strikes (Appendix B).
+      in3d(game); beside(); Object.assign(p, { yaw: 0, pitch: 0, attackCd: 0 });
+      attacks.length = 0;
+      const first = playerMelee(game);
+      p.attackCd = 0; game.time += 0.5;
+      const second = playerMelee(game);
+      p.attackCd = 0; game.time += 3;
+      const late = playerMelee(game);
+      expect(first === null && second?.tgt === pal && late === null && run.logged.some((t) => /hold back/.test(t)), `3D at your follower: the first swing ${first ? "struck" : "held back"}, a second at 0.5 s ${second ? "struck" : "held back"}, another 3 s later ${late ? "struck" : "held back"} (want held, struck, held)`);
+      onMap(game);
+      stats.follow = { whileWalking: +walking.toFixed(1), after4s: +lag.toFixed(1), foughtYourFoe: true, swap: swapped, shiftStrikes: true, secondSwingIn3d: true };
       run.restore(); run = null;
     }
 

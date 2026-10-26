@@ -31,7 +31,7 @@
 //   applyDamage(game, tgt, dmg, { src, label, color, deathText }) → the damage done (no to-hit, no soak
 //       beyond an armoured creature's): spikes, bombs, scrolls. src: who did it (XP only for the player).
 //   playerMelee(game)        3D: swing at the best target in the cone (reach and line of sight): something
-//                            hostile first, else anything but a friend (a follower is never swung at)
+//                            hostile first; at anything else the first swing holds back, a second strikes
 //   bumpAttack(game, c)      the map: you walked into c (turns.js: a friend or a neutral only with Shift)
 //   hitPlayer(game, c, dmg, source, blocked, ranged)   a blow that has landed on you (the legacy tail)
 //   elementVs(c, el), resistText(c)
@@ -481,6 +481,7 @@ function inYourSight(game, c) {
 }
 
 // --- The two views ----------------------------------------------------------------------------------
+const HOLD_BACK = 2;   // seconds: a second swing at someone you held back from strikes
 // 3D: swing at whatever is in front of you (the best target in the cone, within reach and sight).
 export function playerMelee(game) {
   const p = game.player;
@@ -493,7 +494,9 @@ export function playerMelee(game) {
   const cp = Math.cos(p.pitch);
   const fx = cp * Math.cos(p.yaw), fy = cp * Math.sin(p.yaw), fz = Math.sin(p.pitch);
   const ex = p.x, ey = p.y, ez = p.z + EYE;
-  // The nearest in the cone: something hostile to you first, else anything that isn't your friend.
+  // The nearest in the cone: something hostile to you first, else the nearest of the rest. One that isn't out
+  // for you (your follower, a neutral) isn't struck by the first swing (Appendix B: "a second click to attack a
+  // friend", as Shift + direction on the map): you hold back, and a second swing at it within HOLD_BACK s strikes.
   let best = null, bestDist = Infinity, foe = false;
   for (const m of game.zone.creatures) {
     if (!touchable(game, m, p, { blade: true })) continue;   // a flat being: your blade passes through its shadow; people
@@ -503,10 +506,17 @@ export function playerMelee(game) {
     if (dist > reach + m.w * 0.5) continue;
     if ((vx * fx + vy * fy + vz * fz) / dist < (dist < 1.2 ? 0.2 : 0.7)) continue;
     if (!lineOfSight(game.zone, ex, ey, ez, m.x, m.y, cz)) continue;
-    const feel = attitude(game, m, p);
-    if (feel === "friendly") continue;
-    const hostile = feel === "hostile";
+    const hostile = attitude(game, m, p) === "hostile";
     if ((hostile && !foe) || (hostile === foe && dist < bestDist)) { bestDist = dist; best = m; foe = hostile; }
+  }
+  if (best && !foe) {
+    const held = game.heldBack;
+    if (!(held && held.id === best.id && game.time >= held.t && game.time - held.t <= HOLD_BACK)) {
+      game.heldBack = { id: best.id, t: game.time };
+      game.log(`You hold back from the ${best.name}. (Swing again to strike it.)`, [170, 170, 170]);
+      return null;
+    }
+    game.heldBack = null;
   }
   return best ? resolveAttack(game, p, best, weaponSpec(p), { view: "3d" }) : null;
 }
