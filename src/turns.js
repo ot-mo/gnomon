@@ -12,7 +12,7 @@ import { castRay, lineOfSight } from "./raycast.js";
 import { lightAt } from "./light.js";
 import { bumpAttack } from "./combat.js";
 import { updateCreatures } from "./ai.js";
-import { creatureAt, talkerAt, hostilesTo, ghostHidden, canTalk } from "./creatures.js";
+import { creatureAt, talkerAt, hostilesTo, ghostHidden, ghostOffMap, canTalk } from "./creatures.js";
 import { pickUpItems } from "./items.js";
 import { useColumn } from "./interact.js";
 import { EYE, WALK, HEIGHT, WADE_SLOWDOWN, HASTE, attackTime, torchRange, canSwim, speedMul, jumpBonus, hasFeatherFall, bonus } from "./player.js";
@@ -141,11 +141,11 @@ export function mapStep(game, dx, dy) {
   if (nx < 0 || ny < 0 || nx >= zone.w || ny >= zone.d) return stepOffEdge(game, dx, dy, nx, ny);
   p.yaw = Math.atan2(dy, dx);   // face where you're going, so the 3D view matches
 
-  // Walking into someone talks to them (it takes no time). A ghost you haven't met is just a
-  // cold spot in the way: you'd have to see it in 3D, in the dark.
+  // Walking into someone talks to them (it takes no time). A ghost you haven't met (or, under the sky,
+  // one standing in daylight) is just a cold spot in the way: you'd have to see it in 3D, in the dark.
   const m = creatureAt(zone, nx, ny);
   if (m && canTalk(m)) {
-    if (m.vis.ghostly && !m.talk.met) game.log("The air here is icy, as if someone were standing in your way. Someone you can't see from up here.", [150, 210, 240]);
+    if (ghostOffMap(game, m)) game.log("The air here is icy, as if someone were standing in your way. Someone you can't see from up here.", [150, 210, 240]);
     else game.onTalk(m);
     return false;
   }

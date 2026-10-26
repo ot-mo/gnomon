@@ -8,7 +8,7 @@ import { BLOCKS, KIND, FLOOR_Z } from "./world.js";
 import { itemGlyph, itemName, withArticle } from "./items.js";
 import { planTravel } from "./turns.js";
 import { spikeState } from "./traps.js";
-import { talkersIn, typeOf } from "./creatures.js";
+import { talkersIn, typeOf, ghostOffMap } from "./creatures.js";
 import { slamState } from "./guardians.js";
 import { resistText } from "./combat.js";
 
@@ -152,9 +152,10 @@ export function renderMap(game) {
     S.text(sx - (e.text.length >> 1), sy - 1, e.text, ...e.color);
   }
 
-  // People: anyone on a tile you've seen (a ghost only once you've met it in the dark).
+  // People: anyone on a tile you've seen (a ghost only once you've met it in the dark, and under the sky
+  // only while it stands in the dark).
   for (const n of talkersIn(zone)) {
-    if (!zone.seen[n.tx + n.ty * zone.w] || !onScreen(n.tx, n.ty) || (n.vis.ghostly && !n.talk.met)) continue;
+    if (!zone.seen[n.tx + n.ty * zone.w] || !onScreen(n.tx, n.ty) || ghostOffMap(game, n)) continue;
     const [sx, sy] = toScreen(n.tx, n.ty);
     S.put(sx, sy, n.glyph, ...n.color);
   }
@@ -266,7 +267,7 @@ function describeTile(game, tile) {
                     [KIND.BRIDGE]: "A wooden bridge.", [KIND.MOSAIC]: "Mosaic tiles. From up here, the picture is clear.",
                     [KIND.SPIKES]: { up: "A spike trap: the spikes are UP.", warn: "A spike trap: the spikes come up next beat!", down: "A spike trap, down for now." }[spikeState(zone, i, game.time)] }[kind]);
   for (const n of talkersIn(zone))
-    if (n.tx === tile.x && n.ty === tile.y && (!n.vis.ghostly || n.talk.met)) {
+    if (n.tx === tile.x && n.ty === tile.y && !ghostOffMap(game, n)) {
       const title = typeOf(n).title;
       parts.push(`${n.name}${title ? ", " + title : ""}, is here.${n.vis.flat ? " (A flat being: in 3D you'd only see a shadow.)" : ""} Walk into them to talk.`);
     }

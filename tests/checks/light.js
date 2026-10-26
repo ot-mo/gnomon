@@ -18,8 +18,9 @@
 import { Zone, B, FLOOR_Z } from "../../src/world.js";
 import { enterZone } from "../../src/zones.js";
 import { interact } from "../../src/interact.js";
+import { mapStep } from "../../src/turns.js";
 import { updateCreatures } from "../../src/ai.js";
-import { spawnCreature, addCreature, creatureSprite, touchable } from "../../src/creatures.js";
+import { spawnCreature, addCreature, creatureSprite, touchable, ghostOffMap } from "../../src/creatures.js";
 import { inDark, lightAt, naturalLight, zoneIsLightless, setDaylight } from "../../src/light.js";
 import { RULES } from "../../src/rules.js";
 import { EYE } from "../../src/player.js";
@@ -117,8 +118,37 @@ export function checkLight({ game, startRun, render3d, frameHash, dungeonLevel }
     }
     expect(!ghostSeen[1].sprite && ghostSeen[1].talks === 0, `at noon with the torch out a ghost is seen (${ghostSeen[1].sprite}) or talks (${ghostSeen[1].talks})`);
     expect(ghostSeen[0].sprite && ghostSeen[0].talks === 1, `at daylight 0 with the torch out a ghost isn't seen (${ghostSeen[0].sprite}) or doesn't talk (${ghostSeen[0].talks})`);
+    // On the map, once met: walking into Brann talks only in the dark (at noon he's a cold spot), and the
+    // map draws him only then. Underground (no sky) the parent's rule stays: once met, always there.
+    ghost.talk.met = true;
+    const ghostMap = {};
+    const mapGhost = (zone, g, dl) => {
+      day(dl);
+      game.mode = "map"; game.view = "map";
+      stand(g.tx - 0.5, g.ty + 0.5, 0, 0);
+      p.torch = false;
+      const n0 = talked.length;
+      mapStep(game, 1, 0);
+      const drawn = !ghostOffMap(game, g);
+      game.mode = "explore"; game.view = "3d";
+      return { talks: talked.length - n0, drawn };
+    };
+    ghostMap.noon = mapGhost(sky, ghost, 1); ghostMap.night = mapGhost(sky, ghost, 0);
+    expect(ghostMap.noon.talks === 0 && !ghostMap.noon.drawn, `on the map at noon a met ghost talks (${ghostMap.noon.talks}) or is drawn (${ghostMap.noon.drawn})`);
+    expect(ghostMap.night.talks === 1 && ghostMap.night.drawn, `on the map at daylight 0 a met ghost doesn't talk (${ghostMap.night.talks}) or isn't drawn (${ghostMap.night.drawn})`);
+    {
+      const under = field("light-ghost-under", false);
+      enterZone(game, under, { how: "start" });
+      const g2 = addCreature(under, spawnCreature("brann", 12, 10, FLOOR_Z, { level: 4 }));
+      g2.talk.met = true;
+      day(1); p.torch = true; const n0 = talked.length; game.mode = "map"; game.view = "map"; stand(11.5, 10.5); mapStep(game, 1, 0);
+      ghostMap.underLit = { talks: talked.length - n0, drawn: !ghostOffMap(game, g2) };
+      game.mode = "explore"; game.view = "3d";
+      expect(ghostMap.underLit.talks === 1 && ghostMap.underLit.drawn, `underground a met ghost on the map with your torch lit: talks ${ghostMap.underLit.talks}, drawn ${ghostMap.underLit.drawn} (the parent's rule: yes)`);
+      enterZone(game, sky, { how: "start" });
+    }
     sky.creatures.length = 0;
-    stats.gate = { plankDrawnNoon: plankFrames[1], plankDrawnNight: plankFrames[0], ghostNoon: ghostSeen[1], ghostNight: ghostSeen[0] };
+    stats.gate = { plankDrawnNoon: plankFrames[1], plankDrawnNight: plankFrames[0], ghostNoon: ghostSeen[1], ghostNight: ghostSeen[0], ghostMap };
 
     // --- 3. The other dark-only rules -------------------------------------------------------------------
     // Runes: a rune wall ahead, frames at noon and at daylight 0 (torch out).

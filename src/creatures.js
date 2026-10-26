@@ -19,6 +19,7 @@
 //                                       can this blow reach it? (planes, ghosts; talkers never)
 //   ghostHidden(game, c)                a ghostly creature drowned out by light (the one place that asks;
 //                                       light.js inDark at the creature)
+//   ghostOffMap(game, c)                a ghost person the map neither draws nor lets you talk to
 //   hostilesTo(game, e), targetsFor(game, e), talkersIn(zone)   (through factions.js attitude)
 //   creaturesNear(zone, x, y, r)        through spatial buckets during an AI update; buildBuckets, dropBuckets
 //   isFlat(c), isGhostly(c), canTalk(c)
@@ -125,6 +126,9 @@ export function creatureAt(zone, x, y) {
 // only where it stands in the dark (light.js inDark: your torch out, and no daylight there). Every ghost
 // rule asks here.
 export const ghostHidden = (game, c) => isGhostly(c) && !inDark(game, game.zone, c.x, c.y, c.z + c.h * 0.5);
+// A ghost person on the map: only once you've met it in the dark, and under the sky only while it stands
+// in the dark (underground the parent game's rule: once met, always there on the map).
+export const ghostOffMap = (game, c) => isGhostly(c) && (!c.talk?.met || (!!game.zone.hasSky && ghostHidden(game, c)));
 
 // Flat beings can only be touched while you look at the world flat, on the map (unless the Flat
 // Queen has risen out of the plane: then only in 3D). Ghostly things only in the dark (your torch out).
