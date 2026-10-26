@@ -115,7 +115,7 @@ export async function checkRender(m) {
     let worst = 0, views = 0;
     const blackBelow = () => {
       let black = 0;
-      for (let y = Math.ceil(capture.rows / 2); y < capture.rows; y++)
+      for (let y = Math.floor(capture.rows / 2); y < capture.rows; y++)   // (on an odd count, from the level row)
         for (let x = 0; x < capture.cols; x++) {
           const i = y * capture.cols + x;
           if (capture.chars[i] === " " || capture.colors[i * 3] + capture.colors[i * 3 + 1] + capture.colors[i * 3 + 2] < 8) black++;
@@ -150,8 +150,9 @@ export async function checkRender(m) {
       // An odd number of rows: at pitch 0 the middle row's rays are level (dz 0).
       if (m.resize && !key && name === "real") {
         m.resize(180, 55);
-        const s = standNear(zone, zone.w >> 1, zone.d >> 1);
-        for (const yaw of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+        for (const side of open.filter((d) => d.length === 1)) {   // 6 tiles in from each open side, facing out
+          const dx = side === "e" ? 1 : side === "w" ? -1 : 0, dy = side === "s" ? 1 : side === "n" ? -1 : 0, yaw = Math.atan2(dy, dx);
+          const s = standNear(zone, dx > 0 ? zone.w - 7 : dx < 0 ? 6 : zone.w >> 1, dy > 0 ? zone.d - 7 : dy < 0 ? 6 : zone.d >> 1);
           Object.assign(p(), { x: s.x + 0.5, y: s.y + 0.5, z: s.z, vz: 0, yaw, pitch: 0, torch: true });
           frame3d();
           const black = blackBelow();
