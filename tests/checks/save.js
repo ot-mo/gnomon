@@ -27,7 +27,7 @@
 //      may leave memory only once that write has committed (refused before, allowed after; read back identical);
 //      writes land in the order they were made, however long each takes; evictDormant keeps the zone you are in
 //      and its neighbours.
-//   5. Loading: the mode stack starts afresh (no data, no callbacks) and prefetch state is not saved; zone:enter
+//   5. Loading (from the map, frames running and drawn during the read): the mode stack starts afresh (no data, no callbacks) and prefetch state is not saved; zone:enter
 //      says "load", never a first visit; a stored neighbour and a stored level are read back over an edge and
 //      down stairs, never generated; refused: another game's slot, another save version, another map version,
 //      a slot without the zone you were in; listSlots newest first; deleteSlot takes the zones too.
@@ -323,7 +323,20 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
     const enters = [];
     const off = on("zone:enter", (g, e) => enters.push({ how: e.how, first: e.first }));
     startRun(5);
-    await loadGame(meta.id, { store: s });
+    game.pages = null; playing(game, "map");
+    // Loaded from the map (not the title), with frames running and drawn while the store is read.
+    let settledLoad = false, framesDuring = 0, zoneless = 0;
+    const loading = loadGame(meta.id, { store: s }).finally(() => { settledLoad = true; });
+    try {
+      for (let k = 0; k < 400 && !settledLoad; k++) {
+        await tick(0);
+        if (settledLoad) break;
+        if (!game.zone) zoneless++;
+        game.debug.step(1 / 60); game.debug.draw(); framesDuring++;
+      }
+      await loading;
+    } catch (e) { fail(`a frame during a load from the map: ${String(e.stack || e).split(/\r?\n/).slice(0, 3).join(" | ")}`); await loading.catch(() => {}); }
+    if (!zoneless) notes.push(`no frame ran while the load had no zone yet (${framesDuring} frames during it)`);
     off();
     const top = game.modeStack;
     const wantStack = game.view === "map" ? ["map"] : ["explore", "pause"];
@@ -367,7 +380,7 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
     if (list.length !== 2 || list[0].id !== meta2?.id) fail(`listSlots: ${JSON.stringify(list.map((l) => [l.id, l.updated]))}`);
     if (!(await deleteSlot(meta.id, { store: s })) || (await s.list("zones", { slot: meta.id })).length || (await listSlots({ store: s })).length !== 1)
       fail("deleteSlot left the slot or its zones");
-    stats.load = `stack ${wantStack.join("+")}; zone:enter how=load first=false; stored span and level read back (${gens.n} generated); 4 refusals`;
+    stats.load = `from the map with ${framesDuring} frames drawn during it (${zoneless} with no zone yet); stack ${wantStack.join("+")}; zone:enter how=load first=false; stored span and level read back (${gens.n} generated); 4 refusals`;
   }
 
   // --- 6. The title screen ----------------------------------------------------------------------------------
