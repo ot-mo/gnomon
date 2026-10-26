@@ -324,6 +324,7 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
     game.zones.get(L2).markers.push({ x: 2, y: 2 });       // (you're in it: the next leave writes two)
     game.debug.enterZone(A, "up"); playing(game, "map");   // write 2 (fast): two markers
     await whenWritten(game);
+    await tick(100);   // past the slow write's 60 ms: had the writes not waited for each other, it lands only now
     const last = await base.get("zones", [game.saving.slotId, L2]);
     if (last?.markers?.length !== game.zones.get(L2).markers.length) fail(`writes landed out of order: the store holds ${last?.markers?.length} markers for ${L2}, the zone ${game.zones.get(L2).markers.length}`);
     // evictDormant keeps the zone you're in and its straight neighbours.
