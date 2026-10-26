@@ -14,11 +14,11 @@
 // Generates many dungeon levels and checks each can be finished (stairs, rooms, vault, keys
 // reachable), then sanity-checks the monster and item art. Open with ?seeds=50&depths=20 to change
 // the size. The levels are the legacy stack's (the fixture site under world tile 0, 0):
-// generateDungeonLevel(seed, legacyParams(depth, seed)). tools/check-dungeons.mjs does the same in Node.
+// generateDungeonLevel(seed, legacyParams(depth, seed)). tools/check-dungeons.mjs does the same in Node, and
+// tools/check-content.mjs the art (test-world.html runs both in the browser).
 import { generateDungeonLevel, validateDungeonLevel, legacyParams, LEGACY_GUARDIANS } from "./src/gen/dungeon.js";
 import { templeFixture as buildTemple } from "./src/content/world/temple.js";
-import { MONSTER_TYPES } from "./src/monsters.js";
-import { NPC_TYPES } from "./src/npcs.js";
+import { CREATURE_TYPES, canTalk } from "./src/creatures.js";
 import { FLOOR_ART, WEAPONS, WEAPON_PALETTE, itemPalette, POTIONS, POTION_COLORS, RINGS, AMULETS, RELICS, makeRelic, itemName, itemInfo } from "./src/items.js";
 
 const out = document.getElementById("out");
@@ -31,7 +31,7 @@ const features = { vaults: {}, locked: 0, monsters: 0, climbs: 0, stones: 0, gea
 // The temple (the legacy site's surface) is drawn by hand: check it has what the story needs.
 for (const seed of [1, 2, 3]) {
   const t = buildTemple(seed);
-  if (!t.npcs.some((n) => n.type === "maren") || !t.items.some((i) => i.kind === "cube") || !t.stairs || !t.spikes.size || !t.cubeWall?.length)
+  if (!t.creatures.some((n) => n.type === "maren") || !t.items.some((i) => i.kind === "cube") || !t.stairs || !t.spikes.size || !t.cubeWall?.length)
     failures.push(`temple (seed ${seed}) is missing something`);
 }
 
@@ -47,12 +47,13 @@ for (let seed = 1; seed <= SEEDS; seed++) {
     if (problems.length) failures.push(`seed ${seed} depth ${depth}: ${problems.join(", ")}`);
     features.vaults[f.vault.name] = (features.vaults[f.vault.name] || 0) + 1;
     if (f.rooms.some((r) => r.locked)) features.locked++;
-    features.monsters += f.monsters.length;
-    features.npcs = (features.npcs || 0) + f.npcs.length;
+    const monsters = f.creatures.filter((c) => !canTalk(c)), people = f.creatures.filter(canTalk);   // (one list since 0C)
+    features.monsters += monsters.length;
+    features.npcs = (features.npcs || 0) + people.length;
     if (f.secret) { features.secrets = (features.secrets || 0) + 1; features.secretWalls = (features.secretWalls || 0) + f.secretWalls.size; }
-    features.elites = (features.elites || 0) + f.monsters.filter((m) => m.elite).length;
+    features.elites = (features.elites || 0) + monsters.filter((m) => m.elite).length;
     const band = depth <= 5 ? "1-5" : depth <= 10 ? "6-10" : depth <= 15 ? "11-15" : "16-20";
-    for (const m of f.monsters) { const b = (features.mix ||= {})[band] ||= {}; b[m.type] = (b[m.type] || 0) + 1; }
+    for (const m of monsters) { const b = (features.mix ||= {})[band] ||= {}; b[m.type] = (b[m.type] || 0) + 1; }
     features.climbs += f.rooms.filter((r) => r.climb).length;
     features.stones += f.rooms.filter((r) => r.stones).length;
     features.gear += f.items.filter((i) => i.kind === "weapon" || i.kind === "armour").length;
@@ -61,9 +62,9 @@ for (let seed = 1; seed <= SEEDS; seed++) {
     features.potions += f.items.filter((i) => i.kind === "potion").length;
     features.jewels = (features.jewels || 0) + f.items.filter((i) => i.kind === "ring" || i.kind === "amulet").length;
     features.relics = (features.relics || 0) + f.items.filter((i) => i.kind === "relic?").length;
-    features.shrines = (features.shrines || 0) + f.npcs.filter((n) => n.type === "shrine").length;
+    features.shrines = (features.shrines || 0) + people.filter((n) => n.type === "shrine").length;
     // A guardian's floor: the guardian, its hall, and stairs in the hall's alcove.
-    if (LEGACY_GUARDIANS[depth] && (!f.guardianHall || !f.monsters.some((m) => m.guardian === f.guardianHall.type) || !f.stairs))
+    if (LEGACY_GUARDIANS[depth] && (!f.guardianHall || !monsters.some((m) => m.guardian === f.guardianHall.type) || !f.stairs))
       failures.push(`seed ${seed} depth ${depth}: guardian hall incomplete`);
   }
 }
@@ -79,7 +80,7 @@ const checkArt = (name, frames, palette) => {
     }
   }
 };
-for (const [name, t] of Object.entries(MONSTER_TYPES)) checkArt(name, t.frames, t.palette);
+for (const [name, t] of Object.entries(CREATURE_TYPES)) if (t.frames) checkArt(name, t.frames, t.palette);
 for (const [name, w] of Object.entries(WEAPONS)) {
   checkArt(`held ${name}`, [w.held.art], WEAPON_PALETTE);
   if (!(w.held.pivot > 0 && w.held.pivot < 1)) artProblems.push(`held ${name}: pivot ${w.held.pivot}`);
@@ -87,9 +88,9 @@ for (const [name, w] of Object.entries(WEAPONS)) {
 const fakeGame = { potionColor: Object.fromEntries(Object.keys(POTIONS).map((k, i) => [k, i])), knownPotions: new Set() };
 const samples = { potion: { kind: "potion", effect: "healing" }, weapon: { kind: "weapon", id: "mace", element: "fire" }, armour: { kind: "armour", id: "plate" },
                   key: { kind: "key" }, heart: { kind: "heart" }, strength: { kind: "strength" }, scroll: { kind: "scroll", effect: "fire" }, knife: { kind: "knife", count: 3 }, bomb: { kind: "bomb", count: 1 },
-                  gold: { kind: "gold", amount: 5 }, cube: { kind: "cube" }, quest: { kind: "quest", name: "skull" },
+                  gold: { kind: "gold", amount: 5 }, cash: { kind: "cash", amount: 5 }, cube: { kind: "cube" }, quest: { kind: "quest", name: "skull" },
                   ring: { kind: "ring", id: "protection" }, amulet: { kind: "amulet", id: "life" } };
-for (const [name, t] of Object.entries(NPC_TYPES)) if (t.art) checkArt(`npc ${name}`, [t.art], t.palette);
+for (const [name, t] of Object.entries(CREATURE_TYPES)) if (t.talks && t.art) checkArt(`npc ${name}`, [t.art], t.palette);
 for (const [kind, a] of Object.entries(FLOOR_ART)) checkArt(`floor ${kind}`, [a.art], itemPalette(fakeGame, samples[kind]));
 if (Object.keys(POTIONS).length > POTION_COLORS.length) artProblems.push("more potion effects than colours");
 // Every ring, amulet and relic: art, a name and a description.
