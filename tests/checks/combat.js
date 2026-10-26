@@ -1153,7 +1153,7 @@ export function checkArena(ctx, { runs = 100 } = {}) {
 const BANDS = [1, 2, 3, 4, 5, 6, 7, 8].map((tier) => ({ tier, level: 3 * tier - 1 }));
 const GEAR = { 1: ["mace", "leather"], 2: ["longsword", "chain"], 3: ["waraxe", "scale"], 4: ["greatsword", "plate"] };
 export function ttkTables(ctx, { blows = 1500 } = {}) {
-  const { game } = ctx;
+  const { game, seedRandom, restoreRandom } = ctx;
   const problems = [], stats = {};
   const expect = (ok, m) => { if (!ok) problems.push(m); return ok; };
   const run = fresh(ctx, 97);
@@ -1164,6 +1164,7 @@ export function ttkTables(ctx, { blows = 1500 } = {}) {
   const saved = { attrs: { ...p.attrs }, level: p.level, body: p.body, perks: p.perks };
   const table = {};
   const sets = [["d20", "attributes"], ["legacy", "legacy"]];
+  seedRandom?.(97);   // (the legacy set draws Math.random)
   try {
     for (const [combat, statsSet] of sets) {
       const undo = [overrideRules("combat", combat), overrideRules("stats", statsSet)];
@@ -1226,6 +1227,7 @@ export function ttkTables(ctx, { blows = 1500 } = {}) {
   } finally {
     Object.assign(p, { attrs: saved.attrs, level: saved.level, body: saved.body, perks: saved.perks });
     invalidateStats(p);
+    restoreRandom?.();
     run.restore();
   }
   return resultOf("combat: time to kill by level band (WS8)", problems, stats);
