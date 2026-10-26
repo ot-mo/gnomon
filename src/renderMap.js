@@ -9,7 +9,7 @@
 // liquid takes its colour (in any zone); and the legend is the terrain one (the looks you have seen here, then the
 // things that matter outdoors), narrow enough to sit beside an 80-wide zone at 180 columns. Underground the
 // map is the parent game's, legend and all (golden (b)).
-//   toggleMapLegend() → bool         show or hide the legend (for a key to bind; shown where it doesn't fit,
+//   toggleMapLegend(game) → bool     show or hide the legend (for a key to bind; shown where it doesn't fit,
 //                                    the map's view narrows and follows you); mapLegendShown(game) → bool
 //   setLegendKeyHint(text)           the key's label, shown at the foot of the outdoor legend once one is bound
 //   liquidColor(zone, x, y) → [r, g, b] | null   the colour of a column's water when it holds another liquid
@@ -71,7 +71,12 @@ function legendWidth(zone) {
   return { w: LEGEND_NARROW, fits: S.cols >= zone.w * TILE_W + LEGEND_NARROW + 2 };
 }
 let lastFits = true;
-export function toggleMapLegend() { legendMode = shownFor(legendMode, lastFits) ? "off" : "on"; return legendMode === "on"; }
+// game: judge from the zone you are in (else from the last map drawn).
+export function toggleMapLegend(game = null) {
+  const fits = game?.zone ? legendWidth(game.zone).fits : lastFits;
+  legendMode = shownFor(legendMode, fits) ? "off" : "on";
+  return legendMode === "on";
+}
 export const mapLegendShown = (game) => shownFor(legendMode, legendWidth(game.zone).fits);
 export function setLegendKeyHint(text) { legendHint = String(text || ""); }
 
@@ -359,11 +364,19 @@ function drawLegend(x, y, game) {
   notes.forEach((t, k) => y + rows.length + 4 + k < S.rows - 2 && S.text(x, y + rows.length + 4 + k, t, 120, 120, 120));
 }
 
-// The legend outdoors: the ground looks you have seen here (the commonest first), then what matters outdoors.
+// The legend outdoors: the ground looks you have seen here (the commonest first), the features you have seen
+// here (doors, stairs, levers…: the parent's legend rows), then what matters outdoors.
+const FEATURES = [
+  [KIND.DOOR, "+", [200, 130, 60], "door"], [KIND.LOCKED, "+", [240, 200, 80], "locked door"], [KIND.GATE, "|", [160, 165, 185], "gate"],
+  [KIND.LEVER, "&", [210, 210, 220], "lever"], [KIND.STAIRS, ">", [255, 255, 255], "stairs down"], [KIND.STAIRS_UP, "<", [190, 220, 255], "stairs up"],
+  [KIND.HOLE, ":", [95, 80, 140], "chasm / pit"], [KIND.BRIDGE, "=", [190, 130, 70], "bridge"], [KIND.MOSAIC, "█", [240, 195, 60], "floor mosaic"],
+  [KIND.SPIKES, "▲ ^", [255, 70, 60], "spike trap"],
+];
 function drawTerrainLegend(x, y, game) {
   const { zone } = game, room = S.rows - 2 - y, width = LEGEND_NARROW - 5;
-  const counts = new Map();
+  const counts = new Map(), kinds = new Set();
   for (let i = 0; i < zone.w * zone.d; i++) {
+    if (zone.seen[i]) kinds.add(mapKind(zone, i % zone.w, Math.floor(i / zone.w)));
     if (!zone.seen[i] || zone.kind[i] !== KIND.FLOOR || mapKind(zone, i % zone.w, Math.floor(i / zone.w)) !== KIND.FLOOR) continue;
     const look = groundLook(zone, i, KIND.FLOOR);
     if (!look) continue;
@@ -385,8 +398,9 @@ function drawTerrainLegend(x, y, game) {
     ["r g", [200, 200, 200], "monster seen"],
     ["f", [200, 170, 255], "flat (map)"],
   ];
+  const features = FEATURES.filter(([k]) => kinds.has(k)).map(([, g, c, label]) => [g, c, label]);
   const lines = room - 2 - (legendHint ? 2 : 0);
-  const rows = [...ground.slice(0, Math.max(2, lines - fixed.length)), ...fixed].slice(0, Math.max(0, lines));
+  const rows = [...ground.slice(0, Math.max(2, lines - fixed.length - features.length)), ...features, ...fixed].slice(0, Math.max(0, lines));
   S.text(x, y, "LEGEND", 255, 255, 255);
   rows.forEach(([g, c, label], k) => {
     S.text(x, y + 2 + k, g, ...c);

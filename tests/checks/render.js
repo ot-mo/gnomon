@@ -337,6 +337,9 @@ export async function checkRender(m) {
       `outdoor map looks: road ${JSON.stringify(rc)}, grass ${JSON.stringify(gc)} (want "·" and "." ${want})`);
     const text = Array.from({ length: capture.rows }, (_, y) => capture.chars.slice(y * capture.cols, (y + 1) * capture.cols).join("")).join("\n");
     expect(/LEGEND/.test(text) && /\$ +glim/.test(text) && !/\$ +gold/.test(text), "the outdoor legend doesn't show (or doesn't say glim)");
+    // The features seen on the temple span (its doors, stairs, levers, spikes) have their rows too.
+    const missing = ["door", "stairs down", "lever", "spike trap"].filter((w) => !new RegExp(` ${w} *$`, "m").test(text));
+    expect(!missing.length, `the outdoor legend lacks rows for what the span shows: ${missing}`);
     // Another liquid: a pool on a field, the zone's liquid named; the map and the 3D frame take its colour, under the
     // sky and underground alike; and beyond an edge (the apron) the water is the neighbour's.
     const KEY = "renderCheckBrine";
