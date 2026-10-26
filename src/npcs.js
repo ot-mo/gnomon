@@ -20,6 +20,7 @@ import { revealFloor, liftCurses } from "./effects.js";
 import { regear, worn } from "./player.js";
 import { wielded, carried } from "./body.js";
 import { sfx } from "./sfx.js";
+import { on } from "./events.js";
 import { maxHp, raiseAttr, raiseMaxHp } from "./stats.js";
 import { addStatus, removeStatus } from "./status.js";
 import { pay, receive, funds, formatPrice, priceLevel, CURRENCY } from "./currency.js";
@@ -42,15 +43,14 @@ export function finishQuest(game, id, title = null) {
 export const questActive = (game, id) => game.quests.some((q) => q.id === id && !q.done);
 export const questDone = (game, id) => game.quests.some((q) => q.id === id && q.done);
 
-// Something happened that a quest might care about (monsters.js calls this for bounties).
-export function questEvent(game, what, data) {
-  if (what === "bounty") {
-    game.log(`That was Rook's quarry. Go and tell Rook.`, [255, 220, 120]);
-    const q = game.quests.find((o) => o.id === "rook");
-    if (q) q.text = "The beast is dead. Go back to Rook for the bounty.";
-    data.killed = true;
-  }
-}
+// Rook's bounty: the marked beast died (the "kill" event, events.js; it was game.questEvent).
+on("kill", (game, { c }) => {
+  if (!c.bounty) return;
+  game.log(`That was Rook's quarry. Go and tell Rook.`, [255, 220, 120]);
+  const q = game.quests.find((o) => o.id === "rook");
+  if (q) q.text = "The beast is dead. Go back to Rook for the bounty.";
+  c.killed = true;
+});
 
 // --- Who turns up where ----------------------------------------------------------------------
 // Each run, every character appears once, on a floor picked from the run's seed: a peddler

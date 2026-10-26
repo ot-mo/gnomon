@@ -29,7 +29,7 @@ import { makePlayer, clampPitch, updatePlayer, takeImpact, hasFeatherFall, bonus
 import { pushPlayerOut } from "./monsters.js";
 import { playerMelee } from "./combat.js";
 import { updateCreatures } from "./ai.js";
-import { creatureAt, hostilesTo, canTalk } from "./creatures.js";
+import { creatureAt, hostilesTo, canTalk, CREATURE_TYPES } from "./creatures.js";
 import { pickUpItems, POTIONS, POTION_COLORS, scrollTitles, makeItem, makeRelic, pickRelic, randomEquipment, awayFromWalls, RELICS, RELIC_COLOR } from "./items.js";
 import { render3d } from "./render3d.js";
 import { renderMap, mapView, tileAtCell } from "./renderMap.js";
@@ -46,7 +46,6 @@ import { updateSpikes } from "./traps.js";
 import { toggleMusic, updateMusic, playCubeTheme } from "./music.js";
 import { unlockAudio, audioFrame } from "./audio.js";
 import { sfx, toggleSounds, setListener } from "./sfx.js";
-import { questEvent } from "./npcs.js";
 import { INTRO, CUBE_PAGES, TAUNTS, FINAL_PAGES, EPILOGUE, LICH_COLOR } from "./story/legacy.js";
 import { openCubeWall } from "./content/world/temple.js";
 import { openTalk, talkKey, talkClick, talkHover, drawTalk, shopKey, drawShop, openJournal, journalKey, drawJournal,
@@ -82,14 +81,6 @@ export const game = {
     if (below) fallTo(below, this.zone, this.player.x, this.player.y, "");
   },
 
-  // The Lich King falls: the run is won (after the epilogue).
-  win() {
-    this.travel = null;
-    this.log("The Lich King crumbles to dust. The dungeon falls silent. You have won!", [255, 230, 120]);
-    finishMainQuest();
-    openStory(this, EPILOGUE, () => { this.mode = "won"; });
-  },
-
   // You touch the Rotation Cube: the world turns (see step), then the story continues.
   onCube() {
     this.story.cube = true;
@@ -105,32 +96,6 @@ export const game = {
 
   onTalk(npc) { openTalk(this, npc); },
 
-  // A guardian notices you.
-  onGuardianWakes(m) {
-    const words = {
-      flatqueen: "The drawing on the floor moves. The Flat Queen slides toward you, flat as a shadow. (She lives in the plane: fight her on the map.)",
-      warden: "Something huge breathes out in the dark, and your torch gutters. The Gloom Warden is awake. (It hides from torchlight.)",
-      colossus: "Stone grinds on stone. The Colossus turns its head to look at you, and the star in its brow blazes. (Strike the core from up high.)",
-    }[m.guardian];
-    this.log(words, m.color);
-  },
-  // A guardian falls: the gate to the stairs opens, and it leaves a relic behind.
-  onGuardianDies(m) {
-    const zone = this.zone, hall = zone.guardianHall;
-    if (hall) for (const [x, y, z] of hall.gate) zone.set(x, y, z, B.AIR);
-    zone.slam = null;
-    zone.refresh();
-    this.log(`The ${m.name} falls! Behind it, the gate to the stairs grinds open.`, [255, 230, 140]);
-    const ground = zone.stand[m.tx + m.ty * zone.w] >= 0 ? zone.stand[m.tx + m.ty * zone.w] : FLOOR_Z;
-    const key = pickRelic(this.relicsFound);
-    const it = key ? makeRelic(key) : { ...randomEquipment(Math.random, zone.level + 2, 0.5), known: true };
-    if (key) this.relicsFound.add(key);
-    zone.items.push(makeItem(it, ...awayFromWalls(zone, m.x, m.y, ground), ground));
-    if (key) this.log(`Where it stood lies a relic: ${RELICS[key].name}.`, RELIC_COLOR);
-    // Its summoned helpers fade with it.
-    zone.creatures = zone.creatures.filter((o) => !(o.type === "shade" || (m.guardian === "flatqueen" && o.type === "flatling")));
-  },
-  questEvent(what, data) { questEvent(this, what, data); },
 
   // Flat (status.js, bible §10.2): you exist only in the Plane, so the view is the map until it ends.
   forceMapView() { if (this.mode === "explore") toMapView(); },
@@ -252,6 +217,45 @@ function finishMainQuest() {
 // Arriving in a zone (zones.js enterZone emits these). Before you're placed: treasure marked
 // "relic?" becomes a relic you haven't found yet; and coming back up to a guardian's level from
 // below (you fell past it), you arrive by its stairs, behind its gate, which opens from this side.
+// The bus (TECH_DESIGN §2.12) in place of game.win(), game.onGuardianWakes/Dies and game.questEvent.
+// A guardian notices you (guardians.js emits "guardian:wake").
+on("guardian:wake", (game, { c }) => {
+  const words = {
+    flatqueen: "The drawing on the floor moves. The Flat Queen slides toward you, flat as a shadow. (She lives in the plane: fight her on the map.)",
+    warden: "Something huge breathes out in the dark, and your torch gutters. The Gloom Warden is awake. (It hides from torchlight.)",
+    colossus: "Stone grinds on stone. The Colossus turns its head to look at you, and the star in its brow blazes. (Strike the core from up high.)",
+  }[c.guardian];
+  game.log(words, c.color);
+});
+on("kill", (game, { c }) => {
+  const t = CREATURE_TYPES[c.type];
+  if (t.guardian) guardianFalls(game, c);
+  if (t.boss) win(game);
+});
+// A guardian falls: the gate to the stairs opens, and it leaves a relic behind.
+function guardianFalls(game, m) {
+  const zone = game.zone, hall = zone.guardianHall;
+  if (hall) for (const [x, y, z] of hall.gate) zone.set(x, y, z, B.AIR);
+  zone.slam = null;
+  zone.refresh();
+  game.log(`The ${m.name} falls! Behind it, the gate to the stairs grinds open.`, [255, 230, 140]);
+  const ground = zone.stand[m.tx + m.ty * zone.w] >= 0 ? zone.stand[m.tx + m.ty * zone.w] : FLOOR_Z;
+  const key = pickRelic(game.relicsFound);
+  const it = key ? makeRelic(key) : { ...randomEquipment(Math.random, zone.level + 2, 0.5), known: true };
+  if (key) game.relicsFound.add(key);
+  zone.items.push(makeItem(it, ...awayFromWalls(zone, m.x, m.y, ground), ground));
+  if (key) game.log(`Where it stood lies a relic: ${RELICS[key].name}.`, RELIC_COLOR);
+  // Its summoned helpers fade with it.
+  zone.creatures = zone.creatures.filter((o) => !(o.type === "shade" || (m.guardian === "flatqueen" && o.type === "flatling")));
+}
+// The Lich King falls: the run is won (after the epilogue).
+export function win(game) {
+  game.travel = null;
+  game.log("The Lich King crumbles to dust. The dungeon falls silent. You have won!", [255, 230, 120]);
+  finishMainQuest();
+  openStory(game, EPILOGUE, () => { game.mode = "won"; });
+}
+
 on("zone:prepare", (game, { zone, arrival }) => {
   resolveRelics(zone);
   const hall = zone.guardianHall;

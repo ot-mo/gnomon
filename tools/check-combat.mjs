@@ -1,5 +1,5 @@
 // Combat: d20 hit-chance tables, map/3D parity, the planes, the dark and the core, creatures against
-// creatures (see tests/checks/combat.js).
+// creatures, and the event bus (see tests/checks/combat.js).
 //   node tools/check-combat.mjs
 import fs from "node:fs";
 import path from "node:path";

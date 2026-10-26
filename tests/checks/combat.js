@@ -1,8 +1,10 @@
-// Combat (combat.js): TECH_DESIGN §3 with the d20 rules of DECISIONS (bible §10.6, §15.6).
+// Combat (combat.js): TECH_DESIGN §3 with the d20 rules of DECISIONS (bible §10.6, §15.6), the event bus
+// in place of game.win / game.onGuardian* / game.questEvent (§2.12).
 //
 //   checkCombat({ game, startRun, srcFiles }) → { name, ok, problems, stats }
 //
-//   1. The move: no penetration dice and no `pv` key anywhere; monsters.js no longer lands blows.
+//   1. The move: no penetration dice and no `pv` key anywhere; monsters.js no longer lands blows; nothing
+//      calls game.win, game.onGuardianWakes/Dies or game.questEvent, and the game object has none of them.
 //   2. Hit-chance tables (d20): rollToHit over 10⁵ rolls per row against hitChance() (the analytic value),
 //      within ±0.02, for you (AGI, accuracy, high ground, aimed, a weapon too heavy, a widened crit range)
 //      against creatures of several levels, and for creatures against your DV. Crit rates too. One row
@@ -14,12 +16,15 @@
 //      above (from the ground every landed blow does exactly 1). In both sets.
 //   5. Creatures against creatures (d20): misses happen, hits land, the victim bears a grudge, a kill gives
 //      you no XP. Creatures against you: your DV decides (a higher AGI is hit less often).
+//   6. The bus: "kill" carries the killer; Rook's bounty, a guardian's gate and relic, and the win come from
+//      it; a guardian waking emits "guardian:wake"; "attack" follows every resolution.
 //
 // game/startRun: the real game (game.js). srcFiles: [{ file, text }] of every src/ module.
 import { Zone, B, FLOOR_Z } from "../../src/world.js";
 import { enterZone } from "../../src/zones.js";
 import { spawnCreature, addCreature } from "../../src/creatures.js";
 import { resolveAttack, rollToHit, hitChance, toHitMod, critNat, dvOf, weaponSpec, naturalSpec, playerMelee, bumpAttack } from "../../src/combat.js";
+import { guardianThink } from "../../src/guardians.js";
 import { mapStep } from "../../src/turns.js";
 import { overrideRules, RULES } from "../../src/rules.js";
 import { invalidateStats, mod } from "../../src/stats.js";
@@ -51,10 +56,14 @@ export function checkCombat({ game, startRun, srcFiles }) {
   for (const { file, text } of code) {
     if (/penetrations\s*\(/.test(text)) problems.push(`${file}: penetration dice (DECISIONS: none)`);
     if (/["'`]pv["'`]|\bpv\s*:/.test(text)) problems.push(`${file}: a pv key (DECISIONS: none)`);
+    if (/\bgame\.(win|onGuardianWakes|onGuardianDies|questEvent)\b|\bthis\.(win|onGuardianWakes|onGuardianDies|questEvent)\s*\(/.test(text))
+      problems.push(`${file}: still calls game.win/onGuardian*/questEvent (the bus replaces them)`);
   }
   const monsters = code.find((f) => f.file === "monsters.js").text;
   const left = ["attackMonster", "hitPlayer", "hurtMonster", "creatureHits", "playerAttack"].filter((n) => monsters.includes(n));
   expect(!left.length, `monsters.js still lands blows: ${left.join(", ")}`);
+  expect(!["win", "onGuardianWakes", "onGuardianDies", "questEvent"].some((k) => typeof game[k] === "function"),
+    "the game object still has win/onGuardianWakes/onGuardianDies/questEvent");
 
   startRun(41);
   game.pages = null; game.pendingPages = null; game.story.cube = true;
@@ -65,6 +74,8 @@ export function checkCombat({ game, startRun, srcFiles }) {
   const undoDay = setDaylight(1);
   const attacks = [];
   const offAttack = on("attack", (g, { result }) => attacks.push(result));
+  const kills = [];
+  const offKill = on("kill", (g, ev) => kills.push(ev));
   const savedAttrs = { ...p.attrs };
   const setAgi = (v) => { p.attrs.agi = v; invalidateStats(p); };
   const stand = (x, y, z = FLOOR_Z, yaw = 0, pitch = 0) => Object.assign(p, { x, y, z, vz: 0, yaw, pitch, attackCd: 0 });
@@ -242,8 +253,9 @@ export function checkCombat({ game, startRun, srcFiles }) {
       expect(v.brain?.grudges?.[a.id] && v.brain.hurtBy === a.id && v.state === "wander", `the goblin hit by the orc: grudge ${JSON.stringify(v.brain)}, state ${v.state} (want a grudge, wander)`);
       v.hp = 1; v.maxHp = 10;
       const xp0 = p.xp;
+      kills.length = 0;
       for (let k = 0; k < 50 && z.creatures.includes(v); k++) resolveAttack(game, a, v, naturalSpec(a));
-      expect(!z.creatures.includes(v) && p.xp === xp0, `the orc's kill: dead ${!z.creatures.includes(v)}, XP ${xp0} → ${p.xp}`);
+      expect(!z.creatures.includes(v) && p.xp === xp0 && kills[0]?.src === a, `the orc's kill: dead ${!z.creatures.includes(v)}, XP ${xp0} → ${p.xp}, kill src ${kills[0]?.src?.name}`);
       // On you: a higher AGI is hit less often.
       const rates = {};
       for (const agi of [12, 24]) {
@@ -261,8 +273,44 @@ export function checkCombat({ game, startRun, srcFiles }) {
       game.effects.length = 0;
     }
 
+    // --- 6. The bus ----------------------------------------------------------------------------------------
+    {
+      const z = arena("combat-bus");
+      enterZone(game, z, { how: "start" });
+      stand(2.5, 2.5);
+      // Rook's quarry.
+      const quarry = addCreature(z, spawnCreature("goblin", 8, 8, FLOOR_Z, { rng: () => 0.5, level: 3 }));
+      quarry.bounty = true; quarry.hp = 1;
+      logged.length = 0; kills.length = 0;
+      const undoSet = overrideRules("combat", "legacy");   // (every legacy blow lands)
+      resolveAttack(game, p, quarry, weaponSpec(p), { view: "map" });
+      expect(quarry.killed === true && logged.some((t) => t.includes("Rook's quarry")) && kills[0]?.src === p,
+        `the bounty: killed ${quarry.killed}, log ${JSON.stringify(logged.slice(0, 3))}, src ${kills[0]?.src === p ? "you" : kills[0]?.src}`);
+      // A guardian wakes, then falls: the gate opens and a relic lies where it stood.
+      const wakes = [];
+      const offWake = on("guardian:wake", (g, { c }) => wakes.push(c.name));
+      const queen = addCreature(z, spawnCreature("colossus", 12, 8, FLOOR_Z, { rng: () => 0.5, level: 9, state: "chase" }));
+      z.set(15, 8, FLOOR_Z, B.STONE); z.guardianHall = { gate: [[15, 8, FLOOR_Z]] };
+      guardianThink(game, queen, 0.1, new Int32Array(z.w * z.d));
+      const items0 = z.items.length;
+      queen.hp = 1; stand(12.5, 8.5, FLOOR_Z + 3);
+      resolveAttack(game, p, queen, weaponSpec(p), { view: "3d" });
+      expect(wakes.length === 1 && z.get(15, 8, FLOOR_Z) === B.AIR && z.items.length === items0 + 1,
+        `the Colossus: woke ${wakes.length} (want 1), gate ${z.get(15, 8, FLOOR_Z) === B.AIR ? "open" : "shut"}, items ${items0} → ${z.items.length}`);
+      offWake();
+      // The Lich King: the win.
+      const lich = addCreature(z, spawnCreature("lich", 6, 10, FLOOR_Z, { rng: () => 0.5, level: 20 }));
+      lich.hp = 1; stand(5.5, 10.5);
+      logged.length = 0;
+      resolveAttack(game, p, lich, weaponSpec(p), { view: "map" });
+      expect(logged.some((t) => t.includes("You have won")) && !!game.pages, `the Lich King's death didn't win the run: ${JSON.stringify(logged.slice(0, 3))}`);
+      game.pages = null;
+      undoSet();
+      expect(attacks.length > 0 && attacks.every((x) => "hit" in x && "touched" in x), "\"attack\" events missing or malformed");
+      stats.bus = { bounty: !!quarry.killed, guardianWakes: wakes.length, kills: kills.map((k) => k.c.type), won: true };
+    }
   } finally {
-    offAttack(); undoCombat(); undoDay();
+    offAttack(); offKill(); undoCombat(); undoDay();
     game.combatRng = null;
     Object.assign(p.attrs, savedAttrs); invalidateStats(p);
     game.log = log;

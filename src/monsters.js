@@ -3,8 +3,9 @@
 // parent game's types in content/creatures/legacy.js; how they think and move is ai.js; how blows land
 // (both views, the legacy and d20 sets) is combat.js.
 //
-//   killMonster(game, c, message, dropLoot = true, byPlayer = true, src): src is the killer (the player
-//       when byPlayer, else a creature or null).
+//   killMonster(game, c, message, dropLoot = true, byPlayer = true, src) → emits "kill" { c, src, uid,
+//       factions } (events.js) last: npcs.js pays bounties from it, game.js opens a guardian's gate and
+//       wins the run when the boss falls. src: the killer (the player when byPlayer, else a creature or null).
 import { DIRS8 } from "./pathing.js";
 import { makeItem, randomPotion, randomScroll, randomEquipment, randomJewel, awayFromWalls } from "./items.js";
 import { HEIGHT, RADIUS, moveAxis, bonus } from "./player.js";
@@ -13,6 +14,7 @@ import { sfx } from "./sfx.js";
 import { maxHp } from "./stats.js";
 import { setStatusHarm, STATUS_DEFS } from "./status.js";
 import { uidWhere, killUid } from "./zones.js";
+import { emit } from "./events.js";
 import { CREATURE_TYPES, spawnCreature, addCreature, removeCreature, isFlat, ghostHidden, canTalk } from "./creatures.js";
 
 // What an elite leaves behind: always something, sometimes gear, a ring or an amulet.
@@ -51,8 +53,7 @@ export function killMonster(game, m, message, dropLoot = true, byPlayer = true, 
     if (heal > 0 && p.hp < maxHp(p)) p.hp = Math.min(maxHp(p), p.hp + heal);
     else if (heal < 0) game.hurtPlayer(-heal, "your cursed ring", true);
   }
-  if (t.guardian) game.onGuardianDies?.(m);
-  else if (dropLoot && ground >= 0) {
+  if (!t.guardian && dropLoot && ground >= 0) {   // (a guardian leaves a relic: game.js, on "kill")
     // Lucky: twice as likely to drop something.
     const luck = p.perks.has("lucky") ? 2 : 1;
     if (m.elite || Math.random() < 0.25 * luck)
@@ -72,8 +73,7 @@ export function killMonster(game, m, message, dropLoot = true, byPlayer = true, 
     for (const [x, y] of spots.slice(0, 2)) addCreature(zone, spawnCreature(t.splits, x, y, zone.stand[x + y * zone.w], { rng: Math.random, state: "chase", level: zone.level }));
     if (spots.length) game.log(`The ${m.name} splits in two!`, m.color);
   }
-  if (m.bounty) game.questEvent?.("bounty", m);
-  if (t.boss) game.win();
+  emit(game, "kill", { c: m, src, uid: m.uid ?? null, factions: m.factions || [] });
 }
 
 // Monsters are solid: push the player out of any they overlap.

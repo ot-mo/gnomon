@@ -17,6 +17,7 @@
 // every update before the usual AI: it shrugs off blindness and long stuns, then guardianThink(game, m,
 // dt, occ); returning true would skip the rest of that AI for this update.
 import { resolveAttack, naturalSpec } from "./combat.js";
+import { emit } from "./events.js";
 import { registerAIHook } from "./ai.js";
 import { spawnCreature, addCreature, removeCreature } from "./creatures.js";
 import { B, FLOOR_Z } from "./world.js";
@@ -36,7 +37,7 @@ for (const id of ["flatqueen", "warden", "colossus"])
 
 export function guardianThink(game, m, dt, occ) {
   if (m.state !== "chase") return false;   // asleep until it notices you (or you hit it)
-  if (!m.g) game.onGuardianWakes?.(m);
+  if (!m.g) emit(game, "guardian:wake", { c: m });
   m.g ||= { t: 0, summon: m.guardian === "warden" ? 3 : 6, snuff: 10, slam: 2.5, sweep: 0, windup: 0 };
   switch (m.guardian) {
     case "flatqueen": return queen(game, m, dt, occ);
