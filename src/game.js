@@ -48,6 +48,7 @@ import { INTRO, CUBE_PAGES, TAUNTS, FINAL_PAGES, EPILOGUE, LICH_COLOR } from "./
 import { openCubeWall } from "./content/world/temple.js";
 import { openTalk, talkKey, talkClick, talkHover, drawTalk, shopKey, drawShop, openJournal, journalKey, drawJournal,
          openStory, storyKey, nextPage, drawStory, updateTalk } from "./dialogue.js";
+import { maxHp } from "./stats.js";
 
 export const game = {
   seed: 0, zone: null, player: null,
@@ -486,7 +487,7 @@ function quickHeal() {
     game.log("You have no potion you know heals. Press I to look through your things.", [170, 170, 170]);
     return false;
   }
-  if (p.hp >= p.maxHp) { game.log("You're already at full health.", [170, 170, 170]); return false; }
+  if (p.hp >= maxHp(p)) { game.log("You're already at full health.", [170, 170, 170]); return false; }
   if (--p.inv[k].count <= 0) p.inv.splice(k, 1);
   drinkPotion(game, "healing");
   return true;

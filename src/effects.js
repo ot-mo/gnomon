@@ -2,6 +2,7 @@
 // (flying, haste, shadows, poison, paralysis, darkness), plus the Regeneration perk.
 import { POTIONS, POTION_COLORS, SCROLLS, ELEMENTS, WEAPONS, itemName, isGear } from "./items.js";
 import { bonus, regear, worn } from "./player.js";
+import { maxHp, raiseAttr } from "./stats.js";
 import { FLOOR_Z } from "./world.js";
 import { sfx } from "./sfx.js";
 import { spawnMonster, pickMonsterType } from "./monsters.js";
@@ -18,12 +19,12 @@ export function drinkPotion(game, effect) {
   switch (effect) {
     case "healing": {
       const heal = p.perks.has("alchemist") ? 18 : 12;
-      p.hp = Math.min(p.maxHp, p.hp + heal);
+      p.hp = Math.min(maxHp(p), p.hp + heal);
       game.log(`Warmth spreads through you. (+${heal} HP)`, [230, 90, 110]);
       break;
     }
     case "strength":
-      p.str += 1;
+      raiseAttr(p, "str", 1);
       game.log("Your muscles swell. STR +1!", [255, 170, 80]);
       break;
     case "flying":
@@ -161,10 +162,10 @@ export function tickEffects(game, dt) {
   // Regeneration (perks, rings, armour of the stars; Brann's Lantern in the dark): 1 HP every
   // 12/points seconds. A cursed ring of regeneration (negative points) drains you instead.
   const regen = bonus(p, "regen") + (p.torch ? 0 : bonus(p, "darkRegen"));
-  if (regen > 0 && p.hp < p.maxHp) {
+  if (regen > 0 && p.hp < maxHp(p)) {
     p.regenTick = (p.regenTick || 0) + dt;
     const every = 12 / regen;
-    while (p.regenTick >= every && p.hp < p.maxHp) { p.regenTick -= every; p.hp++; }
+    while (p.regenTick >= every && p.hp < maxHp(p)) { p.regenTick -= every; p.hp++; }
   } else if (regen < 0) {
     p.regenTick = (p.regenTick || 0) + dt;
     const every = 12 / -regen;

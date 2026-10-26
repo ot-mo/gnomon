@@ -127,7 +127,7 @@ async function gate(browser, seed) {
       for (let y = 0; y < z.d; y++) for (let x = 0; x < z.w; x++) if (!z.get(x, y, 0) && !z.get(x, y, W.FLOOR_Z - 1)) out.push([x, y]);
       return out;
     };
-    H.arrive = () => { game.zone.monsters.length = 0; const p = game.player; p.maxHp = p.hp = 999; p.keys = 99; };
+    H.arrive = () => { game.zone.monsters.length = 0; const p = game.player; p.maxHpGain = p.hp = 999; p.keys = 99; };
     H.beside = (which) => {
       const zone = game.zone, p = game.player, s = zone[which], [x, y] = H.tile();
       if (!s) return `${zone.key} has no ${which}`;
@@ -195,7 +195,7 @@ async function gate(browser, seed) {
     const port = z0.gen.ports.find((q) => q.side === "e" && q.kind === "road");
     const y = port ? port.along + (port.width >> 1) : z0.d >> 1, x = z0.w - 8;
     Object.assign(p, { x: x + 0.5, y: y + 0.5, z: z0.stand[x + y * z0.w], vz: 0, onGround: true, yaw: 0, pitch: -0.15 });
-    p.maxHp = p.hp = 999;
+    p.maxHpGain = p.hp = 999;
   });
   await page.keyboard.press("Tab");
   await page.waitForTimeout(400);

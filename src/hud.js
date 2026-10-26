@@ -5,6 +5,7 @@ import { armourValue } from "./player.js";
 import { WEAPONS, WEAPON_PALETTE, ELEMENTS, itemName, itemGlyph } from "./items.js";
 import { readyStack } from "./throwing.js";
 import { PERKS, xpToNext, perkLabel } from "./leveling.js";
+import { attr, maxHp } from "./stats.js";
 
 export function drawHud(game) {
   const p = game.player;
@@ -53,7 +54,7 @@ export function drawHud(game) {
       ["VICTORY", [255, 230, 120]],
       ["", null],
       ["Vorlath is dust, and Hollowmere is safe: flat, and happy about it.", [220, 220, 220]],
-      [`Level ${p.level} · ${p.maxHp} max HP · ${p.str} STR · ${mins}:${secs} of game time`, [160, 230, 255]],
+      [`Level ${p.level} · ${maxHp(p)} max HP · ${attr(p, "str")} STR · ${mins}:${secs} of game time`, [160, 230, 255]],
       [`Seed ${game.seed}`, [140, 140, 140]],
       ["", null],
       ["Press R to start a new run", [255, 255, 255]],
@@ -118,11 +119,11 @@ function drawStatus(game, p, y) {
   let x = 1;
   const seg = (str, c) => { S.text(x, y, str, ...c); x += str.length + 2; };
   seg(zoneLabel(game.zone), [255, 230, 140]);
-  const n = 16, filled = Math.max(0, Math.min(n, Math.round((p.hp / p.maxHp) * n)));
-  const hpColor = p.hp / p.maxHp > 0.5 ? [120, 230, 120] : p.hp / p.maxHp > 0.25 ? [240, 200, 80] : [255, 80, 80];
-  seg(`HP [${"#".repeat(filled)}${".".repeat(n - filled)}] ${p.hp}/${p.maxHp}`, hpColor);
+  const n = 16, filled = Math.max(0, Math.min(n, Math.round((p.hp / maxHp(p)) * n)));
+  const hpFrac = p.hp / maxHp(p), hpColor = hpFrac > 0.5 ? [120, 230, 120] : hpFrac > 0.25 ? [240, 200, 80] : [255, 80, 80];
+  seg(`HP [${"#".repeat(filled)}${".".repeat(n - filled)}] ${p.hp}/${maxHp(p)}`, hpColor);
   seg(`LV ${p.level} (${p.xp}/${xpToNext(p.level)} XP)`, [160, 230, 255]);
-  seg(`STR ${p.str}`, [255, 170, 80]);
+  seg(`STR ${attr(p, "str")}`, [255, 170, 80]);
   seg(`ARM ${armourValue(p)}`, [175, 180, 200]);
   seg(`$${p.gold}`, [255, 210, 70]);
   seg(`k ${p.keys}`, [240, 200, 70]);

@@ -1,13 +1,14 @@
 // The player: body (look, walk, sprint, jump, fly, collide — learn/04 §5), stats and gear.
 import { FLOOR_Z, B, solidFor } from "./world.js";
-import { WEAPONS, ARMOURS, itemBonuses } from "./items.js";
-import { PERKS, perkRank } from "./leveling.js";
+import { WEAPONS } from "./items.js";
+import { bonus, wornItems, invalidateStats, clampHp, makeAttrs, speedMul, canSwim } from "./stats.js";
+import { RULES } from "./rules.js";
 
 export const RADIUS = 0.3, HEIGHT = 1.6, EYE = 1.45;
 export const WALK = 4.2;           // blocks per second; also sets how long a step takes on the map
 const SPRINT = 7;
 export const WADE_SLOWDOWN = 0.55; // speed multiplier in shallow water
-export const HASTE = 1.6;          // speed multiplier while hasted (and actions take 1/HASTE as long)
+export const HASTE = RULES.haste;  // speed multiplier while hasted (and actions take 1/HASTE as long)
 const GRAVITY = 26, JUMP = 8.85;   // jump height = JUMP² / (2·GRAVITY) ≈ 1.5 blocks
 const JUMP_HIGH = 11.4;            // with the High jumper perk: ≈ 2.5 blocks
 const FLY_SPEED = 4;               // blocks per second up (Space) or down (C) while flying
@@ -16,7 +17,8 @@ const EPS = 0.001;
 export function makePlayer() {
   return {
     x: 0, y: 0, z: FLOOR_Z, vz: 0, onGround: false, yaw: 0, pitch: 0,
-    hp: 20, maxHp: 20, str: 10, keys: 0, gold: 0, torch: true,
+    hp: 20, keys: 0, gold: 0, torch: true,
+    attrs: makeAttrs(), maxHpGain: 0,   // base fields: max HP, STR and the rest are derived (stats.js)
     level: 1, xp: 0, perks: new Set(), pendingLevels: 0, bonusPerks: 0,   // bonusPerks: gifts from people, not levels
     // What you're holding and wearing: { id, ench (+blessed / −cursed), known, element? }
     weapon: { kind: "weapon", id: "shortsword", ench: 0, known: true },
@@ -31,32 +33,17 @@ export function makePlayer() {
   };
 }
 
-// What you're wearing and wielding (the sidearm only counts once it's in your hand).
-export const worn = (p) => [p.weapon, p.armour, p.ring, p.amulet].filter(Boolean);
+// What you're wearing and wielding (the sidearm only counts once it's in your hand), and one bonus
+// (see stats.js for the list) added up over your gear, your perks and your statuses: the stat bus.
+export const worn = wornItems;
+export { bonus };
 
-// One bonus (see items.js for the list), added up over your gear and your perks.
-export function bonus(p, key) {
-  let n = 0;
-  for (const it of worn(p)) n += itemBonuses(it)[key] || 0;
-  for (const k of p.perks) { const b = PERKS[k].bonus; if (b) n += b(perkRank(p, k))[key] || 0; }
-  return n;
-}
-
-// STR and max HP from gear are added to your stats while you wear it (so the rest of the game
-// can keep reading p.str and p.maxHp). sign: +1 putting it on, −1 taking it off.
-export function wear(p, it, sign) {
-  if (!it) return;
-  const b = itemBonuses(it);
-  p.str += sign * (b.str || 0);
-  p.maxHp = Math.max(1, p.maxHp + sign * (b.maxHp || 0));
-  p.hp = Math.max(1, Math.min(p.hp, p.maxHp));
-}
-// Change something you're wearing (its enchantment, say) so its STR / max HP follow along.
+// Change something you're wearing (its enchantment, say). STR, max HP and the rest are derived from
+// your gear (stats.js), so this only drops the cached bonuses, and your HP if your max HP fell.
 export function regear(p, it, change) {
-  const on = worn(p).includes(it);
-  if (on) wear(p, it, -1);
   change(it);
-  if (on) wear(p, it, +1);
+  invalidateStats(p);
+  clampHp(p);
 }
 
 // How long one swing of your weapon takes (also what an attack costs on the map).
@@ -66,10 +53,8 @@ export function attackTime(p) {
 }
 export const weaponReach = (p) => WEAPONS[p.weapon.id].reach + bonus(p, "reach");
 
-// Can be negative with cursed armour: then blows hurt more.
-export function armourValue(p) {
-  return ARMOURS[p.armour.id].armour + p.armour.ench + bonus(p, "armour");
-}
+// Can be negative with cursed armour: then blows hurt more (stats.js av()).
+export { av as armourValue } from "./stats.js";
 
 // Your torch: how far it lights things up for the auto-map, and how bright it is. With it out
 // you see nothing by it, unless something lets you see in the dark a little (darkSight).
@@ -81,12 +66,12 @@ export function torchPower(p) {
   if (!p.torch) return Math.min(0.9, bonus(p, "darkSight") * 0.3);
   return 2.2 * (1 + bonus(p, "torch") * 1.2) * (p.darkTime > 0 ? 0.3 : 1);
 }
-export const speedMul = (p) => 1 + bonus(p, "speed");
+export { speedMul };
 export const jumpBonus = (p) => bonus(p, "jump");
 export const hasFeatherFall = (p) => bonus(p, "featherFall") > 0;
 
-// Swimmers float on deep water instead of sinking: for them it's solid to stand on.
-export const canSwim = (p) => p.perks.has("swimmer");
+// Swimmers (bonus swim: the Swimmer perk) float on deep water instead of sinking: for them it's solid to stand on.
+export { canSwim };
 
 export function inShallowWater(p, zone) {
   const g = zone.get(Math.floor(p.x), Math.floor(p.y), Math.round(p.z) - 1);

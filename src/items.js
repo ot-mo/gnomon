@@ -7,6 +7,7 @@
 
 import { sfx } from "./sfx.js";
 import { seededSort } from "./rng.js";
+import { raiseAttr, raiseMaxHp } from "./stats.js";
 
 // --- Potions ----------------------------------------------------------------
 // Each run shuffles which colour is which effect. Drinking one tells you, for the rest of the run.
@@ -125,8 +126,8 @@ export const ARMOURS = {
 };
 
 // --- Bonuses ------------------------------------------------------------------------
-// Everything you wear or wield can add to a shared set of bonuses (player.js bonus() adds them up,
-// along with your perks):
+// Everything you wear or wield can add to a shared set of bonuses (stats.js bonus() adds them up,
+// along with your perks and statuses; stats.js lists every key):
 //   crit (chance) · swing (fraction faster) · reach · maxDmg · leech (chance a hit heals 1) ·
 //   crush (×2 against brittle monsters) · thorns (damage to whoever hits you) · ward (less from
 //   arrows and bolts) · regen (points: 1 HP every 12/points s) · str · maxHp · armour · speed ·
@@ -507,8 +508,8 @@ export function pickUpItems(game) {
     if (!near) return true;
     const name = itemName(game, it);
     sfx(it.relic ? "crystal" : { gold: "gold", heart: "crystal", strength: "crystal", key: "key", cube: "crystal" }[it.kind] || "pickup");
-    if (it.kind === "heart") { p.maxHp += 5; p.hp += 5; game.log("You absorb the heart crystal. Max HP +5!", [240, 90, 110]); }
-    else if (it.kind === "strength") { p.str += 1; game.log("You absorb the strength crystal. STR +1!", [255, 170, 80]); }
+    if (it.kind === "heart") { raiseMaxHp(p, 5); p.hp += 5; game.log("You absorb the heart crystal. Max HP +5!", [240, 90, 110]); }
+    else if (it.kind === "strength") { raiseAttr(p, "str", 1); game.log("You absorb the strength crystal. STR +1!", [255, 170, 80]); }
     else if (it.kind === "key") { p.keys++; game.log("You pick up a brass key.", [240, 200, 70]); }
     else if (it.kind === "gold") { p.gold += it.amount; game.log(`You pick up ${it.amount} gold.`, [255, 210, 70]); }
     else if (it.kind === "cube") game.onCube();   // the story takes over (game.js)

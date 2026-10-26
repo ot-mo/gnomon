@@ -8,6 +8,7 @@ import { B, FLOOR_Z } from "./world.js";
 import { EYE, HEIGHT, RADIUS, moveAxis, attackTime, armourValue, bonus, weaponReach } from "./player.js";
 import { gainXp } from "./leveling.js";
 import { sfx } from "./sfx.js";
+import { attr, maxHp } from "./stats.js";
 
 // art: pixel art, one letter per pixel (a palette entry), space = see-through.
 // Two frames: standing / mid-step. palette: letter → [colour, glow]
@@ -669,7 +670,7 @@ function killMonster(game, m, message, dropLoot = true, byPlayer = true) {
   const p = game.player;
   if (byPlayer) {
     const heal = bonus(p, "killHeal") + (t.undead ? bonus(p, "undeadHeal") : 0);
-    if (heal > 0 && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + heal);
+    if (heal > 0 && p.hp < maxHp(p)) p.hp = Math.min(maxHp(p), p.hp + heal);
     else if (heal < 0) game.hurtPlayer(-heal, "your cursed ring", true);
   }
   if (t.guardian) game.onGuardianDies?.(m);
@@ -758,7 +759,7 @@ export function attackMonster(game, m) {
   const crit = Math.random() < 0.12 + bonus(p, "crit");
   const hi = w.dmg[1] + bonus(p, "maxDmg");
   const roll = w.dmg[0] + Math.floor(Math.random() * (hi - w.dmg[0] + 1));
-  let dmg = Math.max(1, roll + weapon.ench + Math.max(0, Math.floor((p.str - strNeeded(weapon)) / 2)));
+  let dmg = Math.max(1, roll + weapon.ench + Math.max(0, Math.floor((attr(p, "str") - strNeeded(weapon)) / 2)));
   const el = weapon.element, vs = elementVs(m, el);
   if (el === "holy" && t.undead && vs !== "resist") dmg *= 2;
   if (vs === "weak") dmg = Math.ceil(dmg * 1.5);
@@ -777,7 +778,7 @@ export function attackMonster(game, m) {
   const color = el ? ELEMENTS[el].color : crit ? [255, 220, 80] : [255, 255, 255];
   hurtMonster(game, m, dmg, crit ? `${dmg}!` : `${dmg}`, color);
   game.effects.push({ kind: "spark", time: game.time, crit, color });
-  if (bonus(p, "leech") > 0 && p.hp < p.maxHp && Math.random() < bonus(p, "leech")) p.hp++;
+  if (bonus(p, "leech") > 0 && p.hp < maxHp(p) && Math.random() < bonus(p, "leech")) p.hp++;
 
   if (m.hp <= 0) killMonster(game, m, `You slay the ${m.name}.`);
   else {

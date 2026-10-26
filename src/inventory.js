@@ -7,7 +7,8 @@
 import * as S from "./screen.js";
 import { WEAPONS, ARMOURS, ELEMENTS, itemName, itemInfo, itemGlyph, itemAura, makeItem, isGear, strNeeded, RELIC_COLOR } from "./items.js";
 import { drinkPotion, readScroll } from "./effects.js";
-import { armourValue, wear, bonus, weaponReach } from "./player.js";
+import { armourValue, bonus, weaponReach } from "./player.js";
+import { attr, maxHp, invalidateStats, clampHp } from "./stats.js";
 
 const DRINK_TIME = 0.5, READ_TIME = 1.0, EQUIP_TIME = 1.0;
 const layout = { x0: 0, y0: 0, listY: 0, w: 0 };   // where the list was drawn, for mouse clicks
@@ -78,8 +79,8 @@ export function equip(game, it, index) {
   const p = game.player;
   if (it.kind === "weapon" || it.kind === "armour") {
     const need = strNeeded(it);
-    if (p.str < need) {
-      game.log(`You're not strong enough for the ${itemName(game, it)} (needs ${need} STR, you have ${p.str}).`, [255, 150, 120]);
+    if (attr(p, "str") < need) {
+      game.log(`You're not strong enough for the ${itemName(game, it)} (needs ${need} STR, you have ${attr(p, "str")}).`, [255, 150, 120]);
       return false;
     }
   }
@@ -90,9 +91,9 @@ export function equip(game, it, index) {
     return false;
   }
   p.inv.splice(index, 1);
-  wear(p, old, -1);
   p[slot] = it;
-  wear(p, it, +1);
+  invalidateStats(p);   // STR, max HP and armour follow your gear (stats.js)
+  clampHp(p);
   if (slot === "weapon") {
     if (p.sidearm) p.inv.push(p.sidearm);
     p.sidearm = old;
@@ -114,10 +115,10 @@ export function swapWeapons(game) {
   const p = game.player;
   if (!p.sidearm) { game.log("You have no second weapon on your belt. (Wield another weapon and the old one goes there.)", [170, 170, 170]); return 0; }
   if (p.weapon.ench < 0) { game.log(`Your cursed ${itemName(game, p.weapon)} won't leave your hand!`, [200, 80, 120]); return 0; }
-  if (p.str < strNeeded(p.sidearm)) { game.log(`You're not strong enough for the ${itemName(game, p.sidearm)}.`, [255, 150, 120]); return 0; }
-  wear(p, p.weapon, -1);
+  if (attr(p, "str") < strNeeded(p.sidearm)) { game.log(`You're not strong enough for the ${itemName(game, p.sidearm)}.`, [255, 150, 120]); return 0; }
   [p.weapon, p.sidearm] = [p.sidearm, p.weapon];
-  wear(p, p.weapon, +1);
+  invalidateStats(p);
+  clampHp(p);
   const fresh = !p.weapon.known;
   p.weapon.known = true;
   const bad = fresh && p.weapon.ench < 0;
@@ -162,7 +163,7 @@ export function drawInventory(game) {
   const line = (y) => { for (let x = x0; x < x0 + w; x++) S.put(x, y, "-", 70, 70, 80); };
   line(y0); line(y0 + h - 1);
 
-  const header = `LV ${p.level} · STR ${p.str} · HP ${p.hp}/${p.maxHp} · armour ${armourValue(p)} · keys ${p.keys}`;
+  const header = `LV ${p.level} · STR ${attr(p, "str")} · HP ${p.hp}/${maxHp(p)} · armour ${armourValue(p)} · keys ${p.keys}`;
   S.text(x0 + 2, y0 + 1, "INVENTORY", 255, 230, 140);
   S.text(x0 + w - header.length - 2, y0 + 1, header, 170, 170, 170);
 
@@ -200,7 +201,7 @@ export function drawInventory(game) {
     if (it.kind === "weapon" || it.kind === "armour") {
       const need = strNeeded(it), tag = `needs ${need} STR`;
       right -= tag.length;
-      S.text(right, y, tag, ...(p.str < need ? [255, 110, 100] : [120, 200, 120]));
+      S.text(right, y, tag, ...(attr(p, "str") < need ? [255, 110, 100] : [120, 200, 120]));
       right -= 1;
     }
     const aura = itemAura(game, it);

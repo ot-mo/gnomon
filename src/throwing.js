@@ -16,6 +16,7 @@ import { B, FLOOR_Z } from "./world.js";
 import { EYE, RADIUS, HEIGHT } from "./player.js";
 import { noise2 } from "./rng.js";
 import { sfx } from "./sfx.js";
+import { maxHp } from "./stats.js";
 
 export const THROW_TIME = 0.5;
 const SPEED = 15, GRAVITY = 12, SPLASH = 1.8;
@@ -192,7 +193,7 @@ function shatter(game, effect, x, y, z) {
     case "healing":
       for (const m of near) m.hp += 12;
       if (near.length) game.log(`The ${names()} ${near.length > 1 ? "look" : "looks"} healthier. Oops.`, [230, 90, 110]);
-      if (youToo) { p.hp = Math.min(p.maxHp, p.hp + 6); game.log("Some of it splashes on you. (+6 HP)", [230, 90, 110]); }
+      if (youToo) { p.hp = Math.min(maxHp(p), p.hp + 6); game.log("Some of it splashes on you. (+6 HP)", [230, 90, 110]); }
       break;
     case "haste":
       for (const m of near) m.haste = 12;

@@ -47,7 +47,7 @@ function settle() {   // let the "DEPTH n" beat (and any story page) pass
 function arrive() {   // a fresh zone: no fights, no dying
   game.zone.monsters.length = 0;
   const p = game.player;
-  p.maxHp = p.hp = 999;
+  p.maxHpGain = p.hp = 999;
   p.keys = 99;
 }
 
@@ -189,7 +189,7 @@ export function runEdges({ seed = 1234 } = {}) {
   const port = z0.gen.ports.find((q) => q.side === "e" && q.kind === "road");
   const y = port ? port.along + (port.width >> 1) : z0.d >> 1, x = z0.w - 6;
   Object.assign(p, { x: x + 0.5, y: y + 0.5, z: z0.stand[x + y * z0.w], vz: 0, onGround: true, yaw: 0, pitch: -0.15 });
-  p.maxHp = p.hp = 999;
+  p.maxHpGain = p.hp = 999;
   keys.add("KeyW"); keys.add("Space");   // (Space: hop up any one-block step on the way)
   let crossed = false, prefetched = false, before = 0;
   for (let k = 0; k < 600 && !crossed; k++) {
@@ -242,7 +242,7 @@ export function runSmoke({ seed = 1234, view = "map", levels = [3, 5, 10, 15, 20
       game.debug.enterZone(`0,0,${z}`, "down");
       settle();
       const zone = game.zone, p = game.player;
-      p.maxHp = p.hp = 1e6;
+      p.maxHpGain = p.hp = 1e6;
       // Start next to the guardian or boss if there is one (so it wakes), else the nearest monster.
       const target = zone.monsters.find((m) => m.guardian || MONSTER_TYPES[m.type].boss) || zone.monsters[0];
       if (target) {

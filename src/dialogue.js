@@ -12,6 +12,7 @@ import { lockPointer, unlockPointer } from "./input.js";
 import { NPC_TYPES, talkTo, mapPercent } from "./npcs.js";
 import { itemName, itemGlyph, itemInfo, addToInventory, sellPrice, priceFactor, isGear, ELEMENTS, RINGS, AMULETS, POTIONS } from "./items.js";
 import { worn, regear } from "./player.js";
+import { raiseAttr, raiseMaxHp } from "./stats.js";
 import { sfx, speakLetter } from "./sfx.js";
 
 // --- Text helpers ----------------------------------------------------------------------
@@ -235,8 +236,8 @@ function trade(game, row) {
     p.gold -= row.price;
     sfx("gold");
     row.stock.count--;
-    if (row.it.kind === "heart") { p.maxHp += 5; p.hp += 5; game.log("You absorb the heart crystal. Max HP +5!", [240, 90, 110]); }
-    else if (row.it.kind === "strength") { p.str += 1; game.log("You absorb the strength crystal. STR +1!", [255, 170, 80]); }
+    if (row.it.kind === "heart") { raiseMaxHp(p, 5); p.hp += 5; game.log("You absorb the heart crystal. Max HP +5!", [240, 90, 110]); }
+    else if (row.it.kind === "strength") { raiseAttr(p, "str", 1); game.log("You absorb the strength crystal. STR +1!", [255, 170, 80]); }
     else { addToInventory(p, { ...row.it, count: 1 }); game.log(`You buy the ${name} for ${row.price} gold.`, [255, 215, 90]); }
     if (row.it.kind === "heart" || row.it.kind === "strength") game.crystalsBought = (game.crystalsBought || 0) + 1;
   } else {

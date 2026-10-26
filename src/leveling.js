@@ -2,11 +2,12 @@
 // three permanent perks (the game pauses while you choose: 1 / 2 / 3 or click — the screen
 // itself is drawn by hud.js). Every fifth level is a milestone: four choices, one of them a
 // rare "major" perk. Some perks can be taken again, for a stronger rank (max: how many times).
-// bonus(rank): what the perk adds to player.js bonus() (see items.js for the list of bonuses).
+// bonus(rank): what the perk adds to the stat bus (stats.js bonus(), the "powers" source).
 import { sfx } from "./sfx.js";
+import { invalidateStats, raiseAttr, raiseMaxHp } from "./stats.js";
 
 export const PERKS = {
-  swimmer:      { name: "Swimmer",       info: "Deep water no longer drags you down: you can swim in it (slowly)." },
+  swimmer:      { name: "Swimmer",       info: "Deep water no longer drags you down: you can swim in it (slowly).", bonus: () => ({ swim: 1 }) },
   brightTorch:  { name: "Bright torch",  info: "Your torch burns brighter and reaches half again as far.", bonus: () => ({ torch: 0.5 }) },
   tough:        { name: "Tough",         info: "+8 max HP.", max: 3 },
   mighty:       { name: "Mighty",        info: "+2 STR.", max: 2 },
@@ -47,8 +48,7 @@ export function gainXp(game, amount) {
   p.xp += amount;
   while (p.xp >= xpToNext(p.level)) {
     p.xp -= xpToNext(p.level);
-    p.level++;
-    p.maxHp += 3;
+    p.level++;            // max HP follows the level (stats.js maxHp)
     p.hp += 3;
     p.pendingLevels++;
     sfx("levelup");
@@ -72,7 +72,8 @@ export function takePerk(game, key) {
   const r = perkRank(p, key) + 1;
   p.perks.add(key);
   (p.perkRank ||= {})[key] = r;
-  if (key === "tough") { p.maxHp += 8; p.hp += 8; }
-  if (key === "mighty") p.str += 2;
+  invalidateStats(p);
+  if (key === "tough") { raiseMaxHp(p, 8); p.hp += 8; }
+  if (key === "mighty") raiseAttr(p, "str", 2);
   game.log(`You gain a perk: ${PERKS[key].name}${r > 1 ? ROMAN[r] : ""}. ${PERKS[key].info}`, [255, 230, 120]);
 }

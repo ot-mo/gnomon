@@ -2,6 +2,7 @@
 // tools/check-golden.mjs replays tests/golden/scenarios.js through it and compares the result with
 // the fixtures recorded at 75edbd3 (legacy-api.js). When a later session changes an API the
 // scenarios touch (stats in 0B, creatures in 0C), it updates this adapter, never the fixtures.
+// Since 0B the derived numbers come from the stat bus (stats.js) with RULES.stats = "legacy".
 //
 // env: from tools/node-env.mjs.
 export async function currentApi(env, seedRandom) {
@@ -18,6 +19,7 @@ export async function currentApi(env, seedRandom) {
   const { renderMap } = await env.load("renderMap.js");
   const temple = await env.load("content/world/temple.js");
   const zones = await env.load("zones.js");
+  const stats = await env.load("stats.js");
   const game = G.game;
   const STACKS = ["potion", "scroll", "knife", "bomb"];
 
@@ -68,8 +70,8 @@ export async function currentApi(env, seedRandom) {
     playerFacts(keys) {
       const p = game.player;
       return {
-        derived: { str: p.str, maxHp: p.maxHp, armour: player.armourValue(p), reach: player.weaponReach(p),
-                   bonus: Object.fromEntries(keys.map((k) => [k, player.bonus(p, k)])) },
+        derived: { str: stats.attr(p, "str"), maxHp: stats.maxHp(p), armour: stats.av(p), reach: player.weaponReach(p),   // the stat bus (0B)
+                   bonus: Object.fromEntries(keys.map((k) => [k, stats.bonus(p, k)])) },
         gear: { weapon: p.weapon, armour: p.armour, ring: p.ring, amulet: p.amulet, sidearm: p.sidearm },
         inv: p.inv, keys: p.keys, gold: p.gold, torch: p.torch,
         perks: [...p.perks].map((k) => [k, leveling.perkRank(p, k)]),

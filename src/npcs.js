@@ -17,6 +17,7 @@ import { randomPotion, randomScroll, randomEquipment, randomJewel, addToInventor
 import { revealFloor, liftCurses } from "./effects.js";
 import { regear, worn } from "./player.js";
 import { sfx } from "./sfx.js";
+import { maxHp, raiseAttr, raiseMaxHp } from "./stats.js";
 
 // --- How they look ---------------------------------------------------------------------
 const ROBE = [
@@ -190,8 +191,8 @@ function bless(game, bold) {
   const p = game.player;
   const gear = worn(p).filter((it) => !(it.kind === "ring" || it.kind === "amulet") || !(it.kind === "ring" ? RINGS : AMULETS)[it.id].fixed);
   const plain = [
-    () => { p.maxHp += 3; p.hp += 3; return "Warmth settles into your bones. (+3 max HP)"; },
-    () => { p.hp = p.maxHp; p.poisonTime = 0; return "Every hurt you carry fades away. (Healed fully.)"; },
+    () => { raiseMaxHp(p, 3); p.hp += 3; return "Warmth settles into your bones. (+3 max HP)"; },
+    () => { p.hp = maxHp(p); p.poisonTime = 0; return "Every hurt you carry fades away. (Healed fully.)"; },
     () => { regear(p, p.weapon, (w) => { w.ench = Math.min(5, w.ench + 1); w.known = true; }); return `Light runs along your weapon. It's now a ${itemName(game, p.weapon)}.`; },
     () => (liftCurses(p) ? "Something heavy lets go of you. (Every curse lifted.)" : null),
     () => { revealFloor(game); return "You see this whole floor laid out flat in your mind. (Your map is filled in.)"; },
@@ -207,7 +208,7 @@ function bless(game, bold) {
     },
   ];
   const great = [
-    () => { p.str += 1; return "Strength floods your arms. (+1 STR)"; },
+    () => { raiseAttr(p, "str", 1); return "Strength floods your arms. (+1 STR)"; },
     () => { for (const it of gear) regear(p, it, (o) => { o.ench = Math.min(5, o.ench + 1); o.known = true; }); return "Everything you wear and wield glows for a moment. (+1 to each.)"; },
     () => {
       const j = randomJewel(Math.random, game.zone.level + 2, 0.3);
@@ -215,7 +216,7 @@ function bless(game, bold) {
       addToInventory(p, j);
       return `Something clinks into your hand: ${itemName(game, j)}.`;
     },
-    () => { p.maxHp += 6; p.hp += 6; return "You feel deeper, somehow. Harder to fold. (+6 max HP)"; },
+    () => { raiseMaxHp(p, 6); p.hp += 6; return "You feel deeper, somehow. Harder to fold. (+6 max HP)"; },
   ];
   const pool = bold ? great : plain;
   for (let k = 0; k < 20; k++) {
@@ -314,8 +315,8 @@ export function talkTo(game, n) {
           ]) },
         ]) },
       ]);
-      return node(p.hp < p.maxHp ? "You're hurt. Sit, child. Rest a while." : "Be careful down there. And come back whenever you need rest.", [
-        ...(p.hp < p.maxHp ? [{ label: "Rest (heal fully)", go: () => { p.hp = p.maxHp; p.poisonTime = 0; game.log("You rest in the temple. You feel whole again.", [140, 255, 160]); return node("There. Off you go.", [bye()]); } }] : []),
+      return node(p.hp < maxHp(p) ? "You're hurt. Sit, child. Rest a while." : "Be careful down there. And come back whenever you need rest.", [
+        ...(p.hp < maxHp(p) ? [{ label: "Rest (heal fully)", go: () => { p.hp = maxHp(p); p.poisonTime = 0; game.log("You rest in the temple. You feel whole again.", [140, 255, 160]); return node("There. Off you go.", [bye()]); } }] : []),
         { label: "Tell me about Vorlath.", go: () => node("He was clever, and he was lonely, and he thought the world had too many directions in it. Down at the bottom he found something that agreed with him. That's all anyone knows.", [bye("Thank you.")]) },
         bye(),
       ]);
