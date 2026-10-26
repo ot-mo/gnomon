@@ -346,6 +346,14 @@ function legacyBlow(game, att, tgt, spec, ctx, result) {
     const dmg = applyDamage(game, tgt, base * (crit ? 2 : 1), { color: crit ? [255, 220, 80] : [255, 255, 255] });
     game.log(`Your knife ${crit ? "sinks deep into" : "hits"} the ${name} (${dmg}).`, [220, 220, 230]);
     Object.assign(result, { crit, dmg, killed: tgt.hp <= 0 });
+  } else if (isPlayer(game, att) && spec.kind === "missile") {   // (no parent counterpart: a thrown knife's rules)
+    const crit = R() < RULES.legacy.crit;
+    const base = roll(R, spec.dmg[0], spec.dmg[1]) + (spec.ench || 0);
+    const name = tgt.name;
+    const dmg = applyDamage(game, tgt, base * (crit ? 2 : 1), { color: crit ? [255, 220, 80] : [255, 255, 255] });
+    game.log(`Your ${spec.noun || "shot"} ${crit ? "sinks deep into" : "hits"} the ${name} (${dmg}).`, [220, 220, 230]);
+    Object.assign(result, { crit, dmg, killed: tgt.hp <= 0 });
+    if (!result.killed && spec.onHit && game.zone.creatures.includes(tgt)) spec.onHit(game, tgt, result);
   } else if (isPlayer(game, tgt)) {
     const dmg = spec.fixed ?? roll(R, spec.dmg[0], spec.dmg[1]) + (spec.plus || 0);
     result.dmg = hitPlayer(game, att, dmg, ctx.source || `the ${att.name}`, ctx.blocked || `the ${att.name}'s blow`, !!ctx.ranged);
