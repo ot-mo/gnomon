@@ -1,7 +1,7 @@
 // The bot: scripted play through game.debug, in both views (TECH_DESIGN §9). Each session extends it.
 //
 //   node tools/bot.mjs [--seed 1234] [--view map|3d|both]
-//   import { runStairs } from "./bot.mjs"   (tools/check-bot.mjs)
+//   import { runStairs } from "./bot.mjs"   (tools/check-bot.mjs; runSession: tools/check-save.mjs)
 //
 // 0A1: the stairs walk. Starting on level 1 of the legacy site under tile (0, 0), go down three
 // levels and back up, and check that every arrival is in the right zone, on standable ground,
@@ -632,6 +632,210 @@ export async function runGoldenA({ view = "map" } = {}) {
 }
 const api_makeItem = (item, x, y, z) => ({ ...item, x, y, z });
 
+// The 10-zone session (runSession, 0D2; check-save saves and loads after it): one run through ten zones as
+// a player goes, the views taking turns. The run starts in the temple; the session goes on from the legacy
+// stack's level 1, as runStairs does (the temple's own way down stays shut until its story opens it): in 3D
+// down to level 2, back up to level 1 on the map and in 3D up into the temple, in front of Maren; then over
+// span edges, the map and 3D in turn, each time to a span not seen yet where one is open, zigzagging (on the
+// test world 0,0 → 1,0 → 1,1 → 0,1 → 0,2 → …), ten zones in all. The views change with Tab. Monsters stay alive (the bot
+// can't die, and starts with 20 glim for the torch), and
+// in every zone it does what a save has to keep: on the map waits, a throw, Fold Step and a marker
+// (right-click), and a few frames, so the neighbours are made ahead (in memory, never visited: a save leaves them
+// out); in 3D the torch out and back, Fold Step, a walk and a swing; a perk when a level comes; and
+// an hour's rest (skipTime) underground, so the torch burns glim. Stairs and edges are walked: by key presses
+// on the map; in 3D from a spot beside the stairs or two tiles inside the edge, holding W (and Space for a
+// step up) frame by frame.
+// Returns { ok, steps, problems, stats: { visited: [keys], crossings: { map, 3d }, stairs: { map, 3d }, keys, frames } }.
+export async function runSession({ seed = 1234, zones: want = 10 } = {}) {
+  const { mapView } = await import("../src/renderMap.js");
+  const { neighbourAddr } = await import("../src/zones.js");
+  const { skipTime } = await import("../src/time.js");
+  const problems = [], steps = [], visited = [];
+  const counts = { keys: 0, frames: 0, crossings: { map: 0, "3d": 0 }, stairs: { map: 0, "3d": 0 } };
+  startRun(seed);
+  game.pages = null; game.pendingPages = null; game.story.cube = true;
+  game.view = "map"; game.mode = "map"; game.paused = false;
+  const p = game.player;
+  p.funds = 20;
+  const press = (code) => { inputHandlers.onKeyDown(code, false, code); counts.keys++; };
+  const frame = () => { game.debug.step(1 / 60); counts.frames++; };
+  const tough = () => { p.maxHpGain = 999; if (p.hp < 900) p.hp = 999; p.keys = Math.max(p.keys, 9); };
+  const note = () => { tough(); if (!visited.includes(game.zone.key)) visited.push(game.zone.key); };
+  // Level-ups, the "DEPTH n" beat, story pages and the pause card out of the way.
+  const settled = () => {
+    for (let k = 0; k < 600; k++) {
+      if (game.mode === "levelup") press("Digit1");
+      else if (game.mode === "transition") frame();
+      else if (game.mode === "story") { game.pages = null; game.mode = game.view === "map" ? "map" : "explore"; }
+      else if (game.mode === "pause") game.debug.lockChange(true);
+      else break;
+    }
+    tough();
+  };
+  const toView = (view) => {
+    settled();
+    if ((view === "map") !== (game.view === "map")) press("Tab");
+    settled();
+    if ((view === "map") !== (game.view === "map")) throw new Error(`Tab didn't turn the world to ${view} (mode ${game.mode})`);
+    game.paused = false;
+  };
+
+  // Breadth-first over the zone's tiles from where you stand, as the map lets you step (doors open by
+  // bumping; not through people or over stairs). → { prev } for pathTo.
+  const reach = () => {
+    const zone = game.zone, { w, d } = zone, stand = standWith(zone, "all");
+    const [sx, sy] = tileOf(p), start = sx + sy * w;
+    const blocked = new Set(talkersIn(zone).map((n) => n.tx + n.ty * w));
+    for (let i = 0; i < w * d; i++) { const g = zone.blocks[i + (FLOOR_Z - 1) * w * d]; if (g === B.STAIRS || g === B.STAIRS_UP) blocked.add(i); }
+    const prev = new Int32Array(w * d).fill(-1);
+    prev[start] = start;
+    const q = [start];
+    for (let h = 0; h < q.length; h++) {
+      const c = q[h], cx = c % w, cy = (c - cx) / w;
+      for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const x = cx + ox, y = cy + oy, i = x + y * w;
+        if (x < 0 || y < 0 || x >= w || y >= d || prev[i] >= 0 || blocked.has(i)) continue;
+        if (!canWalk(stand, w, cx, cy, x, y, PLAYER_STEP_UP, PLAYER_DROP)) continue;
+        prev[i] = c; q.push(i);
+      }
+    }
+    return { prev, start, w };
+  };
+  const pathTo = ({ prev, start, w }, i) => {
+    if (prev[i] < 0) return null;
+    const out = [];
+    for (let k = i; k !== start; k = prev[k]) out.push([k % w, Math.floor(k / w)]);
+    return out.reverse();
+  };
+  // On the map, along a path, one key press a tile (a door takes a bump first). → true when you stand at its end.
+  const follow = (path) => {
+    const zone = game.zone;
+    for (const [x, y] of path) {
+      const [px, py] = tileOf(p), code = ARROWS[`${x - px},${y - py}`];
+      if (!code) return false;
+      for (let k = 0; k < 3 && game.zone === zone && tileOf(p).join() !== `${x},${y}`; k++) { press(code); settled(); if (game.mode !== "map") toView("map"); }
+      if (game.zone !== zone || tileOf(p).join() !== `${x},${y}`) return false;
+    }
+    return true;
+  };
+
+  // --- What a save must keep, in every zone --------------------------------------------------------------
+  const choresMap = () => {
+    toView("map");
+    for (let k = 0; k < 3; k++) frame();   // (the map makes every open neighbour ahead: zones a save leaves out)
+    for (const code of ["Space", "Space", "KeyT", "Digit1", "Space"]) { press(code); settled(); if (game.mode !== "map") toView("map"); }
+    game.debug.draw();   // a marker on the tile you stand on: a right-click where the map draws it
+    const [tx, ty] = tileOf(p);
+    game.debug.mapClick(2, (tx - mapView.tx0) * 2, ty - mapView.ty0 + mapView.top);
+  };
+  const chores3d = () => {
+    toView("3d");
+    press("KeyF"); press("KeyF");   // the torch out and back
+    press("Digit1");                // Fold Step
+    const zone = game.zone;
+    keys.add("KeyW");
+    for (let k = 0; k < 30 && game.zone === zone; k++) { frame(); settled(); }
+    keys.delete("KeyW");
+    press("Enter");
+    for (let k = 0; k < 10 && game.zone === zone; k++) frame();
+    settled();
+  };
+
+  // --- Stairs ------------------------------------------------------------------------------------------
+  const stairs = (dir, view) => {
+    const zone = game.zone, goal = dir === "down" ? zone.stairs : zone.upStairs;
+    if (!goal) throw new Error(`${zone.key} has no stairs ${dir}`);
+    toView(view);
+    const err = view === "3d" ? walk3d(goal) : walkMap(goal);
+    settled();
+    if (err) throw new Error(`${view} ${zone.key} ${dir}: ${err}`);
+    counts.stairs[view]++;
+    steps.push(`${zone.key} → ${game.zone.key} (${dir}, ${view})`);
+    note();
+  };
+
+  // --- Edges -------------------------------------------------------------------------------------------
+  const STEP = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] };
+  const border = (zone, side, inset) => {   // the tiles `inset` in from `side`, along it
+    const out = [], { w, d } = zone;
+    for (let a = 0; a < (side === "n" || side === "s" ? w : d); a++) {
+      const x = side === "e" ? w - 1 - inset : side === "w" ? inset : a, y = side === "s" ? d - 1 - inset : side === "n" ? inset : a;
+      out.push([x, y]);
+    }
+    return out;
+  };
+  const TURNS = ["e", "s", "w", "s"];   // east, south, west, south, …: a zigzag down the map's first columns
+  const cross = (view, k) => {
+    const zone = game.zone, first = TURNS[k % TURNS.length];
+    const open = [first, ...["e", "s", "w", "n"].filter((s) => s !== first)].map((side) => ({ side, addr: neighbourAddr(game, zone, side) })).filter((o) => o.addr);
+    const pick = open.find((o) => !visited.includes(o.addr.key)) || open[0];
+    if (!pick) throw new Error(`${zone.key} has no open edge`);
+    const { side } = pick, [dx, dy] = STEP[side];
+    toView(view);
+    const r = reach(), { w, stand } = zone;
+    if (view === "map") {
+      // Walk to the nearest border tile you can reach, then one more step, off the edge.
+      const tiles = border(zone, side, 0).map(([x, y]) => [x, y, pathTo(r, x + y * w)]).filter((t) => t[2]).sort((a, b) => a[2].length - b[2].length);
+      for (const [, , path] of tiles.slice(0, 6)) {
+        if (!follow(path) && game.zone === zone) continue;
+        if (game.zone !== zone) break;
+        press(ARROWS[`${dx},${dy}`]); settled();
+        if (game.zone !== zone) break;
+      }
+    } else {
+      // Two tiles in from the edge on ground you can reach, the way out at your height or a step up: hold W.
+      const tiles = border(zone, side, 2).filter(([x, y]) => {
+        const s = stand[x + y * w];
+        if (s < 0 || r.prev[x + y * w] < 0) return false;
+        for (let k = 1; k <= 2; k++) { const t = stand[x + dx * k + (y + dy * k) * w]; if (t < 0 || Math.abs(t - s) > 1) return false; }
+        return true;
+      });
+      tiles.sort((a, b) => Math.abs((side === "e" || side === "w" ? a[1] : a[0]) - (side === "e" || side === "w" ? zone.d : zone.w) / 2)
+                         - Math.abs((side === "e" || side === "w" ? b[1] : b[0]) - (side === "e" || side === "w" ? zone.d : zone.w) / 2));
+      for (const [x, y] of tiles.slice(0, 6)) {
+        Object.assign(p, { x: x + 0.5, y: y + 0.5, z: stand[x + y * w], vz: 0, onGround: true, pitch: 0, yaw: Math.atan2(dy, dx) });
+        game.paused = false;
+        keys.add("KeyW"); keys.add("Space");
+        for (let k = 0; k < 240 && game.zone === zone; k++) { frame(); if (game.mode !== "explore") { keys.clear(); settled(); toView("3d"); keys.add("KeyW"); keys.add("Space"); } }
+        keys.clear();
+        for (let k = 0; k < 20 && p.vz !== 0; k++) frame();   // land
+        if (game.zone !== zone) break;
+      }
+    }
+    if (game.zone === zone) throw new Error(`${view}: couldn't walk off ${zone.key}'s ${side} edge`);
+    counts.crossings[view]++;
+    steps.push(`${zone.key} → ${game.zone.key} (edge ${side}, ${view})`);
+    note();
+  };
+
+  try {
+    note();
+    choresMap();
+    game.debug.enterZone("0,0,1", "down");   // the legacy stack's level 1 (runStairs' start)
+    settled(); note();
+    chores3d();
+    stairs("down", "3d");                // → level 2
+    choresMap();
+    skipTime(game, 3600, { interruptible: false, reason: "rest" });   // an hour's rest underground: the torch burns
+    settled();
+    stairs("up", "map");                 // → level 1
+    chores3d();
+    stairs("up", "3d");                  // → the temple
+    for (let k = 0; visited.length < want && k < 3 * want; k++) {
+      const view = k % 2 ? "3d" : "map";
+      cross(view, k);
+      if (view === "map") chores3d(); else choresMap();
+    }
+    settled();
+    if (visited.length < want) problems.push(`visited ${visited.length} zones, wanted ${want}`);
+  } catch (e) {
+    keys.clear();
+    problems.push(`${String(e.stack || e).split(/\r?\n/).slice(0, 4).join(" | ")}`);
+  }
+  steps.unshift(`seed ${seed}: ${visited.length} zones (${visited.join(" ")}); edges map ${counts.crossings.map} / 3D ${counts.crossings["3d"]}, stairs map ${counts.stairs.map} / 3D ${counts.stairs["3d"]}; ${counts.keys} keys, ${counts.frames} frames; ${game.time.toFixed(0)} s of game time`);
+  return { ok: problems.length === 0, steps, problems, stats: { visited, ...counts } };
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = parseArgs();
   const views = !args.view || args.view === "both" ? ["map", "3d"] : [args.view];
@@ -647,5 +851,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       ok &&= r.ok;
     }
   }
+  const session = await runSession({ seed: Number(args.seed) || 1234 });
+  console.log(`${session.ok ? "OK  " : "FAIL"} session: ${session.steps.join(" · ")}`);
+  for (const p of session.problems) console.log(`  ✗ ${p}`);
+  ok &&= session.ok;
   process.exit(ok ? 0 : 1);
 }
