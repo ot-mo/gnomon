@@ -180,8 +180,11 @@ export async function checkRender(m) {
                    nightTorchMap: seenAt(24, true, true), duskMap: seenAt(18.5, false, true) };
     lit.set(3, 20, FLOOR_Z, B.LAMP); lit.refresh();
     seen.nightLampMap = seenAt(24, false, true);
-    expect(seen.night3d <= 9 && seen.nightMap <= 9 && seen.noon3d > 50 && seen.noonMap > 50 && seen.nightTorchMap > 20 && seen.nightLampMap > seen.nightMap + 5 &&
-           seen.duskMap > 50, `the auto-map's night rule: seen ${JSON.stringify(seen)}`);
+    // By day (and at 18:30, daylight 0.5) the map's rays reach every column of the open field from its middle (24 × 24),
+    // the ones that climb above the field's top included (they mark what they pass over, as the parent's did).
+    const all = lit.w * lit.d;
+    expect(seen.night3d <= 9 && seen.nightMap <= 9 && seen.noon3d > 100 && seen.noonMap === all && seen.duskMap === all && seen.nightTorchMap > 100 &&
+           seen.nightLampMap > seen.nightMap + 100, `the auto-map's night rule: seen ${JSON.stringify(seen)} (all ${all})`);
     game.time = T(12);
     stats.dark = { plank: drawn, runesDifferNoonMidnight: runeNoon !== runeNight, seen };
   }

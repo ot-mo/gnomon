@@ -73,7 +73,8 @@ export function rayInfo(zone) {
 // its floor layer: you've looked into a pit or chasm (only the 3D view passes this).
 // Beyond an open side of a surface zone the ray keeps going through the apron (world.js, TECH_DESIGN
 // §6.1) and hits its voxels like any other block (hit.apron = true); the apron never marks seen or
-// holes. A zone without an apron (every dungeon level) stops at its grid as before.
+// holes. A zone without an apron (every dungeon level) stops at its grid as before. Outdoors a ray that has
+// climbed above the zone's highest block can hit nothing more: it only goes on marking `seen`.
 const HOLE_Z = 1;   // the floor layer (world.js FLOOR_Z - 1)
 // info: rayInfo(zone), when the caller has it (render3d, once a frame).
 export function castRay(zone, ox, oy, oz, dx, dy, dz, maxT, seen = null, torchRange = 0, holes = null, info = rayInfo(zone)) {
@@ -94,7 +95,7 @@ export function castRay(zone, ox, oy, oz, dx, dy, dz, maxT, seen = null, torchRa
     else                                { z += stepZ; t = tMaxZ; tMaxZ += tDeltaZ; axis = 2; }
     if (t > maxT) { hit.out = 0; hit.missT = maxT; return false; }
     if (x >= 0 && y >= 0 && z >= 0 && x < W && y < D && z < H) {   // inside the grid (most steps)
-      if (z >= TOP && stepZ > 0) { hit.out = 3; hit.missT = t; return false; }
+      if (z >= TOP && stepZ > 0) break;   // above everything, going up
       const i = x + y * W + z * WD;
       const b = blocks[i];
       if (b && (b !== B.GHOST || ghostShows(x, y, z, axis, stepX, stepY, stepZ))) {
@@ -117,7 +118,7 @@ export function castRay(zone, ox, oy, oz, dx, dy, dz, maxT, seen = null, torchRa
     if ((x < X0 && stepX < 0) || (x >= X1 && stepX > 0) ||
         (y < Y0 && stepY < 0) || (y >= Y1 && stepY > 0)) { hit.out = 1; hit.missT = t; return false; }
     if (z < 0 && stepZ < 0) { hit.out = 2; hit.missT = t; return false; }
-    if (z >= TOP && stepZ > 0) { hit.out = 3; hit.missT = t; return false; }
+    if (z >= TOP && stepZ > 0) break;
     lastLit = false;
     if (z < 0 || z >= H || x < X0 || y < Y0 || x >= X1 || y >= Y1) continue;
     // In the apron (or a corner without a band: air).
@@ -134,6 +135,24 @@ export function castRay(zone, ox, oy, oz, dx, dy, dz, maxT, seen = null, torchRa
       return true;
     }
   }
+  // Above everything and going up: there is nothing more to hit. With `seen` the columns it passes over are still
+  // marked as before (in the grid, where the air is lit or within torchRange), without looking at the blocks;
+  // without it the ray is done.
+  if (seen) for (;;) {
+    if (x >= 0 && y >= 0 && x < W && y < D) {
+      if (z >= H) break;
+      if (lit[x + y * W + z * WD] === 1 || t < torchRange) {
+        seen[x + y * W] = 1;
+        if (holes && z === HOLE_Z) holes[x + y * W] = 1;
+      }
+    } else if ((x < 0 && stepX < 0) || (x >= W && stepX > 0) || (y < 0 && stepY < 0) || (y >= D && stepY > 0) || z >= H) break;
+    if (tMaxX < tMaxY && tMaxX < tMaxZ) { x += stepX; t = tMaxX; tMaxX += tDeltaX; }
+    else if (tMaxY < tMaxZ)             { y += stepY; t = tMaxY; tMaxY += tDeltaY; }
+    else                                { z += stepZ; t = tMaxZ; tMaxZ += tDeltaZ; }
+    if (t > maxT) break;
+  }
+  hit.out = 3; hit.missT = t;
+  return false;
 }
 
 // Can a point see another point? (Nothing solid in between.)
