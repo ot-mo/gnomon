@@ -5,7 +5,11 @@
 //     right comes from the right, and far-off sounds are quieter.
 //   speakLetter(ch, voice): one syllable of the made-up language people speak, like Animal
 //     Crossing's: every letter of what they say becomes a tiny blip, shaped like a vowel, in
-//     that person's own voice. dialogue.js calls it as the words type out.
+//     that person's own voice. dialogue.js calls it as the words type out. `voice` is a voice object
+//     (TECH_DESIGN §1.2; social/voices.js voiceFor makes them from species and faction):
+//       { pitch: Hz, wave: "sine" | "triangle" | "sawtooth" | "square", thin?, ghost?, stone? }
+//     or the id of one of the parent's people (VOICES: "maren", "pell"…); anything else speaks in the
+//     NEUTRAL_VOICE, not Maren's. voiceOf(voice) → the voice object it plays.
 //
 // N switches sounds and voices on and off (remembered between visits).
 import { onAudioReady, audioContext, audioOut, savedSwitch, saveSwitch, impulse } from "./audio.js";
@@ -195,12 +199,19 @@ const VOICES = {
 const VOWELS = { a: [800, 1200], e: [500, 1800], i: [320, 2300], o: [500, 900], u: [340, 800], y: [320, 2300] };
 const HUM = [260, 1100], NEUTRAL = [520, 1500];
 
-export function speakLetter(ch, voiceId) {
+export const NEUTRAL_VOICE = Object.freeze({ pitch: 190, wave: "triangle" });
+export { VOICES };
+export function voiceOf(voice) {
+  if (voice && typeof voice === "object") return { ...NEUTRAL_VOICE, ...voice, pitch: Number(voice.pitch) > 0 ? Number(voice.pitch) : NEUTRAL_VOICE.pitch };
+  return (typeof voice === "string" && Object.hasOwn(VOICES, voice) && VOICES[voice]) || NEUTRAL_VOICE;
+}
+
+export function speakLetter(ch, voice) {
   const ac = ready();
   if (!ac) return;
   const c = ch.toLowerCase();
   if (c < "a" || c > "z") return;
-  const v = VOICES[voiceId] || VOICES.maren;
+  const v = voiceOf(voice);
   const t = ac.currentTime + 0.003;
   const dur = v.stone ? 0.11 : 0.065;
   // Every letter has its own little pitch, so the same word always sounds the same.

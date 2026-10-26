@@ -26,7 +26,8 @@
 //      around them; underground the map is the parent's (golden (b), part 9). Water holding
 //      another liquid takes its colour on the map and in 3D.
 //   7. Music: the temple keeps the temple mood, a flats span plays open by day and night at night, the Shade
-//      plays shade all night; every mood content/moods.js names is one music.js plays.
+//      plays shade all night; every mood content/moods.js names is one music.js plays. Voices: speakLetter's voice
+//      is a voice object, a parent's person's id, or else the neutral voice (not Maren's).
 //   8. Dynamic resolution: casts over 17 ms for 2 s halve the columns, a halved frame repeats every even
 //      column in the odd one, and casts whose full cost is under 12 ms for 2 s bring it back; never underground.
 //   9. Golden (b) unchanged: the legacy levels' 27 frames (tests/checks/golden.js, its frames part).
@@ -384,6 +385,11 @@ export async function checkRender(m) {
     const named = [T2.surface, T2.night, ...T2.allNight, ...Object.values(T2.landmarks), ...Object.values(T2.terrains)];
     const unknown = named.filter((n) => !names.has(n));
     expect(!unknown.length, `content/moods.js names moods music.js doesn't play: ${[...new Set(unknown)]}`);
+    // Voices (sfx.js, TECH_DESIGN §1.2): a voice object plays as given, a parent's person by id, anything else neutrally.
+    const sfx = m.sfx, v = { maren: sfx.voiceOf("maren"), stranger: sfx.voiceOf("someoneNew"), object: sfx.voiceOf({ pitch: 410, wave: "square", thin: true }),
+      partial: sfx.voiceOf({ wave: "sine" }), proto: sfx.voiceOf("toString"), none: sfx.voiceOf(null) };
+    expect(v.maren.pitch === 255 && v.stranger === sfx.NEUTRAL_VOICE && v.object.pitch === 410 && v.object.thin && v.partial.pitch === sfx.NEUTRAL_VOICE.pitch &&
+           v.partial.wave === "sine" && v.proto === sfx.NEUTRAL_VOICE && v.none === sfx.NEUTRAL_VOICE, `voices: ${JSON.stringify(v)}`);
     stats.moods = got;
   }
 
@@ -481,14 +487,14 @@ export async function checkRender(m) {
 export async function run(env) {
   const scr = await env.screen({ cols: 180, rows: 56 });
   const load = (p) => env.src(p);
-  const [g, clock, light, raycast, render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap] = await Promise.all(
+  const [g, clock, light, raycast, render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, sfx] = await Promise.all(
     ["game.js", "clock.js", "light.js", "raycast.js", "render3d.js", "renderMap.js", "zones.js", "turns.js", "world.js", "rules.js", "music.js",
-     "content/moods.js", "content/liquids.js", "content/world/worldmap.js"].map(load));
+     "content/moods.js", "content/liquids.js", "content/world/worldmap.js", "sfx.js"].map(load));
   const fixtures = { frames: await env.json("tests/fixtures/golden/frames.json") };
   const { currentApi } = await import("../golden/current-api.js");
   const S = await load("screen.js");
   const result = await checkRender({ game: g.game, startRun: g.startRun, S, capture: scr.capture, frameHash: scr.frameHash, clock, light, raycast,
-    render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, golden: null, seedRandom: env.seedRandom, resize: scr.resize });
+    render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, golden: null, seedRandom: env.seedRandom, resize: scr.resize, sfx });
   // Golden (b) last: its api reseeds Math.random and replaces the run.
   const api = await currentApi({ load, capture: scr.capture, frameHash: scr.frameHash }, env.seedRandom);
   const gold = checkGolden(api, fixtures, { only: ["frames"] });
