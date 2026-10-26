@@ -551,7 +551,7 @@ on("zone:leave", (game, { zone, how }) => {
     removeCreature(zone, c);
     zone.sightings?.delete(c.id);
     const speed = Math.max(0.5, t.speed * (c.speedMul || 1));
-    transit.push({ c, dx: c.x - p.x, dy: c.y - p.y, delay: Math.min(4, d / speed), follows });
+    transit.push({ c, from: zone, dx: c.x - p.x, dy: c.y - p.y, delay: Math.min(4, d / speed), follows });
   }
 });
 
@@ -563,21 +563,25 @@ on("zone:enter", (game, { zone, arrival, how, away }) => {
 });
 
 // A mover comes in: over an edge at the border you crossed, as far along it as it was beside you; by
-// the stairs beside you. Hidden and still for `delay` seconds (brain.arriving).
-function place(game, zone, at, { c, dx, dy, delay }, how) {
+// the stairs beside you. Hidden and still for `delay` seconds (brain.arriving). On the nearest free tile within
+// 4; if every one is taken, on the nearest standable one all the same (ai.js arrive moves it off a taken tile
+// when it shows); with no ground at all there, it stays in the zone it was leaving, where it stood.
+function place(game, zone, at, { c, from, dx, dy, delay }, how) {
   const { w, d, stand } = zone;
   let sx = Math.floor(at.x + (how === "edge" ? dx : Math.sign(dx))), sy = Math.floor(at.y + (how === "edge" ? dy : Math.sign(dy)));
   sx = Math.max(0, Math.min(w - 1, sx)); sy = Math.max(0, Math.min(d - 1, sy));
   const ax = Math.floor(at.x), ay = Math.floor(at.y);
-  const free = (x, y) => x >= 0 && y >= 0 && x < w && y < d && stand[x + y * w] >= 0 && !(x === ax && y === ay) &&
-    zone.get(x, y, stand[x + y * w] - 1) !== B.WATER_DEEP && Math.abs(stand[x + y * w] - at.z) <= 3 &&
-    !zone.creatures.some((o) => (o.tx === x && o.ty === y) || (o.nx === x && o.ny === y));
-  let spot = null;
-  for (let r = 0; r <= 4 && !spot; r++)
-    for (let oy = -r; oy <= r && !spot; oy++)
-      for (let ox = -r; ox <= r && !spot; ox++)
-        if (Math.max(Math.abs(ox), Math.abs(oy)) === r && free(sx + ox, sy + oy)) spot = [sx + ox, sy + oy];
-  if (!spot) return;   // nowhere to come in: it stays behind, lost between the zones
+  const ground = (x, y) => x >= 0 && y >= 0 && x < w && y < d && stand[x + y * w] >= 0 && !(x === ax && y === ay) &&
+    zone.get(x, y, stand[x + y * w] - 1) !== B.WATER_DEEP && Math.abs(stand[x + y * w] - at.z) <= 3;
+  const free = (x, y) => ground(x, y) && !zone.creatures.some((o) => (o.tx === x && o.ty === y) || (o.nx === x && o.ny === y));
+  const near = (ok) => {
+    for (let r = 0; r <= 4; r++)
+      for (let oy = -r; oy <= r; oy++)
+        for (let ox = -r; ox <= r; ox++) if (Math.max(Math.abs(ox), Math.abs(oy)) === r && ok(sx + ox, sy + oy)) return [sx + ox, sy + oy];
+    return null;
+  };
+  const spot = near(free) || near(ground);
+  if (!spot) { if (from && !from.creatures.includes(c)) addCreature(from, c); return; }   // no way in: it stays where it was
   const t = CREATURE_TYPES[c.type];
   Object.assign(c, { tx: spot[0], ty: spot[1], nx: spot[0], ny: spot[1], p: 0, x: spot[0] + 0.5, y: spot[1] + 0.5, z: stand[spot[0] + spot[1] * w] + (t.hover || 0) });
   const b = (c.brain ||= {});

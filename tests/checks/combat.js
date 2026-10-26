@@ -836,6 +836,23 @@ export function checkAiDepth(ctx) {
       run.restore(); run = null;
     }
     stats.edge = edge;
+    // Every tile where they'd come in taken: your follower still comes (it isn't lost between the zones).
+    {
+      run = fresh(ctx, 4242);
+      const p = game.player;
+      changeZone(game, "0,0,0", { how: "travel" });
+      const z0 = game.zone, z1 = cachedZone(game, "1,0,0") || (changeZone(game, "1,0,0", { how: "travel" }), changeZone(game, "0,0,0", { how: "travel" }), cachedZone(game, "1,0,0"));
+      let y = -1;
+      for (let yy = 4; yy < z0.d - 4 && y < 0; yy++) if (z0.stand[z0.w - 1 + yy * z0.w] >= 0 && z0.stand[z0.w - 3 + yy * z0.w] >= 0) y = yy;
+      for (let yy = 0; yy < z1.d; yy++) for (let xx = 0; xx < 8; xx++) if (z1.stand[xx + yy * z1.w] >= 0) { const r = addCreature(z1, spawnCreature("rat", xx, yy, z1.stand[xx + yy * z1.w], { rng: () => 0.5, level: 1 })); r.status.stunned = { t: Infinity, mag: 1, src: null, acc: 0 }; }
+      z0.creatures = z0.creatures.filter((c) => c.talk);
+      Object.assign(p, { x: z0.w - 0.5, y: y + 0.5, z: z0.stand[z0.w - 1 + y * z0.w], vz: 0 });
+      const f = recruit(game, addCreature(z0, spawnCreature("goblin", z0.w - 3, y, z0.stand[z0.w - 3 + y * z0.w], { rng: () => 0.5, level: 2 })));
+      onMap(game); mapStep(game, 1, 0, { force: false });
+      expect(game.zone === z1 && z1.creatures.includes(f), `with every tile by the border taken the follower was ${z1.creatures.includes(f) ? "in 1,0,0" : z0.creatures.includes(f) ? "left in 0,0,0" : "lost"}`);
+      stats.crowdedEdge = { followerCame: z1.creatures.includes(f) };
+      run.restore(); run = null;
+    }
     {
       run = fresh(ctx, 4242);
       const p = game.player;
