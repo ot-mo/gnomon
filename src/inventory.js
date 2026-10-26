@@ -5,6 +5,8 @@
 // Gear's enchantment is hidden until you equip it. Cursed gear (−) can't be taken off
 // until a scroll of remove curse lifts the curse.
 import * as S from "./screen.js";
+import { pushMode, popMode } from "./screens.js";
+import { hitLabel } from "./ui.js";
 import { WEAPONS, ARMOURS, ELEMENTS, ITEM_KINDS, itemName, itemInfo, itemGlyph, itemAura, makeItem, isGear, strNeeded, takeOne,
   registerItemAction, useItem, canUse, RELIC_COLOR } from "./items.js";
 import { drinkPotion, readScroll } from "./effects.js";
@@ -22,15 +24,19 @@ const layout = { x0: 0, y0: 0, listY: 0, w: 0 };   // where the list was drawn, 
 const TOP = 9;   // the item list starts this many rows below the top of the box
 const AURA = { good: ["(good)", [120, 220, 120]], neutral: ["(neutral)", [170, 170, 170]], bad: ["(bad)", [255, 110, 100]] };
 
+// The inventory is a screen on the mode stack (src/screens/inventory.js): opening pushes it over the view
+// you are in; closing pops back there (in 3D the pointer locks again).
 export function openInventory(game) {
-  game.invReturn = game.mode;
-  game.mode = "inventory";
+  pushMode(game, "inventory");
   game.invSel = Math.min(game.invSel || 0, Math.max(0, game.player.inv.length - 1));
 }
 
 export function closeInventory(game) {
-  game.mode = game.invReturn;
+  if (game.mode === "inventory") popMode(game);
 }
+
+// The keys inventoryKey answers (any other goes on to the global bindings: M, N).
+export const INVENTORY_KEYS = new Set(["ArrowUp", "KeyW", "ArrowDown", "KeyS", "KeyE", "Enter", "Space", "NumpadEnter", "KeyT", "KeyX", "KeyR", "KeyI", "Escape"]);
 
 // Returns the game time the action took (0 if nothing happened), null to just close,
 // or "throw" (the selected stack is in game.throwStack: main.js throws it).
@@ -212,8 +218,10 @@ export function drawInventory(game) {
     if (isGear(sel) && !sel.known && !sel.relic) info += " · enchantment unknown until equipped";
     S.text(x0 + 2, infoY, info.slice(0, w - 4), 190, 190, 200);
   }
-  const hint = game.invReturn === "map" ? "each takes a turn" : "game paused";
-  S.text(x0 + 2, y0 + h - 2, `E use/equip · T throw · X drop · ↑↓ select · R swap weapons · I close  (${hint})`.slice(0, w - 4), 120, 120, 130);
+  const hint = game.view === "map" ? "each takes a turn" : "game paused";
+  const help = `E use/equip · T throw · X drop · ↑↓ select · R swap weapons · I close  (${hint})`.slice(0, w - 4);
+  S.text(x0 + 2, y0 + h - 2, help, 120, 120, 130);
+  hitLabel({ x: x0 + 2, y: y0 + h - 2, text: help }, "I close", { key: "Escape" });
 }
 
 function compare(a, b, value, label) {

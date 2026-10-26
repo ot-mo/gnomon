@@ -1,5 +1,7 @@
 // The screens that sit over the game: conversations, the peddler's shop, the quest journal
-// (J), and the full-screen story pages. The game is paused while any of them is open.
+// (J), and the full-screen story pages. The game is paused while any of them is open. Each is a
+// registered screen (src/screens/talk.js, journal.js, story.js) on the mode stack (screens.js): opening
+// one pushes it, closing it pops back to whatever was under it.
 //
 //   talk:    the words type out (each letter a syllable of the speaker's made-up language:
 //            sfx.js), then numbered choices · 1–9, or ↑↓ and Enter/E/Space, or click · Esc leaves
@@ -8,34 +10,29 @@
 //   journal: J or Esc closes
 //   story:   Space / Enter / click turns the page
 import * as S from "./screen.js";
-import { lockPointer, unlockPointer } from "./input.js";
+import { pushMode, popMode } from "./screens.js";
 import { talkTo, servicesFor, serviceDef } from "./talk.js";
 import { mapPercent } from "./story/quests.js";
 import { typeOf, talkersIn } from "./creatures.js";
 import { itemName, itemGlyph, itemInfo, itemPrice, addToInventory, ITEM_KINDS } from "./items.js";
 import { funds, pay, receive, purseRoom, formatPrice, buyPrice, sellPrice, CURRENCY } from "./currency.js";
 import { sfx, speakLetter } from "./sfx.js";
-import { wrap, box as uiBox, UI } from "./ui.js";
+import { wrap, box as uiBox, UI, hit, hitLabel } from "./ui.js";
 
 // --- Text helpers ----------------------------------------------------------------------
 // wrap(text, width) and box() live in ui.js (one copy for every screen); these screens keep the
 // parent's look, a rule above and below.
 const box = (x0, y0, w, h, edge = UI.edge) => uiBox(x0, y0, w, h, { edge, rules: true });
 
-function leave(game, ret) {
-  game.mode = ret;
-  if (game.mode === "explore") { game.paused = false; lockPointer(); }
-}
-
 // --- Conversations ---------------------------------------------------------------------------
 const talkLayout = { x0: 0, w: 0, rows: [] };   // where each option was drawn, for the mouse
 
 export function openTalk(game, npc) {
   game.travel = null;
-  const ret = game.mode === "talk" || game.mode === "shop" ? game.talk.ret : game.mode;
-  game.talk = { npc, node: null, sel: 0, ret };
-  game.mode = "talk";
-  unlockPointer();
+  if (game.mode === "shop") { game.shop = null; popMode(game, undefined, { pointer: false }); }   // back to talking
+  const talking = game.mode === "talk";
+  game.talk = { npc, node: null, sel: 0 };
+  if (!talking) pushMode(game, "talk");
   const first = talkTo(game, npc);
   if (first) showNode(game.talk, first); else endTalk(game);
 }
@@ -74,9 +71,8 @@ export function updateTalk(game, dt) {
 }
 
 function endTalk(game) {
-  const ret = game.talk.ret;
   game.talk = null;
-  leave(game, ret);
+  if (game.mode === "talk") popMode(game);
 }
 
 function choose(game, k) {
@@ -86,7 +82,7 @@ function choose(game, k) {
   if (game.mode !== "talk") return;
   sfx("click");
   if (!next) { endTalk(game); return; }
-  if (next.shop) { game.shop = { npc: t.npc, tab: next.shop, sel: 0 }; game.mode = "shop"; return; }
+  if (next.shop) { game.shop = { npc: t.npc, tab: next.shop, sel: 0 }; pushMode(game, "shop"); return; }
   showNode(t, next);
 }
 
@@ -140,7 +136,9 @@ export function drawTalk(game) {
       y++;
     });
   });
-  S.text(x0 + 3, y0 + h - 2, done ? "1-9 or arrows + Enter to answer · Esc to leave" : "Space: skip ahead", 110, 110, 120);
+  const help = done ? "1-9 or arrows + Enter to answer · Esc to leave" : "Space: skip ahead";
+  S.text(x0 + 3, y0 + h - 2, help, 110, 110, 120);
+  hitLabel({ x: x0 + 3, y: y0 + h - 2, text: help }, "Esc to leave", { key: "Escape" });
 }
 
 // --- The shop -----------------------------------------------------------------------------------
@@ -175,7 +173,7 @@ function shopRows(game) {
 
 export function shopKey(game, code) {
   const sh = game.shop, rows = shopRows(game);
-  if (code === "Escape") { game.mode = "talk"; game.talk.node = talkTo(game, sh.npc); game.talk.sel = 0; game.shop = null; return; }
+  if (code === "Escape") { popMode(game); game.talk.node = talkTo(game, sh.npc); game.talk.sel = 0; game.shop = null; return; }
   const step = code === "Tab" || code === "ArrowRight" || code === "KeyD" ? 1 : code === "ArrowLeft" || code === "KeyA" ? -1 : 0;
   if (step) { sh.tab = TABS[(TABS.indexOf(sh.tab) + step + TABS.length) % TABS.length]; sh.sel = 0; return; }
   if (code === "ArrowUp" || code === "KeyW") sh.sel = Math.max(0, sh.sel - 1);
@@ -221,8 +219,10 @@ export function drawShop(game) {
   const w = Math.min(S.cols - 4, 84), h = Math.max(rows.length, 1) + 9;
   const x0 = (S.cols - w) >> 1, y0 = Math.max(1, (S.rows - h) >> 1);
   box(x0, y0, w, h, [200, 160, 60]);
-  const tabs = TABS.map((t) => (t === sh.tab ? `[ ${t.toUpperCase()} ]` : `  ${t}  `)).join(" ");
-  S.text(x0 + 3, y0 + 1, `${typeOf(sh.npc).name.toUpperCase()}'S PACK  · ${tabs}`, 255, 220, 120);
+  const tabLabels = TABS.map((t) => (t === sh.tab ? `[ ${t.toUpperCase()} ]` : `  ${t}  `)), tabs = tabLabels.join(" ");
+  const head = { x: x0 + 3, y: y0 + 1, text: `${typeOf(sh.npc).name.toUpperCase()}'S PACK  · ${tabs}` };
+  S.text(head.x, head.y, head.text, 255, 220, 120);
+  tabLabels.forEach((label, k) => hitLabel(head, label, { tab: TABS[k] }));
   const purse = `your ${CURRENCY.name}: ${funds(p)}`;
   S.text(x0 + w - purse.length - 3, y0 + 1, purse, ...CURRENCY.color);
   const empty = { buy: "(sold out)", sell: "(you have nothing to sell)", services: `(nothing ${sh.npc.name} can do for you right now)` }[sh.tab];
@@ -236,22 +236,32 @@ export function drawShop(game) {
     const price = r.price > 0 ? formatPrice(r.price) : "-";
     S.text(x0 + 5, y, label.slice(0, w - price.length - 10), ...(sel ? [255, 255, 255] : [200, 200, 200]));
     S.text(x0 + w - price.length - 3, y, price, ...(sh.tab !== "sell" && r.price > funds(p) ? [200, 90, 80] : CURRENCY.color));
+    hit({ x: x0, y, w, h: 1 }, { row: k });
   });
   const sel = rows[sh.sel];
   if (sel) S.text(x0 + 3, y0 + h - 4, (sel.info || itemInfo(game, sel.it)).slice(0, w - 6), 180, 180, 190);
   const verb = { buy: "buy", sell: "sell", services: "pay" }[sh.tab];
-  S.text(x0 + 3, y0 + h - 2, `Enter ${verb} · Tab / ←→ switch tabs (buy, sell, services) · Esc back`, 110, 110, 120);
+  const help = { x: x0 + 3, y: y0 + h - 2, text: `Enter ${verb} · Tab / ←→ switch tabs (buy, sell, services) · Esc back` };
+  S.text(help.x, help.y, help.text, 110, 110, 120);
+  hitLabel(help, "Esc back", { key: "Escape" });
+}
+
+// The mouse in the shop: a tab switches to it, a row selects it, the selected row trades, "Esc back" goes back.
+export function shopClick(game, hitAt) {
+  const sh = game.shop;
+  if (!hitAt) return;
+  if (hitAt.key) shopKey(game, hitAt.key);
+  else if (hitAt.tab) { sh.tab = hitAt.tab; sh.sel = 0; }
+  else if (hitAt.row !== undefined) { if (hitAt.row === sh.sel) trade(game, shopRows(game)[sh.sel]); else sh.sel = hitAt.row; }
 }
 
 // --- The journal -----------------------------------------------------------------------------------
 export function openJournal(game) {
-  game.journalRet = game.mode;
-  game.mode = "journal";
   game.travel = null;
-  unlockPointer();
+  pushMode(game, "journal");
 }
 export function journalKey(game, code) {
-  if (code === "KeyJ" || code === "Escape") leave(game, game.journalRet);
+  if (code === "KeyJ" || code === "Escape") popMode(game);
 }
 
 export function drawJournal(game) {
@@ -276,12 +286,12 @@ export function drawJournal(game) {
 }
 
 // --- Story pages ------------------------------------------------------------------------------------
-// pages: [{ title?, text, color? }]. then: called after the last page.
+// pages: [{ title?, text, color? }]. then: called after the last page, once the story screen has closed
+// (it says where the pointer goes: the pages leave it unlocked).
 export function openStory(game, pages, then) {
   game.pages = { list: pages, k: 0, then };
-  game.mode = "story";
   game.travel = null;
-  unlockPointer();
+  pushMode(game, "story");
 }
 export function storyKey(game, code) {
   if (code === "Space" || code === "Enter" || code === "NumpadEnter" || code === "KeyE" || code === "Escape") nextPage(game);
@@ -290,6 +300,7 @@ export function nextPage(game) {
   const pg = game.pages;
   if (++pg.k < pg.list.length) return;
   game.pages = null;
+  if (game.mode === "story") popMode(game, undefined, { pointer: false });
   pg.then();
 }
 

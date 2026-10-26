@@ -8,19 +8,24 @@
 //                                      pausesTime = true, pointer = "unlock" | "lock" | "keep", over = "view" | "none",
 //                                      saveable = false }
 //                               Registering a mode again replaces it (the later port of a screen wins).
-//   pushMode(game, mode, data)  open `mode` over the current one; data.onPop?(game, result) runs when it closes
-//   popMode(game, result)       close the top screen and return to the one under it (never empties the stack)
-//   setMode(game, mode, data)   replace the whole stack (title, dead, world)
+//   pushMode(game, mode, data, opts)   open `mode` over the current one; data.onPop?(game, result) runs when it closes
+//   popMode(game, result, opts)        close the top screen and return to the one under it (never empties the stack)
+//   setMode(game, mode, data, opts)    replace the whole stack (dead, a floor change, explore ⇄ map)
+//                               opts.pointer = false: leave the pointer alone (for a change made outside a key
+//                               press or click, or one that is about to be followed by another)
 //   topMode(game)               game.mode
+//   inStack(game, mode)         is `mode` anywhere on the stack?
 //   screenFor(mode)             the registered def, or null
 //   modeData(game)              the data the top screen was opened with
 //   dispatchMouse/Hover/Wheel(game, …) → bool   the top screen's handler, if it has one (keys: keys.js)
-//   drawStack(game) → bool      draws every screen in the stack bottom-up (those drawn over the view, and the
-//                               top one); false when the top mode has no registered screen
+//   updateScreen(game, dt)      the top screen's update
+//   timeRuns(game)              does the world run under the top screen (pausesTime === false)?
+//   drawStack(game) → bool      draws from the topmost opaque screen (over: "none": it draws the whole screen,
+//                               like the views) up to the top; false when the top mode has no registered screen
 //
-// Until 0D1 ports them, the old modes (explore, map, talk, shop, …) are not registered and game.js still
-// sets game.mode directly; the stack follows such a change the next time it is touched (syncStack), so
-// both ways of changing modes can live side by side.
+// Tests and tools still set game.mode directly (game.mode = "map"); syncStack follows such a change the next
+// time the stack is touched: a mode already lower in the stack pops back to it, an opaque mode (a view, the
+// story, death) becomes the whole stack, and anything else goes on top.
 import { lockPointer, unlockPointer } from "./input.js";
 
 export const SCREENS = new Map();   // mode → def (with defaults filled in)
@@ -41,13 +46,21 @@ function stackOf(game) {
   return game.modeStack;
 }
 
-// Legacy code may have set game.mode directly: the top entry becomes that mode (what was under it stays).
+// Something set game.mode directly: the stack follows (see the header).
 export function syncStack(game) {
   const st = stackOf(game);
-  if (!st.length) st.push({ mode: game.mode, data: null });
-  else if (st[st.length - 1].mode !== game.mode) st[st.length - 1] = { mode: game.mode, data: null };
+  if (!st.length) { st.push({ mode: game.mode, data: null }); return st; }
+  if (st[st.length - 1].mode === game.mode) return st;
+  const k = st.findLastIndex((e) => e.mode === game.mode);
+  const def = screenFor(game.mode);
+  if (k >= 0) st.length = k + 1;
+  else if (def?.over === "none") st.splice(0, st.length, { mode: game.mode, data: null });
+  else if (def) st.push({ mode: game.mode, data: null });
+  else st[st.length - 1] = { mode: game.mode, data: null };
   return st;
 }
+
+export const inStack = (game, mode) => syncStack(game).some((e) => e.mode === mode);
 
 export function modeData(game) {
   const st = syncStack(game);
@@ -61,35 +74,35 @@ function applyPointer(game, def) {
   else if (def.pointer === "lock") { game.paused = false; lockPointer(); }
 }
 
-export function pushMode(game, mode, data = null) {
+export function pushMode(game, mode, data = null, { pointer = true } = {}) {
   const st = syncStack(game);
   st.push({ mode, data });
   game.mode = mode;
   const def = screenFor(mode);
-  applyPointer(game, def);
+  if (pointer) applyPointer(game, def);
   def?.enter?.(game, data);
   return data;
 }
 
-export function popMode(game, result) {
+export function popMode(game, result, { pointer = true } = {}) {
   const st = syncStack(game);
   if (st.length < 2) return false;
   const top = st.pop(), def = screenFor(top.mode);
   game.mode = st[st.length - 1].mode;
   def?.leave?.(game, result);
-  applyPointer(game, screenFor(game.mode));
+  if (pointer) applyPointer(game, screenFor(game.mode));
   top.data?.onPop?.(game, result);
   return true;
 }
 
-export function setMode(game, mode, data = null) {
-  const st = stackOf(game);
-  const old = st.length ? st.splice(0) : [];
+export function setMode(game, mode, data = null, { pointer = true } = {}) {
+  const st = syncStack(game);
+  const old = st.splice(0);
   for (let k = old.length - 1; k >= 0; k--) screenFor(old[k].mode)?.leave?.(game, undefined);
   st.push({ mode, data });
   game.mode = mode;
   const def = screenFor(mode);
-  applyPointer(game, def);
+  if (pointer) applyPointer(game, def);
   def?.enter?.(game, data);
 }
 
@@ -117,13 +130,10 @@ export function updateScreen(game, dt) { top(game)?.update?.(game, dt); }
 export const timeRuns = (game) => top(game)?.pausesTime === false;
 
 export function drawStack(game) {
-  const def = top(game);
-  if (!def) return false;
+  if (!top(game)) return false;
   const st = syncStack(game);
-  for (let k = 0; k < st.length - 1; k++) {
-    const d = screenFor(st[k].mode);
-    if (d && d.over === "view") d.draw(game);
-  }
-  def.draw(game);
+  let from = st.length - 1;
+  while (from > 0 && screenFor(st[from].mode)?.over !== "none") from--;
+  for (let k = from; k < st.length; k++) screenFor(st[k].mode)?.draw(game);
   return true;
 }

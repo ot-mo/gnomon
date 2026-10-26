@@ -204,7 +204,7 @@ export function fillApron(game, zone, sides = APRON_SIDES) {
 
 // Walk off `side` of the surface zone you are in, `along` tiles along that edge (x for n and s, y for e
 // and w), standing at opts.fromStand (default: where you stand). An open edge takes you into the
-// neighbour at once, without the transition screen, and logs its name (the HUD toast is 0D1's); returns
+// neighbour at once, without the transition screen, and shows its name (game.toast, the HUD's); returns
 // true. A solid edge or the world's border stays shut and says why, once per visit and side (the
 // neighbour terrain's edgeMessage); returns false. opts.exact = { x, y, z }: your exact point in the
 // neighbour's coordinates (3D), kept when it is within the rules (arrivalPoint "edge"); facing and
@@ -228,7 +228,7 @@ export function tryWalkOff(game, side, along, opts = {}) {
   const ok = changeZone(game, addr.key, { how: "edge", side, along, fromStand, exact: opts.exact || null,
                                           keepFacing: true, keepMotion: opts.keepMotion !== false });
   if (ok === true) {
-    game.log(target.name, [200, 220, 200]);
+    (game.toast || game.log).call(game, target.name, [200, 220, 200]);   // the HUD toast (a log line in a bare game)
     if (game.arrival?.shifted) game.log(EDGE_RULES.shifted, [170, 170, 170]);   // §5.1: no tile within the rules
   }
   return ok === true;

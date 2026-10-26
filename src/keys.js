@@ -13,6 +13,7 @@
 //   dispatchKey(game, code, repeat, key) → bool   key = e.key (the typed character), for text fields
 //   helpFor(mode) → [{ code, help }]              the mode's bindings with help text, then "play", then "*"
 //   keyLabel(code) → "M", "1", "Esc", "↑"…        how a code is written in help lines
+//   globalKey(code) → bool                        is it a "*" binding (M, N)?
 import { screenFor } from "./screens.js";
 
 const BINDINGS = new Map();   // mode → [{ code, handler, repeat, help, when }]
@@ -42,6 +43,9 @@ export function dispatchKey(game, code, repeat = false, key = "") {
   }
   return false;
 }
+
+// Is `code` bound in "*" (M, N)? The map lets those through without stopping a click-to-travel.
+export const globalKey = (code) => (BINDINGS.get("*") || []).some((b) => b.code === code);
 
 export function helpFor(mode) {
   const out = [], seen = new Set();

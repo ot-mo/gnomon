@@ -620,7 +620,7 @@ export async function runGoldenA({ view = "map" } = {}) {
     },
     takePerk(k) {
       ready();
-      game.perkChoices = [k]; game.levelReturn = game.mode; game.mode = "levelup";
+      game.perkChoices = [k]; game.mode = "levelup";   // over the view (screens.js follows the change)
       key("Digit1");
       after();
     },

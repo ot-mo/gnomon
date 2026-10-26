@@ -178,10 +178,14 @@ export function renderMap(game) {
   }
 
   // Header, legend, inspect line
-  const header = game.story.cube
+  let header = game.story.cube
     ? " MAP · turn-based · WASD/arrows: move, attack, talk · click: walk there · X: explore · T: throw · Space: wait · I: inventory · J: journal · Tab: 3D "
     : " WASD/arrows: step (walk into people to talk) · click: walk there · X: explore · Space: wait · I: inventory · J: journal ";
-  S.text(1, 0, header.slice(0, S.cols - 2), 255, 255, 255);
+  if (header.length > S.cols - 2)   // a narrow screen (100 columns): the same keys, said shorter
+    header = game.story.cube ? " MAP · WASD: move · click: walk · X: explore · Space: wait · I: inventory · J: journal · Tab: 3D "
+      : " WASD: step · click: walk there · X: explore · Space: wait · I: inventory · J: journal ";
+  mapView.header = { x: 1, y: 0, text: header.slice(0, S.cols - 2) };   // the map screen makes its keys clickable
+  S.text(1, 0, mapView.header.text, 255, 255, 255);
   if (legend) drawLegend(S.cols - LEGEND_W + 1, top, game);
   S.text(1, S.rows - 1, " " + describeTile(game, hoveredTile()) + " ", 200, 200, 200);
 }

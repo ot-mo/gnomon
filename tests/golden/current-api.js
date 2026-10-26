@@ -10,6 +10,7 @@
 // Since 0C monsters and people are one list, zone.creatures (creatures.js): the parent's monsters are the
 // creatures that don't talk, and its people the talkers, shown in the parent's shape (depth = level,
 // met and state from talk).
+// Since 0D1 every mode is a screen on the mode stack (screens.js): a perk is taken on the levelup screen.
 //
 // env: from tools/node-env.mjs.
 export async function currentApi(env, seedRandom) {
@@ -30,6 +31,7 @@ export async function currentApi(env, seedRandom) {
   const body = await env.load("body.js");
   const currency = await env.load("currency.js");
   const { canTalk } = await env.load("creatures.js");
+  const screens = await env.load("screens.js");
   const game = G.game;
   const STACKS = ["potion", "scroll", "knife", "bomb"];
   const parentKinds = (zone) => { for (const it of zone.items) if (it.kind === "cash") it.kind = "gold"; return zone; };
@@ -76,7 +78,7 @@ export async function currentApi(env, seedRandom) {
     invKey(code) { game.debug.openInv(); game.debug.inventoryAction(inventory.inventoryKey(game, code)); },
     dropAtFeet(item) { const p = game.player; game.zone.items.push(items.makeItem(item, p.x, p.y, p.z)); },
     pickUp() { items.pickUpItems(game); },
-    takePerk(key) { game.perkChoices = [key]; game.levelReturn = game.mode; game.debug.choosePerk(0); },
+    takePerk(key) { game.perkChoices = [key]; screens.pushMode(game, "levelup"); game.debug.choosePerk(0); },   // the levelup screen (0D1)
     relic: (key) => items.makeRelic(key),
     playerFacts(keys) {
       const p = game.player;

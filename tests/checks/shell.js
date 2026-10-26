@@ -4,20 +4,21 @@
 //   checkShell({ game, startRun, inputHandlers, screens, keys, ui, input, S, capture, srcFiles }) → { name, ok, problems, stats }
 //
 //   1. The stack: pushMode remembers what to return to, popMode returns there with the result (onPop, leave),
-//      never empties the stack; setMode replaces it; a mode the old code set directly (game.mode = …) is
-//      followed; the pointer goes as each screen wants it ("unlock" / "lock" / "keep").
+//      never empties the stack; setMode replaces it; a mode set directly (game.mode = …, as checks and tools
+//      do) is followed (over the view: pushed; lower in the stack: popped back to; opaque: the whole stack);
+//      the pointer goes as each screen wants it ("unlock" / "lock" / "keep"); timeRuns.
 //   2. Keys, through the game's real onKeyDown: a screen with a text field sees every key first, so "m",
 //      "M", "Ö" and "å" type and M toggles no music; with no such screen M and N are "*" bindings (they log
-//      their switch), not on auto-repeat, and not while talking or trading (the old rule, until those
-//      screens are ported). Order: the mode's bindings, then "play" (explore and map only), then "*"; a
+//      their switch) in the views, rotate, transition, dead and won, not on auto-repeat (talk and the pack
+//      take every key themselves: section 5). Order: the mode's bindings, then "play" (explore and map only), then "*"; a
 //      handler returning false passes the key on; when; unbind; helpFor and keyLabel.
 //   3. Widgets at 100×30: modal centres and clamps; box draws a full border (rules: only the top and bottom);
 //      wrap; list scrolls to keep the selection in view, listKey (wrapping ↑↓, PgUp/PgDn, Home/End, select),
 //      listWheel, listAt; tabs and tabsKey; bar; textInput (one printable character inserted at the cursor,
 //      emoji as one, Shift/Dead/Tab/Enter keys not, the length cap, editing keys, done and cancel);
 //      drawTextInput; keyHelp fits its width; hit-testing (the last rect drawn wins, beginFrame clears).
-//   4. The game draws, updates and routes the mouse, hover and wheel to a registered top screen; with none,
-//      the old modes run as before (the golden check holds the frames). input-browser.js passes e.key.
+//   4. The game draws, updates and routes the mouse, hover and wheel to a registered top screen.
+//      input-browser.js passes e.key.
 export function checkShell({ game, startRun, inputHandlers, screens, keys, ui, input, S, capture, srcFiles }) {
   const problems = [], stats = {};
   const fail = (m) => problems.push(m);
@@ -51,22 +52,28 @@ export function checkShell({ game, startRun, inputHandlers, screens, keys, ui, i
     if (game.mode !== "map" || popped !== "done") fail(`second pop: mode ${game.mode}, onPop got ${popped}`);
     if (screens.popMode(game) !== false || game.mode !== "map" || game.modeStack.length !== 1) fail("popMode emptied the stack");
     if (log.join("|") !== "enter a 1|enter b|leave b x|leave a done") fail(`enter/leave order: ${log.join("|")}`);
-    // The old code sets game.mode directly: the stack follows it.
+    // Checks and tools set game.mode directly: the stack follows. A screen drawn over the view goes on top,
+    // a mode lower in the stack pops back to it, an opaque one (a view) becomes the whole stack.
     screens.pushMode(game, "t:a");
     game.mode = "inventory";
     screens.popMode(game);
-    if (game.mode !== "map") fail(`a legacy mode change on top of the stack: pop went to ${game.mode}`);
-    game.mode = "explore";   // and under it too
+    if (game.mode !== "t:a") fail(`game.mode = "inventory" over t:a, then pop: went to ${game.mode}`);
+    game.mode = "inventory";
+    game.mode = "map";
+    screens.syncStack(game);
+    if (game.modeStack.map((e) => e.mode).join() !== "map") fail(`game.mode = "map" under two screens: stack ${game.modeStack.map((e) => e.mode)}`);
+    game.mode = "explore";   // and an opaque mode replaces it
     screens.pushMode(game, "t:lock");
-    const l0 = ptr.locks;
     game.paused = true;
     screens.popMode(game);
-    if (game.mode !== "explore") fail(`pushed over a legacy mode, popped to ${game.mode}`);
+    if (game.mode !== "explore" || game.paused) fail(`pushed over explore, popped to ${game.mode} (paused ${game.paused}): explore locks the pointer and unpauses`);
+    const l0 = ptr.locks;
+    game.paused = true;
     screens.pushMode(game, "t:lock");
     if (ptr.locks !== l0 + 1 || game.paused) fail("a \"lock\" screen didn't lock the pointer and unpause");
     screens.setMode(game, "t:a", { n: 7 });
     if (game.mode !== "t:a" || game.modeStack.length !== 1 || screens.modeData(game).n !== 7) fail(`setMode: ${game.modeStack.map((e) => e.mode)}`);
-    if (!screens.timeRuns({ mode: "t:lock" }) || screens.timeRuns({ mode: "t:a" }) || screens.timeRuns({ mode: "map" })) fail("timeRuns");
+    if (!screens.timeRuns({ mode: "t:lock" }) || screens.timeRuns({ mode: "t:a" }) || !screens.timeRuns({ mode: "explore" }) || screens.timeRuns({ mode: "inventory" })) fail("timeRuns");
     screens.setMode(game, "map");
     stats.stack = `push/pop/set, ${log.length} enter/leave calls, pointer ${ptr.locks} locks ${ptr.unlocks} unlocks`;
   }
@@ -98,10 +105,7 @@ export function checkShell({ game, startRun, inputHandlers, screens, keys, ui, i
     press("KeyN", "n"); press("KeyN", "n");
     if (said(/^Music (on|off)/) !== music0 + 2 || said(/^Sounds and voices/) !== sounds0 + 2) fail("M and N on the map didn't toggle music and sounds");
     if (keys.dispatchKey(game, "KeyM", true, "m")) fail("M on auto-repeat toggled the music");
-    for (const mode of ["talk", "shop"]) {
-      if (keys.dispatchKey({ ...game, mode }, "KeyM", false, "m")) fail(`M toggled the music in ${mode}`);
-    }
-    for (const mode of ["explore", "inventory", "journal", "dead", "story"])
+    for (const mode of ["explore", "map", "dead", "won", "rotate", "transition"])   // screens that leave N to the "*" binding
       if (!keys.dispatchKey({ ...game, mode, log() {} }, "KeyN", false, "n")) fail(`N isn't global in ${mode}`);
     if (said(/^Music (on|off)/) !== music0 + 2) fail("M toggled during the mode sweep");
 

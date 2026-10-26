@@ -9,76 +9,104 @@ import { attr, maxHp } from "./stats.js";
 import { wielded } from "./body.js";
 import { statusLine } from "./status.js";
 import { CURRENCY, formatFunds } from "./currency.js";
+import { hitLabel } from "./ui.js";
 
+// The HUD under every screen: the crosshair and [E] label in 3D (exploring, paused, or dead), the status
+// line, the toasts, the messages and the boss bar. The screens over it (pause, dead, won, levelup, the
+// "DEPTH n" beat) draw themselves with the functions below (src/screens/).
 export function drawHud(game) {
   const p = game.player;
   const inMap = game.view === "map";
-  if (!inMap && (game.mode === "explore" || game.mode === "dead")) {
+  const looking = game.mode === "explore" || game.mode === "pause";
+  if (!inMap && (looking || game.mode === "dead")) {
     drawSword(game);
     drawSpark(game);
     S.put(S.cols >> 1, S.rows >> 1, "+", 255, 255, 255);
-    if (game.target && game.mode === "explore") {
+    if (game.target && looking) {
       const label = `[E] ${game.target.label}`;
       S.text((S.cols - label.length) >> 1, (S.rows >> 1) + 2, label, 255, 230, 140);
     }
   }
-  if (game.mode !== "descend") {
-    drawStatus(game, p, inMap ? 1 : 0);
-    drawMessages(game, inMap ? 1 : 0);
-    drawBossBar(game, inMap ? 2 : 1);
-  }
+  drawStatus(game, p, inMap ? 1 : 0);
+  drawToasts(game, inMap ? 3 : 2);   // under the boss bar
+  drawMessages(game, inMap ? 1 : 0);
+  drawBossBar(game, inMap ? 2 : 1);
+}
 
-  if (game.mode === "explore" && game.paused) {
-    overlay([
-      ["THE ROTATION CUBE", [255, 230, 120]],
-      ["", null],
-      ["Click to play", [255, 255, 255]],
-      ["", null],
-      ["WASD move · Shift sprint · Space jump", [170, 170, 170]],
-      ["Mouse look · Left click attack · Wheel zoom", [170, 170, 170]],
-      ["E use / talk · I inventory · J journal · T / right-click throw · Q quick-heal · R swap weapons · F torch · M music · N sounds", [170, 170, 170]],
-      ["Tab: rotate to the view from above (the map: turn-based)", [170, 170, 170]],
-      ["", null],
-      ["From inside you see height, depth, light and dark.", [130, 130, 130]],
-      ["From above you see the whole floor, the floor's pictures, and the flat things.", [130, 130, 130]],
-    ]);
-  } else if (game.mode === "dead") {
-    overlay([
-      ["YOU DIED", [255, 80, 80]],
-      ["", null],
-      [`Killed by ${game.deathCause} ${game.zone.type === "dungeon" ? `on depth ${game.zone.dungeonIndex}` : `in ${game.zone.name}`}.`, [220, 220, 220]],
-      [`Seed ${game.seed}`, [140, 140, 140]],
-      ["", null],
-      ["Press R to start a new run", [255, 255, 255]],
-    ]);
-  } else if (game.mode === "won") {
-    const mins = Math.floor(game.time / 60), secs = String(Math.floor(game.time % 60)).padStart(2, "0");
-    overlay([
-      ["VICTORY", [255, 230, 120]],
-      ["", null],
-      ["Vorlath is dust, and Hollowmere is safe: flat, and happy about it.", [220, 220, 220]],
-      [`Level ${p.level} · ${maxHp(p)} max HP · ${attr(p, "str")} STR · ${mins}:${secs} of game time`, [160, 230, 255]],
-      [`Seed ${game.seed}`, [140, 140, 140]],
-      ["", null],
-      ["Press R to start a new run", [255, 255, 255]],
-    ]);
-  } else if (game.mode === "descend") {
-    S.clear();
-    const t = game.zone.type === "dungeon" ? `DEPTH ${game.zone.dungeonIndex}` : game.zone.name.toUpperCase();
-    S.text((S.cols - t.length) >> 1, S.rows >> 1, t, 255, 230, 140);
-    if (game.zone.final) {
-      const sub = "The last floor. Something old waits here.";
-      S.text((S.cols - sub.length) >> 1, (S.rows >> 1) + 2, sub, 140, 255, 170);
-    }
-  } else if (game.mode === "levelup") {
-    drawLevelUp(game);
+// The 3D view paused (pointer lock lost, or not yet taken): click to play.
+export function drawPause() {
+  const at = overlay([
+    ["THE ROTATION CUBE", [255, 230, 120]],
+    ["", null],
+    ["Click to play", [255, 255, 255]],
+    ["", null],
+    ["WASD move · Shift sprint · Space jump", [170, 170, 170]],
+    ["Mouse look · Left click attack · Wheel zoom", [170, 170, 170]],
+    ["E use / talk · I inventory · J journal · T / right-click throw · Q quick-heal · R swap weapons · F torch · M music · N sounds", [170, 170, 170]],
+    ["Tab: rotate to the view from above (the map: turn-based)", [170, 170, 170]],
+    ["", null],
+    ["From inside you see height, depth, light and dark.", [130, 130, 130]],
+    ["From above you see the whole floor, the floor's pictures, and the flat things.", [130, 130, 130]],
+  ]);
+  hitLabel(at[6], "I inventory", { key: "KeyI" });
+  hitLabel(at[6], "J journal", { key: "KeyJ" });
+  hitLabel(at[7], at[7].text, { key: "Tab" });
+}
+
+export function drawDead(game) {
+  const at = overlay([
+    ["YOU DIED", [255, 80, 80]],
+    ["", null],
+    [`Killed by ${game.deathCause} ${game.zone.type === "dungeon" ? `on depth ${game.zone.dungeonIndex}` : `in ${game.zone.name}`}.`, [220, 220, 220]],
+    [`Seed ${game.seed}`, [140, 140, 140]],
+    ["", null],
+    ["Press R to start a new run", [255, 255, 255]],
+  ]);
+  hitLabel(at[5], at[5].text, { key: "KeyR" });
+}
+
+export function drawWon(game) {
+  const p = game.player;
+  const mins = Math.floor(game.time / 60), secs = String(Math.floor(game.time % 60)).padStart(2, "0");
+  const at = overlay([
+    ["VICTORY", [255, 230, 120]],
+    ["", null],
+    ["Vorlath is dust, and Hollowmere is safe: flat, and happy about it.", [220, 220, 220]],
+    [`Level ${p.level} · ${maxHp(p)} max HP · ${attr(p, "str")} STR · ${mins}:${secs} of game time`, [160, 230, 255]],
+    [`Seed ${game.seed}`, [140, 140, 140]],
+    ["", null],
+    ["Press R to start a new run", [255, 255, 255]],
+  ]);
+  hitLabel(at[6], at[6].text, { key: "KeyR" });
+}
+
+// The beat between zones: "DEPTH n" (or the zone's name) on a black screen.
+export function drawTransition(game) {
+  S.clear();
+  const t = game.zone.type === "dungeon" ? `DEPTH ${game.zone.dungeonIndex}` : game.zone.name.toUpperCase();
+  S.text((S.cols - t.length) >> 1, S.rows >> 1, t, 255, 230, 140);
+  if (game.zone.final) {
+    const sub = "The last floor. Something old waits here.";
+    S.text((S.cols - sub.length) >> 1, (S.rows >> 1) + 2, sub, 140, 255, 170);
   }
+}
+
+// Toasts (TECH_DESIGN §4.5): a line for 2 s under the status line, centred: a zone's name when you walk
+// into it over an edge, discoveries. game.toast(text, color) adds one (game.js).
+export const TOAST_TIME = 2;
+function drawToasts(game, y) {
+  const live = (game.toasts || []).filter((t) => game.uiTime - t.time < TOAST_TIME && game.uiTime >= t.time);
+  live.slice(-2).forEach((t, k) => {
+    const text = t.text.slice(0, S.cols - 2), x = (S.cols - text.length) >> 1;
+    S.blank(x - 1, y + k, text.length + 2, 1);
+    S.text(x, y + k, text, ...t.color);
+  });
 }
 
 // --- The level-up screen: pick one of three perks (four at a milestone) ---------------
 const levelLayout = { y0: 0, x0: 0, w: 0 };
 
-function drawLevelUp(game) {
+export function drawLevelUp(game) {
   const choices = game.perkChoices;
   const w = Math.min(S.cols - 4, 76), h = choices.length * 4 + 7;
   const x0 = (S.cols - w) >> 1, y0 = Math.max(1, (S.rows - h) >> 1);
@@ -281,8 +309,11 @@ function overlay(lines) {
   const x0 = (S.cols - w) >> 1, y0 = (S.rows - h) >> 1;
   S.blank(x0, y0, w, h);
   for (let x = x0; x < x0 + w; x++) { S.put(x, y0, "-", 90, 90, 90); S.put(x, y0 + h - 1, "-", 90, 90, 90); }
+  const at = [];   // where each line went, for the mouse (ui.hitLabel)
   lines.forEach(([t, c], k) => {
+    at.push({ x: x0 + ((w - t.length) >> 1), y: y0 + 2 + k, text: t });
     if (!t) return;
     S.text(x0 + ((w - t.length) >> 1), y0 + 2 + k, t, ...c);
   });
+  return at;
 }

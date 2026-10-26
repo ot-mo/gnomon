@@ -23,6 +23,8 @@
 //   keyHelp(x, y, w, entries) → rows       a footer from helpFor(mode): "Esc back · Enter select", wrapped
 //   beginFrame(); hit(rect, payload); at(cell) → payload | null
 //                                         what was drawn where, for the mouse (the last rect drawn wins)
+//   hitLabel({ x, y, text }, label, payload)   the word `label` in a drawn line of text becomes a hit rect
+//                                         (screens use payload { key: code } for "click = press that key")
 import * as S from "./screen.js";
 import { keyLabel } from "./keys.js";
 
@@ -36,6 +38,11 @@ export const UI = {
 let hits = [];
 export function beginFrame() { hits = []; }
 export function hit(rect, payload) { hits.push({ ...rect, payload }); }
+// `label` where it stands in a line of text drawn at { x, y, text } becomes clickable (nothing if it isn't there).
+export function hitLabel(line, label, payload) {
+  const k = line?.text.indexOf(label) ?? -1;
+  if (k >= 0 && label) hit({ x: line.x + k, y: line.y, w: label.length, h: 1 }, payload);
+}
 export function at(cell) {
   if (!cell) return null;
   for (let k = hits.length - 1; k >= 0; k--) {
