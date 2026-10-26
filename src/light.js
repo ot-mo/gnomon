@@ -85,7 +85,11 @@ function flood(zone, grid, queue, falloff) {
 // Under the sky a sample beyond the zone's border takes the border cell's light (TECH_DESIGN §6.3, the edge
 // clamp): the open ground goes on into the next zone, so the last tiles before an edge don't darken.
 export function sampleLight(zone, grid, x, y, z, airOnly = false) {
-  const { w, d, h, blocks } = zone, clamp = zone.hasSky;
+  return sampleGrid(grid, zone.blocks, zone.w, zone.d, zone.h, !!zone.hasSky, x, y, z, airOnly);
+}
+// The same from the zone's arrays and sizes (render3d reads them once a frame: a hot path that never touches
+// the zone object itself isn't thrown off by each zone's own shape, so a new zone's first frame stays fast).
+export function sampleGrid(grid, blocks, w, d, h, clamp, x, y, z, airOnly = false) {
   x -= 0.5; y -= 0.5; z -= 0.5;
   const x0 = Math.floor(x), y0 = Math.floor(y), z0 = Math.floor(z);
   const fx = x - x0, fy = y - y0, fz = z - z0;
@@ -227,9 +231,11 @@ export function bakeSun(zone, bucket, { budgetMs = Infinity } = {}) {
 // (px, py, pz) so a shadow's edge is soft rather than a voxel step. 1 = in full sun. Voxels outside the
 // grid, solid, or not baked don't count; with none to go by, the face is in the sun.
 export function sunlitAt(zone, hx, hy, hz, nx, ny, nz, px, py, pz) {
-  const g = zone.sunlit;
+  return sunlitGrid(zone.sunlit, zone.w, zone.d, zone.h, hx, hy, hz, nx, ny, nz, px, py, pz);
+}
+export function sunlitGrid(g, w, d, h, hx, hy, hz, nx, ny, nz, px, py, pz) {
   if (!g) return 1;
-  const { w, d, h } = zone, wd = w * d;
+  const wd = w * d;
   let u, v, fixed, axis;   // the two coordinates along the face, and the layer in front of it
   if (nz !== 0) { axis = 2; fixed = hz + nz; u = px - 0.5; v = py - 0.5; }
   else if (nx !== 0) { axis = 0; fixed = hx + nx; u = py - 0.5; v = pz - 0.5; }

@@ -24,7 +24,14 @@ export const hit = { t: 0, block: 0, nx: 0, ny: 0, nz: 0, x: 0, y: 0, z: 0, apro
 // the highest block of the zone and its bands. Under the sky a ray going up from there meets nothing, so it
 // stops (sky rays are half the screen). Rebuilt when a band is replaced or the zone refreshed (a new
 // skyLight). Dungeons (no sky) keep their height: nothing about their rays changes.
-const AP = new WeakMap(), TOPS = new WeakMap();
+const AP = new WeakMap(), TOPS = new WeakMap(), BANDS = new WeakMap();
+// A band as castRay reads it: always this shape, whoever built the band.
+const bandOf = (band) => {
+  if (!band) return null;
+  let b = BANDS.get(band);
+  if (!b) BANDS.set(band, (b = { x0: band.x0, y0: band.y0, bw: band.bw, bd: band.bd, n: band.bw * band.bd, blocks: band.blocks }));
+  return b;
+};
 const bandTop = (band, h) => {
   let t = TOPS.get(band);
   if (t !== undefined) return t;
@@ -42,15 +49,19 @@ function zoneTop(zone) {
 export function rayInfo(zone) {
   let r = AP.get(zone);
   const ap = zone.apron;
-  if (r && r.sky === zone.skyLight && r.ap === ap && (!ap || (r.g[0] === ap.nw && r.g[1] === ap.n && r.g[2] === ap.ne && r.g[3] === ap.w &&
-      r.g[5] === ap.e && r.g[6] === ap.sw && r.g[7] === ap.s && r.g[8] === ap.se))) return r;
-  const g = ap ? [ap.nw, ap.n, ap.ne, ap.w, null, ap.e, ap.sw, ap.s, ap.se] : null;
+  if (r && r.sky === zone.skyLight && r.lit === zone.litMask && r.blocks === zone.blocks && r.ap === ap && (!ap || (r.raw[0] === ap.nw &&
+      r.raw[1] === ap.n && r.raw[2] === ap.ne && r.raw[3] === ap.w && r.raw[5] === ap.e && r.raw[6] === ap.sw && r.raw[7] === ap.s && r.raw[8] === ap.se))) return r;
+  const raw = ap ? [ap.nw, ap.n, ap.ne, ap.w, null, ap.e, ap.sw, ap.s, ap.se] : null, g = raw ? raw.map(bandOf) : null;
   let top = zone.h;
   if (zone.hasSky) {
     top = zoneTop(zone);
-    if (g) for (const band of g) if (band) top = Math.max(top, bandTop(band, zone.h));
+    if (raw) for (const band of raw) if (band) top = Math.max(top, bandTop(band, zone.h));
   }
-  r = { sky: zone.skyLight, ap, g, top };
+  // The zone's sizes and arrays too: castRay reads only this object (always this shape), never the zone.
+  // How far a ray may go outside the grid: the apron's reach on each open side.
+  const W = zone.w, D = zone.d;
+  r = { sky: zone.skyLight, lit: zone.litMask, blocks: zone.blocks, w: W, d: zone.d, h: zone.h, ap, raw, g, top,
+        x0: ap?.w ? -APRON : 0, x1: ap?.e ? W + APRON : W, y0: ap?.n ? -APRON : 0, y1: ap?.s ? D + APRON : D };
   AP.set(zone, r);
   return r;
 }
@@ -66,10 +77,9 @@ export function rayInfo(zone) {
 const HOLE_Z = 1;   // the floor layer (world.js FLOOR_Z - 1)
 // info: rayInfo(zone), when the caller has it (render3d, once a frame).
 export function castRay(zone, ox, oy, oz, dx, dy, dz, maxT, seen = null, torchRange = 0, holes = null, info = rayInfo(zone)) {
-  const W = zone.w, D = zone.d, H = zone.h, WD = W * D;
-  const blocks = zone.blocks, lit = zone.litMask, ap = info.ap, g = info.g, TOP = info.top;
-  // How far the ray may travel outside the grid: the apron's reach on each open side.
-  const X0 = ap?.w ? -APRON : 0, X1 = ap?.e ? W + APRON : W, Y0 = ap?.n ? -APRON : 0, Y1 = ap?.s ? D + APRON : D;
+  const W = info.w, D = info.d, H = info.h, WD = W * D;
+  const blocks = info.blocks, lit = info.lit, g = info.g, TOP = info.top;
+  const X0 = info.x0, X1 = info.x1, Y0 = info.y0, Y1 = info.y1;   // how far it may go outside the grid (the apron)
   let x = Math.floor(ox), y = Math.floor(oy), z = Math.floor(oz);
   const stepX = dx > 0 ? 1 : -1, stepY = dy > 0 ? 1 : -1, stepZ = dz > 0 ? 1 : -1;
   const tDeltaX = Math.abs(1 / dx), tDeltaY = Math.abs(1 / dy), tDeltaZ = Math.abs(1 / dz);
@@ -115,7 +125,7 @@ export function castRay(zone, ox, oy, oz, dx, dy, dz, maxT, seen = null, torchRa
     if (!band) continue;
     const lx = x - band.x0, ly = y - band.y0, bw = band.bw;
     if (lx < 0 || ly < 0 || lx >= bw || ly >= band.bd) continue;
-    const b = band.blocks[lx + ly * bw + z * bw * band.bd];
+    const b = band.blocks[lx + ly * bw + z * band.n];
     if (b > 0 && (b !== B.GHOST || ghostShows(x, y, z, axis, stepX, stepY, stepZ))) {
       hit.t = t; hit.block = b; hit.x = x; hit.y = y; hit.z = z; hit.apron = true;
       hit.nx = axis === 0 ? -stepX : 0;

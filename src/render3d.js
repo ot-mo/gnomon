@@ -13,7 +13,7 @@
 //   horizonOf(game, zone) → { n, e, s, w: { z, color } }   the horizon plane's height and colour per side
 import * as S from "./screen.js";
 import { castRay, hit, setGhostVisible, rayInfo } from "./raycast.js";
-import { sampleLight, inDark, zoneIsLightless, daylight, syncLight, sunState, sunlitAt } from "./light.js";
+import { sampleGrid, inDark, zoneIsLightless, daylight, syncLight, sunState, sunlitGrid } from "./light.js";
 import { sunDir, skyColors, fogFor, spanOf } from "./clock.js";
 import { material, albedo, setMaterialTime, setDarkSight, DARK_SIGHT_BLOCKS } from "./materials.js";
 import { noise2, hash } from "./rng.js";
@@ -95,6 +95,15 @@ let zen = [50, 95, 190], hor = [170, 200, 240];                                /
 let discX = 0, discY = 0, discZ = 1, discVis = 0, discR = 255, discG = 250, discB = 215;
 let cloudR = 245, cloudG = 245, cloudB = 250, starK = 0, horizon = null;
 
+// The zone's arrays and sizes, read once a frame: the per-pixel code below never reads the zone object
+// (each zone has its own shape, and code tuned to one zone's would be thrown out in the first frame of the next).
+let ZW = 0, ZD = 0, ZH = 0, zBlocks = null, zSky = null, zLamp = null, zSun = null, zSecret = null, zPlainWater = true;
+function frameZone(zone) {
+  ZW = zone.w; ZD = zone.d; ZH = zone.h; zBlocks = zone.blocks; zSky = zone.skyLight; zLamp = zone.lampLight;
+  zSun = zone.sunlit; zSecret = zone.secretWalls;
+  zPlainWater = (zone.liquid || "water") === "water" && !Object.keys(zone.liquids || {}).length;
+}
+
 function frameLook(game, zone) {
   outdoor = !!zone.hasSky;
   if (!outdoor) {
@@ -139,9 +148,9 @@ function applyFog(t) {
 
 // Light arriving at a point from sky wells and lamps (no direction needed).
 let lightR = 0, lightG = 0, lightB = 0;
-function ambientAt(zone, x, y, z, airOnly = false) {
-  const sky = sampleLight(zone, zone.skyLight, x, y, z, airOnly);
-  const lamp = sampleLight(zone, zone.lampLight, x, y, z, airOnly);
+function ambientAt(x, y, z, airOnly = false) {
+  const sky = sampleGrid(zSky, zBlocks, ZW, ZD, ZH, outdoor, x, y, z, airOnly);
+  const lamp = sampleGrid(zLamp, zBlocks, ZW, ZD, ZH, outdoor, x, y, z, airOnly);
   const lamp2 = lamp * Math.sqrt(lamp);   // lamp^1.5: bright near the lamp, a soft edge further out
   lightR = AMBIENT[0] + skyR * sky + LAMP_COLOR[0] * lamp2;
   lightG = AMBIENT[1] + skyG * sky + LAMP_COLOR[1] * lamp2;
@@ -170,12 +179,12 @@ function torchAt(dx, dy, dz, t, facing) {
 // What water holds, when it isn't water (the zone's liquid, or its column's: social/liquids.js liquidAt):
 // the liquid's colour, or null.
 function liquidTint(zone, x, y) {
-  if (zone.liquid === "water" && !Object.keys(zone.liquids || {}).length) return null;
+  if (zPlainWater) return null;
   const id = liquidAt(zone, x, y);
   return id !== "water" ? LIQUIDS[id]?.color || null : null;
 }
 
-function shadeHit(game, zone, player, dx, dy, dz) {
+function shadeHit(game, zone, dx, dy, dz) {
   const t = hit.t, block = hit.block, nx = hit.nx, ny = hit.ny, nz = hit.nz;
   const px = cam.ex + dx * t, py = cam.ey + dy * t, pz = cam.ez + dz * t;
   // Under the sky, whether runes glow is asked where they are (the air in front of the face).
@@ -187,28 +196,28 @@ function shadeHit(game, zone, player, dx, dy, dz) {
     if (tint) { const k = (albedo.r + albedo.g + albedo.b) / 3 / 160; albedo.r = tint[0] * k; albedo.g = tint[1] * k; albedo.b = tint[2] * k; }
   }
   // A flat being here? On the floor there's a shadow with nobody casting it.
-  if (nz > 0 && shadows.length) {
-    for (const s of shadows) {
-      const d = Math.hypot(px - s.x, py - s.y);
-      if (d < 0.48 && Math.abs(pz - s.z) < 0.3) {
+  if (nz > 0 && shadowCount) {
+    for (let k = 0; k < shadowCount; k++) {
+      const d = Math.hypot(px - shadowAt[k * 3], py - shadowAt[k * 3 + 1]);
+      if (d < 0.48 && Math.abs(pz - shadowAt[k * 3 + 2]) < 0.3) {
         const k = 0.15 + 0.85 * (d / 0.48) ** 2;
         albedo.r *= k; albedo.g *= k; albedo.b *= k;
       }
     }
   }
   // A thin wall with a lit room behind it: in the dark, up close, light shows through the cracks.
-  if (!player.torch && t < 4.5 && nz === 0 && hit.z >= FLOOR_Z && hit.z <= FLOOR_Z + 1 && !hit.apron &&
-      zone.secretWalls.has(hit.x + hit.y * zone.w) && (!darkPerHit || inDark(game, zone, px + nx * 0.5, py + ny * 0.5, pz)))
+  if (!torchOn && t < 4.5 && nz === 0 && hit.z >= FLOOR_Z && hit.z <= FLOOR_Z + 1 && !hit.apron &&
+      zSecret.has(hit.x + hit.y * ZW) && (!darkPerHit || inDark(game, zone, px + nx * 0.5, py + ny * 0.5, pz)))
     crackLight(nx !== 0 ? py : px, pz - FLOOR_Z, t);
   const ar = albedo.r, ag = albedo.g, ab = albedo.b, glow = albedo.glow;
 
   // The apron (the next zone's ground beyond an open edge) has no light arrays of its own: it is lit as open
   // ground, sky × daylight and the sun without shadows (TECH_DESIGN §6.1: cheap, and inside the haze).
-  const sky = hit.apron ? openSky() : ambientAt(zone, px + nx * 0.5, py + ny * 0.5, pz + nz * 0.5);
+  const sky = hit.apron ? openSky() : ambientAt(px + nx * 0.5, py + ny * 0.5, pz + nz * 0.5);
   if (outdoor && sunOn && sky > 0.05) {
     const facing = nx * sunX + ny * sunY + nz * sunZ;
     if (facing > 0) {
-      const k = hit.apron ? facing : facing * sunlitAt(zone, hit.x, hit.y, hit.z, nx, ny, nz, px, py, pz);
+      const k = hit.apron ? facing : facing * sunlitGrid(zSun, ZW, ZD, ZH, hit.x, hit.y, hit.z, nx, ny, nz, px, py, pz);
       lightR += sunR * k; lightG += sunG * k; lightB += sunB * k;
     }
   }
@@ -348,14 +357,20 @@ function judgeFrame(ms, now) {
 // This frame is under the sky with your torch out: the dark-only things ask light.js where they are.
 let darkPerHit = false;
 
-// Flat beings near you this frame (their shadows are drawn onto the floor in shadeHit).
-let shadows = [];
+// Flat beings near you this frame: where they stand (x, y, z), their shadows drawn onto the floor in shadeHit.
+let shadowAt = new Float64Array(24), shadowCount = 0;
+let torchOn = false;   // your torch is lit (this frame)
 
 export function render3d(game) {
   const { zone, player } = game;
   setCamera(player, game.fov, game.cam);
-  shadows = [];
-  for (const c of [...hostilesTo(game, player), ...talkersIn(zone)]) if (isFlat(c) && Math.hypot(c.x - player.x, c.y - player.y) < 20) shadows.push(c);
+  shadowCount = 0;
+  for (const c of [...hostilesTo(game, player), ...talkersIn(zone)])
+    if (isFlat(c) && Math.hypot(c.x - player.x, c.y - player.y) < 20) {
+      if (shadowAt.length < (shadowCount + 1) * 3) { const more = new Float64Array(shadowAt.length * 2); more.set(shadowAt); shadowAt = more; }
+      shadowAt[shadowCount * 3] = c.x; shadowAt[shadowCount * 3 + 1] = c.y; shadowAt[shadowCount * 3 + 2] = c.z; shadowCount++;
+    }
+  torchOn = !!player.torch;
   setMaterialTime(game.time);   // water ripples move
   if (depth.length !== S.cols * S.rows) depth = new Float32Array(S.cols * S.rows);
   torch.power = torchPower(player, game.time);
@@ -368,7 +383,26 @@ export function render3d(game) {
   setDarkSight(!player.torch && !darkPerHit);
   setGhostVisible(!darkPerHit ? !player.torch : (x, y, z) => inDark(game, zone, x, y, z));
 
-  const t0 = performance.now(), half = dyn.half && outdoor, info = rayInfo(zone);
+  frameZone(zone);
+  const t0 = performance.now();
+  castFrame(game, zone, rayInfo(zone), zone.seen, zone.holeSeen, seeRange, game.time, dyn.half && outdoor);
+  judgeFrame(performance.now() - t0, performance.now());
+
+  setGhostVisible(false);          // everything else (sight lines, aiming…) sees straight through them
+  drawSprites(game);
+  drawDamageNumbers(game);
+  // A bomb going off close by: a flash of light.
+  for (const e of game.effects)
+    if (e.kind === "boom" && game.time - e.time < 0.15 && Math.hypot(e.x - player.x, e.y - player.y) < 10) S.tint(1.7, 1.4, 1.1);
+  if (player.hurt > 0) S.tint(1 + player.hurt * 1.6, 1 - player.hurt * 1.4, 1 - player.hurt * 1.4);
+  // Sinking in deep water: everything goes murky blue.
+  if (zone.get(Math.floor(cam.ex), Math.floor(cam.ey), Math.floor(cam.ez)) === B.WATER_DEEP) S.tint(0.3, 0.55, 1.1);
+}
+
+// Every cell of the view: a ray each (every other column when halved). Its own function, reading nothing
+// from the game, the zone or the player but what it is handed, so the shapes of those objects (a new zone's,
+// the player's after a zone change) never throw this hot loop back to slow code.
+function castFrame(game, zone, info, seen, holes, seeRange, time, half) {
   for (let cy = 0; cy < S.rows; cy++) {
     const v = (1 - (2 * (cy + 0.5)) / S.rows) * cam.halfH;
     for (let cx = 0; cx < S.cols; cx++) {
@@ -382,29 +416,18 @@ export function render3d(game) {
       dx /= len; dy /= len; dz /= len;
 
       let density = 1;
-      if (castRay(zone, cam.ex, cam.ey, cam.ez, dx, dy, dz, maxDist, zone.seen, seeRange, zone.holeSeen, info)) {
-        shadeHit(game, zone, player, dx, dy, dz);
+      if (castRay(zone, cam.ex, cam.ey, cam.ez, dx, dy, dz, maxDist, seen, seeRange, holes, info)) {
+        shadeHit(game, zone, dx, dy, dz);
         depth[i] = hit.t;
       } else {
         depth[i] = Infinity;
-        if (dz > 0 && zone.hasSky) density = shadeSky(dx, dy, dz, game.time);
-        else if (outdoor && dz < 0 && hit.out !== 2) density = shadeHorizon(dx, dy, dz, hit.missT, game.time);
+        if (dz > 0 && outdoor) density = shadeSky(dx, dy, dz, time);
+        else if (outdoor && dz < 0 && hit.out !== 2) density = shadeHorizon(dx, dy, dz, hit.missT, time);
         else outR = outG = outB = 0;        // looking into a bottomless pit, or into the far dark
       }
       plot(cx, cy, density);
     }
   }
-  judgeFrame(performance.now() - t0, performance.now());
-
-  setGhostVisible(false);          // everything else (sight lines, aiming…) sees straight through them
-  drawSprites(game);
-  drawDamageNumbers(game);
-  // A bomb going off close by: a flash of light.
-  for (const e of game.effects)
-    if (e.kind === "boom" && game.time - e.time < 0.15 && Math.hypot(e.x - player.x, e.y - player.y) < 10) S.tint(1.7, 1.4, 1.1);
-  if (player.hurt > 0) S.tint(1 + player.hurt * 1.6, 1 - player.hurt * 1.4, 1 - player.hurt * 1.4);
-  // Sinking in deep water: everything goes murky blue.
-  if (zone.get(Math.floor(cam.ex), Math.floor(cam.ey), Math.floor(cam.ez)) === B.WATER_DEEP) S.tint(0.3, 0.55, 1.1);
 }
 
 // Numbers that pop up above a monster when you hit it, then float up and fade.
@@ -487,7 +510,7 @@ function drawSprite(game, s) {
   if (x1 < 0 || y1 < 0 || x0 >= S.cols || y0 >= S.rows) return;
 
   // Light at the sprite (it faces the camera, so the torch hits it head-on).
-  ambientAt(zone, s.x, s.y, cz, true);
+  ambientAt(s.x, s.y, cz, true);
   torchAt(vx / dist, vy / dist, vz / dist, dist, 1);
   let lr = lightR, lg = lightG, lb = lightB;
   if (s.emit) { lr += s.emit[0]; lg += s.emit[1]; lb += s.emit[2]; }   // its own glow (on fire)
