@@ -7,7 +7,8 @@
 //       while it is written. Only in a saveable screen (screens.js `saveable`: explore and map) with no zone
 //       being read: a request anywhere else waits for the first frame in one (its promise settles then). The
 //       first save of a run makes its slot (slotId, else a new id) in `store` (default: currentStore(), or a
-//       new memory store).
+//       new memory store). A save to another slot or store than the run's copies the zones the old slot holds
+//       that have left memory, so the new slot has every visited zone.
 //   loadGame(slotId, { game, store } = {}) → Promise<game>
 //       §7.3 "Loading": the world compiled (game.world), restoreRun(slot.run), never buildRun; state, player and
 //       the id counter (before any zone: the slot's, or a zone record's when that is higher); then changeZone(where, { how: "load" }) reads the zone you were in
@@ -99,18 +100,31 @@ registerUpdate("save:waiting", (game) => {
 }, { modes: ["*"] });
 
 function writeSave(game, { reason = "manual", store, slotId } = {}) {
-  const st = storeFor(store), sv = savingFor(game, st, slotId), now = Date.now();
+  const st = storeFor(store), old = game.saving, sv = savingFor(game, st, slotId), now = Date.now();
   // The snapshot: everything live is read in these lines, and nothing after them.
   const zones = [...game.zones.values()].filter((z) => visited(game, z) && (z === game.zone || (!sv.committed.has(z.key) && !sv.pending.has(z.key))));
   const snaps = zones.map((z) => snapshotZone(z, { slot: sv.slotId, savedAt: now }));
+  // A run saved to another slot (or store) than before: the zones its old slot holds that have left memory are
+  // copied over, so the new slot has every visited zone.
+  const carried = old && old !== sv ? [...old.committed].filter((k) => !game.zones.has(k)) : [];
   for (const s of snaps) pend(sv, s.key, now);
+  for (const k of carried) pend(sv, k, old.stored.get(k) ?? now);
+  const unpendAll = () => { for (const s of snaps) unpend(sv, s.key); for (const k of carried) unpend(sv, k); };
   let slotSnap;
   try {
     slotSnap = snapshotSlot(game, { id: sv.slotId, created: sv.created, updated: now, zones: [...sv.stored].map(([key, savedAt]) => ({ key, savedAt })) });
-  } catch (e) { for (const s of snaps) unpend(sv, s.key); throw e; }
+  } catch (e) { unpendAll(); throw e; }
   return enqueue(sv, async () => {
     const records = [];
     for (const s of snaps) records.push(await finishZone(s));
+    if (carried.length) {
+      await old.queue;
+      for (const k of carried) {
+        const r = await old.store.get("zones", [old.slotId, k]);
+        if (!r) throw new Error(`saveGame: ${k} left memory, and slot ${old.slotId} holds no record of it to copy`);
+        records.push({ ...r, slot: sv.slotId });
+      }
+    }
     const slot = JSON.parse(slotSnap.json);
     await st.tx(async (t) => {
       for (const r of records) await t.put("zones", r);
@@ -119,11 +133,12 @@ function writeSave(game, { reason = "manual", store, slotId } = {}) {
     return slot;
   }).then((slot) => {
     for (const s of snaps) committed(game, sv, s.key);
+    for (const k of carried) committed(game, sv, k);
     SAVE_STATS.saves++;
     trim(game, sv);
     return { id: slot.id, updated: slot.updated, zones: slot.zones.length, reason };
   }, (e) => {
-    for (const s of snaps) unpend(sv, s.key);
+    unpendAll();
     failed(game, sv, `saving slot ${sv.slotId}`, e);
     throw e;
   });

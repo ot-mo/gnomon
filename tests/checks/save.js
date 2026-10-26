@@ -37,7 +37,8 @@
 //      and while its next slam is warned (both views: zone.slam and zone.slamDone hold Sets). Zones made and left
 //      after a save (written behind): the load's id counter is above every id in them. A busy state on level 20
 //      (a monster hurt, poisoned and chasing, the Lich King in phase 1, holeSeen, uids and zone patches, a person met),
-//      every kept creature field compared as well. Legacy level 10's Gloom
+//      every kept creature field compared as well. The run saved to another slot after a zone left memory: the new
+//      slot holds it. Legacy level 10's Gloom
 //      Warden awake with its shades: its fight and their halved xp come back, and it doesn't wake again.
 //   6. The title screen at 100×30, through the real input handlers: with nothing saved only "New quick game";
 //      with a slot "Continue" too; each by keys (Enter, ↓ Enter, 2) and by a click on its line; New starts a
@@ -619,6 +620,32 @@ export async function checkSave({ game, startRun, inputHandlers, runSession, fre
     for (const key of ["0,0,1", "0,0,2"]) await getZone(game, key);
     idsAbove("zones written after the save, read back");
     hard.push(`zones written after the save (ids up to ${top}; the slot's counter ${atSave}): the counter ${n} after a load`);
+  }
+  // The same run saved to another slot after a visited zone has left memory: the new slot has that zone, read back
+  // as it was left (not generated afresh).
+  {
+    startRun(1234); game.pages = null; game.story.cube = true;
+    playing(game, "map");
+    await changeZone(game, "0,0,1", { how: "down" }); playing(game, "map");
+    const L1 = game.zone, gone = L1.creatures.filter((c) => !c.talk).length;
+    L1.creatures = L1.creatures.filter((c) => c.talk);   // every hostile on level 1 dead
+    const st = memoryAdapter();
+    await saveGame(game, { store: st });
+    await changeZone(game, "0,0,2", { how: "down" }); playing(game, "map");
+    await whenWritten(game);
+    const left = await digestGame(game, [L1.key]);
+    if (!evictZone(game, L1.key)) fail(`${L1.key} couldn't leave memory after its write`);
+    const b = await saveGame(game, { store: st, slotId: "other" });
+    const keysB = (await st.list("zones", { slot: "other" })).map((r) => r.key).sort();
+    startRun(4321); game.pages = null;
+    await loadGame(b.id, { store: st });
+    const gens = { n: 0 }, real = ZONE_GENERATORS.dungeon;
+    ZONE_GENERATORS.dungeon = (...a) => { gens.n++; return real(...a); };
+    const back = await digestGame(game, [L1.key]);
+    ZONE_GENERATORS.dungeon = real;
+    if (!keysB.includes(L1.key) || gens.n || back.zones[L1.key] !== left.zones[L1.key])
+      fail(`a save to another slot after ${L1.key} left memory: the slot holds ${keysB.join(" ")}; reading ${L1.key} generated ${gens.n} zone(s); ${back.zones[L1.key] === left.zones[L1.key] ? "identical" : "it differs from the zone left"}`);
+    hard.push(`saved to another slot after ${L1.key} (${gone} hostiles killed) left memory: the slot holds ${keysB.join(" ")}, ${L1.key} read back ${gens.n ? "GENERATED" : "identical"}`);
   }
   stats.hardCases = hard.join("; ");
 
