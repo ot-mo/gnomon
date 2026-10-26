@@ -201,8 +201,13 @@ const HUM = [260, 1100], NEUTRAL = [520, 1500];
 
 export const NEUTRAL_VOICE = Object.freeze({ pitch: 190, wave: "triangle" });
 export { VOICES };
+const WAVES = new Set(["sine", "triangle", "sawtooth", "square"]);
 export function voiceOf(voice) {
-  if (voice && typeof voice === "object") return { ...NEUTRAL_VOICE, ...voice, pitch: Number(voice.pitch) > 0 ? Number(voice.pitch) : NEUTRAL_VOICE.pitch };
+  if (voice && typeof voice === "object") {   // its own keys only, each checked; what's missing or wrong is neutral
+    const own = (k) => (Object.hasOwn(voice, k) ? voice[k] : undefined), pitch = Number(own("pitch")), wave = own("wave");
+    return { pitch: Number.isFinite(pitch) && pitch > 0 ? pitch : NEUTRAL_VOICE.pitch, wave: WAVES.has(wave) ? wave : NEUTRAL_VOICE.wave,
+             thin: !!own("thin"), ghost: !!own("ghost"), stone: !!own("stone") };
+  }
   return (typeof voice === "string" && Object.hasOwn(VOICES, voice) && VOICES[voice]) || NEUTRAL_VOICE;
 }
 
