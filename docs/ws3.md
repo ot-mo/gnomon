@@ -58,8 +58,10 @@ What other workstreams and the integrator can use (everything P0 froze keeps its
 - `setDynamicResolution(on)`, `dynamicResolution() → { on, half }`, `judgeFrame(ms, now)`: §6.7's half-column
   rendering outdoors (on by default in a page, off in Node; never underground).
 - `horizonOf(game, zone) → { n, e, s, w: { z, color } }`: the horizon plane per side.
-- `GNOMON`, `gnomonDrawn() → bool`: the Gnomon on the horizon (bible §4.12) and whether the last 3D frame showed it
-  (for WS1's "the Gnomon in sight").
+- `GNOMON`, `gnomonDrawn() → bool`, `gnomonLightSeen(game, zone) → bool`: the Gnomon on the horizon (bible §4.12),
+  whether any of it was in sight in the last 3D frame (for WS1's "the Gnomon in sight"; at night only its violet light
+  counts), and whether that light can be seen from where you stand (the Shade; 4 above the datum on the Rust Steps).
+- `lookState()` (this frame's sky: daylight, stars, the disc; tests).
 - `liquidTintAt(game, zone, x, y) → [r, g, b] | null`: the colour of the water at (x, y) when it holds another liquid,
   beyond the edge the neighbour's (when that zone is in memory).
 - `CLOCK_SEGMENT`: the HUD's clock segment (§4.5), for the integrator to register (request 3).
@@ -74,7 +76,8 @@ What other workstreams and the integrator can use (everything P0 froze keeps its
   narrow enough to sit beside an 80-wide zone at 180 columns.
 - `toggleMapLegend(game) → bool` (hide, or show even where it doesn't fit: the view then narrows and follows you),
   `mapLegendShown(game)`, `setLegendKeyHint(text)` (the bound key's label at the foot of the outdoor legend),
-  `liquidColor(zone, x, y)`.
+  `setMapLegendMode("auto" | "on" | "off")` (tests), `liquidColor(zone, x, y)`. A column the map shows as floor
+  without your knowing better takes its nearest true floor's look (a chasm's middle the room's floor).
 
 ### `music.js`, `content/moods.js`, `sfx.js`
 
@@ -84,7 +87,7 @@ What other workstreams and the integrator can use (everything P0 froze keeps its
   plays unless the place's mood is in `allNight`.
 - `speakLetter(ch, voice)`: `voice` is a voice object `{ pitch, wave, thin?, ghost?, stone? }` (WS6b's `voiceFor`
   makes them), or a parent's person's id (`VOICES`); anything else speaks in `NEUTRAL_VOICE`. `voiceOf(voice)` gives
-  the object played.
+  the object played: a voice object's own keys only, a finite positive pitch, a known wave, else the neutral voice's.
 
 ### Outdoor rendering (what a zone with sky looks like)
 
@@ -140,7 +143,14 @@ function of its own): golden (b) and the screen frames are unchanged.
    `tests/checks/index.js`'s perf line still names p0-0d1 as the reference.
 9. **"gold" in the underground map legend**: golden (b)'s frames show the parent's legend, so the word stays
    underground until golden (b) is retired; the outdoor legend says glim. Change `renderMap.js`'s `$` row then.
-10. **For C1, WS6b and WS7**: a region or terrain may carry `fog` (a number added to the haze density) and a region
+10. **The Gnomon's voxel foot** (C1's landmark plan, or WS2's landmark stamping): the bible (§4.12) has a 14-block voxel
+    foot at the middle of span (37, 3), the needle's billboard continuing above it; the landmark has no plan yet, so the
+    billboard rises from the ground there. render3d.js starts it on whatever stands at the span's middle, so the foot
+    needs no change here once it is built.
+11. **For WS1**: `render3d.gnomonDrawn()` is false at night unless the Gnomon's violet light is in sight (the Shade, a
+    Rust Steps mesa's top), and false when terrain hides it; "the Gnomon in sight" (+10% recovery, bible §15.6) can read it
+    after a 3D frame. On the world map it is a letter (WS1's).
+12. **For C1, WS6b and WS7**: a region or terrain may carry `fog` (a number added to the haze density) and a region
     `music` (a mood of `music.moodNames()`); a liquid in `content/liquids.js` is drawn in its `color`; the Lengthening
     sets `state.noonLength` (the Hand's N, bible §4.8; 15.5 until it does). WS1 may use `clock.handAt` / `underHand`
     for the Hand's stripe and caravans, and `render3d.gnomonDrawn()` for "the Gnomon in sight".
