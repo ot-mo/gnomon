@@ -239,7 +239,9 @@ registerStatus("flat", { color: [220, 220, 230], t: 10, flags: { flat: true },
   onEnd(game, e) { if (isPlayer(game, e)) setDownSafely(game, e); } });
 
 // A flat thing coming back up: on its own tile if it can stand there, else on the nearest tile within 3
-// where it can (never over a chasm, in deep water, inside a wall, or onto a creature).
+// where it can (never over a chasm, in deep water, inside a wall, or onto a creature or a person: their
+// tile, or the one a creature is stepping to). If nothing within 3 will do, the search goes on outward:
+// you can't fall out of the Plane (bible §10.2).
 export function setDownSafely(game, e) {
   const zone = game.zone;
   if (!zone?.stand) return;
@@ -247,10 +249,11 @@ export function setDownSafely(game, e) {
     if (x < 0 || y < 0 || x >= zone.w || y >= zone.d) return false;
     const z = zone.stand[x + y * zone.w];
     if (z < 0 || zone.get(x, y, z - 1) === B.WATER_DEEP) return false;
-    return !zone.monsters?.some((m) => m.tx === x && m.ty === y);
+    if (zone.monsters?.some((m) => m !== e && ((m.tx === x && m.ty === y) || (m.nx === x && m.ny === y)))) return false;
+    return !zone.npcs?.some((n) => n.tx === x && n.ty === y);
   };
   const tx = Math.floor(e.x), ty = Math.floor(e.y);
-  for (let r = 0; r <= 3; r++)
+  for (let r = 0, far = Math.max(zone.w, zone.d); r <= far; r++)
     for (let dy = -r; dy <= r; dy++)
       for (let dx = -r; dx <= r; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r || !ok(tx + dx, ty + dy)) continue;

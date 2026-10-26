@@ -18,6 +18,9 @@
 //      map only the first step in from dry ground asks; a step inside the water just swims.
 //   5. Flat: the map view is forced, Tab is locked until it ends, the HUD shows it. Escape (the map's
 //      other way of turning) is locked too, and no fold power fires (Folding strike, a rat next to you).
+//      Set down safely when it ends: one tile into the pond with a person, a rat and a rat stepping onto
+//      the three shore tiles next to you, you come up on the nearest free one two tiles off; in the
+//      pond's middle (no dry tile within 3) you still come up on dry ground.
 //
 //   6. The HUD row (hud.js drawHud, read back from the screen) shows every active status's text in its
 //      colour, in both views, and drops it once the status is removed.
@@ -323,6 +326,25 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles, capture }
   if (!hud.some((t) => t.startsWith("FLAT"))) fail(`flat: the HUD shows ${JSON.stringify(hud)}`);
   if (!ended || !unlocked) fail(`flat: after it ends (${ended}) Tab should work again (${unlocked})`);
   game.mode = "map"; game.view = "map";
+  {
+    const p = game.player, zone = game.zone;
+    const flatAt = (x, y) => { Object.assign(p, { x, y, z: FLOOR_Z }); St.addStatus(game, p, "flat", { t: 30 }); St.removeStatus(game, p, "flat"); return [Math.floor(p.x), Math.floor(p.y)]; };
+    const rat = (tx, ty, nx = tx, ny = ty) => Object.assign(spawnMonster("rat", tx, ty, FLOOR_Z, "idle", 1, null, () => 0.5), { tx, ty, nx, ny });
+    zone.monsters.push(rat(29, 24), rat(28, 25, 29, 25));
+    zone.npcs ||= [];
+    const person = { type: "status-test", tx: 29, ty: 23 };
+    zone.npcs.push(person);
+    const near = flatAt(30.5, 24.5);
+    zone.monsters.length = 0; zone.npcs.splice(zone.npcs.indexOf(person), 1);
+    const far = flatAt(40.5, 24.5);
+    mapWait(game);
+    const dry = (t) => zone.stand[t[0] + t[1] * zone.w] >= 0 && !(t[0] >= 30 && t[0] < 50 && t[1] >= 14 && t[1] < 34);
+    if (near.join() !== "28,22") fail(`flat ends 1 tile into the pond, shore tiles taken: set down on ${near} (want 28,22)`);
+    if (!dry(far) || St.hasStatus(p, "drowning")) fail(`flat ends in the pond's middle: set down on ${far}, drowning ${St.hasStatus(p, "drowning")}`);
+    stats.flatSetDown = { near, far };
+    freshPlayer(); enter();
+    game.mode = "map"; game.view = "map";
+  }
 
   // --- 6. The HUD row ---------------------------------------------------------------------------
   if (!capture) fail("no frame capture passed: the HUD can't be checked");
