@@ -11,8 +11,9 @@
 //      gained, stairs, death; a text field takes "m", "Ö" and "M" from real keys without toggling the
 //      music; losing the pointer lock in 3D opens pause. Here too: the victory card (the Lich King's
 //      epilogue paged by Space, then by clicks; R and a click on "Press R…"), and since 0D2 the title screen (the
-//      page without ?quick=1: Enter, then a click on "New quick game"), and since WS8's merge the target screen
-//      (L on the map; Esc, a right click), so every registered mode is reached.
+//      page without ?quick=1: Enter, then a click on "New quick game"), since WS8's merge the target screen
+//      (L on the map; Esc, a right click) and since WS4a's the creation wizard (pushed over the map as WS9's
+//      title will push it; Esc, a click on [ Back ]), so every registered mode is reached.
 //   2. The HUD at 100×30 (a 600-pixel window 30 cells tall: 300 px with 10-pixel cells, 330 with Windows'
 //      11): tests/checks/hud.js in the browser (screen sizes 100×30,
 //      100×40, 180×56, 80×25), then on the real canvas with every Phase 0 segment and seven statuses on, in
@@ -190,6 +191,20 @@ try {
       await frames(page, 2);
       const closed = await mode();
       if (closed !== "map") problems.push(`target by ${how}: ${how === "keys" ? "Esc" : "a right click"} led to ${closed}, not back to the map`);
+    }
+    // The creation wizard (WS4's, merged at p2-ws4a): pushed over the map with { seed, mode } as WS9's title will
+    // push it (no key opens it before that title is in); Esc on its first step goes back, and again by a click on
+    // its [ Back ].
+    if ((await mode()) === "map") for (const how of ["keys", "mouse"]) {
+      await page.evaluate(async () => { const S = await import("/src/screens.js"); S.pushMode(window.game, "create", { seed: 1234, mode: "commonsLamp" }, { pointer: false }); });
+      await frames(page, 2);
+      const opened = await mode();
+      if (opened !== "create") { problems.push(`create: pushed over the map, the mode is ${opened}`); break; }
+      reached.add("create");
+      if (how === "keys") await page.keyboard.press("Escape"); else await click("[ Back ]");
+      await frames(page, 2);
+      const closed = await mode();
+      if (closed !== "map") problems.push(`create by ${how}: ${how === "keys" ? "Esc" : "a click on [ Back ]"} on its first step led to ${closed}, not back to the map`);
     }
     const all = await page.evaluate(async () => [...(await import("/src/screens.js")).SCREENS.keys()].filter((m) => !m.startsWith("test:")));
     const missing = all.filter((m) => !reached.has(m));
