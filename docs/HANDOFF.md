@@ -3,31 +3,31 @@
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
 **Updated:** 2026-10-27, the integrator (local session), on `integration`. **Phase 1 is running and Phase 2's
-integration has started: WS3, WS8, WS4, WS6, WS7 and WS2 (both halves each), WS5 and WS10 are merged (`p2-ws3`,
-`p2-ws8`, `p2-ws4a`, `p2-ws5`, `p2-ws6a`, `p2-ws4b`, `p2-ws6b`, `p2-ws10`, `p2-ws2a`, `p2-ws7a`, `p2-ws7b`, `p2-ws2b`),
-and the flip is in (`p2-flip`: the attribute set and d20 by default); the next `p1-*` tag merges as it lands (WS9
-isn't tagged yet; WS1 is queued).** From here on only the integrator edits this file and
+integration has started: WS3, WS8, WS4, WS6, WS7 and WS2 (both halves each), WS5, WS10 and WS9 are merged (`p2-ws3`,
+`p2-ws8`, `p2-ws4a`, `p2-ws5`, `p2-ws6a`, `p2-ws4b`, `p2-ws6b`, `p2-ws10`, `p2-ws2a`, `p2-ws7a`, `p2-ws7b`, `p2-ws2b`,
+`p2-ws9`), and the flip is in (`p2-flip`: the attribute set and d20 by default); WS1, the last, merges next.** From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p2-ws2b` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+- **Last tag:** `p2-ws9` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
   `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b`, `p1-ws10`, the flip, `p1-ws2a`, `p1-ws7a`,
-  `p1-ws7b` and `p1-ws2b`, with their integration requests; `p2-ws3` … `p2-ws7b` before it).
+  `p1-ws7b`, `p1-ws2b` and `p1-ws9`, with their integration requests; `p2-ws3` … `p2-ws2b` before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
 - **Branch:** `integration`, in the worktree `C:\Users\Otto Mörner\Code\gnomon-wt\integration` (serves on port
   8660). Nothing is half finished.
 - **Done:** Phase 0 (0A1 … 0D2, notes in `docs/sessions/0A1.md` … `0D2.md`); WS3, WS8, WS4, WS5, WS6, WS10,
-  WS7 and WS2 (`docs/ws3.md`, `ws8.md`, `ws4.md`, `ws5.md`, `ws6.md`, `ws10.md`, `ws7.md`, `ws2.md`;
+  WS7, WS2 and WS9 (`docs/ws3.md`, `ws8.md`, `ws4.md`, `ws5.md`, `ws6.md`, `ws10.md`, `ws7.md`, `ws2.md`, `ws9.md`;
   `docs/sessions/ws3.md`, `ws8.md`, `ws4.md` "Part 4a" and "Part 4b", `ws5.md`, `ws6.md` "Part 6a" and "Part 6b",
-  `ws10.md`, `ws7.md` "Part 7a" and "Part 7b", `ws2.md` "Part 2a" and "Part 2b"), merged. The merges' own numbers are under "Integration log" below.
+  `ws10.md`, `ws7.md` "Part 7a" and "Part 7b", `ws2.md` "Part 2a" and "Part 2b", `ws9.md`), merged. The merges' own numbers are under "Integration log" below.
 - **Checks:** `node tools/run-all.mjs`, 38 checks (WS10 added `check-sites`) (about 2 minutes on an idle machine, 4 with three workstreams
   running; the timed ones, `check-dungeons`, `check-status`, `check-stats` and `check-perf`, alone at the end; since
   WS3, `check-perf` runs the render check first). Browser (headless Playwright, audio silenced,
   `NODE_PATH="$(npm root -g)"`): `browser-0d2.mjs`, `browser-0d1.mjs`, `browser-gate.mjs`, `browser-silent.mjs`, and
   with `node tools/serve.mjs <port>` running, `browser-shell.mjs` and `browser-0c.mjs` (`--port <port>`); each
   workstream's own (`browser-ws8.mjs` from WS8, `browser-ws4.mjs` from WS4, `browser-ws5.mjs` from WS5,
-  `browser-ws6.mjs` from WS6; `browser-ws7.mjs`, the integrator's, for WS7b's pray quests). `tools/README.md` has every command and what each check proves.
+  `browser-ws6.mjs` from WS6; `browser-ws7.mjs`, the integrator's, for WS7b's pray quests); WS9's browser half, `check-save.mjs --browser` (not in
+  `run-all`). `tools/README.md` has every command and what each check proves.
 
 ## Next step
 
@@ -70,7 +70,7 @@ tags; WS1, which builds on the most, last):
 
 | # | Workstream | Worktree (`gnomon-wt\…`), branch | State |
 |---|---|---|---|
-| 1 | WS9 Persistence and shell | `ws9`, `ws/ws9` | running (since 2026-10-26) |
+| 1 | WS9 Persistence and shell | `ws9`, `ws/ws9` | tagged `p1-ws9` (fd2aa33), **merged, `p2-ws9`** (2026-10-27) |
 | 2 | WS3 Rendering outdoors and presentation | `ws3`, `ws/ws3` | tagged `p1-ws3` (51785f7); **merged, `p2-ws3`** (2026-10-27) |
 | 3 | WS8 Combat depth, AI and targeting | `ws8`, `ws/ws8` | tagged `p1-ws8` (c9638c0); **merged, `p2-ws8`** (2026-10-27) |
 | 4 | WS5 Body mods, items and equipment UI | `ws5`, `ws/ws5` | tagged `p1-ws5` (058bbbc); **merged, `p2-ws5`** (2026-10-27) |
@@ -143,10 +143,12 @@ legend in pause card key list"), each now a carried item below:
 
 - **WS9's recorded frames:** at WS9's merge the integrator excludes from `tests/checks/screen-frames.js`, by exact name
   in `NOT_COMPARED`, only the frames WS9's HUD, pause and death screens change, each with its reason; WS9's own check
-  must hold the new screens; golden (b) stays held. No blanket exclusion.
+  must hold the new screens; golden (b) stays held. No blanket exclusion. **Done at `p2-ws9`**: WS9's four "… 3d pause
+  card" frames by name, beside WS3's and WS5's (13 in all), `tests/checks/save.js` section 20 holding the card.
 - **The d20 balance at tiers 5-8:** no retune until WS4's powers are in, then settle it with WS8's TTK tables shown to
   the user: shown at `p2-ws4b`; the user flipped as built and put the tuning in the balance phase (above).
-- **The map's key hints** (L look, V fire, `,` legend, hotbar key 1): in WS9's pause card key list (WS9 has been told).
+- **The map's key hints** (L look, V fire, `,` legend, hotbar key 1): in WS9's pause card key list. **Done at `p2-ws9`**,
+  with P factions beside them; check-save asks that every key the card names is bound.
 
 ## Carried integration requests (by owner)
 
@@ -167,7 +169,7 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   factions step (`world/run.js`, which registers each village's own since `p2-ws7b`); the villagers' fight (mortal
   since `p2-ws7b`, they neither fight back nor flee: people's brains); the line logged after the intro on a
   real-world run (still the parent's "Maren is waiting in the main hall").
-- **WS1** (at its merge; WS10 #7, WS7a #3): `learnSecret` calls `overworld/discovery.js pin(game, wx, wy, { label,
+- **WS1** (at its merge; WS10 #7, WS7a #3; WS9 #8: register `"world"` with `saveable: true`): `learnSecret` calls `overworld/discovery.js pin(game, wx, wy, { label,
   secretId })` once discovery.js drops `STUB`; the visit quest also listens to `world:step` and reads `ev.to` as `{ wx,
   wy }`; the journal's Locations tab wants a key that opens the world map centred on a span; discovery XP is WS1's and skips
   village sites, whose first visit pays its own (`story/village-site.js`, `xpReward("village")`, source `"village"`;
@@ -175,12 +177,6 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   (bible §15.2's spawn keys as registered types with weights) through `gen/biomes/common.js spawnPick(rng, spawns,
   level)`. A legend met on the road is a zone patch `{ op: "spawnCreature", uid: def.uid, type:
   def.species, level: def.level }` with the def from `legendOf(run, uid)`; its lair is then empty of it (checked).
-- **WS9** addition (from WS10 #2): `config.js` `VERSION.gen` should follow `world/run.js GEN_VERSION`, now 4 (WS7a's history and secrets; WS7b's villages,
-  their secrets and factions). From
-  WS2a: #1, `save/codec.js` saves `zone.liquid` (in `AFTER`; one string a zone: without it a surface zone read back
-  holds plain water, the Brine Flats' brine and the rest lost); #3 (WS3 #6's other half, with WS9's "prefetch through
-  the loader"): a neighbour read from the save (`zones.js readAhead`) builds its far bands in the swap; step
-  `apronBandSteps(game.run, wx, wy)` a band a frame once the read lands, as a job beside `game.prefetchJob`.
 - **C4 / WS5** (WS6a #5's wearables, bible §3.5): the feather cloak, an Hour mask, the Assize writ, ink stains give
   `addRep(game, f, n, "worn")` when worn and take it back when unworn. **Content (C)**, WS6a #9: the Lantern Moths'
   "like you while your torch is lit" (text only today); the Smoothers with no membership (the parent rule makes them
@@ -216,23 +212,6 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   pots, marker chalk, an Assize writ); a glim heart through `torchCost` (stats.js, applied). Information: WS8's L in
   both views emits `inspect { open: true }` (the examine screen opens on it); missile weapons are carried in the pack,
   not held, and `inventory.js` reads `WEAPONS[wielded.id]`.
-- **WS9** (at its merge): WS3 #3, register the HUD's clock segment (`hud.registerHudSegment("clock",
-  render3d.CLOCK_SEGMENT)`, under the sky only) and let `tests/checks/hud.js:91`'s 180-column "parent's order"
-  assertion allow it on the start span (outdoors); WS3 #7, the held weapon at night (`hud.js:326-328`) lit by
-  `light.lightAt(...).sky` (sky × daylight), not the raw sky light. **The recorded frames** (the user's decision above): exclude by exact name only the
-  frames WS9's HUD, pause and death screens change, each with its reason, WS9's own check holding the new screens,
-  golden (b) held. **The key hints** L (look), V (fire), `,` (the map legend; it was G until the WS5 merge, WS9 told) and hotbar key 1
-  on the pause card's key list: if
-  WS9 tags without them, add them at the merge (`screens/pause.js` is WS9's, merged by then) or carry the request on.
-  WS5 #4, bare hands, all at once: `player.js attackTime` and `weaponReach` (WS4's) and `hud.js drawSword` read
-  `WEAPONS[wielded(p).id]` and fail with nothing in the main hand; give fists a swing time and reach (no design number
-  exists: the dagger's 0.3 s and a shorter reach, say), then `inventory.js unequipPart`'s "the main hand's weapon
-  stays" can go. WS4 #4 with WS9 #2: `game.js startRun(seed, world, { mode, player })`, then `chargen.js beginRun`
-  calls it so and `player.js` drops `nextRunPlayer`. WS6a #7: "P factions" on the pause
-  card's key list beside the others (WS9 was paused before its tag and not told; add it at the merge).
-  WS4 #12 and #13: WS9's title pushes `"create"` with `{ seed, mode }` (the wizard is registered on `integration`
-  since `p2-ws4a`), and the wizard can read `save.js RUN_MODES` instead of its own copy; the wizard is for the
-  attribute set, which is the default since `p2-flip`, so the title's New game pushes it. WS4 #4 with WS9 #2 (startRun's `{ mode, player }`): above, under WS4b.
 - **C (content), from the WS2b merge** (WS2b #9, #10): a landmark plan (C1) may use WS2's legend letters (`legend: { ch:
   id }`, with `props`, `creatures` and `rubble` on the plan; `gen/biomes/legend.js`); a plan replaces
   `LANDMARK_BUILDERS`, and the Gnomon's must stand its own 14-block foot at the span's middle, (40, 24), where render3d
@@ -254,6 +233,44 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p2-ws9`** (2026-10-27): `p1-ws9` (fd2aa33, from `p0-done`) merged into `integration` (`84639c4`). One conflict,
+`tests/checks/screen-frames.js` `NOT_COMPARED`, joined (WS9 #12): 13 frames by exact name with their reasons (WS3's
+victory card, WS5's 8 inventory frames, WS9's 4 "… 3d pause card" frames); the other 34 compared, 0 mismatched.
+- Applied, each with an assertion that fails without it: the pause card names P factions too, and every key it names
+  is bound (`069dc43`, WS6a #7, the user's decision); `startRun(seed, world, { mode, player })` (`3e0e1d8`, WS4 #4 with
+  WS9 #2: the mode in the run's state before its first save; `nextRunPlayer` gone; the victory card's R keeps the
+  mode too); the held weapon lit by the hour under the sky (`4789ab5`, WS3 #7: 0.82 at noon, 0.22 at midnight; the
+  commit says 0.40, a guess, measured after); bare hands (`cd70e6c`, WS5 #4: FISTS swing 0.3 s, reach 1.3; the
+  parent's boons and Pell's forge find no weapon); a neighbour read from the save gets its far apron bands a band a
+  frame (`893fc1a`, WS2a #3: 3 of 3 sides in 6 frames); browser-shell learns log and options, browser-0d1's title tour
+  goes through the wizard (`532bdb8`, WS9 #11: 25 of 25 modes); `player:hurt` and `log` events (`b1966b8`, #3 and #4:
+  60 lines in one frame all kept); `RULES.oneWick` in rules.js (`a24d5c2`, #6); saveThrough on char, abilities,
+  examine, factions and journal (`e2e0b66`, #9); README rows and the `?quick=1` memory store kept for the tools
+  (`cb93db3`, #10, #1). Coordinator-approved P0 check changes: `VERSION.gen` follows `GEN_VERSION` (4), check-config
+  holds them equal (`7b6b585`, `04422a2` for its run-all runner; WS10 #2: 4 is the baseline of the title's "older
+  version" warning, no saves predate WS9's store); WS3's clock segment registered and check-hud's 180-column row
+  holding it (`d6b273e`, WS3 #3: the parent's row underground as before, the clock required under the sky before fps;
+  the three mutants fail).
+- Confirmed, nothing to change: WS2a #1 (WS9's codec keeps every zone field as plain JSON, `zone.liquid` included;
+  `2925502` holds it); Pilgrim's XP (WS9 #9, in leveling.js since WS4). Carried: #5 (Esc on the map, for the
+  coordinator), #7 (information), #8 to WS1; WS4 #13 (the wizard's own copy of the run modes) left as it is.
+- Merge findings: check-save hung (exit 13, `b9b319d`): WS9's title sections expected p0-done's "New quick game",
+  and on integration the title opens WS4's wizard; they go through it now. WS8's write-behind follower test
+  (`92d474a`): WS9 writes a zone you leave with the next slot record, so the test makes that save. A made Plumb never
+  started with its free implant (`28c83e6`): makeCharacter asked for a Truing Cradle and took a part type for a body
+  part; fitted free now, all six backgrounds. check-save --browser met the same wizard (`f2e4066`). Drowning's
+  `t: Infinity` came back null from a save (`3006fc3`: 1e9 now). browser-ws8's arena pinned its creatures with
+  Infinity, which WS9's automatic save refused (`01ab2d8`). check-save section 21 (`7a478ef`): a made Plumb and Bent
+  with reputation, secrets, a village quest, a struck villager and a follower, through a save and a load: the same.
+- Checks: `run-all` at `01ab2d8` **38 of 38** (190.4 s). Timed alone (24% load, no training job) against `p2-ws2b`, `check-perf --rounds 3 --no-render`:
+  **PASS**, ×0.74-1.14 (the outdoor frame p50 16.3 against 15.9, dungeon generation p95 33.7 against 29.5, budget 40;
+  the night frame's p95 64 ms, its p50 14.8). `check-save --browser` **PASS**. Browser (0 console errors, audio
+  silenced): `browser-0d1 --against p0-done` (25 of 25 modes, the HUD at 100×30 with the clock, golden (b) 27 of 27,
+  per tick underground +1.9% in 3D and +2.0% on the map, the surface −10.0% in 3D); `browser-0d2 --all` (boot with 179
+  modules, `test-world.html` 34 passed, 0 failed); `browser-gate` (1234, 7); `browser-silent`; and on `tools/serve.mjs
+  8660`, `browser-0c` (1234, 7), `browser-shell` (55 mode changes at each size), `browser-ws4`, `browser-ws5`,
+  `browser-ws6`, `browser-ws7`, `browser-ws8`.
 
 **`p2-ws2b`** (2026-10-27): `p1-ws2b` (2003f0a, above `p1-ws2a`) merged into `integration` (`cfb7272`), cleanly: since
 `p1-ws2a` WS2b changed only its own files (`gen/biomes/*`, `gen/surface.js`, `gen/terrain.js`, `gen/apron.js`,
@@ -764,10 +781,14 @@ its §8.4 files and two P0 checks).
   `Θ` artifact, `≡` cell, `¶` true-mark) wait with the underground legend for golden (b)'s retirement; two old lines
   kept as golden and the frames record them (#23: "You put on the The Mantle of Angles.", "throwing knifes"); a stray
   file outside the repository, `C:OTTOMR~1placeholder-never-written.txt` (1 byte), to delete by hand (the user).
-- **WS9:** Continue can mix two moments (zones left after the last save are written behind and read on load: an item
-  dropped after the save is duplicated); §7.3's save on a completed zone change fixes it. Saves are in memory only
-  (IndexedDB, periodic and unload saves, the oneWick slot deleted on death, checkpoints). Prefetch is skipped while
-  `ZONE_LOADER.load` is set (prefetch through the loader). `?debug=1` is parsed but unused.
+- **WS9 (merged; what's left):** **for the coordinator:** Esc on the map is still the parent's "to 3D" (TECH §4.2 says
+  it opens the options; P0's `tests/checks/shell.js:366` holds Esc → 3D, so changing it needs that check changed; WS9
+  #5): the options and save-and-quit are reached from the map by Tab and Esc twice, or the title. A `?quick=1` game's
+  saves stay in memory (the browser tools; the title moves it into IndexedDB), `main.js` and `tools/README.md` say
+  so (#1). The wizard keeps its own copy of the run modes' names (WS4 #13, harmless). `VERSION.gen` is 4, the baseline
+  the title's "made by an older version" warning starts from (no saves predate WS9's store), held equal to
+  `GEN_VERSION` by check-config. `check-save --browser` isn't in `run-all`: run it at every merge that touches saves
+  or the shell.
 - **WS4 (merged; what's left):** the flip is in (`p2-flip`); its tuning is the balance phase's (above). 20 of the bible's 40 mutations (deviation 17);
   the Smoothers never come until something listens to `"smoothers"` (C2); Cast watches the view each frame until
   `"view:turn"` exists (the integrator's backlog). On the map an ability aims within its own reach now (WS8's target
