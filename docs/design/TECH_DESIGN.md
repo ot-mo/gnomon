@@ -1953,7 +1953,7 @@ workstream when both are merged.
 | `render3d.js raycast.js light.js materials.js renderMap.js clock.js screen-canvas.js music.js sfx.js`, `content/moods.js`, `check-perf`, `tests/checks/render.js` | WS3 |
 | `progression/*`, `abilities.js`, `player.js`, `leveling.js`, `screens/create charsheet abilities levelup`, `content/genotypes backgrounds mutations powers`, `check-progression`, `browser-ws4`, `tests/checks/progression.js` | WS4 |
 | `items.js inventory.js effects.js body.js`, `bodymods/*`, `screens/equipment examine inventory`, `content/items/legacy artifacts implants`, `check-items`, `browser-ws5`, `tests/checks/items.js` | WS5 |
-| `factions.js talk.js`, `social/index reputation builders`, `screens/factions`, `content/factions`, `check-social`, `tests/checks/social.js` | WS6a |
+| `factions.js talk.js`, `social/index reputation builders`, `screens/factions`, `content/factions`, `check-social`, `browser-ws6`, `tests/checks/social.js` | WS6a |
 | `dialogue.js`, `social/merchants ritual voices shrines backings liquids`, `screens/trade ritual`, `content/liquids items/containers` | WS6b (same agent as 6a) |
 | `story/*`, `screens/journal story`, `content/grammar quests villages creatures/villagers`, `check-story`, `tests/checks/story.js` | WS7 |
 | `combat.js ai.js creatures.js turns.js throwing.js missiles.js`, `screens/target.js`, `content/items/missiles`, `check-combat`, `browser-ws8`, `tests/checks/combat.js` | WS8 |
