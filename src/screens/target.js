@@ -20,7 +20,7 @@
 //       → a pretend projectile (throwing.js ballisticFrom: the line of fire), done(game, target | null) }
 //       target = { creature, point, tile, dir } (abilities.js aimTarget's shape); creature: one you can
 //       see on the tile (a person for a look), else null
-//   requestTarget(game, ability, done)     abilities.js's seam with the screen behind it: in 3D
+//   requestTarget(game, ability, done)     abilities.js's seam with the screen behind it (abilities.js MAP_TARGET): in 3D
 //       done(aimTarget(game, range)) at once, on the map done(target | null) when you confirm or cancel; an
 //       ability with spec(game, e) → a combat spec gets its hit chance shown
 //   look(game)                             L in either view
@@ -34,7 +34,7 @@ import { keys } from "../input.js";
 import { UI } from "../ui.js";
 import { mapView, tileAtCell, inspectAt, describeTile } from "../renderMap.js";
 import { emit } from "../events.js";
-import { aimTarget, REQUEST_RANGE } from "../abilities.js";
+import { aimTarget, REQUEST_RANGE, MAP_TARGET } from "../abilities.js";
 import { flightOf, THROW_AIM, THROW_RANGE, BOMB_RANGE, THROW_TIME, THROW_GRAVITY, throwSpeed, throwAt, finishFlight, ballisticFrom } from "../throwing.js";
 import { hitChance, toHitMod, dvOf, critNat, weaponSpec, resistText, thrownSpec } from "../combat.js";
 import { canTalk, ghostHidden, ghostOffMap, isFlat, typeOf, touchable } from "../creatures.js";
@@ -118,6 +118,7 @@ export function requestTarget(game, ability, done) {
   openTarget(game, { purpose: "ability", range: ability?.range || REQUEST_RANGE, verb: `use ${ability?.name || "it"}`,
                      spec: ability?.spec?.(game, game.player) || null, done: (g, t) => done(t) });
 }
+MAP_TARGET.request = requestTarget;   // abilities.js requestTarget on the map (WS4 #1, WS8 #1)
 
 // T on the map with the d20 set (throwing.js throwAtNearest calls it through THROW_AIM): the ready stack
 // at a target; the confirm throws it on its arc and passes the throw's time, then the flight's.

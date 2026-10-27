@@ -17,17 +17,17 @@
 //   useAbility(game, e, id) → bool           what a hotbar key does, in either view: refused (and told) when
 //                                            it isn't yours, cools down, or you can't act; else the target
 //                                            (3D: aimTarget; the map: requestTarget), activate, and on the map
-//                                            def.mapTime seconds pass (turns.js mapUseTime, as a throw does)
+//                                            def.mapTime seconds pass (turns.js mapUseTime, as a throw does).
+//                                            On the map the target screen answers later: false now, and the
+//                                            ability acts when you confirm (cancelled: nothing, no cost)
 //   useHotbar(game, k) → bool                e.hotbar[k] (k = 0..8: keys 1-9; ids only) through useAbility
 //   aimTarget(game, range) → { creature, point, tile, dir }   3D: along the view ray (pitch included); the
 //                                            creature nearest the crosshair inside a 6° cone with line of sight
 //                                            within range, the point where the ray meets a block (or its end)
 //   requestTarget(game, ability, done)       a target, in either view: in 3D done(aimTarget(game, range)) at
-//                                            once (range: the ability's, else REQUEST_RANGE); on the map the P0
-//                                            stub, done({ creature, point, tile, dir }) at once with the nearest
-//                                            hostile you can see now within REQUEST_RANGE tiles (as throwing.js
-//                                            throwAtNearest picks), or done(null). WS8 replaces the map's body
-//                                            with the target screen.
+//                                            once (range: the ability's, else REQUEST_RANGE); on the map WS8's
+//                                            target screen (screens/target.js), done({ creature, point, tile,
+//                                            dir }) when you confirm, done(null) when you cancel
 //
 // AbilityDef = { name, source: "mutation" | "implant" | "item" | "power" | "innate",
 //   target: "self" | "dir" | "creature" | "tile" | "area", range, rangeFor?(lvl, e) → tiles, radius,
@@ -51,7 +51,7 @@ import { worn } from "./body.js";
 import { cooldownMul } from "./stats.js";
 import { cooldownLeft, startCooldown, statusFlag } from "./status.js";
 import { pay, funds, formatPrice } from "./currency.js";
-import { hostilesTo, touchable, ghostHidden, creatureAt } from "./creatures.js";
+import { touchable, ghostHidden, creatureAt } from "./creatures.js";
 import { castRay, hit, lineOfSight } from "./raycast.js";
 import { arrivalPoint } from "./zones.js";
 import { mapUseTime, refreshView } from "./turns.js";
@@ -150,17 +150,12 @@ export function aimTarget(game, range) {
   return { creature, point, tile: { x: Math.floor(point.x), y: Math.floor(point.y) }, dir };
 }
 
+// The map's target screen: screens/target.js fills it in when it loads (as throwing.js's THROW_AIM, a hook rather
+// than an import, so the modules that read this one don't load the screens through it). No screen: nothing to aim at.
+export const MAP_TARGET = { request: null };
 export function requestTarget(game, ability, done) {
   if (game.view !== "map") { done(aimTarget(game, ability?.range || REQUEST_RANGE)); return; }
-  const { zone, player: p } = game;
-  const seen = hostilesTo(game, p)
-    .map((m) => ({ m, d: distance(m.x - p.x, m.y - p.y) }))
-    .filter(({ m, d }) => zone.sightings.get(m.id)?.time === game.time && d <= REQUEST_RANGE)
-    .sort((a, b) => a.d - b.d || a.m.id - b.m.id);
-  const m = seen[0]?.m;
-  if (!m) { done(null); return; }
-  const d = seen[0].d || 1;
-  done({ creature: m, point: { x: m.x, y: m.y, z: m.z }, tile: { x: Math.floor(m.x), y: Math.floor(m.y) }, dir: [(m.x - p.x) / d, (m.y - p.y) / d, 0] });
+  if (MAP_TARGET.request) MAP_TARGET.request(game, ability, done); else done(null);
 }
 
 // --- Using one ----------------------------------------------------------------------------------------
@@ -175,11 +170,16 @@ export function useAbility(game, e, id) {
   if (def.cost?.charge && !(chargeOf(a) >= def.cost.charge)) { say(game, e, `${def.name} needs ${def.cost.charge} charge, and ${a.item?.name || "nothing"} holds ${chargeOf(a)}.`); return false; }
   if (def.cost?.funds && funds(e) < def.cost.funds) { say(game, e, `${def.name} costs ${formatPrice(def.cost.funds)}.`); return false; }
   const onMap = game.mode === "map";
-  let target = null;
-  if (def.target !== "self") requestTarget(game, def.rangeFor ? { ...def, range: abilityRange(e, id, a.lvl) } : def, (t) => { target = t; });
-  if (!activate(game, e, id, target)) return false;
-  if (onMap && def.mapTime > 0) mapUseTime(game, def.mapTime);
-  return true;
+  const go = (target) => {
+    if (!activate(game, e, id, target)) return false;
+    if (onMap && def.mapTime > 0) mapUseTime(game, def.mapTime);
+    return true;
+  };
+  if (def.target === "self") return go(null);
+  // In 3D the answer comes at once; on the map when the target screen is confirmed (null: cancelled, so nothing).
+  let answered = false, used = false;
+  requestTarget(game, def.rangeFor ? { ...def, range: abilityRange(e, id, a.lvl) } : def, (t) => { answered = true; used = !!t && go(t); });
+  return answered && used;
 }
 
 export function useHotbar(game, k) {

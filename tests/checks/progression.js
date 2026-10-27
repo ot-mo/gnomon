@@ -40,7 +40,7 @@
 //       Spare Heart's TOU and the HP it brings; a made character has no innate ability and its hotbar holds its
 //       mutations' abilities in order; bible §10.4's reputation changes, at beginRun and in play, once each.
 //   7.4 Every active mutation fires through the real hotbar key in 3D (abilities.js aimTarget) and on the map
-//       (requestTarget's stub, the use's mapTime) with its effect (quills, flight, fire and burning, flat with the
+//       (requestTarget: WS8's target screen, its tile picked and Enter; the use's mapTime) with its effect (quills, flight, fire and burning, flat with the
 //       map forced, sightings on the map, a 9 × 9 drawn onto the map, flat beings marked in both views, a brazier
 //       lit, a fold of 4 + level tiles, EGO's level added); from the use to ready again is the same cooldown
 //       seconds in both views (the WIL-scaled abilityCooldown).
@@ -833,6 +833,9 @@ export async function checkProgression(m) {
                   }, ok: (p, s) => game.zone.get(s.bx, s.by, WD.FLOOR_Z) === WD.B.BRAZIER_LIT },
         foldStep: { muts: ["foldStep"], ok: (p, s, at) => Math.floor(p.x) === at.x + 5 && Math.floor(p.y) === at.y },
       };
+      // On the map an aimed ability opens WS8's target screen (since the WS4b merge): the tile each case means, east
+      // of you (Bellows: what the screen starts on, the rat).
+      const mapPick = { overlook: 5, kindle: 3, foldStep: 5 };
       const actives = ids.filter((id) => MU[id].ability).map((id) => MU[id].ability);
       for (const ab of actives) if (!cases[ab]) fail(`no case for the active mutation ability ${ab}`);
       for (const [ab, c] of Object.entries(cases)) {
@@ -848,6 +851,7 @@ export async function checkProgression(m) {
           if (!code) { fail(`${ab}: not on the hotbar (${JSON.stringify(p.hotbar)})`); continue; }
           const t0 = game.time, lvl = A.abilityOf(p, ab)?.lvl, cd = A.abilityCooldown(p, ab, lvl);
           press(code, code.slice(-1));
+          if (game.mode === "target") { for (let k = 0; k < (mapPick[ab] || 0); k++) press("ArrowRight"); press("Enter", "Enter"); }
           c.after?.();
           if (!c.ok(p, s, at)) fail(`${ab} in ${view}: didn't work (${game.messages.slice(-2).map((x) => x.text).join(" / ")})`);
           else fired[ab] = (fired[ab] || 0) + 1;

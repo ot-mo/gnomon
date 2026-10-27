@@ -13,15 +13,18 @@
 //      else in either view uses them (helpFor lists only the hotbar's); the numpad's digits still move you
 //      on the map. An empty slot says so and does nothing.
 //   3. Both views through the real input (onKeyDown "Digit1"): in 3D, facing an open run of floor, you
-//      land 4 tiles along the aim; on the map with a rat in sight 6 tiles off you land a tile short of
-//      it... at most 4 tiles on, the use costs 0.5 s of game time (as a throw), and with nothing in sight
-//      you step the way you face. Pressed again, it's refused and nothing moves.
+//      land 4 tiles along the aim; on the map the target screen opens (WS8's, behind requestTarget since the
+//      WS4b merge) on a rat in sight 6 tiles off, and Enter lands you a tile short of it... at most 4 tiles
+//      on, the use costs 0.5 s of game time (as a throw); with nothing in sight it opens on your own tile,
+//      Esc costs nothing, and a tile 4 east picked with the arrows and Enter takes you there. Pressed again,
+//      it's refused and nothing moves.
 //   4. Cooldown parity: from the moment of use to ready again is 12 s of game time in 3D (1/60 s frames)
 //      and on the map (the use's 0.5 s, then waits); skipTime catches it up exactly (7 s left after a 5 s
 //      skip, ready after 7 more); the HUD shows "1 Fold Step 12s" while it cools (at 100×30 with two
 //      statuses on, in one row, whole; check-hud holds it to §4.5's priority 70) and nothing once it's ready.
-//   5. Targets: requestTarget on the map gives the nearest hostile seen this moment within 10 tiles (not a
-//      person, not one unseen, not one farther), else null; aimTarget picks the creature nearest the crosshair
+//   5. Targets: requestTarget on the map opens the target screen on the nearest hostile seen this moment
+//      within 10 tiles (not one unseen, not one farther: else on your own tile); Enter gives it, Esc null.
+//      aimTarget picks the creature nearest the crosshair
 //      inside 6° with line of sight, none outside the cone or behind a wall, and its dir follows the pitch;
 //      requestTarget in 3D gives aimTarget's (the rat in the crosshair, not a nearer one below it).
 //   6. Landing is always standable over many seeds and positions: legacy levels and surface spans, both
@@ -30,7 +33,7 @@
 //      away. Walled in on one tile there's no room: refused (told), no cooldown, no time passes.
 const DIGITS = ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9"];
 
-export function checkAbilities({ game, startRun, inputHandlers, abilities: A, keys, hud, time, turns, status, creatures, zones, world, pathing, S, capture, resize }) {
+export function checkAbilities({ game, startRun, inputHandlers, abilities: A, keys, hud, time, turns, status, creatures, zones, world, pathing, target, S, capture, resize }) {
   const problems = [], stats = {};
   const fail = (m) => problems.push(m);
   const rowText = (y) => capture.chars.slice(y * capture.cols, (y + 1) * capture.cols).join("");
@@ -45,7 +48,17 @@ export function checkAbilities({ game, startRun, inputHandlers, abilities: A, ke
     const p = game.player;
     p.maxHpGain = 999; p.hp = 999;
     game.messages = [];
+    game.lastTargetId = null;   // (the target screen starts on the last thing aimed at)
     return p;
+  };
+  // The map's target screen: its cursor moved by (dx, dy) with the arrow keys, then Enter (keys.dispatchKey: no key
+  // stays held). False when no screen is open.
+  const pick = (dx = 0, dy = 0) => {
+    if (game.mode !== "target") return false;
+    for (let k = 0; k < Math.abs(dx); k++) keys.dispatchKey(game, dx > 0 ? "ArrowRight" : "ArrowLeft");
+    for (let k = 0; k < Math.abs(dy); k++) keys.dispatchKey(game, dy > 0 ? "ArrowDown" : "ArrowUp");
+    keys.dispatchKey(game, "Enter", false, "Enter");
+    return true;
   };
   const tile = (p) => [Math.floor(p.x), Math.floor(p.y)];
   // A tile with `n` standable tiles in a row east of it at the same height (no stairs), clear of creatures.
@@ -145,27 +158,38 @@ export function checkAbilities({ game, startRun, inputHandlers, abilities: A, ke
       if (p.x !== before[0] || p.y !== before[1] || !said(/isn't ready yet \(12 s\)/)) fail("3D: a second press while cooling down moved you or wasn't refused");
       stats.view3d = `(${at.x}, ${at.y}) → (${x}, ${y})`;
     }
-    // The map: a rat in sight 6 tiles east; you land a tile short of it, at most 4 on, in 0.5 s.
+    // The map: a rat in sight 3 tiles east, inside Fold Step's 4; the target screen opens on it, and Enter lands you a
+    // tile short of it in 0.5 s. (Out of reach the screen refuses the confirm: P0's stub took any rat within 10.)
     p = fresh({ view: "map" });
     at = runEast(game.zone, 7);
     if (at) {
       place(p, at, Math.PI);   // facing west: the target, not the facing, decides
-      const rat = creatures.addCreature(game.zone, creatures.spawnCreature("rat", at.x + 6, at.y, at.z, { rng: () => 0.5, state: "idle" }));
+      const rat = creatures.addCreature(game.zone, creatures.spawnCreature("rat", at.x + 3, at.y, at.z, { rng: () => 0.5, state: "idle" }));
       turns.refreshView(game);
-      if (game.zone.sightings.get(rat.id)?.time !== game.time) fail("the map: the rat 6 tiles off isn't in sight (test setup)");
+      if (game.zone.sightings.get(rat.id)?.time !== game.time) fail("the map: the rat 3 tiles off isn't in sight (test setup)");
       const t0 = game.time;
       inputHandlers.onKeyDown("Digit1", false, "1");
+      const on = target.cursorTarget(game)?.creature;
+      if (on !== rat) fail(`map: Digit1 opened ${game.mode} with ${on ? `the ${on.name}` : "nothing"} under the cursor, not the target screen on the rat`);
+      pick();
       const [x, y] = tile(p);
-      if (x !== at.x + 4 || y !== at.y) fail(`map: Fold Step toward the rat at (${at.x + 6}, ${at.y}) landed at (${x}, ${y}), want (${at.x + 4}, ${at.y})`);
+      if (x !== at.x + 2 || y !== at.y) fail(`map: Fold Step toward the rat at (${at.x + 3}, ${at.y}) landed at (${x}, ${y}), want (${at.x + 2}, ${at.y})`);
       if (Math.abs(game.time - t0 - 0.5) > 1e-9) fail(`map: the use took ${game.time - t0} s, want 0.5 (a throw's)`);
       if (Math.abs(A.cooldownLeft(p, "foldStep") - 11.5) > 1e-9) fail(`map: cooldown ${A.cooldownLeft(p, "foldStep")} after the use's 0.5 s`);
-      stats.viewMap = `(${at.x}, ${at.y}) → (${x}, ${y}), rat at (${at.x + 6}, ${at.y})`;
-      // Nothing in sight: the way you face.
+      stats.viewMap = `(${at.x}, ${at.y}) → (${x}, ${y}), rat at (${at.x + 3}, ${at.y})`;
+      // Nothing in sight: the screen opens on your own tile; Esc costs nothing; a tile 4 east, picked, is where you go.
       p = fresh({ view: "map" });
       place(p, at, 0);
       turns.refreshView(game);
+      const t1 = game.time;
       inputHandlers.onKeyDown("Digit1", false, "1");
-      if (tile(p)[0] !== at.x + 4) fail(`map: with nothing in sight Fold Step went to (${tile(p)}) instead of 4 east`);
+      const mine = target.cursorTarget(game)?.tile;
+      keys.dispatchKey(game, "Escape");
+      if (mine?.x !== at.x || mine?.y !== at.y || game.mode !== "map" || tile(p).join() !== `${at.x},${at.y}` || A.cooldownLeft(p, "foldStep") > 0 || game.time !== t1)
+        fail(`map: with nothing in sight the screen opened on ${JSON.stringify(mine)}; Esc left ${game.mode}, you at (${tile(p)}), cooldown ${A.cooldownLeft(p, "foldStep")}, time +${game.time - t1}`);
+      inputHandlers.onKeyDown("Digit1", false, "1");
+      pick(4, 0);
+      if (tile(p)[0] !== at.x + 4) fail(`map: a tile 4 east picked, Fold Step went to (${tile(p)})`);
     } else fail("no open run of 7 tiles on legacy level 3");
   }
 
@@ -185,6 +209,7 @@ export function checkAbilities({ game, startRun, inputHandlers, abilities: A, ke
     place(p, at, 0);
     t0 = game.time;
     A.useHotbar(game, 0);
+    pick(4, 0);
     while (A.cooldownLeft(p, "foldStep") > 0 && game.time - t0 < 30) { turns.mapWait(game); game.debug.step(1 / 60); }
     recover.map = game.time - t0;
     if (Math.abs(recover["3d"] - 12) > 1 / 60 + 1e-9) fail(`3D: ready again after ${recover["3d"]} s of game time, want 12`);
@@ -194,6 +219,7 @@ export function checkAbilities({ game, startRun, inputHandlers, abilities: A, ke
     p = fresh({ view: "map" });
     place(p, at, 0);
     A.useHotbar(game, 0);
+    pick(4, 0);
     status.removeStatus(game, p, "x");
     const left0 = A.cooldownLeft(p, "foldStep");
     time.skipTime(game, 5, { interruptible: false });
@@ -226,15 +252,22 @@ export function checkAbilities({ game, startRun, inputHandlers, abilities: A, ke
     const far = add(12), near = add(5), nearer = add(3);
     turns.refreshView(game);
     let got;
-    A.requestTarget(game, A.ABILITIES.foldStep, (t) => { got = t; });
+    const wide = { ...A.ABILITIES.foldStep, range: A.REQUEST_RANGE };   // (Fold Step reaches 4: the selection at 10)
+    A.requestTarget(game, wide, (t) => { got = t; });
+    pick();
     if (got?.creature !== nearer) fail(`requestTarget picked ${got?.creature?.name ?? "nothing"} at ${got?.creature ? tile(got.creature) : "-"}, not the nearest rat`);
-    game.zone.sightings.delete(nearer.id);
-    A.requestTarget(game, A.ABILITIES.foldStep, (t) => { got = t; });
+    game.zone.sightings.delete(nearer.id); game.lastTargetId = null;
+    A.requestTarget(game, wide, (t) => { got = t; });
+    pick();
     if (got?.creature !== near) fail("requestTarget took a rat not seen this moment");
     game.zone.creatures = game.zone.creatures.filter((c) => c !== near && c !== nearer);
-    turns.refreshView(game);
-    A.requestTarget(game, A.ABILITIES.foldStep, (t) => { got = t; });
-    if (got !== null) fail(`requestTarget took a rat ${12} tiles off (beyond ${A.REQUEST_RANGE})`);
+    turns.refreshView(game); game.lastTargetId = null;
+    got = undefined;
+    A.requestTarget(game, wide, (t) => { got = t; });
+    const start = target.cursorTarget(game);
+    keys.dispatchKey(game, "Escape");
+    if (start?.creature || start?.tile.x !== at.x || got !== null)
+      fail(`requestTarget with only a rat 12 tiles off (beyond ${A.REQUEST_RANGE}): the screen opened on ${start?.creature ? "it" : JSON.stringify(start?.tile)}, Esc gave ${JSON.stringify(got)}`);
     void far;
     // aimTarget in 3D.
     game.view = "3d"; game.mode = "explore";
@@ -294,7 +327,9 @@ export function checkAbilities({ game, startRun, inputHandlers, abilities: A, ke
           A.startCooldown(p, "foldStep", 0); delete p.cooldowns.foldStep;
           if (view === "map") turns.refreshView(game);
           const reach = pathing.reachable(world.standWith(zone, "open"), w, d, sx, sy, pathing.PLAYER_STEP_UP, pathing.PLAYER_DROP);
-          const ok = A.useAbility(game, p, "foldStep");
+          let ok = A.useAbility(game, p, "foldStep");
+          // The map: the target screen, a tile up to 5 off picked (your own tile: refused, as Fold Step refuses it).
+          if (pick(Math.round((rand() - 0.5) * 10), Math.round((rand() - 0.5) * 10))) ok = A.cooldownLeft(p, "foldStep") > 0;
           uses++;
           const [x, y] = tile(p), j = x + y * w;
           if (!ok) { noRoom++; if (x !== sx || y !== sy) fail(`seed ${seed} ${zone.key} ${view}: refused but moved`); continue; }
@@ -317,7 +352,8 @@ export function checkAbilities({ game, startRun, inputHandlers, abilities: A, ke
       zone.refresh();
       game.messages = [];
       const t0 = game.time;
-      const ok = A.useAbility(game, p, "foldStep");
+      let ok = A.useAbility(game, p, "foldStep");
+      if (pick(2, 0)) ok = A.cooldownLeft(p, "foldStep") > 0;   // the map: a tile beyond the wall picked
       if (ok || tile(p).join() !== `${at.x},${at.y}` || A.cooldownLeft(p, "foldStep") > 0 || game.time !== t0 || !said(/no room/)) fail(`${view}: walled in, Fold Step ${ok ? "worked" : "was refused"}, at (${tile(p)}), cooldown ${A.cooldownLeft(p, "foldStep")}, time +${game.time - t0}`);
     }
     if (moved < uses * 0.5) fail(`only ${moved} of ${uses} uses moved you`);
@@ -334,5 +370,5 @@ export async function run(env) {
   const { game, startRun, inputHandlers } = await m("game.js");
   return checkAbilities({ game, startRun, inputHandlers, abilities: await m("abilities.js"), keys: await m("keys.js"), hud: await m("hud.js"),
     time: await m("time.js"), turns: await m("turns.js"), status: await m("status.js"), creatures: await m("creatures.js"),
-    zones: await m("zones.js"), world: await m("world.js"), pathing: await m("pathing.js"), S, capture, resize });
+    zones: await m("zones.js"), world: await m("world.js"), pathing: await m("pathing.js"), target: await m("screens/target.js"), S, capture, resize });
 }

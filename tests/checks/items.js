@@ -660,6 +660,7 @@ export function checkItems(m) {
       // In 3D the crosshair is put on it, as a player would (the eye is above its middle).
       if (game.view !== "map") p.pitch = Math.atan2(c.z + (c.h || 1) * 0.6 - (p.z + m.player.EYE), Math.hypot(c.x - p.x, c.y - p.y));
       game.zone.sightings.set(c.id, { x: c.x, y: c.y, glyph: c.glyph, color: c.color, name: c.name, time: game.time });
+      game.zone.seen[c.tx + c.ty * game.zone.w] = 1;   // (a sighting stands on a tile the map shows: the target screen asks)
       return c;
     };
     const lineEast = (p) => {   // stand where 6 tiles east are open floor at the same height
@@ -674,11 +675,21 @@ export function checkItems(m) {
     };
     for (const view of ["map", "3d"]) {
       const r = (out[view] = {});
-      const use = (it) => {   // E in the pack, then the target as the screen would ask for it
+      // E in the pack, then the target: in 3D the crosshair at once; on the map WS8's target screen (since the WS4b
+      // merge), confirmed by Enter on what it starts on (the nearest hostile in reach), on a tile east picked first
+      // (how: a number of tiles), or cancelled by Esc (how: "esc").
+      const use = (it, how = 0) => {
         const p = game.player;
         p.inv.push(it);
         const t = AR.useArtifact(game, p, it);
-        if (t && typeof t === "object" && t.aim) { AR.aimArtifact(game, p, t.aim); return "aimed"; }
+        if (t && typeof t === "object" && t.aim) {
+          AR.aimArtifact(game, p, t.aim);
+          if (game.mode === "target") {
+            if (how === "esc") m.keys.dispatchKey(game, "Escape");
+            else { for (let k = 0; k < how; k++) m.keys.dispatchKey(game, "ArrowRight"); m.keys.dispatchKey(game, "Enter", false, "Enter"); }
+          }
+          return "aimed";
+        }
         return t;
       };
       // Finders and the bell.
@@ -694,7 +705,7 @@ export function checkItems(m) {
       const seen0 = game.zone.seen.reduce((s, v) => s + v, 0), bell = known("echoBell", 500);
       use(bell);
       r.echoBell = { revealed: game.zone.seen.reduce((s, v) => s + v, 0) - seen0, charge: bell.cell.charge };
-      // Aimed ones: a goblin ahead (the map's requestTarget picks the nearest hostile in sight; 3D aims the crosshair).
+      // Aimed ones: a goblin ahead (the map's target screen starts on the nearest hostile in sight; 3D aims the crosshair).
       p = fresh({ view, depth: 4 });
       if (!lineEast(p)) { fail(`${view}: no straight run of floor for the aimed artifacts`); continue; }
       const g1 = hostileAhead(p), hp1 = g1.hp, f1 = p.funds;
@@ -711,15 +722,15 @@ export function checkItems(m) {
       use(known("lancet"));
       r.lancetWall = g5.hp === h5;   // a wall between: the beam stops at it
       p = fresh({ view, depth: 4 }); lineEast(p);
-      hostileAhead(p, 6);   // (something to aim at, beyond the knife's 4 tiles: on the map, abilities.js's P0 stub aims at it)
+      hostileAhead(p, 6);   // (something beyond the knife's 4 tiles: on the map the screen starts on your tile, and 4 east is picked)
       const x0 = p.x, knife = known("foldKnife");
-      use(knife);
+      use(knife, 4);
       r.foldKnife = { moved: +(p.x - x0).toFixed(2), charge: knife.cell.charge };
-      // Nothing in sight on the map: an aimed artifact is lowered, nothing paid (in 3D the crosshair always gives a point).
+      // The map's target screen cancelled: an aimed artifact is lowered, nothing paid (in 3D the crosshair always gives a point).
       if (view === "map") {
         p = fresh({ view, depth: 4 }); lineEast(p);
         const f0 = p.funds, gun = known("glimgun", null), lc = known("lancet");
-        use(gun); use(lc);
+        use(gun, "esc"); use(lc, "esc");
         r.noTarget = p.funds === f0 && lc.cell.charge === 2500;
       } else r.noTarget = true;
       p = fresh({ view, depth: 4 }); lineEast(p);

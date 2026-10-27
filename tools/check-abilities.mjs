@@ -23,6 +23,7 @@ const creatures = await import("../src/creatures.js");
 const zones = await import("../src/zones.js");
 const world = await import("../src/world.js");
 const pathing = await import("../src/pathing.js");
+const target = await import("../src/screens/target.js");
 const { checkAbilities } = await import("../tests/checks/abilities.js");
-process.exit(report(checkAbilities({ game, startRun, inputHandlers, abilities, keys, hud, time, turns, status, creatures, zones, world, pathing,
+process.exit(report(checkAbilities({ game, startRun, inputHandlers, abilities, keys, hud, time, turns, status, creatures, zones, world, pathing, target,
   S: env.S, capture, resize })));
