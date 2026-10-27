@@ -14,7 +14,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn, execSync } from "node:child_process";
-import { installNodeEnv, parseArgs, ROOT } from "./node-env.mjs";
+import { installNodeEnv, parseArgs, ROOT, seedRandom } from "./node-env.mjs";
 import { report } from "./report.mjs";
 
 const args = parseArgs();
@@ -401,4 +401,4 @@ const { game, startRun, inputHandlers } = await import("../src/game.js");
 const { checkSave } = await import("../tests/checks/save.js");
 const screen = (cols, rows) => installNodeEnv({ cols, rows });   // (the title screen at 100×30, last)
 const seeds = args.seeds === undefined ? undefined : String(args.seeds).split(",").filter(Boolean).map(Number);   // the gate's other seeds
-process.exit(report(await checkSave({ game, startRun, inputHandlers, runSession, fresh, screen, root: ROOT, seeds, child })));
+process.exit(report(await checkSave({ game, startRun, inputHandlers, runSession, fresh, screen, root: ROOT, seeds, child, seedRandom })));

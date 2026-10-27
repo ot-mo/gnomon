@@ -86,7 +86,7 @@ export async function checkSave(opts) {
   try { return await checkSections(opts); } finally { SAVE_RULES.auto = autoWas; useStore(null); }
 }
 
-async function checkSections({ game, startRun, inputHandlers, runSession, fresh, screen, root, seeds = [1, 7], v1 = null, child = null }) {
+async function checkSections({ game, startRun, inputHandlers, runSession, fresh, screen, root, seeds = [1, 7], v1 = null, child = null, seedRandom = null }) {
   const problems = [], stats = {}, notes = [];
   const fail = (m) => problems.push(m);
   const compare = (what, a, b) => {
@@ -697,7 +697,7 @@ async function checkSections({ game, startRun, inputHandlers, runSession, fresh,
   }
   stats.hardCases = hard.join("; ");
 
-  await ws9Sections({ game, startRun, inputHandlers, runSession, fresh, screen, v1, child, fail, stats, notes, compare, walk, idsAbove, sameCreature, problems });
+  await ws9Sections({ game, startRun, inputHandlers, runSession, fresh, screen, v1, child, seedRandom, fail, stats, notes, compare, walk, idsAbove, sameCreature, problems });
   return { name: "save", ok: problems.length === 0, problems, stats, notes };
 }
 
@@ -730,8 +730,12 @@ async function checkSections({ game, startRun, inputHandlers, runSession, fresh,
 //      its beat (cause, damage, what the mode does), R keeping the mode, C waking a Commons Lamp life.
 //  18. The HUD at 100×30: the hotbar's ready ability while something hunts you (not otherwise, not while it
 //      cools), on one row with everything showing and dropped by priority; ?debug=1's line (child.debug).
+//  19. Failed writes: a zone whose newest write failed stays in memory; a failed copy on write is made by the next write;
+//      a failed checkpoint is given up; the player is told once.
+//  20. The pause card in screen-frames.js's four "3d pause card" states at 180×56 (not compared there any more): outside
+//      it the view as without it; inside, its lines centred in their colours; at 100×30 every key named.
 async function ws9Sections(ctx) {
-  const { game, startRun, inputHandlers, runSession, fresh, screen, child, fail, stats, notes, compare, walk, idsAbove, problems } = ctx;
+  const { game, startRun, inputHandlers, runSession, fresh, screen, child, seedRandom, fail, stats, notes, compare, walk, idsAbove, problems } = ctx;
   const save = await import("../../src/save/save.js");
   const { SAVE_RULES: RULES, SAVE_STATS, SESSION, listenPage, unloadSave, pageShown, wakeAtCheckpoint, exportSlot, importSlot, moveSlot,
           graveyard, migrate, checkpoint } = save;
@@ -1574,5 +1578,71 @@ async function ws9Sections(ctx) {
       out.push(`a checkpoint whose save failed: the run back on checkpoint ${cpAfter}, the slot's ${stored} after more play; death and C woke in ${woke} ${problems.length === n1 ? "as at it" : "CHANGED"}`);
     } finally { console.error = quiet; RULES.auto = false; }
     stats.failedWrites = out.join("; ");
+  }
+
+  // --- 20. The pause card in the recorded frames' states ----------------------------------------------------------
+  // tests/checks/screen-frames.js's four "… 3d pause card" frames (seeds 99 and 31, depths 3 and 11, at 180×56) are
+  // drawn but not compared any more (NOT_COMPARED: the card names L, V, the hotbar and G). Here the same states are
+  // drawn with and without the card: every cell outside the card's box is what the view draws without it; inside,
+  // the borders are whole, each line stands centred in its colour, and nothing else is there. At 100×30 the card
+  // still fits with every key named.
+  if (screen) {
+    const env = await screen(180, 56), out = [];
+    const W = 180, cell = (y, x) => env.capture.chars[y * W + x], rgb = (y, x) => [...env.capture.colors.slice((y * W + x) * 3, (y * W + x) * 3 + 3)];
+    const want = [
+      ["THE ROTATION CUBE", [255, 230, 120]], ["", null], ["Click to play", [255, 255, 255]], ["", null],
+      ["WASD move · Shift sprint · Space jump", [170, 170, 170]], ["Mouse look · Left click attack · Wheel zoom", [170, 170, 170]],
+      ["E use / talk · I inventory · J journal · L look · T / right-click throw · V fire · Q quick-heal · R swap weapons · F torch · M music · N sounds", [170, 170, 170]],
+      ["1-9 the abilities on your hotbar (1 Fold Step)", [170, 170, 170]],
+      ["Tab: rotate to the view from above (the map: turn-based; G its legend)", [170, 170, 170]], ["", null],
+      ["From inside you see height, depth, light and dark.", [130, 130, 130]],
+      ["From above you see the whole floor, the floor's pictures, and the flat things.", [130, 130, 130]],
+    ];
+    for (const seed of [99, 31]) for (const depth of [3, 11]) {
+      const tag = `seed ${seed} depth ${depth} 3d pause card`;
+      seedRandom?.(seed * 100 + depth);
+      startRun(seed);
+      const st = game.run.world.start;
+      game.pages = null; game.pendingPages = null; game.story.cube = true;
+      game.debug.enterZone(`${st.wx},${st.wy},${depth}`, "down");
+      const p = game.player;
+      Object.assign(game, { mode: "explore", view: "3d", paused: false, modeStack: [] });
+      p.yaw = 0.7; p.pitch = -0.1;
+      for (let k = 0; k < 2; k++) game.debug.step(1 / 60);
+      game.fps = 60; game.frameMs = 1.5;
+      game.debug.draw(); env.S.present();
+      const bare = [...env.capture.chars];
+      inputHandlers.onLockChange(false);
+      game.debug.draw(); env.S.present();
+      const boxW = Math.min(W - 2, Math.max(...want.map(([t]) => t.length)) + 6), boxH = want.length + 4;
+      const x0 = (W - boxW) >> 1, y0 = Math.max(0, (56 - boxH) >> 1), n0 = problems.length;
+      let outside = 0;
+      for (let y = 0; y < 56; y++) for (let x = 0; x < W; x++) {
+        const inBox = x >= x0 && x < x0 + boxW && y >= y0 && y < y0 + boxH;
+        if (!inBox) { if (cell(y, x) !== bare[y * W + x]) outside++; continue; }
+        const k = y - y0 - 2, line = want[k];
+        let ch = " ";
+        if (y === y0 || y === y0 + boxH - 1) ch = "-";
+        else if (line?.[0]) { const lx = x0 + ((boxW - line[0].length) >> 1); if (x >= lx && x < lx + line[0].length) ch = line[0][x - lx]; }
+        if (cell(y, x) !== ch) { fail(`${tag}: at ${x},${y} "${cell(y, x)}", the card wants "${ch}"`); break; }
+      }
+      if (outside) fail(`${tag}: ${outside} cells outside the card differ from the view without it`);
+      want.forEach(([t, c], k) => {
+        if (!t) return;
+        const y = y0 + 2 + k, x = x0 + ((boxW - t.length) >> 1);
+        if (JSON.stringify(rgb(y, x)) !== JSON.stringify(c)) fail(`${tag}: "${t.slice(0, 20)}…" in ${rgb(y, x)}, not ${c}`);
+      });
+      out.push(`${tag}: ${problems.length === n0 ? "the card as written" : "WRONG"} (${boxW}×${boxH} at ${x0},${y0}; ${W * 56 - boxW * boxH} cells outside it as without it)`);
+      inputHandlers.onLockChange(true);
+    }
+    // At 100×30 (browser-shell's small window is 100×27) the card still fits, every key named.
+    const small = await screen(100, 30);
+    inputHandlers.onLockChange(false);
+    game.debug.draw();
+    const shown = small.frameText().replace(/\s+/g, " ");
+    for (const k of ["L look", "V fire", "1-9 the abilities on your hotbar (1 Fold Step)", "G its legend", "I inventory", "J journal", "Click to play"])
+      if (!shown.includes(k)) fail(`the pause card at 100×30 lacks "${k}"`);
+    inputHandlers.onLockChange(true);
+    stats.pauseCard = `${out.join("; ")}; at 100×30 every key named`;
   }
 }
