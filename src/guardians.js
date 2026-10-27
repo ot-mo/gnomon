@@ -27,7 +27,7 @@
 // killed one never comes back; the legend's looks and mutations are put back on (legendLooks).
 import { resolveAttack, naturalSpec } from "./combat.js";
 import { emit, on } from "./events.js";
-import { claimUid, uidWhere, zoneState } from "./zones.js";
+import { claimUid, uidWhere, zoneState, killUid } from "./zones.js";
 import { legendLooks } from "./content/creatures/legends.js";
 import { registerAIHook } from "./ai.js";
 import { spawnCreature, addCreature, removeCreature } from "./creatures.js";
@@ -250,7 +250,7 @@ registerAIHook("legend:twicePressed", (game, m, dt) => {
 
 registerAIHook("legend:lamplessSaint", (game, m, dt) => {
   const zone = game.zone;
-  if (fearLight(game, m, dt)) return true;
+  if (fearLight(game, m, dt)) { killUid(game, m.uid); return true; }   // burnt away: as dead as a slain one
   if (m.state !== "chase") return false;
   m.g ||= { snuff: SAINT_SNUFF };
   if ((m.g.snuff -= dt) > 0) return false;

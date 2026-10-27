@@ -470,7 +470,24 @@ export async function checkLegends({ seed = 7 } = {}) {
     go(deep);
     if (game.zone.creatures.some((o) => o.uid === L.uid)) problems.push("a following legend is also back in its lair");
   } else problems.push("no legend to follow you");
-  stats.cases = 5;
+  // 6. A Lampless Saint burnt away by a lit brazier is as dead as a slain legend.
+  const { AI_HOOKS } = await import("../../src/ai.js");
+  const { spawnLegend } = await import("../../src/gen/vaults.js");
+  const { claimUid } = await import("../../src/zones.js");
+  startRun(seed, TEST_WORLD);
+  go(`0,0,1`);
+  let saint = null;
+  for (let s = 1; s < 200 && !saint; s++) { const d = makeLegend(makeRng(s), { id: "saint" }, 3); if (d.template === "lamplessSaint") saint = d; }
+  const z = game.zone, sx = Math.floor(game.player.x) + 1, sy = Math.floor(game.player.y);
+  const sc = spawnLegend(z, saint, sx, sy, FLOOR_Z, Math.random);
+  claimUid(game, saint.uid, z.key);
+  z.set(sx, sy + 1, FLOOR_Z, B.BRAZIER_LIT);
+  z.refresh();
+  let ticks = 0;
+  while (z.creatures.includes(sc) && ticks < 600) { AI_HOOKS["legend:lamplessSaint"](game, sc, 0.1, new Int32Array(z.w * z.d)); ticks++; }
+  stats.saint = `burnt away after ${(ticks / 10).toFixed(1)} s by a lit brazier; uid ${uidWhere(game, saint.uid)}`;
+  if (z.creatures.includes(sc) || uidWhere(game, saint.uid) !== "dead") problems.push(`a Lampless Saint by a lit brazier: still there ${z.creatures.includes(sc)}, uid ${uidWhere(game, saint.uid)}`);
+  stats.cases = 6;
   return { name: "legends", ok: problems.length === 0, problems, stats };
 }
 
