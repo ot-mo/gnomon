@@ -202,7 +202,7 @@ export function idbAdapter(name = `${GAME_ID}-saves`, { indexedDB: idb = globalT
             };
           } else throw new Error(`writeNow: no op ${o.op}`);
         }
-      } catch (e) { try { tr.abort(); } catch { /* finished */ } return Promise.reject(e); }
+      } catch (e) { try { tr.abort(); } catch { /* finished */ } done.catch(() => {}); return Promise.reject(e); }
       // Committed now, not when the task ends: a page that is going (the unload save) is torn down before that, and
       // its transaction with it. (A keep still has its read's requests to make, so that batch commits by itself.)
       if (!ops.some((o) => o.op === "keep")) tr.commit?.();

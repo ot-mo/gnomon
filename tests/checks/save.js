@@ -1363,7 +1363,11 @@ async function ws9Sections(ctx) {
       const atCp = await digestGame(game, ["0,0,2"]);
       armed = true;
       await go("0,0,2", "up");   // the save that writes 0,0,2 first (its keep) fails
+      await saveGame(game, {}).catch(() => {});   // and another at once: told once, in the log
       armed = false;
+      const told = game.messages.filter((m) => /couldn't be saved/.test(m.text));
+      if (told.length !== 1) fail(`two failed saves told the player ${told.length} time(s) (want once, in the log)`);
+      out.push(`two failed saves told the player once ("${told[0]?.text.slice(0, 70)}…")`);
       game.zone.items.push({ kind: "bomb", count: 5, x: game.player.x, y: game.player.y, z: game.player.z });
       await go("0,0,3", "down");
       const copies = await rowsOf(fs2, game.saving.slotId, "checkpointZones");

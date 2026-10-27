@@ -101,6 +101,7 @@ export const SAVE_RULES = {
   oneWick: { unclean: "warn" },   // "warn" | "death": a One Wick slot loaded after a session that never saved cleanly
   graveyard: 50,       // grave records kept
   retry: 10,           // real seconds after a failed write before the save is tried again
+  told: 30,            // real seconds between two log lines telling of failed saves
 };
 export const RUN_MODES = {
   oneWick: { name: "One Wick", note: "one life: death ends the run, and its save", death: "end" },
@@ -169,9 +170,16 @@ function unpend(sv, key) {
   const n = (sv.pending.get(key) || 0) - 1;
   if (n > 0) sv.pending.set(key, n); else sv.pending.delete(key);
 }
+// A failure is told to the player too (in the log, once in SAVE_RULES.told seconds): what happened since the last save
+// would be lost if the page closed now.
 function failed(game, sv, what, e) {
   sv.failed.push(`${what}: ${e?.message || e}`);
   console.error(`save: ${what} failed:`, e);
+  const now = game.uiTime || 0;
+  if (game.saving !== sv || sv.dead || typeof game.log !== "function" || now - (sv.toldAt ?? -Infinity) < SAVE_RULES.told) return;
+  sv.toldAt = now;
+  const why = String(e?.message || e || "").replace(/.$/, "").slice(0, 80);
+  game.log(`The game couldn't be saved${why ? ` (${why})` : ""}. It will try again; if the page closes first, what happened since the last save is lost.`, [255, 150, 100]);
 }
 // After writes commit, dormant zones beyond the limit may leave memory (only this run's).
 const trim = (game, sv) => { if (game.saving === sv) evictDormant(game); };
