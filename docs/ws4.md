@@ -23,9 +23,9 @@ parent's order, so golden (a) and (b), the 47 recorded screen frames and the leg
 | File | What 4a builds |
 |---|---|
 | `content/genotypes.js` | `GENOTYPES.bent`, `.plumb` (bible §10.3, §15.6): base 10 + 44 points / base 12 + 38 points, 1 point per +1 to 18 then 2, at most 22 at creation before the background; creases 12 (+1 a level) or grade 2 with a free implant costing ≤ 2; the naming culture |
-| `content/backgrounds.js` | the 12 backgrounds of bible §10.9-§10.10: attribute bonus, 2 trees, kit, glim (60-250), reputation changes, the Plumb's Level (Vey, Orrum, Cassin) and free implant. Kit items the game doesn't have yet are listed for WS5/WS8/C4 and left out (or given when their kind is registered) |
+| `content/backgrounds.js` | the 12 backgrounds of bible §10.9-§10.10: attribute bonus, 2 trees, kit, glim (40-250), reputation changes, the Plumb's Level (Vey, Orrum, Cassin) and free implant. Kit items the game doesn't have yet are listed for WS5/WS8/C4 and left out (or given when their kind is registered) |
 | `content/powers.js` | `POWERS`: the parent's 25 perks moved here with their trees (bible §10.8), the general pool (Tough, Mighty) and the majors; the bible's other powers listed with what they wait for (`needs`) and never offered until it lands. `leveling.js` `PERKS` is the same table |
-| `progression/chargen.js` | `makeCharacter(choices)`; point-buy (`pointCost`, `pointsSpent`, `pointsLeft`, `canRaise`, `canLower`, `suggestSpread`); `validateChoices`; `suggestName` (bible §2.3: Marshfolk for the Bent, Plumb names with a Level); `beginRun(game, choices)` (the run started with the made character, its mode and its reputation changes) |
+| `progression/chargen.js` | `makeCharacter(choices)`; point-buy (`pointCost`, `pointsSpent`, `pointsLeft`, `canRaise`, `canLower`, `suggestSpread`); `validateChoices`; `suggestName` (bible §2.3: Marshfolk for the Bent, the Drovers' names for the Mesa Runner and the Drover's Child, Plumb names with a Level); `beginRun(game, choices)` (the run started with the made character, its mode and its reputation changes) |
 | `progression/index.js` | the `origin` bonus source (background attribute bonuses, Vey's +3 examine, Orrum's +1 natural armour); no longer a stub |
 | `player.js` | `makePlayer()` unchanged (the quick game); the seam `beginRun` hands its character through |
 | `leveling.js` | `lvlXP`, `killXp`, `xpFor` (bible §10.7, §15.6), Pilgrim's XP (kills 0, every other source × 2.2), and under the attribute set each level's HP (`max(1, 3 + TOU mod)`, derived), +1 crease for the Bent, an attribute point at levels 4, 8, 12…, one power from 3 seeded offers (4 at INT 18+), a major among them every 5th level |
@@ -70,6 +70,8 @@ beginRun(game, choices, { seed }) → player   // a new run with the made charac
 pointCost(genotype, score) · pointsSpent(genotype, attrs) · pointsLeft(genotype, attrs) · baseAttrs(genotype)
 canRaise(genotype, attrs, k) · canLower(genotype, attrs, k) · suggestSpread(genotype, background) → attrs
 suggestName(genotype, background, rng) → name · originBonuses(e) (the "origin" bonus source) · treeNames(p)
+freeImplants(background) → ids   // the implants a Plumb background may take free: WS5's costing ≤ 2, its own first;
+                                  //   until WS5's table has it, its Level's named one · implantCost(id)
 RUN_MODES = ["oneWick", "commonsLamp", "pilgrim"] · NAME_MAX = 24
 // a made player, besides makePlayer()'s fields: name, genotype, background, trees, attrPoints, mutations: {},
 //   origin: { level, implant, fitted }, and creases (Bent) or grade (Plumb). Plain JSON (the save codec takes it as is).
@@ -162,7 +164,11 @@ when it lands. 1-3 are WS8's requests 1, 8 and 11 (`git show p1-ws8:docs/ws8.md`
 12. **WS9:** the title already pushes `"create"` with `{ seed, mode }` once it is registered, and the wizard begins the
     run as `newGame` does (startRun, then `state.mode`). The wizard keeps its own copy of the modes' names and notes;
     at the merge it can read `save.js RUN_MODES` instead.
-13. **`tools/README.md` (frozen) and §8.4:** `check-progression.mjs`'s sections (the header of
+13. **WS9's title and the formula flip (the integrator):** the wizard is meant for the attribute set. Under the legacy
+    set a made character reads the parent's numbers (STR = bought − 6, so a Mesa Runner who left STR at 10 has STR 4;
+    max HP 20; no creases a level). WS9's title pushes `"create"` as soon as it is registered, so flip `RULES.stats` to
+    `"attributes"` at the WS4 merge (§8.5: WS8 merges before WS4), or keep the title on the quick game until the flip.
+14. **`tools/README.md` (frozen) and §8.4:** `check-progression.mjs`'s sections (the header of
     `tests/checks/progression.js`); `tools/browser-ws4.mjs` (serve with `node tools/serve.mjs 8644`) as WS4's.
 
 ## Handoff
