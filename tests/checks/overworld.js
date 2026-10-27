@@ -209,10 +209,29 @@ function fast(G, name, world, problems) {
       if (!near(encounterChance(game, tt, { fast: true }), Math.min(1, encounterChance(game, tt) * 0.25))) quarter++;
     }
   }
+  // The rate through worldStep itself: every span's rate 0.4, travellers only (a journey goes on through them),
+  // back and forth between two known spans far apart: each step a quarter of the span's (× 1.5 at night), the
+  // hits within ±2 points of the sum.
+  let fastSteps = 0, fastHits = 0, fastWant = 0;
+  {
+    if (!game.trip) { goTo(game, from.wx, from.wy); enterWorldMap(game); }
+    const a = { wx: game.trip.wx, wy: game.trip.wy };
+    const b = targets.find((t) => isKnown(game, t.wx, t.wy) && (travelPath(game, a, t)?.length || 0) >= 6);
+    const undo = [...W.tiles.map((t) => swap(t, { encounterRate: 0.4 })), swap(ENCOUNTERS.kinds, { band: 0, legend: 0, travellers: 1 })];
+    const off2 = on("world:step", (g, ev) => { fastSteps++; fastWant += Math.min(1, 0.4 * (isNight(g) ? OW().nightEncounter : 1) * 0.25); if (ev.encounter) fastHits++; });
+    try {
+      for (let k = 0; k < 400 && fastSteps < 2000 && b; k++) {
+        const r = fastTravel(game, k % 2 ? a : b, { confirm: true });
+        if (!r.ok || r.stopped) { problems.push(`${name} fast: a journey between (${a.wx}, ${a.wy}) and (${b.wx}, ${b.wy}) stopped: ${r.why || r.stopped}`); break; }
+      }
+    } finally { off2(); undo.forEach((u) => u()); }
+    if (!(fastSteps >= 1000) || Math.abs(fastHits - fastWant) / fastSteps > 0.02)
+      problems.push(`${name} fast: encounters on ${fastSteps} fast steps at a span rate of 0.4: ${(fastHits / Math.max(1, fastSteps)).toFixed(4)}, want ${(fastWant / Math.max(1, fastSteps)).toFixed(4)}`);
+  }
   off();
   if (lostAny) problems.push(`${name} fast: lost ${lostAny} times on fast travel`);
   if (quarter) problems.push(`${name} fast: ${quarter} steps' encounter chance is not a quarter of the road's`);
-  return { paths, steps, none, journeys, worldSteps: seen.length, reachable: can.size };
+  return { paths, steps, none, journeys, worldSteps: seen.length, reachable: can.size, fastRate: { steps: fastSteps, rate: +(fastHits / Math.max(1, fastSteps)).toFixed(4), want: +(fastWant / Math.max(1, fastSteps)).toFixed(4) } };
 }
 
 // --- 3. Arrival edges --------------------------------------------------------------------------------------------
