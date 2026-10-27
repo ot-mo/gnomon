@@ -151,3 +151,141 @@ mutation-checked: the old file put back, the check run, the assertion seen faili
 - The earlier run-all at `a4ed51d` on the loaded machine (33 of 37, the four timed checks) and each timed check
   alone with `p0-done` alternately: §3.
 - Tag `p1-ws6a` on `ws/ws6`, pushed. Next in this worktree: WS6b (`docs/ws6.md` "Handoff").
+
+
+# Part 6b
+
+Local session, 2026-10-27, on Windows 11 (Node 20.11.0, headless Chromium from Playwright), with WS10 and the
+integrator running on the same machine and the user's training job. One commit per step, each pushed by the
+post-commit hook:
+
+| Commits | What |
+|---|---|
+| `599ad65` | `ITEM_SAMPLES`: one line for the two new kinds, `vial` and `coinage` (`// WS6b`) |
+| `46634d9` | liquids (`content/liquids.js`, `social/liquids.js`), the vial (`content/items/containers.js`), the item backing (`social/backings.js`) |
+| `16bc3b8` | `social/voices.js` |
+| `8a3ce37` | trade (`social/merchants.js`, `screens/trade.js`), the Kindling (`social/ritual.js`, `screens/ritual.js`), shrines, `dialogue.js`, the builders' merchant |
+| `8dc334c` `c1ae827` | found while writing the check and the browser tool: opinions through parent groups; a capital in the ritual screen's head |
+| `11a8d2f` | `tests/checks/social.js` Part 6b (sections 8-17) |
+| `314fbe2` | `tools/browser-ws6.mjs`: the trade and ritual screens, the three rites in their views |
+| `039a802` … `04f6640` | the verification's findings, one commit each (§5) |
+
+Size: `src/` + tests + tools: 17 files, +1,947 / −95 lines against `p1-ws6a` at `04f6640`.
+
+## 1. Acceptance (§8.3 "WS6b", with DECISIONS), with numbers
+
+All from `node tools/check-social.mjs` (Part 6b; also in the browser's test page through `browser-0d2 --all`)
+unless said otherwise.
+
+| Item | Numbers |
+|---|---|
+| **Price multipliers vs EGO and reputation** | Under the attribute set, a 60-glim mace from a level-0 Drover at EGO 10, 12, 16, 20 and 24 × Cold, Grey, Warm and Bright (20 cells): buy = round(60 × (1.5 − 0.1·mod − step)), sell = floor(60 × (0.3 + 0.05·mod + step/2)), the step +0.1 / +0.2 / −0.1 by the trader's main faction, exactly bible §3.1, and the price note on the screen agrees; buying dearer than selling in every cell. Grey, EGO 16: buy 90, sell 18; Bright, EGO 24: 54 / 36; the Snuffer buys at 65 (×1.2), sells as before, and pays ×1.2 for services. A trader with no faction has no step; a level-6 trader charges × priceLevel(6). The legacy set: the parent's prices (`priceMul` ignores the trader). No fill-and-sell loop: at Bright and EGO 24 no liquid's vial sells for what an empty vial costs (3), at Pell's either |
+| **Pay, receive and overflow for the item backing** | With content's backing switched to `{ kind: "item", item: "testBit" }` and encumbrance on: receive 30 → overflow 0, funds 30; pay 12 → 18; pay 100 → refused, 18 kept; stacks of 18 and 5 pay 6 from the 5 first → [17]; room 463 under the carry cap: receive 503 → overflow 40, a full pack takes nothing; the money is never offered for sale; the coins are plain JSON. Registered backings: counter, item (no liquid: DECISIONS). The counter: an 18-glim sale into a purse with room for 3 is refused whole (bible §3.1) and the trade screen turns to the trader's goods |
+| **Pell's legacy services all reachable through `registerService`** | Pell with a cursed worn ring, an unknown longsword, an unknown potion and a known cursed helm: the trade screen's services tab lists all six (uncurseWorn, enchant, forge, identify, namePotion, uncurse), and each is paid and run from it (6 of 6). In play Pell keeps his own shop (its services tab lists the same `registerService` rows: `check-talk`, `browser-0c` seeds 1234 and 7) |
+| **The Kindling's three view rites** | A named Hollowmere villager beside you: ready on the map only the Tracing, in lit 3D facing it only the Lighting, with the torch out in the dark only the Snuffing; talk offers exactly that rite in each view. Refused: the Lighting with your back turned or 3 tiles off; the Tracing 3 tiles off or across a 3-block cliff; the Lighting and the Snuffing through a stone column; the Flatfolk ("flat only") the Lighting; the Unlit ("dark only") the Tracing. The bond against bible §3.3: the Tracing in glim (paid 1) Hollowmere +40, the Noon Vigil +40, the Assize −40, the Clatter +40, the Bent villages +40 and one petty opinion; with two vials of ink a Flatfolk +100 (likes, own reading, sacrament; paid in ink), with one +80; the Lighting at EGO 20 with glim poured Hollowmere +120 (48 + 48 + 24), paid 1, the vial left empty; the Snuffing 60 s of game time, no glim, the Lampless +80. The menu: a rumour +60 and a reading +35 (each sold once), the +120 cap held, Warm Hands +28 at EGO 24 and +10 then nothing at net 110, a power −50 then −100 for rank 2, recruit −210 at a level gap of 4 and −60 far below, the best item −value/5 once per pack, the −250 floor, 2 Kindled followers (3 at EGO 20). Oathbreaking: −120 with everyone, the Moths −600, the Snuffer for 7 world days; not for a fall, a follower or a splash kill. Browser: §2 |
+| **Merchant restock on `zone:enter` after away ≥ 2 game days** | A sold-out Drover merchant: no restock at 2 days − 1 s away, none on a load three days after you last left; a fresh 10-row pack at 2 days (2,880 s), `stockedAt` set; the same day gives the same goods (seeded by run, merchant, day); the legacy Pell never restocks; its faction's sacrament (longback milk) on sale; the back shelf only at Bright |
+| **The trade and ritual screens in the browser** | `tools/browser-ws6.mjs` at 1280×720 and 600×330: §2 |
+
+Also: voices (the 11 legacy people keep their sfx voices; a Lampless priest `{ pitch 110, sine, ghost }`, a Survey
+guard `{ 300, square, beat }`, the heaviest membership's, a creature's own; 12 Flatfolk in 430-560 Hz at ≥ 4 pitches),
+liquids (liquidAt by column, a vial filled beside brine, not from water 3 blocks up, fresh water +2 HP, ink Flat, every
+faction's sacrament in the table), shrines (the component on a statue keeps the legacy offering; the Vigil +10 per 50
+glim to +200; the Lampless +1 per 2 glim only in the dark), the trade screen by keys (from talk, a buy by Enter, a held
+Enter buys nothing more, Tab, Esc back to the talker's first words), JSON state (`kindling`, `snuffer`, `donations`,
+`merchants`).
+
+## 2. The browser
+
+Served by `node tools/serve.mjs 8646`, `?silent=1` and the zero-gain sink, no console error:
+
+- `tools/browser-ws6.mjs` at 1280×720 and 600×330: PASS. 6a's part as before; then a Drover merchant by a bump: "Show
+  me what you have." → the trade screen on theirs (LU, THEIRS, services, EGO, glim drawn), a buy by Enter (200 → 166
+  glim), Tab → yours, a click on "Esc back" → talk; "Will you kindle with me?" on the map offers only the Tracing, its
+  words, "Sit with me a while." → the ritual screen (THE KINDLING), Esc → talk → map; in 3D facing a Hollowmere
+  villager, E opens the talk, only the Lighting is offered (165 → 164 glim); F puts the torch out, and with a Lampless
+  villager in the dark only the Snuffing (60 s of game time pass, flame-kin); Pell's six services on the trade screen.
+- The old game: `browser-0c` PASS for seeds 1234 and 7 (legacy and d20 fights in both views, Pell's talk, shop,
+  services, back to talk, 0 errors); `browser-shell` PASS at 1280×720 and 600×300 (43 mode changes each);
+  `browser-0d2 --all`: boot with 153 modules and no console error, with and without `quick=1`; imports 1 of 1;
+  `test-world.html?all=1` social ok, body failing on the sample line until `4c35f3b` (§6).
+
+## 4. Deviations
+
+1. **Credit is not built.** A sale a full flask can't hold is refused and the trader's goods are shown (bible §3.1);
+   there is no slate.
+2. **Any rite will do** unless the faction's rite says "X only"; one done in its own reading earns +40. The variants
+   (the Pouring, the Oiling, the Ascent, the Mirroring, Moon-Wick and Herdmothers only) are content (integration
+   request 7).
+3. **Opinions** of a named creature, unless content gives `c.opinions`: its own faction likes it, the factions that
+   like or hate its faction (through parent groups) like or dislike it, and one seeded petty love or hate.
+4. **A Kindling cost may not take your rep with the creature's faction to −250 or below** (the bible names no floor;
+   below it, it wouldn't kindle with you). The best item is once for each pack the merchant stocks.
+5. **The rites need you on one level (a step at most) and in sight of each other**; the Lighting's facing is within
+   45°.
+6. **Prices move with EGO and rep only under the attribute set** (`stats.js priceMul`); today's legacy set keeps the
+   parent's numbers.
+7. **The legacy Pell keeps the parent's pack** (never restocked) **and his own shop screen**; his services are the
+   same `registerService` rows on either screen.
+8. **A filled vial sells as glass**: liquid any pool gives is worth nothing to a trader.
+9. **Drinking**: brine's nausea and glim's glow are a line, a second sunwine within 10 s stuns for 2 s (the
+   confusion), umbra gives darkSight for 60 s, turnwater and clear glim only their words (request 7).
+10. **Not built:** the dish, the faction specials, the commons lamp, the Chandler banks (bible §3.1, §3.3; content).
+
+## 3. Timing
+
+Nothing WS6b adds runs per frame or per tick: talk options are asked when you talk; the "kill", "zone:enter" handlers
+return at once for a creature with no Kindling record and a zone without stocked merchants.
+
+- The full run-all at `04f6640`, the machine quieter (143 s): check-dungeons PASS (p95 30.7 ms), check-status PASS
+  (8-hour skip 1.14 ms, poisoned 34.95 ms), check-stats PASS; check-perf failing in it on refresh ×1.43 and surface
+  generation's max ×1.33 against `p0-0d1` (code WS6b doesn't touch).
+- **`check-perf --against p0-done --rounds 2` alone, twice** (3 runs of each tree, alternating): **PASS** both times.
+  First: passTime p50 8.09 against 5.29 ms (×1.53, within the 12 ms budget), mapStep ×1.14, refresh ×0.99, surface
+  generation p95 ×1.00 and its max 151 against 145 ms (both trees over the 150 budget: the machine's), dungeon
+  generation ×0.97, the dungeon frame ×1.04, the outdoor frame ×0.97 (both over 17 ms). Second: passTime 6.69 against
+  6.49 (×1.03), mapStep ×0.77, refresh ×0.90, the outdoor frame ×0.99. passTime's ×1.53 didn't come back; nothing in
+  it is WS6b's.
+
+## 5. Verification
+
+One independent read-only verifier (a subagent briefed with the contract and the files, not my conclusions; it
+worked in a copy and ran single checks there), plus my own pass for money leaks. Each finding fixed in its own
+commit with a check-social assertion; each assertion seen failing on the old file in a scratch copy (findings 1, 2, 7,
+8, 11, 12 by construction: the assertion is the finding's own repro).
+
+| Finding | Fix |
+|---|---|
+| Mine: a vial filled free at a pool sold for its liquid's worth (umbra 6 against an empty vial's 3 at Bright, EGO 24; turnwater above the vial at Grey) | `039a802`: a filled vial sells as glass, at Pell's too; without it 9 liquids fail |
+| 1. Merchants restocked on a save load (a load's `away` is the time since you last left that zone) | `a37d306` |
+| 2. The legacy Pell restocked (new crystals in the old game) | `907591f`: his one pack, as the parent's |
+| 3. Warm Hands broke the +120 cap (the cap before EGO's share: net 124) | `9ac97b3` |
+| 4. Thorns and the lightning arc made you the Snuffer (splash) | `04f6640`: a `splash` kill is skipped; WS8 marks them (request 2) |
+| 6. Rep turned into glim through the best item from every pack; the Bright-only shelf counted at any band | `cf9742a`: once per pack, the shelf only at Bright |
+| 7. A sale into a full purse became unlimited, fee-free credit (a bank) | `6bb4a9d`: refused whole, the trader's goods shown (bible §3.1) |
+| 8. The Snuffer's +20% didn't reach services | `85c682a` |
+| 10. The rites worked through walls and across cliffs; a vial filled from water at any height | `58ed7c0`: one level and in sight; feet to knees |
+| 11. A later Kindling poured the sacrament for nothing | `44fce8b` |
+| 12. A held Enter kept buying | `13b7126` |
+| 13. The Flatfolk's and the Plan's voices were single pitches where the bible gives ranges | `5ba4daf` |
+| 9 (the faction variants), 14 (in play Pell's services show on his own shop's tab, not the new screen), 13's Maren fallback on this branch | not changed: deviations 2 and 7, request 4 |
+
+Checked and fine by the verifier: every price cell against bible §3.1, no buy-sell loop; the +120 cap in the menu and
+the −250 floor; the Snuffing's 60 s and an interrupted one giving nothing; the Snuffer's 7 × 1,440 s and restock's 2 ×
+1,440 s; the item backing; donations; edge inputs (no faction, a hidden group, no level or name, no `talk.state`, an
+unknown stock id); JSON state; the legacy people's voices, dialogue and shop.
+
+The old game: run-all's golden (mechanics 86, frames 27, dungeons 95, 0 mismatched), screen frames (47, 0
+mismatched), legacy fights (map 1,359 steps, 3D 1,027, 0 differing), the bot (seeds 1234 and 7, both views),
+determinism, talk (2,406 service rows, 0 mismatched) and imports all PASS; `browser-0c` seeds 1234 and 7, and
+`browser-shell`, PASS (§2).
+
+## 6. The recheck and the tag
+
+- The coordinator agreed to integration request 1: `check-body`'s sample line (`4c35f3b`), and an assertion that a vial
+  never backs money (`9186378`).
+- `node tools/run-all.mjs` at `053549b`: **37 of 37** (133 s, 11 at a time). Timed ones in it: check-dungeons p95
+  26.6 ms; check-perf against `p0-0d1`: passTime ×0.90, mapStep ×0.97, refresh ×1.00, surface generation's max ×1.11
+  (139 ms, within 150), the outdoor frame over 17 ms in both trees (×0.98). Alone against `p0-done`: §3 (PASS twice).
+  No budget was loosened.
+- `browser-ws6` (1280×720, 600×330), `browser-0c` (seeds 1234 and 7) and `browser-shell` PASS on the fixed head (§2).
+- Tag `p1-ws6b` on `ws/ws6`, pushed. WS6 is done; the integrator merges it (`docs/ws6.md` "Handoff").

@@ -11,7 +11,8 @@
 //                               go }] }; text a non-empty string, at least one option, labels non-empty strings,
 //                               go functions)
 //   walkDialogue(game, c, { depth = 4, max = 60 }) → { nodes, problems }   talkTo, then every option's go()
-//                               down to `depth`: each answer must be a node, null (the talk ends) or { shop: tab }
+//                               down to `depth`: each answer must be a node, null (the talk ends), { shop: tab }
+//                               (Pell), or { trade: tab } / { ritual: true } (WS6b's screens; the walk opens neither)
 //
 // What a talker says follows how it feels about you (factions.js attitude) and its faction's band: Dark, or a
 // fighter out for you → a short refusal and goodbye; Cold, or wary of you (a grudge, or a talker who can't fight
@@ -139,10 +140,10 @@ export function buildDialogue(role) {
   };
 }
 
-// A merchant's pack: the parent's shop screen while its stock is in talk.state (WS6b's trade screen takes over).
+// A merchant's pack: the trade screen (WS6b: social/merchants.js openTrade stocks it on the first look).
 function shopOf(game, c, curt, back) {
   if (curt) return node("Not for you. Find someone who doesn't know your face.", [back, bye()]);
-  return c.talk.state?.stock?.length ? { shop: "buy" } : node("The pack's empty. The road ate it.", [back, bye()]);
+  return { trade: "theirs" };
 }
 
 for (const role of ROLES) registerDialogue(role, buildDialogue(role));
@@ -173,6 +174,8 @@ export function walkDialogue(game, c, { depth = 4, max = 60 } = {}) {
       try { next = o.go(); } catch (err) { problems.push(`${path}.${k} "${o.label}": go() threw ${err.message}`); return; }
       if (next === null || next === undefined) return;
       if (next.shop) { if (!["buy", "sell", "services"].includes(next.shop)) problems.push(`${path}.${k}: shop tab ${next.shop}`); return; }
+      if (next.trade) { if (!["theirs", "yours", "services"].includes(next.trade)) problems.push(`${path}.${k}: trade tab ${next.trade}`); return; }
+      if (next.ritual) return;
       visit(next, `${path}.${k}`, d + 1);
     });
   };

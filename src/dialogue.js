@@ -7,6 +7,7 @@
 //            sfx.js), then numbered choices · 1–9, or ↑↓ and Enter/E/Space, or click · Esc leaves
 //            (any of those while it's still typing just shows the rest at once)
 //   shop:    ↑↓ choose · Enter buys, sells or pays · Tab/←→ switches buy/sell/services · Esc back to talking
+//            (Pell's pack, the parent's; every other merchant opens the trade screen: screens/trade.js)
 //   journal: J or Esc closes
 //   story:   Space / Enter / click turns the page
 import * as S from "./screen.js";
@@ -14,10 +15,13 @@ import { pushMode, popMode } from "./screens.js";
 import { talkTo, servicesFor, serviceDef } from "./talk.js";
 import { mapPercent } from "./story/quests.js";
 import { typeOf, talkersIn } from "./creatures.js";
-import { itemName, itemGlyph, itemInfo, itemPrice, addToInventory, ITEM_KINDS } from "./items.js";
-import { funds, pay, receive, purseRoom, formatPrice, buyPrice, sellPrice, CURRENCY } from "./currency.js";
+import { itemName, itemGlyph, itemInfo, addToInventory, ITEM_KINDS } from "./items.js";
+import { funds, pay, receive, purseRoom, formatPrice, buyPrice, CURRENCY } from "./currency.js";
 import { sfx, speakLetter } from "./sfx.js";
 import { wrap, box as uiBox, UI, hit, hitLabel } from "./ui.js";
+import { voiceFor } from "./social/voices.js";
+import { openTrade, priceOf } from "./social/merchants.js";
+import { openRitual } from "./social/ritual.js";
 
 // --- Text helpers ----------------------------------------------------------------------
 // wrap(text, width) and box() live in ui.js (one copy for every screen); these screens keep the
@@ -25,13 +29,17 @@ import { wrap, box as uiBox, UI, hit, hitLabel } from "./ui.js";
 const box = (x0, y0, w, h, edge = UI.edge) => uiBox(x0, y0, w, h, { edge, rules: true });
 
 // --- Conversations ---------------------------------------------------------------------------
+// An answer's go() returns the next node, null (the talk ends), { shop: tab } (Pell's pack), { trade: tab } (the
+// trade screen: social/merchants.js openTrade) or { ritual: true } (the Kindling's menu: social/ritual.js
+// openRitual). Closing the trade or ritual screen comes back to the talker's first words. Each letter is spoken
+// in the talker's voice (social/voices.js voiceFor: its faction's, else its own species').
 const talkLayout = { x0: 0, w: 0, rows: [] };   // where each option was drawn, for the mouse
 
 export function openTalk(game, npc) {
   game.travel = null;
   if (game.mode === "shop") { game.shop = null; popMode(game, undefined, { pointer: false }); }   // back to talking
   const talking = game.mode === "talk";
-  game.talk = { npc, node: null, sel: 0 };
+  game.talk = { npc, node: null, sel: 0, voice: voiceFor(npc) ?? npc.type };
   if (!talking) pushMode(game, "talk");
   const first = talkTo(game, npc);
   if (first) showNode(game.talk, first); else endTalk(game);
@@ -64,10 +72,18 @@ export function updateTalk(game, dt) {
   while (t.clock > 0 && typing(t)) {
     const ch = text[t.shown++];
     t.clock -= 1 / LETTERS_PER_SECOND;
-    if (/[a-z]/i.test(ch)) speakLetter(ch, t.npc.type);
+    if (/[a-z]/i.test(ch)) speakLetter(ch, t.voice);
     else if (".!?".includes(ch)) t.clock -= 0.22;
     else if (",;:".includes(ch)) t.clock -= 0.1;
   }
+}
+
+// Back from the trade or ritual screen: the talker starts over, from its first words.
+function talkAgain(game) {
+  const t = game.talk;
+  if (!t || game.mode !== "talk") return;
+  const root = talkTo(game, t.npc);
+  if (root) showNode(t, root); else endTalk(game);
 }
 
 function endTalk(game) {
@@ -83,6 +99,8 @@ function choose(game, k) {
   sfx("click");
   if (!next) { endTalk(game); return; }
   if (next.shop) { game.shop = { npc: t.npc, tab: next.shop, sel: 0 }; pushMode(game, "shop"); return; }
+  if (next.trade) { openTrade(game, t.npc, next.trade, { onPop: talkAgain }); return; }
+  if (next.ritual) { openRitual(game, t.npc, { onPop: talkAgain }); return; }
   showNode(t, next);
 }
 
@@ -168,7 +186,7 @@ function shopRows(game) {
     return { it: s.item, price: haggle(game, price), count: s.count, stock: s };
   });
   if (sh.tab === "services") return services(game);
-  return p.inv.map((it) => ({ it, price: sellPrice(game, p, itemPrice(it)), count: it.count || 1 }));
+  return p.inv.map((it) => ({ it, price: priceOf(game, it, null, "sell"), count: it.count || 1 }));   // (a vial: the glass only)
 }
 
 export function shopKey(game, code) {
