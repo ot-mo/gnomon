@@ -317,7 +317,8 @@ export async function run(env) {
     let blows = 0, first = null;
     const swing = () => {
       blows++;
-      if (view === "map") { game.mode = "map"; game.view = "map"; turns.mapStep(game, side[0], side[1]); }
+      // (On the map a creature not out for you is in the way: Shift + the direction strikes it, turns.js mapStep.)
+      if (view === "map") { game.mode = "map"; game.view = "map"; turns.mapStep(game, side[0], side[1], { force: true }); }
       else {
         game.mode = "explore"; game.view = "3d";
         P.attackCd = 0; P.pitch = Math.atan2(victim.z + victim.h * 0.5 - (P.z + 1.5), Math.hypot(victim.x - P.x, victim.y - P.y));
