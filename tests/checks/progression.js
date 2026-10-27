@@ -196,8 +196,12 @@ export async function checkProgression(m) {
     const offers = [], issues = [];
     let pointsGot = 0, pointsSpent = 0, majors = 0;
     for (let level = 2; level <= 20; level++) {
+      const fullBefore = p.hp === st.maxHp(p), maxBefore = st.maxHp(p);
       L.gainXp(game, L.xpToNext(p.level) - p.xp, { source: "quest" });
       if (p.level !== level || p.pendingLevels !== 1) { issues.push(`level ${p.level}, pending ${p.pendingLevels} (want ${level}, 1)`); break; }
+      // The level's HP is yours at once: full before, full after (the HP gain is the max HP gain).
+      if (!fullBefore) issues.push(`level ${level}: not at full health before the level (${p.hp}/${maxBefore})`);
+      else if (p.hp !== st.maxHp(p) || st.maxHp(p) <= maxBefore) issues.push(`level ${level}: ${p.hp}/${st.maxHp(p)} after the level, ${maxBefore} before`);
       step(1 / 60);
       if (game.mode !== "levelup") { issues.push(`level ${level}: no card (in ${game.mode})`); break; }
       if (level % 4 === 0) {
