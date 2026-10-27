@@ -92,10 +92,14 @@ try {
   await key("ArrowUp"); await key("ArrowUp"); await key("ArrowLeft");
   const moved = await cursor();
   if (args.shots) await page.screenshot({ path: `${args.shots}/ws8-look.png` });
+  // A confirm emits inspect { open: true }, which opens WS5's examine (since the integrator's merge of p1-ws5); Esc
+  // there goes back to where you looked from.
   await key("Enter");
   let ev = await events();
-  expect((await mode()) === "map" && ev.inspect.length === 1 && ev.inspect[0].open && ev.inspect[0].x === moved.x && ev.inspect[0].y === moved.y,
-    `Enter: one inspect, open, at the cursor (${JSON.stringify(ev.inspect)} vs ${JSON.stringify(moved)})`);
+  expect((await mode()) === "examine" && ev.inspect.length === 1 && ev.inspect[0].open && ev.inspect[0].x === moved.x && ev.inspect[0].y === moved.y,
+    `Enter: examine, one inspect, open, at the cursor (${await mode()}; ${JSON.stringify(ev.inspect)} vs ${JSON.stringify(moved)})`);
+  await key("Escape");
+  expect((await mode()) === "map", `Esc in examine: back to the map (${await mode()})`);
   await key("KeyL"); await key("Escape");
   expect((await mode()) === "map" && (await events()).inspect.length === 1, "Esc: cancelled, no inspect");
 
@@ -107,7 +111,8 @@ try {
   expect(c?.x === 16 && c?.y === 6, `the mouse moved the cursor to ${JSON.stringify(c)} (want 16,6)`);
   await page.mouse.click(px.x, px.y); await frames(2);
   ev = await events();
-  expect((await mode()) === "map" && ev.inspect.length === 2 && ev.inspect[1].x === 16 && ev.inspect[1].y === 6, `a click looked at 16,6 (${JSON.stringify(ev.inspect[1])})`);
+  expect((await mode()) === "examine" && ev.inspect.length === 2 && ev.inspect[1].x === 16 && ev.inspect[1].y === 6, `a click looked at 16,6, examine (${await mode()}; ${JSON.stringify(ev.inspect[1])})`);
+  await key("Escape");
   await key("KeyL");
   await page.mouse.click(px.x, px.y, { button: "right" }); await frames(2);
   expect((await mode()) === "map" && (await events()).inspect.length === 2, "a right click cancelled");
@@ -145,7 +150,11 @@ try {
   const n0 = (await events()).inspect.length;
   await key("KeyL");
   ev = await events();
-  expect(ev.inspect.length === n0 + 1 && ev.inspect[n0].creature === "goblin" && ev.inspect[n0].open, `L in 3D: the goblin in the crosshair (${JSON.stringify(ev.inspect[n0])})`);
+  expect(ev.inspect.length === n0 + 1 && ev.inspect[n0].creature === "goblin" && ev.inspect[n0].open && (await mode()) === "examine", `L in 3D: the goblin in the crosshair, examine (${await mode()}; ${JSON.stringify(ev.inspect[n0])})`);
+  await key("Escape");
+  if ((await mode()) === "pause") await page.mouse.click(640, 360);
+  await frames(5);
+  expect((await mode()) === "explore", `Esc in examine over 3D: back to 3D (${await mode()})`);
   const a0 = ev.attack.length;
   await aim(); await key("KeyV"); await frames(40);
   await aim(); await key("KeyT"); await frames(40);
