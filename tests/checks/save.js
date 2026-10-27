@@ -50,7 +50,7 @@ import { saveGame, loadGame, listSlots, deleteSlot, whenWritten, saveStatus, can
 import { getZone, cachedZone, evictZone, evictDormant, ZONE_GENERATORS, ZONE_RULES, changeZone, neighbourAddr } from "../../src/zones.js";
 import { entityCounter, getIds, setEntityCounter } from "../../src/ids.js";
 import { serializeRun, RUN_STATS } from "../../src/world/run.js";
-import { pushMode, popMode, screenFor } from "../../src/screens.js";
+import { pushMode, popMode, screenFor, registerScreen } from "../../src/screens.js";
 import { on } from "../../src/events.js";
 import { useStore, currentStore } from "../../src/save/store.js";
 import { openTitle } from "../../src/screens/title.js";
@@ -60,6 +60,9 @@ import { addStatus } from "../../src/status.js";
 import { addZonePatch, claimUid } from "../../src/zones.js";
 
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
+// A screen no save is made under (it isn't saveable, nor one a save looks through: like the story's pages or talk).
+const BUSY = "check:busy";
+registerScreen(BUSY, { draw() {} });
 // What a saved creature must keep (§7.2's whitelist, then 0C's state fields, then a guardian's fight and xp).
 const KEEP = ["id", "uid", "type", "elite", "tx", "ty", "z", "hp", "maxHp", "level", "brain", "status", "cooldowns", "inv", "body", "merchant",
   "faction", "name", "named", "flags", "state", "phase", "risen", "bounty", "lightBurn", "regenAcc", "g", "xp"];
@@ -301,9 +304,9 @@ async function checkSections({ game, startRun, inputHandlers, runSession, fresh,
     if (slot.player.hp !== hp || slot.time !== t || slot.state.time !== t || slot.state.flags) fail(`snapshot-first: the slot has hp ${slot.player.hp} (was ${hp}), time ${slot.time}/${slot.state.time} (was ${t}), flags ${JSON.stringify(slot.state.flags)}`);
     if (zback.get(5, 5, FLOOR_Z) !== block || (c && zback.creatures.find((q) => q.id === c.id)?.hp !== chp)) fail("snapshot-first: the zone record has changes made after saveGame returned");
     p.hp = hp; game.time = t; z.set(5, 5, FLOOR_Z, block); if (c) c.hp = chp; delete game.state.flags;
-    // Waiting: the inventory (no save there), then a screen whose data holds a callback.
-    for (const [what, open, close] of [["the inventory", () => game.debug.openInv(), () => popMode(game, undefined, { pointer: false })],
-                                       ["a screen with a callback", () => pushMode(game, "journal", { onPop() {} }, { pointer: false }), () => popMode(game, undefined, { pointer: false })]]) {
+    // Waiting: a screen no save is made under, then one a save would look through but whose data holds a callback.
+    for (const [what, open, close] of [["a busy screen", () => pushMode(game, BUSY, null, { pointer: false }), () => popMode(game, undefined, { pointer: false })],
+                                       ["a screen a save looks through, with a callback", () => pushMode(game, "inventory", { onPop() {} }, { pointer: false }), () => popMode(game, undefined, { pointer: false })]]) {
       open();
       if (screenFor(game.mode)?.saveable) fail(`${what} is saveable`);
       let done = false;
@@ -670,12 +673,12 @@ async function checkSections({ game, startRun, inputHandlers, runSession, fresh,
       fail(`a save to another slot after ${L1.key} left memory: the slot holds ${keysB.join(" ")}; reading ${L1.key} generated ${gens.n} zone(s); ${back.zones[L1.key] === left.zones[L1.key] ? "identical" : "it differs from the zone left"}`);
     hard.push(`saved to another slot after ${L1.key} (${gone} hostiles killed) left memory: the slot holds ${keysB.join(" ")}, ${L1.key} read back ${gens.n ? "GENERATED" : "identical"}`);
   }
-  // A save asked for over the inventory, then a new run before any frame back in a view: refused, never written
-  // with the new run's state.
+  // A save asked for over a screen no save is made under, then a new run before any frame back in a view: refused,
+  // never written with the new run's state.
   {
     startRun(1234); game.pages = null; game.story.cube = true;
     playing(game, "map");
-    game.debug.openInv();
+    pushMode(game, BUSY, null, { pointer: false });
     const st = memoryAdapter();
     let outcome = "pending";
     const wp = saveGame(game, { store: st }).then((m) => { outcome = `written (${m.id})`; }, (e) => { outcome = `refused: ${e.message}`; });
@@ -684,7 +687,7 @@ async function checkSections({ game, startRun, inputHandlers, runSession, fresh,
     await Promise.race([wp, tick(500)]);
     const slots = await st.list("slots");
     if (!outcome.startsWith("refused") || slots.length) fail(`a save asked for in one run, then a new run: ${outcome}; ${slots.length} slot(s) written (seed ${slots[0]?.seed})`);
-    hard.push(`a save waiting over the inventory when a new run began: ${outcome.split(":")[0]}`);
+    hard.push(`a save waiting over a busy screen when a new run began: ${outcome.split(":")[0]}`);
   }
   stats.hardCases = hard.join("; ");
 
@@ -940,6 +943,35 @@ async function ws9Sections(ctx) {
     const liveGone = (await slotOf(held, id)).live;
     off();
     if (liveBack !== SESSION || liveGone !== null) fail(`visible: live ${liveBack}; pagehide: live ${liveGone}`);
+    // Under the screens a save looks through (the pause card, the options over it, the log, the inventory) the unload
+    // save happens as it does in a view; under one it doesn't (the story's pages, talk, the "DEPTH n" beat) nothing is
+    // written, and the last save stands.
+    const under = [];
+    for (const [what, view, open] of [["the pause card", "3d", () => inputHandlers.onLockChange(false)],
+                                      ["the options over it", "3d", () => { inputHandlers.onLockChange(false); inputHandlers.onKeyDown("Escape", false, "Escape"); }],
+                                      ["the log", "map", () => inputHandlers.onKeyDown("KeyH", false, "h")], ["the inventory", "map", () => game.debug.openInv()],
+                                      ["a busy screen", "map", () => pushMode(game, BUSY, null, { pointer: false })]]) {
+      const us = memoryAdapter();
+      freshRun(1234, { store: us, view });
+      await settle();
+      game.debug.enterZone("0,0,1", "down"); playing(game, view);
+      await settle();
+      const uid = game.saving.slotId, before = { x: game.player.x, y: game.player.y };
+      if (view === "map") for (const k of ["KeyD", "KeyD", "KeyS"]) game.debug.mapKey(k); else { game.player.x += 2; game.player.y += 1; }
+      const moved = { x: game.player.x, y: game.player.y };
+      open();
+      const mode = game.mode, d2 = new EventTarget();
+      d2.visibilityState = "hidden";
+      const off2 = listenPage(d2, null, game);
+      d2.dispatchEvent(new Event("visibilitychange"));
+      off2();
+      await whenWritten(game); await tick(5);
+      const s = await slotOf(us, uid), busy = what === "a busy screen", want = busy ? before : moved;
+      if ((s.live === null) === busy || s.player.x !== want.x || s.player.y !== want.y)
+        fail(`the unload save under ${what} (${mode}): live ${s.live ? "set" : "null"}, at ${s.player.x},${s.player.y} (moved to ${moved.x},${moved.y}, saved at ${before.x},${before.y})`);
+      under.push(`${what} ${busy ? "nothing written" : "committed"}`);
+    }
+    stats.unloadUnder = under.join("; ");
     stats.unload = `hidden: 1 transaction opened in the handler (the temple's write-behind, then the slot with live cleared and ${L1} uncompressed); ` +
       `loaded back ${problems.length === n0 ? "identical" : "DIFFERENT"} with 0 unclean; visible sets live again; pagehide clears it`;
   }

@@ -4,7 +4,8 @@
 //       The slot record and every visited zone without a committed record (the one you are in, always). Snapshot
 //       first: the slot's JSON and the zones' snapshots are made before saveGame returns (codec.js snapshotSlot,
 //       snapshotZone), and compression and the store come after and never read a live object, so play goes on
-//       while it is written. Only in a saveable screen (screens.js `saveable`: explore and map) with no zone
+//       while it is written. Only in a saveable screen (screens.js `saveable`: explore and map), or under screens a
+//       save looks through (canSave, SAVE_THROUGH: the pause card, options, the log, the inventory), with no zone
 //       being read: a request anywhere else waits for the first frame in one (its promise settles then; it is
 //       refused if by then that run has ended: a new run, a load, a death). The first save of a run makes its
 //       slot (slotId, else a new id) in `store` (default: currentStore(), else a memory store of this module's
@@ -49,7 +50,8 @@
 //   migrate(slot, zones, { to, migrations }) → { slot, zones }   MIGRATIONS[n] = { slot(rec), zone(rec) } takes n → n + 1
 //   registerWorld(id, def | () => def | Promise<def>)  the worlds a load can choose by state.world.id
 //   requestSave(game, reason, { delay, checkpoint }) the automatic saves' request (below), for other modules
-//   canSave(game) → bool · whenWritten(game) → Promise · saveStatus(game) · SAVE_STATS · SAVE_RULES · RUN_MODES · SESSION
+//   canSave(game) → bool (a saveable screen, or one under SAVE_THROUGH's) · whenWritten(game) → Promise · saveStatus(game) ·
+//   SAVE_STATS · SAVE_RULES · RUN_MODES · SESSION · SAVE_THROUGH
 //
 // Run modes (DECISIONS §1, bible §10.1): state.mode is "oneWick" (one life: death ends the run and its slot),
 // "commonsLamp" (a checkpoint whenever you enter or leave a settlement, landing or village, and on the run's first
@@ -80,7 +82,7 @@
 // live, last: { reason, at, ok } }.
 import { GAME_ID, VERSION } from "../config.js";
 import { game as theGame, resumeRun } from "../game.js";
-import { screenFor, setMode, pushMode } from "../screens.js";
+import { screenFor, setMode, pushMode, syncStack } from "../screens.js";
 import { playMode } from "../screens/play.js";
 import { on, registerUpdate } from "../events.js";
 import { changeZone, ZONE_LOADER, evictDormant, zoneState, parseKey } from "../zones.js";
@@ -176,7 +178,23 @@ const trim = (game, sv) => { if (game.saving === sv) evictDormant(game); };
 // Zones you have been in (the one you are in, and every one you have left), not the neighbours made ahead.
 const visited = (game, zone) => zone === game.zone || zoneState(game).zoneLeft[zone.key] !== undefined;
 
-export const canSave = (game) => !!(game.state && game.player && game.zone && !game.zoneLoading && screenFor(game.mode)?.saveable);
+// Where a save may be made: a saveable screen (screens.js `saveable`: explore, map, the world map), or one under
+// screens a save may look through, as if they were closed: they hold nothing it would lose (no callback in their
+// stack data, nothing half done). The pause card, the options, the message log and the inventory (its actions
+// happen at once) are; a screen says so itself with `saveThrough: true`. Not the story's pages, talk, trade, the
+// level-up choice or the "DEPTH n" beat: they hold what comes next.
+export const SAVE_THROUGH = new Set(["pause", "options", "log", "inventory"]);
+const holdsCallback = (data) => !!data && typeof data === "object" && Object.values(data).some((v) => typeof v === "function");
+function playUnder(game) {
+  const st = syncStack(game);
+  for (let k = st.length - 1; k >= 0; k--) {
+    const def = screenFor(st[k].mode);
+    if (def?.saveable) return true;
+    if (!(SAVE_THROUGH.has(st[k].mode) || def?.saveThrough) || holdsCallback(st[k].data)) return false;
+  }
+  return false;
+}
+export const canSave = (game) => !!(game.state && game.player && game.zone && !game.zoneLoading && playUnder(game));
 
 // --- Jobs: rows snapshotted now, written in order ------------------------------------------------------
 // job = { rows: [{ zone: key, snap, cp, keep } | { slot: json } | { carry: { store, slot, key } } | { op }], run?: async (store) → void,

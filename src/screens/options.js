@@ -17,7 +17,7 @@ import { helpFor, keyLabel } from "../keys.js";
 import { toggleMusic, musicMuted } from "../music.js";
 import { toggleSounds, soundsOn } from "../sfx.js";
 import { playMode } from "./play.js";
-import { saveGame, currentStore } from "../save/index.js";
+import { saveGame, canSave, currentStore } from "../save/index.js";
 
 export const MODE = "options";
 export const BASE_SENSITIVITY = 0.0025;
@@ -81,7 +81,7 @@ function choose(game, item) {
   else if (item.id === "fov" || item.id === "look") step(game, item.id, 1);
   else if (item.id === "keys") { st.view = "keys"; st.keys.sel = 0; }
   else if (item.id === "save") {
-    st.note = "Saving as soon as the game is back...";
+    st.note = canSave(game) ? "Saving..." : "Saving as soon as the game is back...";
     saveGame(game, { reason: "options" }).then(() => { st.note = "Saved."; }, (e) => { st.note = `The save failed: ${e.message}`; st.bad = true; });
   } else if (item.id === "quit") saveAndQuit(game);
   else if (item.id === "back") popMode(game, undefined, { pointer: false });
