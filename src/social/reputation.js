@@ -1,7 +1,7 @@
 // Reputation events (TECH_DESIGN §2.11 "Reputation events"; bible §3.5 "What changes it"; owner WS6a). Subscribed
 // to the bus when this file loads (social/index.js imports it).
 //
-//   RULES.rep = { witnessRange 12, attackPenalty −10, killPenalty −5, namedKillPenalty −50 }
+//   RULES.rep = { witnessRange 12, attackPenalty −10, killPenalty −5, namedKillPenalty −50, implant 25, implantMax 100 }
 //   witnessesOf(game, by, victim) → c[]   the victim's fellows (a shared faction) within witnessRange tiles of `by`
 //                                         who perceive `by`: WS8's creatures.witnessesOf when it is there, else
 //                                         line of sight from their eyes, by the §2.11 house rule (no fellow across
@@ -20,13 +20,16 @@
 // faction that hates one of them gains half of it, rounded toward zero (bible: "Factions that hate it gain
 // half that"); a creature's (or its type's) repOnKill { factionId: n } adds its own (legendaries, bible ±100 to
 // ±200). A kill is not hidden by a lack of witnesses.
+// "install" { e } (bodymods/implants.js, an implant fitted in play; WS5 #20, bible §10.4): the Plan +implant for
+// you, the first implantMax / implant fittings only (game.state.planFittings counts them); taking one out gives
+// nothing back, and the starting implant (fitted before the run, with no game) counts for nothing.
 import { on } from "../events.js";
 import { extendRules } from "../rules.js";
 import * as creatures from "../creatures.js";
 import { lineOfSight } from "../raycast.js";
 import { FACTIONS, addRep, attitude, membershipsOf, relation, followsPlayer } from "../factions.js";
 
-export const REP_RULES = extendRules("rep", { witnessRange: 12, attackPenalty: -10, killPenalty: -5, namedKillPenalty: -50 });
+export const REP_RULES = extendRules("rep", { witnessRange: 12, attackPenalty: -10, killPenalty: -5, namedKillPenalty: -50, implant: 25, implantMax: 100 });
 
 export const offender = (game, e) => !!e && (e === game.player || followsPlayer(e));
 
@@ -88,3 +91,8 @@ const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 on("hurt", (game, { tgt, src }) => { if (src && tgt && tgt !== game.player) offend(game, src, tgt); });
 on("attack", (game, { att, tgt, result }) => { if (result?.touched && tgt && tgt !== game.player) offend(game, att, tgt); });
 on("kill", (game, { c, src }) => { if (c) killed(game, src, c); });
+on("install", (game, { e }) => {
+  if (e !== game.player || !game.state) return;
+  const n = (game.state.planFittings = (game.state.planFittings || 0) + 1);
+  if (n * REP_RULES.implant <= REP_RULES.implantMax) addRep(game, "plan", REP_RULES.implant, "body");
+});

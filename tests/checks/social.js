@@ -501,6 +501,23 @@ export async function run(env) {
         stats.harmSource = got.join("; ");
       } finally { off(); }
     }
+    // An implant fitted in play (WS5 #20, bible §10.4): the Plan +25 each, the first four only; taking one out, or a
+    // creature's fitting, moves nothing.
+    {
+      const IM = await m("bodymods/implants.js");
+      fresh(1234, { genotype: "plumb" });
+      const P8 = p(), r0 = F.repOf(game, "plan"), it = { kind: "implant", id: "lampCrown" };
+      const fit = IM.install(game, P8, it, "head", { free: true });
+      const r1 = F.repOf(game, "plan");
+      IM.uninstall(game, P8, "head");
+      const r2 = F.repOf(game, "plan");
+      events.emit(game, "install", { e: mob(null, null), item: it, partId: "head" });
+      const rc = F.repOf(game, "plan");
+      for (let k = 0; k < 4; k++) events.emit(game, "install", { e: P8, item: it, partId: "head" });
+      const r3 = F.repOf(game, "plan");
+      stats.implants = `Plan ${r0} → ${r1} fitted → ${r2} out → ${rc} a creature's → ${r3} after four more`;
+      if (!fit.ok || r1 !== r0 + 25 || r2 !== r1 || rc !== r2 || r3 !== r0 + 100) fail(`implants and the Plan: ${stats.implants}${fit.ok ? "" : ` (install: ${fit.reason})`}, want ${r0 + 25}, ${r0 + 25}, ${r0 + 25}, ${r0 + 100}`);
+    }
     stats.offend = `follower's blow ${rep.REP_RULES.attackPenalty}, at the hostile 0, unseen 0`;
   }
 
