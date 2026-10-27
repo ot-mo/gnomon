@@ -100,27 +100,26 @@ MODE = "world" · WAIT_MODE = "wait" · openWorldMap(game, { center }) · openWa
 4. **WS4 (`leveling.js` RULES.progression.xp.rewards):** add `site: 0.1` beside `landmark: 0.3` if the progression
    table should hold every reward (discovery.js reads it first; until then RULES.overworld.xp.site).
 5. **The integrator (`tools/browser-0d1.mjs`):** its mode tour must reach the two new screens, or it fails "modes
-   never reached: world, wait". The block below, after the target screen's (tested on a scratch copy against
-   `p2-ws7b`, `docs/sessions/ws1.md`):
+   never reached: world, wait". This block, placed just before the factions screen's (after the target screen's), was
+   run on a scratch merge of `ws/ws1` into `origin/integration` (`p2-ws7b`): 25 of 25 modes reached, golden (b) 27 of 27:
    ```js
-   // WS1: the world map (O, Esc back, and again a click on "Esc: back") and the wait menu (Z, Esc; Z, a right click).
-   {
-     const ok = [];
-     for (const how of ["keys", "mouse"]) {
-       await page.keyboard.press("KeyO"); await frames(page, 2);
-       if ((await mode()) === "world") { reached.add("world"); ok.push(`O (${how})`); }
-       if (how === "keys") await page.keyboard.press("Escape"); else await click("Esc: back");
-       await frames(page, 2);
-       if ((await mode()) !== "map") problems.push(`world map closed by ${how}: in ${await mode()}`);
-       await page.keyboard.press("KeyZ"); await frames(page, 2);
-       if ((await mode()) === "wait") reached.add("wait");
-       if (how === "keys") await page.keyboard.press("Escape");
-       else { const c = await page.evaluate(() => document.getElementById("screen").getBoundingClientRect());
-              await page.mouse.click(c.left + 5, c.top + 5, { button: "right" }); }
-       await frames(page, 2);
-       if ((await mode()) !== "map") problems.push(`wait menu closed by ${how}: in ${await mode()}`);
-     }
-   }
+       // The world map and the wait menu (WS1's): O on the map opens the world map, Esc closes it, and again a click on
+       // its "Esc: back"; Z opens the wait menu, Esc closes it, and again a right click.
+       if ((await mode()) === "map") for (const how of ["keys", "mouse"]) {
+         for (const [code, want, close] of [["KeyO", "world", "Esc: back"], ["KeyZ", "wait", null]]) {
+           await page.keyboard.press(code);
+           await frames(page, 2);
+           const opened = await mode();
+           if (opened !== want) { problems.push(`${want} by ${how}: ${code.slice(3)} on the map led to ${opened}, not ${want}`); continue; }
+           reached.add(want);
+           if (how === "keys") await page.keyboard.press("Escape");
+           else if (close) await click(close);
+           else { const c = await page.evaluate(() => { const r = document.getElementById("screen").getBoundingClientRect(); return { x: r.left + 5, y: r.top + 5 }; }); await page.mouse.click(c.x, c.y, { button: "right" }); }
+           await frames(page, 2);
+           const closed = await mode();
+           if (closed !== "map") problems.push(`${want} by ${how}: ${how === "keys" ? "Esc" : close ? `a click on ${close}` : "a right click"} led to ${closed}, not back to the map`);
+         }
+       }
    ```
 6. **The integrator (`torch.js`):** on the world map the torch burns by the zone you left (`clock:tick` reads
    `game.zone`), so travelling the Shade by day costs nothing. `darkSeconds` could read the span under
