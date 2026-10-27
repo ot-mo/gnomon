@@ -22,7 +22,7 @@
 //       called. Every other visited zone stays in the store until it is entered or prefetched (zones.js
 //       ZONE_LOADER, readZone; each record migrated as it is read). A slot whose `live` is still set was left
 //       without a clean save: its `unclean` count goes up (and is written back at once, with this session's
-//       live); under One Wick with SAVE_RULES.oneWick.unclean = "death" that is a death instead (the slot goes,
+//       live); under One Wick with RULES.oneWick.unclean = "death" (rules.js) that is a death instead (the slot goes,
 //       a grave is written, and the load is refused with error.code "unclean").
 //   listSlots({ store } = {}) → Promise<[{ id, created, updated, seed, mode, character, where, time, unclean, live,
 //                                         checkpoint, genVersion, version }]>   newest first
@@ -82,6 +82,7 @@
 // stored: Map<key, savedAt>, queue: Promise, jobs: [job not yet written], failed: [], cp, cpRecord, unclean, dead,
 // live, last: { reason, at, ok } }.
 import { GAME_ID, VERSION } from "../config.js";
+import { RULES } from "../rules.js";
 import { game as theGame, resumeRun } from "../game.js";
 import { screenFor, setMode, pushMode, syncStack } from "../screens.js";
 import { playMode } from "../screens/play.js";
@@ -99,7 +100,6 @@ export const SAVE_RULES = {
   afterChange: 0.5,    // real seconds after a completed zone change
   every: 120,          // seconds of play in explore and map
   travelEvery: 10,     // real seconds of world-map travel
-  oneWick: { unclean: "warn" },   // "warn" | "death": a One Wick slot loaded after a session that never saved cleanly
   graveyard: 50,       // grave records kept
   retry: 10,           // real seconds after a failed write before the save is tried again
   told: 30,            // real seconds between two log lines telling of failed saves
@@ -638,7 +638,7 @@ async function loadHeld(slotId, { game = theGame, store, version = VERSION.save,
   const run = restoreRun(slot.run, def);
   // A session that ended without a clean save (a crash, the tab closed mid-fight): counted; One Wick may call it a death.
   const unclean = (slot.unclean || 0) + (slot.live ? 1 : 0);
-  if (slot.live && (slot.mode ?? "oneWick") === "oneWick" && SAVE_RULES.oneWick.unclean === "death") {
+  if (slot.live && (slot.mode ?? "oneWick") === "oneWick" && RULES.oneWick.unclean === "death") {
     await bury(st, slotId, { name: slot.character?.name ?? null, seed: slot.seed, mode: "oneWick", level: slot.character?.level ?? 1,
                              cause: "the last session ended without a save", where, time: slot.time, unclean, at: Date.now() });
     const e = new Error("This life's last session ended without a save, and One Wick counts that as a death.");

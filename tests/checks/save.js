@@ -58,6 +58,7 @@ import { B, FLOOR_Z } from "../../src/world.js";
 import { CREATURE_TYPES } from "../../src/creatures.js";
 import { addStatus } from "../../src/status.js";
 import { addZonePatch, claimUid } from "../../src/zones.js";
+import { overrideRules } from "../../src/rules.js";
 
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 // A screen no save is made under (it isn't saveable, nor one a save looks through: like the story's pages or talk).
@@ -1065,19 +1066,19 @@ async function ws9Sections(ctx) {
     const s2 = await slotOf(st, m.id), listed = (await listSlots({ store: st }))[0];
     if (live0 !== SESSION || s1.unclean !== 1 || s1.live !== SESSION || liveClean !== null || s2.unclean !== 1 || listed.unclean !== 1)
       fail(`unclean: live ${live0}; after a load ${s1.unclean} (live ${s1.live}); a clean save's live ${liveClean}; the next load ${s2.unclean}; listed ${listed.unclean}`);
-    RULES.oneWick.unclean = "death";
-    let code = "";
-    const g0 = (await graveyard({ store: st })).length;
-    startRun(4321); game.pages = null;
-    try { await loadGame(m.id, { store: st }); } catch (e) { code = e.code || e.message; }
-    const gone = !(await slotOf(st, m.id)), graves = await graveyard({ store: st });
-    // A Commons Lamp life left the same way loads (the rule is One Wick's).
-    freshRun(99, { mode: "commonsLamp", store: null });
-    const mc = await saveGame(game, { store: st });
-    startRun(4321); game.pages = null;
-    let lamp = "loaded";
-    try { await loadGame(mc.id, { store: st }); } catch (e) { lamp = e.message; }
-    RULES.oneWick.unclean = "warn";
+    const undoDeath = overrideRules("oneWick", { unclean: "death" });   // (rules.js's since the WS9 merge, WS9 #6)
+    let code = "", lamp = "loaded", g0, gone, graves;
+    try {
+      g0 = (await graveyard({ store: st })).length;
+      startRun(4321); game.pages = null;
+      try { await loadGame(m.id, { store: st }); } catch (e) { code = e.code || e.message; }
+      gone = !(await slotOf(st, m.id)); graves = await graveyard({ store: st });
+      // A Commons Lamp life left the same way loads (the rule is One Wick's).
+      freshRun(99, { mode: "commonsLamp", store: null });
+      const mc = await saveGame(game, { store: st });
+      startRun(4321); game.pages = null;
+      try { await loadGame(mc.id, { store: st }); } catch (e) { lamp = e.message; }
+    } finally { undoDeath(); }
     if (code !== "unclean" || !gone || graves.length !== g0 + 1 || !/without a save/.test(graves[graves.length - 1]?.cause) || lamp !== "loaded")
       fail(`One Wick's unclean death: ${code}, slot gone ${gone}, graves ${g0} → ${graves.length} (${graves[graves.length - 1]?.cause}); a Commons Lamp slot ${lamp}`);
     // One page a slot: a stand-in for Web Locks (navigator.locks) and another page holding the slot's lock. Continue

@@ -80,6 +80,11 @@ const CORE = {
   // darkness (underground, the Shade, surface night), nothing by day. With an empty purse it gutters to a
   // flicker gutterRange tiles across, at gutterPower of a torch's strength, and never goes out.
   torch: { hoursPerGlim: 4, gutterRange: 1, gutterPower: 0.35 },
+
+  // One Wick (DECISIONS §1: RULES.classic.* became RULES.oneWick.*; save/save.js, WS9 #6 at the WS9 merge): a One Wick
+  // slot loaded after a session that never saved cleanly is warned about ("warn"), or counted a death ("death": the
+  // slot goes, with a grave).
+  oneWick: { unclean: "warn" },
 };
 
 const store = new Map(Object.entries(CORE).map(([k, v]) => [k, deepFreeze(v)]));
