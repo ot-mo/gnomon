@@ -176,9 +176,34 @@ if (args.browser) {
     await until(page, () => ["map", "explore", "pause"].includes(window.game.mode) && window.game.zone);
     await page.waitForTimeout(300);
     const crashed = await where(page), listed = (await slots(page))[0];
-    if (!/without a save \(once\), or is still open in another tab/.test(warned) || crashed.unclean !== 1 || listed?.unclean !== 1)
+    if (!/without a save \(once\)\.$/.test(warned) || crashed.unclean !== 1 || listed?.unclean !== 1)   // (a crash, not an open tab: its lock went with it)
       fail(`after a crash: the title warned "${warned}"; the load's unclean ${crashed.unclean}, the slot's ${listed?.unclean}`);
     stats.crash = `the renderer crashed: the title warned ("${warned}"); Continue counted 1 unclean exit (the slot holds it)`;
+
+    // 2b. Two tabs: while this page plays the slot, a second one's title says it is open there and refuses Continue;
+    // once the first page goes, the second continues it.
+    if (args.verbose) console.log("· 2b. Two tabs");
+    {
+      const other = await open("");
+      await titleReady(other);
+      await until(other, async () => (await import("/src/screens/title.js")).titleItems().some((it) => it.id === "continue"));
+      const said = await G(other, async () => (await import("/src/screens/title.js")).titleState().warnings.join(" "));
+      await toLine(other, "continue"); await press(other, "Enter");
+      await other.waitForTimeout(800);
+      const refused = await G(other, async () => ({ mode: window.game.mode, error: (await import("/src/screens/title.js")).titleState().error }));
+      const at = await where(page);
+      await page.close();
+      await other.reload();
+      await titleReady(other);
+      await until(other, async () => (await import("/src/screens/title.js")).titleItems().some((it) => it.id === "continue"));
+      await toLine(other, "continue"); await press(other, "Enter");
+      await until(other, () => ["map", "explore", "pause"].includes(window.game.mode) && window.game.zone);
+      const took = await where(other);
+      if (!/is open in another tab/.test(said) || refused.mode !== "title" || !/open in another tab/.test(refused.error) || took.key !== at.key)
+        fail(`two tabs: the second's title said "${said}"; its Continue ${refused.mode} ("${refused.error}"); after the first went, it continued in ${took.key} (the first was in ${at.key})`);
+      stats.twoTabs = `while one page played the slot, a second's title said "${said}" and its Continue was refused ("${refused.error.slice(0, 50)}…"); the first closed, the second continued in ${took.key}`;
+      page = other;
+    }
 
     // 3. One Wick's death.
     if (args.verbose) console.log("· 3. One Wick's death");

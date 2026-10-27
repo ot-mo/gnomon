@@ -1013,6 +1013,49 @@ async function ws9Sections(ctx) {
     RULES.oneWick.unclean = "warn";
     if (code !== "unclean" || !gone || graves.length !== g0 + 1 || !/without a save/.test(graves[graves.length - 1]?.cause) || lamp !== "loaded")
       fail(`One Wick's unclean death: ${code}, slot gone ${gone}, graves ${g0} → ${graves.length} (${graves[graves.length - 1]?.cause}); a Commons Lamp slot ${lamp}`);
+    // One page a slot: a stand-in for Web Locks (navigator.locks) and another page holding the slot's lock. Continue
+    // is refused there (the slot as it was), the slot is listed as open elsewhere, and once that page goes it loads,
+    // this page holding it until save and quit.
+    {
+      const held = new Map(), navWas = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+      const fake = {
+        request(name, opts, cb) {
+          if (held.has(name)) return Promise.resolve(cb(null));
+          const hold = new String("this page");   // (its own: released, it takes away only itself)
+          held.set(name, hold);
+          return Promise.resolve(cb({ name })).finally(() => { if (held.get(name) === hold) held.delete(name); });
+        },
+        query: async () => ({ held: [...held.keys()].map((name) => ({ name })) }),
+      };
+      Object.defineProperty(globalThis, "navigator", { value: { locks: fake }, configurable: true, writable: true });
+      try {
+        RULES.auto = false;
+        const ls = memoryAdapter();
+        freshRun(1234, { store: null });
+        const lm = await saveGame(game, { store: ls });
+        const name = `gnomon-slot:${lm.id}`, mine = String(held.get(name));
+        save.releaseSlot(lm.id);
+        await tick(0);
+        held.set(name, "another page");
+        const before = await slotOf(ls, lm.id), open = await save.slotsOpenElsewhere();
+        startRun(4321); game.pages = null;
+        let code = "";
+        try { await loadGame(lm.id, { store: ls }); } catch (e) { code = e.code || e.message; }
+        const after = await slotOf(ls, lm.id);
+        held.delete(name);   // that page goes
+        await loadGame(lm.id, { store: ls });
+        const nowMine = String(held.get(name));
+        playing(game, "map");
+        await saveGame(game, { clean: true });
+        await tick(0);
+        const afterQuit = held.has(name);
+        if (mine !== "this page" || !open.has(lm.id) || code !== "open" || after.live !== before.live || after.unclean !== before.unclean || nowMine !== "this page" || afterQuit)
+          fail(`one page a slot: first save held ${mine}; open elsewhere ${[...open].join(" ")}; Continue there ${code}, the slot's live ${after.live === before.live ? "kept" : "changed"}; once free, held by ${nowMine}; after save and quit held ${afterQuit}`);
+        stats.oneTab = "the first save takes the slot's lock; held by another page: listed as open there, Continue refused (code open, the slot untouched); once that page goes it loads and holds it; save and quit lets it go";
+      } finally {
+        if (navWas) Object.defineProperty(globalThis, "navigator", navWas); else delete globalThis.navigator;
+      }
+    }
     // Save and quit while a zone change's save is still to come (Esc twice within its half second): nothing lands after
     // the clean save, so the slot stays clean.
     {

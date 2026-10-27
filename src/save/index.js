@@ -10,7 +10,7 @@ import { listenPage } from "./save.js";
 
 export { saveGame, loadGame, listSlots, deleteSlot, checkpoint, canSave, whenWritten, saveStatus, SAVE_STATS, SAVE_RULES, RUN_MODES, SESSION, SAVE_THROUGH,
          modeOf, endRun, wakeAtCheckpoint, restoreCheckpoint, unloadSave, pageShown, listenPage, exportSlot, importSlot, moveSlot, graveyard,
-         migrate, MIGRATIONS, registerWorld, requestSave } from "./save.js";
+         migrate, MIGRATIONS, registerWorld, requestSave, holdSlot, releaseSlot, slotsOpenElsewhere } from "./save.js";
 export { memoryAdapter, idbAdapter, useStore, currentStore, openSaves, storageLeft, STORES } from "./store.js";
 export { registerZoneField, registerCreatureField, CODEC, DEFLATE_AVAILABLE, canonicalJson, jsonProblems } from "./codec.js";
 

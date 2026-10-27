@@ -49,6 +49,7 @@
 //                                                      which only audio.js touches (check-config)
 //   migrate(slot, zones, { to, migrations }) → { slot, zones }   MIGRATIONS[n] = { slot(rec), zone(rec) } takes n → n + 1
 //   registerWorld(id, def | () => def | Promise<def>)  the worlds a load can choose by state.world.id
+//   holdSlot(id) → Promise<bool> · releaseSlot(id) · slotsOpenElsewhere() → Promise<Set<id>>   one page a slot (below)
 //   requestSave(game, reason, { delay, checkpoint }) the automatic saves' request (below), for other modules
 //   canSave(game) → bool (a saveable screen, or one under SAVE_THROUGH's) · whenWritten(game) → Promise · saveStatus(game) ·
 //   SAVE_STATS · SAVE_RULES · RUN_MODES · SESSION · SAVE_THROUGH
@@ -114,6 +115,39 @@ const checkpoints = (game) => RUN_MODES[modeOf(game)].death === "checkpoint";
 // This page's (or process's) session: a slot it plays holds it in `live` until a clean save.
 export const SESSION = globalThis.crypto?.randomUUID?.() ?? `s${Date.now().toString(36)}${Math.floor(performance.now() * 1000).toString(36)}`;
 
+// --- One page plays a slot at a time ------------------------------------------------------------------------
+// Where the browser has Web Locks (navigator.locks), the page playing a slot holds a lock named for it, from its load
+// or first save until it leaves it (another slot, save and quit, death) or the page goes (a crash too: the lock goes
+// with it). A load of a slot another page holds is refused (error.code "open"), and the title says which are open.
+// Without Web Locks (Node, older browsers) every slot is free.
+const locks = () => globalThis.navigator?.locks || null;
+const lockName = (id) => `${GAME_ID}-slot:${id}`;
+let lockHeld = null;   // { id, release }
+export function holdSlot(id) {
+  const lm = locks();
+  if (!lm || lockHeld?.id === id) return Promise.resolve(true);
+  releaseSlot();
+  return new Promise((resolve) => {
+    lm.request(lockName(id), { ifAvailable: true }, (lock) => {
+      if (!lock) { resolve(false); return undefined; }
+      return new Promise((release) => { lockHeld = { id, release }; resolve(true); });
+    }).catch(() => resolve(true));
+  });
+}
+export function releaseSlot(id) {
+  if (!lockHeld || (id !== undefined && lockHeld.id !== id)) return;
+  lockHeld.release();
+  lockHeld = null;
+}
+export async function slotsOpenElsewhere() {
+  const lm = locks();
+  if (!lm?.query) return new Set();
+  try {
+    const q = await lm.query(), pre = lockName("");
+    return new Set((q.held || []).map((l) => l.name).filter((n) => n?.startsWith(pre)).map((n) => n.slice(pre.length)).filter((id) => id !== lockHeld?.id));
+  } catch { return new Set(); }
+}
+
 // --- Worlds a load can choose (state.world.id) ---------------------------------------------------------
 const WORLDS = new Map([[TEST_WORLD.world.id, () => TEST_WORLD],
   ["gnomon", async () => (await import("../content/world/worldmap.js")).REAL_WORLD]]);   // (loaded by content/index.js)
@@ -164,6 +198,7 @@ function savingFor(game, store, slotId) {
   const id = slotId || newSlotId(game);
   game.saving = newSaving(id, Date.now(), store, sv ? { cp: sv.cp, cpRecord: sv.cpRecord && { ...sv.cpRecord, id }, unclean: sv.unclean } : {});
   game.saving.fresh = true;   // (its first write clears the slot: an id given may be another run's)
+  holdSlot(id);
   return game.saving;
 }
 
@@ -354,6 +389,7 @@ function writeSave(game, { reason = "manual", store, slotId, clean = false, chec
   job.after = (e) => {
     if (e && clean) { sv.quitting = false; waiting.push(...answered); }   // (the session goes on: so do they)
     if (e && cpSave) failedCheckpoint(game, sv, n, prev);
+    if (!e && clean) releaseSlot(sv.slotId);   // (this page has left it)
     for (const c of carry) if (c.carry.into === "zones") { unpend(sv, c.carry.key); if (!e) sv.committed.add(c.carry.key); }
     sv.last = { reason, at: Date.now(), ok: !e };
     if (e) { failed(game, sv, `saving slot ${sv.slotId}`, e); return; }
@@ -531,6 +567,7 @@ export function endRun(game, { cause = game.deathCause } = {}) {
     return sv.restoring;
   }
   const rec = graveOf(game, cause, sv.unclean);
+  releaseSlot(sv.slotId);
   return submit(game, sv, { rows: [], run: (st) => bury(st, sv.slotId, rec) }).then(() => null);
 }
 
@@ -578,7 +615,15 @@ function checkSlot(slot, slotId) {
   if (slot.worldVersion !== VERSION.world) throw new Error(`loadGame: ${slotId} was made on map version ${slot.worldVersion}, the map is version ${VERSION.world} now (§7.6)`);
 }
 
-export async function loadGame(slotId, { game = theGame, store, version = VERSION.save, migrations = MIGRATIONS } = {}) {
+export async function loadGame(slotId, opts = {}) {
+  if (!(await holdSlot(slotId))) {
+    const e = new Error("That save is open in another tab: close it there (or save and quit) first.");
+    e.code = "open";
+    throw e;
+  }
+  try { return await loadHeld(slotId, opts); } catch (e) { releaseSlot(slotId); throw e; }   // (a load that failed holds nothing)
+}
+async function loadHeld(slotId, { game = theGame, store, version = VERSION.save, migrations = MIGRATIONS } = {}) {
   const st = storeFor(store);
   const stored = await st.get("slots", slotId);
   checkSlot(stored, slotId);

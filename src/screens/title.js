@@ -26,14 +26,14 @@ import { registerScreen, setMode, pushMode, screenFor } from "../screens.js";
 import { UI, list, listKey, listWheel, listAt, keyHelp, textInput, drawTextInput, at } from "../ui.js";
 import { FLAGS, TITLE, VERSION } from "../config.js";
 import { startRun, randomSeed } from "../game.js";
-import { listSlots, loadGame, deleteSlot, exportSlot, importSlot, RUN_MODES, SESSION, openSaves, storageLeft, moveSlot, currentStore } from "../save/index.js";
+import { listSlots, loadGame, deleteSlot, exportSlot, importSlot, RUN_MODES, SESSION, openSaves, storageLeft, moveSlot, currentStore, slotsOpenElsewhere } from "../save/index.js";
 import { minutesAt } from "../clock.js";
 import { loadSettings } from "./options.js";
 
 const modes = () => Object.keys(RUN_MODES);   // (not at load: save/index.js may still be loading)
 const LOW_STORAGE = 10 * 1024 * 1024;   // §7.3: below this the title warns
 const menu = { sel: 0, top: 0, slots: [], busy: "", error: "", view: "main", mode: "oneWick", seed: { text: "", max: 9 }, editing: false,
-               load: { sel: 0, top: 0 }, armed: null, persistent: true, reason: "", left: null, told: new Set() };
+               load: { sel: 0, top: 0 }, armed: null, persistent: true, reason: "", left: null, told: new Set(), open: new Set() };
 
 export const titleState = () => ({ view: menu.view, mode: menu.mode, seed: menu.seed.text, slots: menu.slots, warnings: warnings(), busy: menu.busy, error: menu.error });
 
@@ -62,14 +62,21 @@ function warnings() {
   if (menu.left !== null && menu.left < LOW_STORAGE) out.push(`Less than 10 MB of storage is left for saves (${(menu.left / 1048576).toFixed(1)} MB).`);
   const s = menu.slots[0];
   if (s && s.genVersion !== undefined && s.genVersion !== VERSION.gen) out.push("This save was made by an older version: where new ground meets old, the land may not line up.");
-  // (live: another session holds it, and never saved cleanly: a crash, or the game open in another tab.)
-  const other = s?.live && s.live !== SESSION, n = (s?.unclean || 0) + (other ? 1 : 0);
-  if (n) out.push(`${who(s)[0].toUpperCase() + who(s).slice(1)}'s last session ended without a save (${n === 1 ? "once" : `${n} times`})${other ? ", or is still open in another tab" : ""}.`);
+  // Open in another tab (it holds the slot's lock), or left by a session that never saved cleanly (live: a crash; or,
+  // where the browser has no Web Locks, perhaps a tab still open).
+  const name = s && who(s)[0].toUpperCase() + who(s).slice(1);
+  if (s && menu.open.has(s.id)) out.push(`${name} is open in another tab: play it there, or save and quit there first.`);
+  else {
+    const other = s?.live && s.live !== SESSION, n = (s?.unclean || 0) + (other ? 1 : 0);
+    const maybe = other && !globalThis.navigator?.locks ? ", or is still open in another tab" : "";
+    if (n) out.push(`${name}'s last session ended without a save (${n === 1 ? "once" : `${n} times`})${maybe}.`);
+  }
   return out;
 }
 
 async function refresh() {
   menu.slots = await listSlots().catch((e) => { menu.error = `The saves couldn't be read: ${e.message}`; return []; });
+  menu.open = await slotsOpenElsewhere();
   return menu.slots;
 }
 
@@ -98,7 +105,7 @@ function load(game, slot) {
   menu.error = "";
   loadGame(slot.id, { game }).then(() => { menu.busy = ""; }, (e) => {
     menu.busy = "";
-    menu.error = e.code === "unclean" ? e.message : `That save couldn't be loaded: ${e.message}`;
+    menu.error = e.code === "unclean" || e.code === "open" ? e.message : `That save couldn't be loaded: ${e.message}`;
     if (game.mode !== "title") setMode(game, "title", null, { pointer: false });
     refresh();
   });
