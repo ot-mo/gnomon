@@ -61,17 +61,19 @@ export const BLOCKS = [
   { key: "SNOW",      name: "snow",        color: [235, 240, 248], reserved: true, map: { glyph: ".", color: [235, 240, 248] } },
   { key: "ASH",       name: "ash",         color: [96, 92, 90],    reserved: true, map: { glyph: ".", color: [110, 106, 104] } },
   { key: "CLAY",      name: "clay",        color: [168, 98, 70],   reserved: true, map: { glyph: ".", color: [168, 98, 70] } },
-  { key: "SHALE",     name: "shale",       color: [90, 92, 102],   reserved: true },   // no map look yet: "^" is spikes (bible §15.7)
-  { key: "TRUNK",     name: "tree trunk",  color: [96, 70, 46],    reserved: true },   // no map look yet: "♣" is the speaking trees
-  { key: "LEAVES",    name: "leaves",      color: [70, 130, 66],   reserved: true },
-  { key: "REED",      name: "reeds",       color: [150, 160, 90],  reserved: true },
+  // Rock outcrops and trees don't take §6.5's "^" and "♣" (bible §15.7: spikes and the speaking trees):
+  // shale is ground, "." in its grey; a trunk (a map wall) and a canopy you stand on are "♠".
+  { key: "SHALE",     name: "shale",       color: [90, 92, 102],   reserved: true, map: { glyph: ".", color: [128, 130, 142] } },
+  { key: "TRUNK",     name: "tree trunk",  color: [96, 70, 46],    reserved: true, map: { glyph: "♠", color: [124, 92, 58] } },
+  { key: "LEAVES",    name: "leaves",      color: [70, 130, 66],   reserved: true, map: { glyph: "♠", color: [80, 150, 72] } },
+  { key: "REED",      name: "reeds",       color: [150, 160, 90],  reserved: true, map: { glyph: "¦", color: [160, 170, 96] } },
   { key: "MUD_BRICK", name: "mud brick",   color: [160, 120, 84],  reserved: true },
   { key: "THATCH",    name: "thatch",      color: [196, 170, 100], reserved: true },
   { key: "SCRAP",     name: "scrap metal", color: [130, 100, 80],  reserved: true },
-  { key: "GLASS",     name: "glass",       color: [170, 215, 225], reserved: true },
+  { key: "GLASS",     name: "glass",       color: [170, 215, 225], reserved: true, map: { glyph: ".", color: [170, 215, 225] } },
   { key: "METAL",     name: "metal",       color: [150, 155, 165], reserved: true },
   { key: "BONE",      name: "bone",        color: [225, 215, 190], reserved: true },
-  { key: "CRYSTAL",   name: "crystal",     color: [180, 220, 240], reserved: true },
+  { key: "CRYSTAL",   name: "crystal",     color: [180, 220, 240], reserved: true, map: { glyph: ".", color: [180, 220, 240] } },
   { key: "FUNGUS",    name: "fungus",      color: [170, 110, 180], reserved: true },
   { key: "STATION",   name: "cradle",      color: [140, 170, 190], reserved: true },
   { key: "STILL",     name: "still",       color: [150, 120, 80],  reserved: true },
