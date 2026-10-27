@@ -2,24 +2,25 @@
 
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
-**Updated:** 2026-10-27, the integrator (local session), on `integration`. **Phase 1 is running and Phase 2's
-integration has started: WS3, WS8, WS4, WS6, WS7 and WS2 (both halves each), WS5, WS10 and WS9 are merged (`p2-ws3`,
-`p2-ws8`, `p2-ws4a`, `p2-ws5`, `p2-ws6a`, `p2-ws4b`, `p2-ws6b`, `p2-ws10`, `p2-ws2a`, `p2-ws7a`, `p2-ws7b`, `p2-ws2b`,
-`p2-ws9`), and the flip is in (`p2-flip`: the attribute set and d20 by default); WS1, the last, merges next.** From here on only the integrator edits this file and
+**Updated:** 2026-10-28, the integrator (local session), on `integration`. **Phase 1 is done and fully merged: every
+workstream's `p1-*` tag is in, each tagged `p2-*` at its merge (`p2-ws3` … `p2-ws9`, the last `p2-ws1`), the flip
+too (`p2-flip`); `main` = `p2-ws1`. Phase 2's rest (TECH_DESIGN §8.5: the last wiring merge and 2B hardening) starts
+from `p2-ws1`: "Next step" below. Nothing is running: the user is taking a break, so no session works on GNOMON until
+the user starts one.** From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p2-ws9` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+- **Last tag:** `p2-ws1` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
   `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b`, `p1-ws10`, the flip, `p1-ws2a`, `p1-ws7a`,
-  `p1-ws7b`, `p1-ws2b` and `p1-ws9`, with their integration requests; `p2-ws3` … `p2-ws2b` before it).
+  `p1-ws7b`, `p1-ws2b`, `p1-ws9` and `p1-ws1`, with their integration requests; `p2-ws3` … `p2-ws9` before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
 - **Branch:** `integration`, in the worktree `C:\Users\Otto Mörner\Code\gnomon-wt\integration` (serves on port
   8660). Nothing is half finished.
 - **Done:** Phase 0 (0A1 … 0D2, notes in `docs/sessions/0A1.md` … `0D2.md`); WS3, WS8, WS4, WS5, WS6, WS10,
-  WS7, WS2 and WS9 (`docs/ws3.md`, `ws8.md`, `ws4.md`, `ws5.md`, `ws6.md`, `ws10.md`, `ws7.md`, `ws2.md`, `ws9.md`;
+  WS7, WS2, WS9 and WS1, all of Phase 1 (`docs/ws3.md`, `ws8.md`, `ws4.md`, `ws5.md`, `ws6.md`, `ws10.md`, `ws7.md`, `ws2.md`, `ws9.md`, `ws1.md`;
   `docs/sessions/ws3.md`, `ws8.md`, `ws4.md` "Part 4a" and "Part 4b", `ws5.md`, `ws6.md` "Part 6a" and "Part 6b",
-  `ws10.md`, `ws7.md` "Part 7a" and "Part 7b", `ws2.md` "Part 2a" and "Part 2b", `ws9.md`), merged. The merges' own numbers are under "Integration log" below.
+  `ws10.md`, `ws7.md` "Part 7a" and "Part 7b", `ws2.md` "Part 2a" and "Part 2b", `ws9.md`, `ws1.md`), merged. The merges' own numbers are under "Integration log" below.
 - **Checks:** `node tools/run-all.mjs`, 38 checks (WS10 added `check-sites`) (about 2 minutes on an idle machine, 4 with three workstreams
   running; the timed ones, `check-dungeons`, `check-status`, `check-stats` and `check-perf`, alone at the end; since
   WS3, `check-perf` runs the render check first). Browser (headless Playwright, audio silenced,
@@ -31,14 +32,19 @@ moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## Next step
 
-**The integrator:** wait for the coordinator's message; merge each `p1-*` tag as it lands, in §8.5's
-order (WS9, WS3, WS8, WS5, WS4, WS6a, WS6b, WS10, WS2, WS7, WS1). For each: read `docs/<ws>.md` and
-`docs/sessions/<ws>.md`; merge the tag; apply the requests aimed at P0's, unowned, the integrator's or merged
-workstreams' files, and carry the rest (below, "Carried integration requests"); rerun its dependency-table items
-(§8.3's end) against the real code; `run-all`, the bot, golden (b), the browser checks (serve on 8660, `?silent=1`);
-verify sceptically, one commit per finding; tag `p2-<ws>` (annotated), push it, and only when
-`git merge-base --is-ancestor origin/main p2-<ws>` holds, `git push origin 'p2-<ws>^{commit}:refs/heads/main'` (an
-annotated tag's own name can't be pushed to a branch; `^{commit}` is the commit it tags).
+**Phase 1 is closed.** What `main` (= `p2-ws1`) holds, the balance phase's list and Phase 2's work are under "Phase 1's
+closing state" below.
+
+**Phase 2 starts from `p2-ws1`.** Its exact first step, for the session the user starts next (local; CLAUDE.md's
+"Start of every session"): `git fetch origin --tags`, then in the worktree `C:\Users\Otto Mörner\Code\gnomon-wt\integration`
+on branch `integration` (at `p2-ws1`) run `node tools/run-all.mjs` (38 of 38 at `p2-ws1`) and
+`NODE_PATH="$(npm root -g)" node tools/check-save.mjs --browser` (PASS), so the start is known green; then begin 2B
+hardening (TECH_DESIGN §8.5) with its bot playthrough: a scripted session in `tools/bot.mjs` (a new scenario beside
+`runSession`) that goes create → 3 zones in both views → world travel 10 steps → village trade and ritual → a quest →
+a dungeon 3 levels down → save → reload → continue, on the test world (the real world has no village until C1), each
+step asserted. After it: the performance pass against §6.7 and the browser QA checklist with silent audio. §8.5's
+"last wiring merge" (title → create → the start landmark → the first village, the legacy fixture site off the default
+world) waits on C1's regions and villages: `game.js` still builds runs on the test world.
 
 **On `main` since `p2-ws6a`** (both at the user's request, without a tag of their own): the root README for GNOMON as
 it stands at `p2-ws5` (`6645658`, from `wip/readme`; an interim update before Phase 4's rewrite; the secret rooms'
@@ -56,6 +62,43 @@ files, fills its stubs in place (keep every name `tests/checks/imports.js` freez
 replaces its check stub keeping `run(env)`, and puts any change to someone else's file in `docs/<ws>.md` under
 "Integration requests". `features.js`, `content/index.js` and `tests/checks/index.js` are never edited after P0. Each
 workstream ends the same way as a Phase 0 session: implement → independent verification → fix → recheck → tag.
+
+## Phase 1's closing state (2026-10-28)
+
+**What `main` holds** (`p2-ws1`): P0's ported game in both views (the parent's legacy stack on the test world, golden (b)
+held), and on it: the outdoor renderer, day and night, the Gnomon (WS3); d20 combat, the target cursor, AI depth and
+followers (WS8); character creation, the attribute set, powers, mutations and the level-up (WS4; the attribute set and
+d20 are the defaults since `p2-flip`); implants, artifacts, the Truing Cradle and the inventory (WS5); factions, rep,
+dialogue builders, trade and the Kindling (WS6); dungeon sites, lairs and legends (WS10); surface generation with 20
+biomes, wildlife and props (WS2); history, secrets, the journal, villages, village quests and the campaign's hooks
+(WS7); saves in IndexedDB with the run modes, checkpoints, the title, options, log, death and pause screens (WS9); and
+the world map: travel, encounters, rest, getting lost and discovery (WS1). Every merge's numbers are in the
+integration log below.
+
+**The balance phase** (Phase 4, §8.7; the user, 2026-10-27: "settle the tuning (creature scaling, kill XP) in the balance
+phase once C4's gear and WS1/WS7's XP are in": both XPs are in now): WS8's TTK tables ("Open items" below) with C4's gear;
+creature level scaling (+6% HP a level, +1 damage per 4); tier gear enchantment; the kill-XP pace, about 100 kills a
+level from level 3 on (the parent's 3 / 9 / 20 / 41 / 91 / 147 at levels 1 / 3 / 5 / 8 / 14 / 20); the quest, beat and
+village XP (`xpReward` 0.6, 0.75, 0.2 of a level); discovery, which on the real world now pays about 8,600 XP in all
+(16 landmarks about 7,300, 8 historic sites about 1,300: alone, level 1 to level 14; seeds 1234 and 7); bare hands
+(FISTS: 0.3 s, reach 1.3, no design number); the wildlife's d20 numbers (no species has `dv` or attributes).
+
+**Phase 2's work** (TECH_DESIGN §8.5): 2B hardening (the bot playthrough, the performance pass, the browser QA
+checklist) and the last wiring merge (after C1). Found at the last merges and left for it:
+- **Travel saves:** WS9 saves every 10 s on the world map, but WS1's world map isn't saveable, rightly: `game.trip`
+  isn't saved, so a save there would load you back where the journey began. Saving the trip (and then making
+  `"world"` saveable, WS9 #8) is the fix; until then a travel save waits for the next view.
+- **Discovery XP on a load:** WS1's `visit` runs on every `zone:enter`, a load included, so loading a save made before
+  WS1 pays the sites of the span you're in (WS9's rule: a load is never a first visit; WS7b's village XP keeps it).
+- **`RULES.cooldown.restClears`** (WS1 #7): 3600 s is 60 world hours since a world hour became 60 s; one hour is 60.
+  WS1's own R10 rest test leans on the old number (a 2-hour rest keeps the second wind's cooldown), so it changes too.
+- **The torch on the road** (WS1 #6): on the world map the torch burns by the zone you left, so the Shade by day costs
+  nothing; `torch.js darkSeconds` could read the span under `game.trip`.
+- **The journal's Locations tab** (WS1 #2): a key and a click to `openWorldMap(game, { center })` need a selected
+  location, which the tab (scrolling text) doesn't have yet.
+- **For the coordinator:** Esc on the map (TECH §4.2's options against P0's check-shell, WS9 #5); naming props in the
+  legend and inspect (check-hud's frozen describer list, WS2b #7).
+- The integrator's backlog and every carried request: "Carried integration requests" and "Open items" below.
 
 ## Phase 1 plan (agreed with the user, 2026-10-26)
 
@@ -79,7 +122,7 @@ tags; WS1, which builds on the most, last):
 | 7 | WS10 Dungeon sites, lairs and legends | `ws10`, `ws/ws10` | tagged `p1-ws10` (1bbd302), **merged, `p2-ws10`** (2026-10-27) |
 | 8 | WS2a → WS2b Surface generation | `ws2`, `ws/ws2` | WS2a tagged `p1-ws2a` (386bd98), **merged, `p2-ws2a`**; WS2b tagged `p1-ws2b` (2003f0a), **merged, `p2-ws2b`** (2026-10-27) |
 | 9 | WS7a → WS7b Knowledge: history, villages, quests | `ws7`, `ws/ws7` | WS7a tagged `p1-ws7a` (b503957), **merged, `p2-ws7a`**; WS7b tagged `p1-ws7b` (d7a0038), **merged, `p2-ws7b`** (2026-10-27) |
-| 10 | WS1 Overworld travel | `ws1`, `ws/ws1` | queued |
+| 10 | WS1 Overworld travel | `ws1`, `ws/ws1` | tagged `p1-ws1` (b042cc0), **merged, `p2-ws1`** (2026-10-28) |
 
 - **Why these three first:** WS9 fixes the Continue hazard and gives real saves (IndexedDB, periodic and unload
   saves); WS3 owns the open outdoor-frame budget (§6.7's 17 ms), the horizon band and the clock's looks; WS8 builds the
@@ -233,6 +276,32 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p2-ws1`** (2026-10-28): `p1-ws1` (b042cc0) merged into `integration` (`e6f16e2`), the last Phase 1 tag. One
+conflict, the imports of `tests/checks/world.js` (WS1 #12): WS7a's history import and WS1's `canStep`, both kept;
+`siteRules` keeps WS10's approved `historicRule` and WS7a's approved history line, and WS1's `checkTravel` joined.
+- Applied, each with an assertion that fails without it: WS1's four powers offered (`60d145e`, #3: Keen Eye,
+  Pathfinder, Terrain lore, Homing sense; a pathcraft village's leader now teaches Pathfinder, 139 of 139 leaders teach);
+  `site: 0.1` in the progression's reward table (`c2a4720`, #4: the same number); browser-0d1's tour reaches the world
+  map and the wait menu (`7600c24`, #5); the pause card names O world map and Z to wait (`a99f9fb`, #8).
+- Confirmed: #1 (a learned location's pin: check-overworld's discovery part passes on the merge); #11 (a legend met on
+  the road leaves its lair empty: check-overworld's encounter bands pass). Carried to Phase 2: #2 (the journal's
+  Locations key), #6 (the torch on the road), #7 (restClears, with WS1's R10 test); #9 to C1/C3; #10 information.
+- Merge findings: check-save under WS1 (`abb2bd0`): a save made before WS1 loads with an atlas of the one span loaded
+  into (section 10 compares without it and holds it to that span); WS1's world map isn't saveable, rightly (the trip
+  isn't saved), so no save is made on it and the waiting travel save lands back on the map (section 12). browser-gate
+  (`51274c2`): entering the ruin's span pays its discovery XP and raised a level, whose card took the gate's keys.
+- The leveling pace with discovery in: on the real world every site's discovery pays about 8,600 XP (16 landmarks
+  about 7,300, 8 historic sites about 1,300; seeds 1234 and 7): alone, level 1 to level 14. Kills: about 100 a level
+  from level 3 on (the parent's 9 to 147). For the balance phase ("Phase 1's closing state").
+- Checks: `run-all` at `abb2bd0` **38 of 38** (194.3 s; after it only browser tools changed). Timed alone against
+  `p2-ws9`, `check-perf --rounds 3 --no-render`: **PASS**, ×0.92-1.17 (the outdoor frame p50 15.9 against 16.0, dungeon
+  generation p95 33.4 against 29.6, budget 40; passTime p50 7.2 against 6.2, budget 12). `check-save --browser` **PASS**.
+  Browser (0 console errors, audio silenced): `browser-0d1 --against p0-done` (27 of 27 modes, the HUD at 100×30,
+  golden (b) 27 of 27, per tick underground +0.1% in 3D and +2.1% on the map, the surface −11.4% in 3D);
+  `browser-0d2 --all` (boot with 181 modules, `test-world.html` 34 passed, 0 failed); `browser-gate` (1234, 7);
+  `browser-silent`; and on `tools/serve.mjs 8660`, `browser-ws1`, `browser-0c` (1234, 7), `browser-shell` (55 mode
+  changes at each size), `browser-ws4`, `browser-ws5`, `browser-ws6`, `browser-ws7`, `browser-ws8`.
 
 **`p2-ws9`** (2026-10-27): `p1-ws9` (fd2aa33, from `p0-done`) merged into `integration` (`84639c4`). One conflict,
 `tests/checks/screen-frames.js` `NOT_COMPARED`, joined (WS9 #12): 13 frames by exact name with their reasons (WS3's
