@@ -290,6 +290,12 @@ export async function run(env) {
     p.torch = true;
     events.emit(game, "inspect", { zone: z, x: rx, y: ry, z: FLOOR_Z + 1, open: true });
     if (J()[idR]?.source !== "mural") fail(`a relief in 3D with the torch lit: ${json(J()[idR])}`);
+    // A rune in daylight with the torch out: the light is too much for it.
+    p.torch = false;
+    const lit = !murals.readable(game, z, { x: rx, y: ry, z: FLOOR_Z + 1, view: "dark" }) && murals.readable(game, z, { x: rx, y: ry, z: FLOOR_Z + 1, view: "3d" });
+    z.murals.push({ x: rx, y: ry + 1, z: FLOOR_Z + 1, view: "dark", text: ev[1].text.hostile });
+    events.emit(game, "inspect", { zone: z, x: rx, y: ry + 1, z: FLOOR_Z + 1, open: true });
+    if (!lit || J()[`hist:${ev[1].id}:dark`]) fail(`a rune by daylight with the torch out was read (the surface lit: ${lit})`);
     // A rune: in the dark only, below ground.
     game.debug.enterZone("0,0,1", "down");
     const d = game.zone, q = game.player, dx = Math.floor(q.x), dy = Math.floor(q.y), idK = `hist:${ev[2].id}:dark`;
@@ -300,8 +306,13 @@ export async function run(env) {
     q.torch = false;
     events.emit(game, "inspect", { zone: d, x: dx + 1, y: dy, z: FLOOR_Z + 1, open: true });
     if (J()[idK]?.source !== "mural") fail(`a rune in the dark: ${json(J()[idK])}`);
+    // A relief in the dark with the torch out: too dark to read.
+    const idR2 = `hist:${ev[2].id}:deep`;
+    d.murals.push({ x: dx - 1, y: dy, z: FLOOR_Z + 1, view: "3d", text: ev[2].text.inscription });
+    events.emit(game, "inspect", { zone: d, x: dx - 1, y: dy, z: FLOOR_Z + 1, open: true });
+    if (J()[idR2]) fail("a relief was read in the dark with the torch out");
     stats.murals = "a mosaic by a 0.5 s hover and by the look cursor's payload (open: true); a relief in 3D in light, not on the map; " +
-      "a mosaic not in 3D; a rune in the dark, not by torchlight; drawing and describing learned nothing";
+      "a mosaic not in 3D; a rune in the dark, not by torchlight nor by daylight; a relief not in the dark; drawing and describing learned nothing";
   }
 
   // --- 5. Gossip --------------------------------------------------------------------------------------------------
