@@ -1582,7 +1582,7 @@ async function ws9Sections(ctx) {
 
   // --- 20. The pause card in the recorded frames' states ----------------------------------------------------------
   // tests/checks/screen-frames.js's four "… 3d pause card" frames (seeds 99 and 31, depths 3 and 11, at 180×56) are
-  // drawn but not compared any more (NOT_COMPARED: the card names L, V, the hotbar and G). Here the same states are
+  // drawn but not compared any more (NOT_COMPARED: the card names L, V, the hotbar and the legend's comma). Here the same states are
   // drawn with and without the card: every cell outside the card's box is what the view draws without it; inside,
   // the borders are whole, each line stands centred in its colour, and nothing else is there. At 100×30 the card
   // still fits with every key named.
@@ -1594,7 +1594,7 @@ async function ws9Sections(ctx) {
       ["WASD move · Shift sprint · Space jump", [170, 170, 170]], ["Mouse look · Left click attack · Wheel zoom", [170, 170, 170]],
       ["E use / talk · I inventory · J journal · T / right-click throw · Q quick-heal · R swap weapons · F torch · M music · N sounds", [170, 170, 170]],
       ["L look · V fire · 1-9 the abilities on your hotbar (1 Fold Step)", [170, 170, 170]],
-      ["Tab: rotate to the view from above (the map: turn-based; G its legend)", [170, 170, 170]], ["", null],
+      ["Tab: rotate to the view from above (the map: turn-based; its legend on the , key)", [170, 170, 170]], ["", null],
       ["From inside you see height, depth, light and dark.", [130, 130, 130]],
       ["From above you see the whole floor, the floor's pictures, and the flat things.", [130, 130, 130]],
     ];
@@ -1640,7 +1640,7 @@ async function ws9Sections(ctx) {
     inputHandlers.onLockChange(false);
     game.debug.draw();
     const shown = small.frameText().replace(/\s+/g, " ");
-    for (const k of ["L look", "V fire", "1-9 the abilities on your hotbar (1 Fold Step)", "G its legend", "I inventory", "J journal", "Click to play"])
+    for (const k of ["L look", "V fire", "1-9 the abilities on your hotbar (1 Fold Step)", "its legend on the , key", "I inventory", "J journal", "Click to play"])
       if (!shown.includes(k)) fail(`the pause card at 100×30 lacks "${k}"`);
     inputHandlers.onLockChange(true);
     stats.pauseCard = `${out.join("; ")}; at 100×30 every key named`;

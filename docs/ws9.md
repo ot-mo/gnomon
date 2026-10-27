@@ -44,7 +44,7 @@ options.js: MODE "options" · openOptions(game, { from }) · optionItems(game) �
 log.js:     MODE "log" · openLog(game) · logHistory(game) · LOG_LINES = 500     (H in both views)
 dead.js:    recapOf(game) · RECAP_AFTER = 1                                  (C wakes, R a new run in the same mode, T the title)
 pause.js:   HINT_AFTER = 0.75                                                 (Esc on the card: the options)
-// hud.js pauseLines(game) → the card's lines: L look, V fire, 1-9 the hotbar (its first ability by name), G the legend
+// hud.js pauseLines(game) → the card's lines: L look, V fire, 1-9 the hotbar (its first ability by name), the map legend on ,
 // hud.js
 HOTBAR_NEAR = 10 · segment "hotbar" (priority 70) · segment "debug" (?debug=1 only) · drawPause() → the card's box { x0, y0, w, h }
 ```
@@ -114,9 +114,9 @@ changes when it lands.
     the card in those four states (every cell outside it as without it, each line centred in its colour). Join the list
     with WS3's ("victory card") and WS5's (its inventory frames).
 13. **The pause card's keys come true at the merge**: it names L look and V fire (WS8: `screens/target.js`,
-    `missiles.js`, on `main` at `p2-ws8`) and G the map's legend (WS3: `screens/play.js`'s binding, on `main` at
-    `p2-ws3`); on `ws/ws9` alone (from `p0-done`) only the hotbar's 1 is bound. If either merge changes those keys,
-    the card's line in `hud.js pauseLines` changes with it.
+    `missiles.js`, on `main` at `p2-ws8`) and the comma for the map's legend (WS3's binding, moved from G by the
+    integrator since G is WS5's pick-up); on `ws/ws9` alone (from `p0-done`) only the hotbar's 1 is bound. If a
+    merge changes those keys, the card's lines in `hud.js pauseLines` change with it (and check-save section 20's).
 
 ## Handoff
 
