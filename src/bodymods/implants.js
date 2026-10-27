@@ -11,7 +11,8 @@
 //       paid or fitted unless the whole hour passed);
 //       takes the item out of the pack; a part it adds (the folding rack) appears; invalidateStats; emits
 //       "install" { e, item, partId }. free: no station, fee or hour (WS4's starting implant); paid: the fee
-//       is already paid (a surgeon's service).
+//       is already paid (a surgeon's service); waive: no fee, but the station and the hour (bible §10.4: free at the
+//       Square for the Plumb at Assize ≥ Warm; the station context's `waive` passes it).
 //   uninstall(game, p, partId) → { ok, item, reason, destroyed, dropped }
 //       the curse lock: refused ("station") anywhere but a Cradle or a surgeon. Gives the grade back (it is
 //       counted from what is installed, never stored); a † implant is destroyed, any other goes to the pack;
@@ -111,10 +112,10 @@ function lieStill(game) {
 }
 
 // paid: the fee is already paid (a surgeon's service: the shop takes the price before it runs).
-export function install(game, p, item, partId, { free = false, paid = false } = {}) {
+export function install(game, p, item, partId, { free = false, paid = false, waive = false } = {}) {
   const check = canInstall(game, p, item, partId, { free });
   if (!check.ok) return { ok: false, reason: check.reason, need: check.need, have: check.have, time: 0, fee: 0 };
-  const fee = free || paid ? 0 : fittingFee(item);
+  const fee = free || paid || waive ? 0 : fittingFee(item);
   if (fee > funds(p)) return { ok: false, reason: "funds", fee, time: 0 };
   const t0 = game?.time ?? 0;
   const stopped = free ? null : lieStill(game);

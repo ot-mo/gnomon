@@ -329,6 +329,14 @@ export function checkItems(m) {
     want("a hunt within reach", withC(() => IM.install(game, p, eye, "face")), "hunted");
     if (game.time !== t0 || p.funds !== 500 || !p.inv.includes(eye) || p.body.implants.face) fail("a refused fitting took time, glim or the implant");
     game.zone.creatures = game.zone.creatures.filter((c) => c !== goblin);
+    // A waived fee (the Square's free fittings): no glim, but the station and the hour.
+    {
+      const q = fresh(), it = { kind: "implant", id: "lampCrown" };
+      q.inv.push(it);
+      const fw = q.funds, tw = game.time, r = IM.withTruing(game, { at: "cradle", waive: true }, () => IM.install(game, q, it, "head", { waive: true }));
+      if (!r.ok || q.funds !== fw || game.time - tw !== 60) fail(`a waived fitting: ${r.ok ? "fitted" : r.reason}, ${fw - q.funds} glim, ${game.time - tw} s (want fitted, 0, 60)`);
+      want("a waived fitting with no station", IM.install(game, fresh(), { kind: "implant", id: "lampCrown" }, "head", { waive: true }), "station");
+    }
     // Dying on the table (poison running out your last HP inside the hour): not fitted, nothing paid.
     {
       const q = fresh();
@@ -465,6 +473,7 @@ export function checkItems(m) {
       const data = m.screens.modeData(game);
       data.list.sel = k;
       m.keys.dispatchKey(game, "Enter", false, "");
+      if (!said(/draughtsmen trace you on the drafting floor, flat/)) fail(`${view}: the Cradle's fitting doesn't tell the draughtsmen's tracing (bible §10.4)`);
       if (p.body.implants.face !== it || game.time - t2 < 60) fail(`${view}: Enter on the dark lens in the Cradle: ${p.body.implants.face ? "in" : "not in"}, ${game.time - t2} s`);
       data.list.sel = m.equipment.truingRows(game).findIndex((r) => r.kind === "socket" && r.part.id === "face");
       m.keys.dispatchKey(game, "Enter", false, "");
@@ -562,6 +571,18 @@ export function checkItems(m) {
     const cellPrice = cellRows.find((r) => r.target === gc) && m.talk.serviceDef("rechargeCell").price(game, tinker, gc);
     if (cellRows.length !== 1 || cellRows[0].target !== gc || cellPrice !== 15) fail(`the tinker's recharging: ${cellRows.length} rows (want the glim cell only), ${cellPrice} glim (want 15)`);
     else { m.talk.serviceDef("rechargeCell").run(game, tinker, gc); if (gc.charge !== 2500) fail(`the tinker's recharge left ${gc.charge}`); }
+    // Draining a cell into the purse: 100 charge a glim, as far as the purse holds (bible §3.1).
+    {
+      const dc = { kind: "cell", id: "dark", charge: 950 }, big = { kind: "cell", id: "glim", charge: 2500 };
+      p.inv.push(dc, big);
+      p.purse = 200; p.funds = 100;
+      const drain = m.talk.serviceDef("drainCell");
+      drain.run(game, tinker, dc);
+      const after1 = [p.funds, dc.charge];
+      p.funds = 195;
+      drain.run(game, tinker, big);
+      if (!same(after1, [109, 50]) || p.funds !== 200 || big.charge !== 2000) fail(`draining: a dark cell at 950 gave ${JSON.stringify(after1)} (want [109, 50]); a full glim cell into a purse 5 short left ${p.funds} glim, ${big.charge} charge (want 200, 2000)`);
+    }
   });
 
   // --- 4. Examine from an inspect event --------------------------------------------------------------------------

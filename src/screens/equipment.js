@@ -8,7 +8,8 @@
 // sockets and the implants in your pack, in one list. Enter on an implant in the pack fits it into the first free
 // socket it goes in (25 glim × its grade, and a world hour on the table); on a socket that holds one, takes it out
 // (the grade comes back; a † one is destroyed); G spends true-marks on the next grade. Esc leaves.
-//   openTruing(game, at)    at: { at: "cradle", x, y, z }: where you lie (bodymods withTruing's context)
+//   openTruing(game, at)    at: { at: "cradle", x, y, z, waive? }: where you lie (bodymods withTruing's context; waive:
+//                           no fee, the Square's free fittings)
 //   truingRows(game) → [{ kind: "socket" | "pack" | "grade", … }]
 import * as S from "../screen.js";
 import { registerScreen, pushMode, popMode, modeData } from "../screens.js";
@@ -93,9 +94,10 @@ function truingAct(game, row) {
     say(game, `The ${name}: ${WHY[why] || "it won't go in."}`);
     return;
   }
-  const r = withTruing(game, where, () => install(game, p, row.item, part));
+  const r = withTruing(game, where, () => install(game, p, row.item, part, { waive: !!where.waive }));
   if (!r.ok) { say(game, `The ${name}: ${WHY[r.reason] || "it won't go in."}${r.reason === "funds" ? ` (${formatPrice(r.fee)})` : ""}`); return; }
-  say(game, `You lie in the Cradle while the ${name} is fitted into your ${partLabel(p.body.parts.find((q) => q.id === part)).toLowerCase()}. (${formatPrice(r.fee)}, an hour.)`, [150, 210, 230]);
+  // Bible §10.4: the draughtsmen trace you first on the drafting floor, flat, then fit you, deep.
+  say(game, `The draughtsmen trace you on the drafting floor, flat as a plan; then, deep again, you lie in the Cradle while the ${name} is fitted into your ${partLabel(p.body.parts.find((q) => q.id === part)).toLowerCase()}. (${r.fee ? formatPrice(r.fee) : "no fee"}, an hour.)`, [150, 210, 230]);
 }
 
 function drawTruing(game) {

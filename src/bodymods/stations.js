@@ -8,13 +8,14 @@
 //                                  (screens/equipment.js) for the Plumb; anyone else is told it isn't for them
 //   SERVICES                       fitImplant · removeImplant (a surgeon: the same rules, fee and hour as a Cradle),
 //                                  identifyArtifact (a tinker: 10 glim × complexity, bible §13.4) · rechargeCell (a glim
-//                                  cell, a glim for every 100 charge missing). A merchant offers one when its
+//                                  cell, a glim for every 100 charge missing) · drainCell (a cell's charge into your purse,
+//                                  100 charge a glim, as far as the purse holds). A merchant offers one when its
 //                                  services list names it (no legacy merchant does, so nothing changes in the old game).
 import { registerUse } from "../interact.js";
 import { registerService } from "../talk.js";
 import { B } from "../world.js";
 import { itemName } from "../items.js";
-import { receive, formatPrice } from "../currency.js";
+import { receive, formatPrice, purseRoom } from "../currency.js";
 import { IMPLANTS } from "../content/items/implants.js";
 import { ARTIFACTS, CELLS } from "../content/items/artifacts.js";
 import { canInstall, install, uninstall, socketsFor, installedImplants, fittingFee, withTruing, isPlumb, partWord } from "./implants.js";
@@ -35,7 +36,7 @@ registerUse(CRADLE, useCradle, { label: (game) => (isPlumb(game.player) ? "lie d
 
 // --- Services -------------------------------------------------------------------------------------------------
 const surgeon = (c) => ({ at: "surgeon", c });
-export const SERVICES = ["fitImplant", "removeImplant", "identifyArtifact", "rechargeCell"];
+export const SERVICES = ["fitImplant", "removeImplant", "identifyArtifact", "rechargeCell", "drainCell"];
 
 registerService("fitImplant", {
   available: (game, c) => {
@@ -78,4 +79,19 @@ registerService("rechargeCell", {
   info: () => "A glim for every 100 charge.",
   run: (game, c, it) => { const cell = cellOf(it); cell.charge = cellMax(cell); },
   done: (game, c, it, price) => `${c.name} fills it to the brim. (${formatPrice(price)})`,
+});
+// Draining a cell into your purse (bible §3.1: glim is "drained from Deepwright cells", 100 charge a glim): the tinker
+// pays out what your purse has room for, and the cell is left with the rest.
+registerService("drainCell", {
+  available: (game) => game.player.inv.filter((it) => it.kind === "cell" && Math.floor(it.charge / CHARGE_PER_GLIM) > 0),
+  label: (game, c, it) => `Drain the ${itemName(game, it)} into your purse (${formatPrice(Math.floor(it.charge / CHARGE_PER_GLIM))})`,
+  price: () => 0,
+  info: () => "100 charge a glim, up to what your purse holds.",
+  run(game, c, it) {
+    const glim = Math.min(Math.floor(it.charge / CHARGE_PER_GLIM), purseRoom(game.player));
+    receive(game, game.player, glim);
+    it.charge -= glim * CHARGE_PER_GLIM;
+    it.drained = glim;
+  },
+  done: (game, c, it) => (it.drained ? `${c.name} drains the cell: ${formatPrice(it.drained)} into your purse.` : "Your purse is full."),
 });
