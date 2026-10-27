@@ -2,8 +2,8 @@
 
 TECH_DESIGN §8.3 "WS9" (with DECISIONS: the run modes are `oneWick`, `commonsLamp` and `pilgrim`). Branch `ws/ws9`,
 worktree `C:\Users\Otto Mörner\Code\gnomon-wt\ws9`, from `p0-done`. Files (§8.4): `save/*`, `hud.js`, `config.js`,
-`screens/title log options dead pause`, `tools/check-save.mjs`, `tests/checks/save.js`. Gate numbers:
-`docs/sessions/ws9.md`.
+`screens/title log options dead pause`, `tools/check-save.mjs`, `tests/checks/save.js`. Gate numbers, deviations and
+the verification: `docs/sessions/ws9.md`.
 
 ## Public API
 
@@ -11,22 +11,24 @@ worktree `C:\Users\Otto Mörner\Code\gnomon-wt\ws9`, from `p0-done`. Files (§8.
 // save/index.js (re-exports save.js, store.js and codec.js)
 saveGame(game, { reason = "manual", store, slotId, clean = false }) → Promise<{ id, updated, zones, reason }>
 //   no store: the run's own (its slot's store), else currentStore(), else a memory store of save.js's own.
-//   clean: a session ending here (save and quit): the slot's live cleared
+//   clean: a session ending here (save and quit): the slot's live cleared, waiting and automatic saves answered by it
 loadGame(slotId, { game, store, version = VERSION.save, migrations = MIGRATIONS }) → Promise<game>
-//   migrates the slot and each zone record as it is read; the world by state.world.id (registerWorld); an unclean
-//   exit counted (error.code "unclean" when One Wick's rule makes it a death)
+//   refused (error.code "open") when another page holds the slot; the slot and each zone record migrated when read;
+//   the world by state.world.id (registerWorld); an unclean exit counted (error.code "unclean": One Wick's death rule)
 listSlots({ store }) → [{ id, created, updated, seed, mode, character, where, time, unclean, live, checkpoint, genVersion, version }]
 deleteSlot(id, { store }) → bool · checkpoint(game) → Promise<{ id, n } | null>
-endRun(game, { cause }) → Promise          // a death: One Wick buries the slot; a checkpoint mode restores it
+endRun(game, { cause }) → Promise          // a death: One Wick buries the slot (a grave in meta); a checkpoint mode restores it
 wakeAtCheckpoint(game) → Promise<game> · restoreCheckpoint(slotId, { store }) → SlotRecord | null
 unloadSave(game) → Promise | null · pageShown(game) · listenPage(doc, win, game)   // (save/index.js listens in a browser)
 exportSlot(id, { store }) → SaveFile · importSlot(file | text, { store }) → id · moveSlot(game, store) → bool
+holdSlot(id) → Promise<bool> · releaseSlot(id) · slotsOpenElsewhere() → Promise<Set<id>>   // one page a slot (Web Locks)
 graveyard({ store }) → [{ name, seed, mode, level, cause, where, time, unclean, at }]
 migrate(slot, zones, { to, migrations }) → { slot, zones } · MIGRATIONS = { [n]: { slot(rec), zone(rec) } }
-registerWorld(id, def | () => def) · requestSave(game, reason, { delay, checkpoint }) · modeOf(game) → mode
+registerWorld(id, def | () => def) · requestSave(game, reason, { delay, checkpoint, backoff }) · modeOf(game) → mode
 canSave(game) · whenWritten(game) · saveStatus(game) → { slotId, committed, pending, failed, cp, live, unclean, dead, last }
 SAVE_RULES = { auto, afterChange: 0.5, every: 120, travelEvery: 10, oneWick: { unclean: "warn" | "death" }, graveyard: 50, retry: 10, told: 30 }
 RUN_MODES = { oneWick, commonsLamp, pilgrim: { name, note, death: "end" | "checkpoint" } } · SESSION · SAVE_STATS
+SAVE_THROUGH = Set { "pause", "options", "log", "inventory" }   // screens a save is made under, as if they were closed
 // save/store.js
 STORES = { slots: "id", zones: ["slot","key"], checkpointZones: ["slot","key"], meta: "id" }
 Adapter = { kind, get, put, del, list(store, { slot }), tx(fn), writeNow(ops) }   // ops: put, del, clear (a slot's rows), keep (copy on write)
@@ -50,13 +52,20 @@ What a workstream needs to know:
 
 - **Saving is automatic** once a store is in use (the browser) or the run has a slot: half a second after every
   completed zone change, every 120 s of play in explore and map, every 10 real seconds in mode `"world"`, when the page
-  is hidden or closed, and back on the page. A save waits for a screen registered `saveable: true` (explore, map; the
-  world map's must say so too).
+  is hidden or closed, and back on the page. A save is made in a screen registered `saveable: true` (explore, map; the
+  world map's must say so too), or under screens it looks through: the pause card, the options, the log, the
+  inventory, or any screen registered `saveThrough: true` that holds nothing a save would lose (no callback in its
+  stack data, nothing half done). The story's pages, talk, trade, the level-up choice and the "DEPTH n" beat are not;
+  a save asked for there waits.
+- **The zone you leave is written with the next slot record** (in one transaction), so the store never holds a zone
+  newer than its slot: a load is always one moment.
 - **A settlement** is a surface span whose site has `checkpoint: true` (landmarks that say so, every village:
   `world/sites.js`). Under the Commons Lamp and Pilgrim, entering or leaving one makes a checkpoint, and so does the
-  run's first save.
+  run's first save. A checkpoint whose save fails is given up: the run goes back to the last one written.
 - **New runs** get their mode from whoever starts them: `title.js newGame(game, { seed, mode })` (startRun, then
   `state.mode`). The title pushes `"create"` with `{ seed, mode }` once WS4 registers it.
+- **One page plays a slot** where the browser has Web Locks: a second tab's Continue is refused while the first holds it.
+- **A failed save** is told in the log (once in 30 s) and tried again 10 s on.
 - **The browser half** of the gate: `NODE_PATH="$(npm root -g)" node tools/check-save.mjs --browser` (not in run-all).
 
 ## Integration requests
@@ -85,11 +94,19 @@ changes when it lands.
 8. **WS1**: register `"world"` with `saveable: true` (the travel saves and any save asked for there wait for it).
 9. **WS4**: Pilgrim's XP (kills 0, every other source ×2.2: bible §10.1) belongs to the progression; `save.js modeOf(game)`
    says the run's mode. The create screen ends by starting the run with its mode (`newGame` or request 2). The HUD's
-   `"hotbar"` segment shows `p.hotbar`'s ready abilities by `ABILITIES[id].name` while something hunts you.
-10. **`tools/README.md`** (frozen): `check-save.mjs`'s new options (`--browser [--port]`, `--v1-from <ref> | none`) and
-    what the browser half proves.
+   `"hotbar"` segment shows `p.hotbar`'s ready abilities by `ABILITIES[id].name` while something hunts you. WS4's
+   char and abilities screens, WS5's examine, WS6a's factions and WS7's journal can say `saveThrough: true` if they
+   hold nothing a save would lose.
+10. **`tools/README.md`** (frozen): `check-save.mjs`'s new options (`--browser [--port] [--verbose]`, `--v1-from <ref> | none`)
+    and what the browser half proves.
+11. **`tools/browser-shell.mjs` and `tools/browser-0d1.mjs`** (P0's): `browser-0d1` fails at `ws/ws9` with "modes never
+    reached: options, log", since it counts the modes `browser-shell` reports and WS9 registers two new ones. Add to
+    `browser-shell` (both window sizes): H on the map → `log`, H → `map`; H in 3D → `log`, Esc → `explore`; in 3D the
+    lock let go → `pause`, Esc → `options`, Esc → `pause`; and by clicks: a click in the log closes it, a click on the
+    pause card's "Esc: options" line (it appears 0.75 s after the card) → `options`. `check-save --browser` step 6b
+    plays exactly these in a real page and they pass.
 
 ## Handoff
 
-- **State:** see `docs/sessions/ws9.md` for what was built, the gate numbers, the deviations and the verification.
+- **State:** see `docs/sessions/ws9.md`.
 - **Next step:** written at the end of the session (below).
