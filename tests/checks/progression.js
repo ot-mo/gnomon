@@ -873,6 +873,8 @@ export async function checkProgression(m) {
         const tile = { x: at.x + 8, y: at.y }, picked = (t) => ({ creature: null, tile: t, point: { x: t.x + 0.5, y: t.y + 0.5, z: at.z }, dir: [1, 0, 0] });
         A.activate(game, p, "overlook", picked(tile));
         if (!zone.seen[tile.x + tile.y * zone.w] || zone.seen[at.x - 6 + at.y * zone.w]) fail("Overlook on a picked tile: the 9 × 9 isn't around it");
+        const own = A.activate(game, p, "foldStep", picked({ x: at.x, y: at.y }));
+        if (own || Math.floor(p.x) !== at.x || A.cooldownLeft(p, "foldStep") > 0) fail(`Fold Step onto your own tile: ${own ? "used" : "refused"}, at ${Math.floor(p.x) - at.x} east, cooldown ${A.cooldownLeft(p, "foldStep")}`);
         A.activate(game, p, "foldStep", picked({ x: at.x + 3, y: at.y }));
         if (Math.floor(p.x) !== at.x + 3 || Math.floor(p.y) !== at.y) fail(`Fold Step onto a picked tile 3 east: at (${Math.floor(p.x) - at.x}, ${Math.floor(p.y) - at.y}) from the start`);
         zone.set(at.x + 7, at.y, WD.FLOOR_Z, WD.B.BRAZIER); zone.set(at.x + 5, at.y + 1, WD.FLOOR_Z, WD.B.BRAZIER); zone.refresh();
