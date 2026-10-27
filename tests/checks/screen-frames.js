@@ -71,7 +71,7 @@ export function screenFrames({ game, startRun, inputHandlers, addStatus, frameHa
 // Frames still drawn but not compared with the fixture, each with its reason (WS5, applied on ws/ws5 with the
 // coordinator's leave, for the integrator to union with WS3's list at the merge; tests/checks/items.js checks the
 // inventory itself in the same 8 states).   // WS5
-const WS5_INVENTORY = "the inventory screen WS5 rebuilt (Pack and Equipment tabs, TECH_DESIGN §4.2); the other frames stay held";   // WS5
+const WS5_INVENTORY = "the inventory screen is rewritten by WS5 (TECH_DESIGN §2: inventory.js rewritten); tests/checks/items.js holds it";   // WS5
 export const NOT_COMPARED = new Map([
   ["seed 99 depth 3 3d inventory", WS5_INVENTORY], ["seed 99 depth 3 map inventory", WS5_INVENTORY],     // WS5
   ["seed 99 depth 11 3d inventory", WS5_INVENTORY], ["seed 99 depth 11 map inventory", WS5_INVENTORY],   // WS5
