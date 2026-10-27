@@ -146,6 +146,32 @@ export function checkItems(m) {
     } finally { game.player = real; }
     if (writes.length) fail(`the inventory wrote base fields: ${[...new Set(writes)].join(", ")}`);
     stats.inventoryBaseWrites = writes.length;
+
+    // The second finger and the folding rack's second back, filled from the Equipment tab: Enter on the empty part shows
+    // the pack "for" it, and E there puts the thing on that part (E from the pack alone keeps the parent's one ring).
+    {
+      const q = fresh();
+      q.license = { grade: 6 };
+      IM.grantImplant(q, "foldingRack");
+      const ra = { kind: "ring", id: "strength", ench: 1, known: true }, rb = { kind: "ring", id: "protection", ench: 1, known: true };
+      const ca = { kind: "armour", id: "cloak", ench: 0, known: true }, cb = { kind: "armour", id: "cloak", ench: 0, known: true };
+      q.inv.push(ra, rb, ca, cb);
+      m.inventory.equip(game, ra, q.inv.indexOf(ra));
+      m.inventory.equip(game, ca, q.inv.indexOf(ca));
+      const putOn = (partId, it) => {
+        game.invTab = "equipment"; game.eqSel = m.inventory.bodyRows(game).findIndex((r) => r.part?.id === partId);
+        m.inventory.inventoryKey(game, "Enter");
+        const chosen = game.invTab === "pack" && game.invFilter === "for" && q.inv[game.invSel] === it;
+        const t = m.inventory.inventoryKey(game, "Enter");
+        return chosen && t === RULES().body.equipTime && Bd.wornOn(q, partId) === it && game.invFilter === "all";
+      };
+      if (!putOn("finger_l", rb) || Bd.wornOn(q, "finger_r") !== ra) fail("the left finger can't be filled from the Equipment tab (or it pushed the right finger's ring off)");
+      if (!putOn("back_2", cb) || Bd.wornOn(q, "back") !== ca) fail("the folding rack's second back can't be filled from the Equipment tab");
+      game.invTab = "equipment"; game.eqSel = m.inventory.bodyRows(game).findIndex((r) => r.part?.id === "neck");
+      game.messages = [];
+      if (m.inventory.inventoryKey(game, "Enter") !== 0 || game.invTab !== "equipment" || !said(/Nothing in your pack goes on your neck/)) fail("Enter on an empty neck with no amulet in the pack wasn't told so");
+      game.invTab = "pack";
+    }
   });
 
   // --- 2. Implants ------------------------------------------------------------------------------------------------

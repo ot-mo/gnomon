@@ -3,7 +3,8 @@
 // body, what it wears or holds, the implant in its socket, and the belt). It opens on the Pack.
 //   Pack:      ↑↓ / W S / PgUp PgDn / wheel / mouse: select · E / Enter / Space: use, read, equip or examine an
 //              artifact · T: throw · X: drop · F: filter · L: look closer (examine) · R: swap weapons
-//   Equipment: ↑↓ / mouse: select · E / Enter / Space: take it off (into the pack) · L: look closer · R
+//   Equipment: ↑↓ / mouse: select · E / Enter / Space: take it off (into the pack), or on an empty part, the pack
+//              showing what goes there (E on one puts it on that part) · L: look closer · R
 //   Tab / ← →: the other tab · I / Esc: close
 // Using something on the map costs game time (returned by the key), like any other action, and closes the screen.
 //
@@ -14,7 +15,7 @@
 //   openInventory(game), closeInventory(game)
 //   inventoryKey(game, code) → seconds | 0 | null (close) | "throw" (game.throwStack) | { aim: it } (an artifact to aim)
 //   inventoryClick(game, cell) → the same, for a left click;  inventoryWheel(game, sign)
-//   useSelected(game), equip(game, it, index) → bool, unequipPart(game, partId) → seconds, swapWeapons(game) → seconds
+//   useSelected(game), equip(game, it, index, part?) → bool, unequipPart(game, partId) → seconds, swapWeapons(game) → seconds
 //   packFilters(p) → [{ id, label, n }]   packWeight(p)   bodyRows(game) → the Equipment tab's rows
 //   setBodyNote(fn)   fn(game, p) → the line over the Equipment tab's parts (bodymods: grade and true-marks)
 //   drawInventory(game)
@@ -28,12 +29,14 @@ import { RULES } from "./rules.js";
 import { armourValue, bonus, weaponReach } from "./player.js";
 import { attr, maxHp, dv, carryCap } from "./stats.js";
 import { purseCap, formatFunds } from "./currency.js";
-import { defaultPart, canEquip, equip as bodyEquip, unequip as bodyUnequip, swapBelt, wielded, wornOn, belt } from "./body.js";
+import { defaultPart, slotsFor, canEquip, equip as bodyEquip, unequip as bodyUnequip, swapBelt, wielded, wornOn, belt } from "./body.js";
 
 // What using things from the pack does (the kinds in content name these actions).
 registerItemAction("drink", (game, e, it) => { takeOne(e, it); drinkPotion(game, it.effect); return RULES.body.drinkTime; });
 registerItemAction("read", (game, e, it) => { takeOne(e, it); readScroll(game, it.effect); return RULES.body.readTime; });
-registerItemAction("wear", (game, e, it) => (equip(game, it, e.inv.indexOf(it)) ? RULES.body.equipTime : 0));
+registerItemAction("wear", (game, e, it) => (equip(game, it, e.inv.indexOf(it), wearPart(game, e, it)) ? RULES.body.equipTime : 0));
+// Where E puts gear on: the part chosen on the Equipment tab (the pack shown "for" it), else the body's default.
+const wearPart = (game, e, it) => (e === game.player && game.invFilter === "for" && slotsFor(e, it).includes(game.invFor) ? game.invFor : undefined);
 
 const AURA = { good: ["(good)", [120, 220, 120]], neutral: ["(neutral)", [170, 170, 170]], bad: ["(bad)", [255, 110, 100]] };
 const TABS = ["pack", "equipment"];
@@ -45,7 +48,7 @@ export function openInventory(game) {
   pushMode(game, "inventory");
   game.invSel = Math.min(game.invSel || 0, Math.max(0, game.player.inv.length - 1));
   game.invTab = "pack";
-  game.invFilter ||= "all";
+  if (!game.invFilter || game.invFilter === "for") { game.invFilter = "all"; game.invFor = null; }
   if (!visible(game).includes(game.invSel)) game.invFilter = "all";
   game.eqSel ||= 0;
 }
@@ -71,9 +74,11 @@ export function packFilters(p) {
   return [...FILTERS, OTHER].map((f) => ({ id: f.id, label: f.label, n: inv.filter(f.test).length })).filter((f) => f.id === "all" || f.n > 0);
 }
 const filterOf = (id) => [...FILTERS, OTHER].find((f) => f.id === id) || FILTERS[0];
-// The pack indices the list shows, in pack order.
+// The pack indices the list shows, in pack order. The filter "for" (from the Equipment tab: game.invFor, a part)
+// shows what goes on that part.
 function visible(game) {
-  const inv = game.player.inv, test = filterOf(game.invFilter || "all").test;
+  const inv = game.player.inv, p = game.player;
+  const test = game.invFilter === "for" ? (it) => slotsFor(p, it).includes(game.invFor) : filterOf(game.invFilter || "all").test;
   const out = [];
   inv.forEach((it, i) => { if (test(it)) out.push(i); });
   return out;
@@ -121,7 +126,8 @@ function moveSel(game, shown, step) {
 }
 function cycleFilter(game) {
   const fs = packFilters(game.player), k = fs.findIndex((f) => f.id === (game.invFilter || "all"));
-  game.invFilter = fs[(k + 1) % fs.length].id;
+  game.invFilter = fs[(k + 1) % fs.length].id;   // (from "for", k is -1: back to everything)
+  game.invFor = null;
   const shown = visible(game);
   if (!shown.includes(game.invSel)) game.invSel = shown[0] ?? 0;
 }
@@ -178,9 +184,8 @@ export function useSelected(game) {
 // Put on (or take in hand) a piece of gear from the inventory, on the part the body picks for it
 // (body.js defaultPart). A new weapon goes into your hand and the one you held moves to your belt
 // (swapped in with R); whatever was on your belt goes back in your pack. Returns true if it worked.
-export function equip(game, it, index) {
+export function equip(game, it, index, part = defaultPart(game.player, it)) {
   const p = game.player;
-  const part = defaultPart(p, it);
   const check = canEquip(game, p, it, part);
   if (!check.ok) {
     if (check.reason === "weak") game.log(`You're not strong enough for the ${itemName(game, it)} (needs ${check.need} STR, you have ${attr(p, "str")}).`, BAD);
@@ -206,6 +211,7 @@ export function equip(game, it, index) {
   else if (!wasKnown && it.ench > 0 && !it.relic) game.log(`You ${verb} the ${itemName(game, it)}. It hums with a blessing.`, [255, 245, 200]);
   else game.log(`You ${verb} the ${itemName(game, it)}.`, [220, 220, 220]);
   if (holds && old) game.log(`Your ${itemName(game, old)} goes on your belt. (R: swap weapons)`, DIM);
+  if (game.invFilter === "for") { game.invFilter = "all"; game.invFor = null; }
   game.invSel = Math.min(game.invSel, Math.max(0, p.inv.length - 1));
   return true;
 }
@@ -239,11 +245,24 @@ function takeOff(game, row) {
     game.log(`You put the ${itemName(game, it)} from your belt into your pack.`, [220, 220, 220]);
     return RULES.body.beltSwap;
   }
-  if (!row.item) {
-    if (row.implant) game.log(`The ${itemName(game, row.implant)} comes out only at a Truing Cradle.`, DIM);
+  if (!row.item && !row.both) return putOnHere(game, row);
+  if (!row.item) return 0;
+  return unequipPart(game, row.part.id);
+}
+
+// E on an empty part: the pack, showing what goes there; E on one of those then puts it on that part (the second
+// finger, the folding rack's second back, the off hand: E from the pack alone takes the body's default part, one ring
+// at a time as in the parent's game).
+function putOnHere(game, row) {
+  const p = game.player, label = partLabel(row.part).toLowerCase();
+  if (!p.inv.some((it) => slotsFor(p, it).includes(row.part.id))) {
+    game.log(row.implant ? `Nothing in your pack goes on your ${label}. (The ${itemName(game, row.implant)} in its socket comes out only at a Truing Cradle.)`
+                         : `Nothing in your pack goes on your ${label}.`, DIM);
     return 0;
   }
-  return unequipPart(game, row.part.id);
+  game.invTab = "pack"; game.invFilter = "for"; game.invFor = row.part.id;
+  game.invSel = visible(game)[0];
+  return 0;
 }
 
 // R: swap the weapon in your hand with the one on your belt. Returns the time it took (0 if not).
@@ -338,7 +357,7 @@ export function drawInventory(game) {
   // The keys, "I close" first so a narrow screen never loses it; the hint where it fits.
   const hint = game.view === "map" ? "  (each takes a turn)" : "  (game paused)";
   const keys = tab === "pack" ? "I close · E use · T throw · X drop · F filter · L look · R swap weapons · Tab equipment"
-                              : "I close · E take off · L look · R swap weapons · Tab pack";
+                              : "I close · E take off or put on · L look · R swap weapons · Tab pack";
   const help = (keys.length + hint.length <= w - 4 ? keys + hint : keys).slice(0, w - 4);
   S.text(x0 + 2, y0 + h - 2, help, 120, 120, 130);
   const at = { x: x0 + 2, y: y0 + h - 2, text: help };
@@ -350,7 +369,7 @@ export function drawInventory(game) {
 
 function drawPack(game, { x0, w, top, listH, shown }) {
   const p = game.player, inv = p.inv;
-  const f = filterOf(game.invFilter || "all");
+  const f = game.invFilter === "for" ? { label: `for your ${partLabel(p.body.parts.find((q) => q.id === game.invFor) || { id: game.invFor }).toLowerCase()}` } : filterOf(game.invFilter || "all");
   const cap = carryCap(p), weight = packWeight(p);
   const summary = `F: ${f.label} (${shown.length} of ${inv.length}) · weight ${weight} of ${cap} · ${formatFunds(p)} of ${purseCap(p)}`;
   S.text(x0 + 2, top - 1, summary.slice(0, w - 4), 150, 150, 160);
