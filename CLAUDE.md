@@ -1,4 +1,4 @@
-# GNOMON: rules for every session (local or cloud)
+# GNOMON: rules for every session
 
 GNOMON is the overworld fork of The Rotation Cube, a browser ASCII roguelike. GitHub Pages serves `main` at
 https://ot-mo.github.io/gnomon/, so **`main` must always be playable**.
@@ -30,13 +30,8 @@ try to break the claims) → fix (one commit per finding) → recheck → tag. A
 - Never modify the original repo `ot-mo/ascii-roguelike`. No Caves of Qud names (bible §15.11).
 - The user's taste: both views must matter; rewards stay meaningful to the end; money is never plentiful.
 
-## Handing off (local ↔ cloud)
+## Before you stop
 
-Sessions alternate between the local machine and the cloud. Only **one** machine works on a branch at a time.
-Before you stop, or as soon as you get close to a session or usage limit:
-
-1. Commit and push everything. Leave no uncommitted or unpushed work; if a step is half done, commit it with a
-   `WIP:` message that says what is unfinished.
-2. Update `docs/HANDOFF.md` (branch, last tag, what is done, the exact next step, what is half finished, anything
-   surprising), commit it, push it.
-3. Say in your last message that the handoff is pushed, and on which branch.
+All sessions run locally. Commit and push everything before you stop; if a step is half done, commit it with a `WIP:`
+message that says what is unfinished. A workstream writes its handoff in `docs/<ws>.md`; only the integrator edits
+`docs/HANDOFF.md` and moves `main`.
