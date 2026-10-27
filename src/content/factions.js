@@ -97,7 +97,7 @@ export const FACTIONS = {
   },
   flatfolk: {
     name: "the Flatfolk", parent: "plane", temperament: "docile", startRep: both(0), color: [90, 110, 200], glyph: "@", flat: true,
-    liquid: "ink", rite: "flat only", voice: { hz: 495, wave: "square", flags: ["thin"] }, homeRegions: ["G"],
+    liquid: "ink", rite: "flat only", voice: { hz: [430, 560], wave: "square", flags: ["thin"] }, homeRegions: ["G"],
     about: "The people of the Plane, in Folio and the Tessellate. From above they are the whole of themselves.",
     likes: [["survey", "good maps"], ["pressed", "devotees"], ["noonVigil", "they keep Noon's memory"]],
     hates: [["assize", "they press people as punishment"], ["askew", "they crumple the Plane"], ["errata", "bad copies of good lines"]],
@@ -118,7 +118,7 @@ export const FACTIONS = {
   },
   plan: {
     name: "the Plan", parent: "engines", temperament: "neutral", startRep: { bent: -100, plumb: 100 }, color: [160, 180, 190], glyph: "R",
-    liquid: "glim", rite: "deep or flat", voice: { hz: 220, wave: "square", flags: ["beat"] }, homeRegions: ["K"],
+    liquid: "glim", rite: "deep or flat", voice: { hz: [180, 260], wave: "square", flags: ["beat"] }, homeRegions: ["K"],
     about: "A machine faith of automata, at the Metronome and in the Stacks.",
     likes: [["survey", "accuracy"], ["assize", "clear orders"], ["horary", "the dials we built together"]],
     hates: [["rustbacks", "they strip ruins"], ["askew", "unbuildable"], ["sporeMoot", "rot"]],

@@ -1048,6 +1048,16 @@ export async function run(env) {
     if (v2?.pitch !== 300 || v2.wave !== "square" || !v2.flags.includes("beat")) fail(`a Survey guard's voice: ${JSON.stringify(v2)}`);
     const mix = person("mira", "villager", null); mix.faction = { clatter: 0.3, pleatwood: 0.7 };
     if (voices.voiceFor(mix)?.stone !== true) fail(`the heaviest membership's voice (the Pleatwood, stone): ${JSON.stringify(voices.voiceFor(mix))}`);
+    // A range (the Flatfolk 430-560 Hz, the Plan 180-260): each speaker its own pitch, the same every time.
+    const pitches = new Set();
+    for (let k = 0; k < 12; k++) {
+      const ff = person("ess", "villager", "flatfolk"), vf = voices.voiceFor(ff);
+      if (!(vf.pitch >= 430 && vf.pitch <= 560) || vf.thin !== true || voices.voiceFor(ff).pitch !== vf.pitch) fail(`a Flatfolk voice: ${JSON.stringify(vf)}`);
+      pitches.add(vf.pitch);
+      const pv = voices.voiceFor(person("mira", "guard", "plan")).pitch;
+      if (!(pv >= 180 && pv <= 260)) fail(`a Plan voice at ${pv} Hz`);
+    }
+    if (pitches.size < 4) fail(`12 Flatfolk speak at only ${pitches.size} pitches`);
     const own = person("mira", "villager", "survey"); own.voice = { pitch: 99, wave: "sine" };
     if (voices.voiceFor(own)?.pitch !== 99) fail("a creature's own voice doesn't win");
     if (voices.voiceFor(creatures.spawnCreature("goblin", 2, 2, 0, { rng: R })) !== null) fail("a monster with no faction has a voice");
