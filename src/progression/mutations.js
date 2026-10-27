@@ -49,7 +49,7 @@ import { makeRng, seedFor } from "../rng.js";
 
 extendRules("mutations", {
   cost: 4, raiseCost: 1, levelsPerCap: 2, maxLevel: 10, offers: 3, planarOffers: 1,
-  cast: { free: 10, perEgo: 2, chance: 0.02, max: 0.75, wakes: 3, fade: 3600, delay: 10,
+  cast: { free: 10, perEgo: 2, chance: 0.02, max: 0.75, wakes: 3, fadeHours: 1, delay: 10,
           pack: { over: 12, per: 8, max: 4, burnisher: 30, great: 45 } },
   sunsick: { period: 20, light: 0.5 },
 });
@@ -172,7 +172,8 @@ export function turnWorld(game) {
   const C = RULES.mutations.cast, st = castState(game), key = game.zone.key;
   const rng = makeRng(seedFor(game.seed ?? 0, "cast", st.turns++));
   if (!(rng() < chance)) return false;
-  const wakes = (st.wakes[key] || []).filter((t) => game.time - t < C.fade);
+  const fade = C.fadeHours * 60 * RULES.clock.secondsPerMinute;   // one world hour: 60 s of game time (DECISIONS §1)
+  const wakes = (st.wakes[key] || []).filter((t) => game.time - t < fade);
   wakes.push(game.time);
   st.wakes[key] = wakes;
   game.log("The Plane creases behind your turn.", [200, 200, 215]);

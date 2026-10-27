@@ -904,6 +904,14 @@ export async function checkProgression(m) {
         // The same seed and turns give the same wakes.
         const replay = () => { game.state.cast = null; const w = []; for (let k = 0; k < 30; k++) w.push(PM.turnWorld(game)); return w.join(); };
         if (replay() !== replay()) fail("Cast's wakes differ for the same seed and turns");
+        // Wakes fade after a world hour (60 s of game time, DECISIONS §1): two older than that don't count toward the third.
+        const key = game.zone.key, wakeOnce = () => { for (let k = 0; k < 60; k++) if (PM.turnWorld(game)) return true; return false; };
+        game.state.cast = { turns: 100, wakes: { [key]: [game.time - 61, game.time - 61] }, pack: null };
+        wakeOnce();
+        if (game.state.cast.pack || game.state.cast.wakes[key].length !== 1) fail(`two wakes 61 s old and a new one: ${JSON.stringify(game.state.cast)}`);
+        game.state.cast = { turns: 200, wakes: { [key]: [game.time - 59, game.time - 59] }, pack: null };
+        wakeOnce();
+        if (!game.state.cast.pack) fail(`two wakes 59 s old and a new one called no pack: ${JSON.stringify(game.state.cast)}`);
         // Pressed flat onto the map is no turn.
         game.view = "3d"; game.mode = "explore"; step(1 / 60);
         game.state.cast = null;

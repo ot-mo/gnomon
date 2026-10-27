@@ -104,7 +104,7 @@ canGain(game, p, id) · canRaise(p, id) → null | why · levelCap(p, id) · mut
 isMental(id) · isDefect(id) · creasesSpent(ids) · mutationRep(game, p, id) · watchDefects(game, p)
 castOf(e) · wakeChance(e) · packFor(cast) → { size, burnisher, great } · turnWorld(game) → woke
 // RULES.mutations = { cost: 4, raiseCost: 1, levelsPerCap: 2, maxLevel: 10, offers: 3, planarOffers: 1,
-//   cast: { free: 10, perEgo: 2, chance: 0.02, max: 0.75, wakes: 3, fade: 3600, delay: 10, pack: { over: 12, per: 8, max: 4, burnisher: 30, great: 45 } },
+//   cast: { free: 10, perEgo: 2, chance: 0.02, max: 0.75, wakes: 3, fadeHours: 1, delay: 10, pack: { over: 12, per: 8, max: 4, burnisher: 30, great: 45 } },
 //   sunsick: { period: 20, light: 0.5 } }
 // game.state.cast = { turns, wakes: { zoneKey: [time] }, pack: { zone, at, size, burnisher, great } | null }   (saved with the state)
 // events: "mutate" { e, id, level, how: "gain" | "raise" } · "smoothers" { zone, size, burnisher, great }
