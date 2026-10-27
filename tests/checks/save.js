@@ -1411,6 +1411,9 @@ async function ws9Sections(ctx) {
     foe.x = p.x + 30;
     const far = shownWith();
     foe.x = p.x + 4;
+    game.mode = "dead";
+    const onDeath = shownWith();
+    playing(game, "map");
     startCooldown(p, "foldStep", 12);
     const cooling = shownWith();
     p.cooldowns = {};
@@ -1420,10 +1423,10 @@ async function ws9Sections(ctx) {
     const inverted = L.dropped.filter((id) => L.rows.flat().some((q) => pr(q.id) < pr(id)));
     const invertedH = H.dropped.filter((id) => H.rows.flat().some((q) => pr(q.id) < pr(id)));
     if (quiet.includes("1 Fold Step") || !hunted.includes("1 Fold Step") || H.rows.length !== 1 || invertedH.length || far.includes("1 Fold Step")
-        || !/1 Fold Step 1[12]s/.test(cooling) || /1 Fold Step( \||$)/.test(cooling) || L.rows.length !== 1 || inverted.length)
-      fail(`the hotbar segment: quiet "${quiet}"; hunted "${hunted}" (${H.rows.length} rows, dropped ${H.dropped.join(",")}); 30 tiles off "${far}"; cooling "${cooling}"; ` +
+        || onDeath.includes("1 Fold Step") || !/1 Fold Step 1[12]s/.test(cooling) || /1 Fold Step( \||$)/.test(cooling) || L.rows.length !== 1 || inverted.length)
+      fail(`the hotbar segment: quiet "${quiet}"; hunted "${hunted}" (${H.rows.length} rows, dropped ${H.dropped.join(",")}); 30 tiles off "${far}"; on the death card "${onDeath}"; cooling "${cooling}"; ` +
            `every status on: ${L.rows.length} rows, dropped ${L.dropped.join(",")}, inverted ${inverted.join(",")}`);
-    stats.hud = `100×30: "1 Fold Step" (priority ${pr("hotbar")}) only while a hostile hunts within ${hud.HOTBAR_NEAR} tiles (one row, dropping ${H.dropped.join(", ") || "nothing"} below it; not at 30 tiles; while it cools "1 Fold Step 12s" instead); ` +
+    stats.hud = `100×30: "1 Fold Step" (priority ${pr("hotbar")}) only while a hostile hunts within ${hud.HOTBAR_NEAR} tiles (one row, dropping ${H.dropped.join(", ") || "nothing"} below it; not at 30 tiles, nor on the death card; while it cools "1 Fold Step 12s" instead); ` +
       `with every status on as well, one row, dropped ${L.dropped.join(", ") || "nothing"} (by priority, none inverted)`;
     if (child?.debug) {
       try {

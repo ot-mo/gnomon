@@ -270,10 +270,10 @@ registerHudSegment("ready", { priority: 40, row: 1, parts(game, p) {   // what T
 // Active statuses (status.js), each as its def draws it (flying blinks when about to run out).
 registerHudSegment("statuses", { priority: 90, split: true, parts: (game, p) => statusLine(game, p) });
 // The hotbar's ready abilities (§4.3: keys 1-9), "1 Fold Step", while something hunts you within HOTBAR_NEAR tiles:
-// the moments you would reach for one, and how you learn the key. (One cooling down shows its seconds instead:
+// the moments you would reach for one, and how you learn the key (not once you are dead). (One cooling down shows its seconds instead:
 // play.js's "abilities".) Nothing hunts you in the old game's recorded frames, so they stay as they were.
 export const HOTBAR_NEAR = 10;
-const hunted = (game, p) => !!game.zone?.creatures.some((c) => c.state === "chase" && !c.talk && Math.hypot(c.x - p.x, c.y - p.y) <= HOTBAR_NEAR);
+const hunted = (game, p) => game.mode !== "dead" && !!game.zone?.creatures.some((c) => c.state === "chase" && !c.talk && Math.hypot(c.x - p.x, c.y - p.y) <= HOTBAR_NEAR);
 registerHudSegment("hotbar", { priority: 70, split: true, parts: (game, p) => hunted(game, p) && (p.hotbar || []).map((id, k) =>
   (id && ABILITIES[id] && !(cooldownLeft(p, id) > 0) ? { text: `${k + 1} ${ABILITIES[id].name}`, color: [190, 170, 255] } : null)).filter(Boolean) });
 // ?debug=1 (config.js FLAGS.debug): where you are and how the save stands, last to be placed.
