@@ -40,8 +40,9 @@ export function drawHud(game, layout = layoutHud(game)) {
 
 // The 3D view paused (pointer lock lost, or not yet taken): click to play. → the card's box { x0, y0, w, h }.
 // Its keys name what the map header can't (golden (b) holds that), on a line of their own under the parent's (which
-// check-hud holds as one row): L look and V fire (WS8's), the hotbar (its first ability by name), and the comma for the
-// map's legend (WS3's; the integrator moved it there from G, which §4.3 gives WS5's pick-up).
+// check-hud holds as one row): L look and V fire (WS8's), P factions (WS6a's; added at the WS9 merge), the hotbar (its
+// first ability by name), and the comma for the map's legend (WS3's; the integrator moved it there from G, which §4.3
+// gives WS5's pick-up).
 export const pauseLines = (game) => {
   const id = game?.player?.hotbar?.[0], name = id && ABILITIES[id]?.name;
   return [
@@ -52,7 +53,7 @@ export const pauseLines = (game) => {
     ["WASD move · Shift sprint · Space jump", [170, 170, 170]],
     ["Mouse look · Left click attack · Wheel zoom", [170, 170, 170]],
     ["E use / talk · I inventory · J journal · T / right-click throw · Q quick-heal · R swap weapons · F torch · M music · N sounds", [170, 170, 170]],
-    [`L look · V fire · 1-9 the abilities on your hotbar${name ? ` (1 ${name})` : ""}`, [170, 170, 170]],
+    [`L look · V fire · P factions · 1-9 the abilities on your hotbar${name ? ` (1 ${name})` : ""}`, [170, 170, 170]],
     ["Tab: rotate to the view from above (the map: turn-based; its legend on the , key)", [170, 170, 170]],
     ["", null],
     ["From inside you see height, depth, light and dark.", [130, 130, 130]],
