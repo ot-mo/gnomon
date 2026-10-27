@@ -68,16 +68,30 @@ export function screenFrames({ game, startRun, inputHandlers, addStatus, frameHa
   return out;
 }
 
+// Frames still drawn but not compared with the fixture, each with its reason. WS9: the four pause cards, applied on
+// ws/ws9 for the integrator to confirm at merge (docs/ws9.md, integration requests); tests/checks/save.js section 20
+// checks the card itself in those states. (WS3's "victory card" and WS5's inventory frames are on their branches: the
+// integrator joins the lists.)
+export const NOT_COMPARED = new Map([
+  // WS9
+  ["seed 99 depth 3 3d pause card", "the pause card names L look, V fire, the hotbar and G the legend (the user's decision, 2026-10-27); tests/checks/save.js section 20 holds the card in this state, and the other frames and golden (b) stay held"],
+  ["seed 99 depth 11 3d pause card", "the pause card names L look, V fire, the hotbar and G the legend (the user's decision, 2026-10-27); tests/checks/save.js section 20 holds the card in this state, and the other frames and golden (b) stay held"],
+  ["seed 31 depth 3 3d pause card", "the pause card names L look, V fire, the hotbar and G the legend (the user's decision, 2026-10-27); tests/checks/save.js section 20 holds the card in this state, and the other frames and golden (b) stay held"],
+  ["seed 31 depth 11 3d pause card", "the pause card names L look, V fire, the hotbar and G the legend (the user's decision, 2026-10-27); tests/checks/save.js section 20 holds the card in this state, and the other frames and golden (b) stay held"],
+]);
+
 export function checkScreenFrames(frames, fixture) {
   const problems = [], want = new Map(fixture.frames.map((f) => [f.name, f.hash]));
-  let mismatched = 0;
+  let mismatched = 0, skipped = 0;
   for (const f of frames) {
     if (!want.has(f.name)) { problems.push(`no recorded frame "${f.name}"`); continue; }
+    if (NOT_COMPARED.has(f.name)) { skipped++; continue; }
     if (want.get(f.name) !== f.hash) { mismatched++; problems.push(`"${f.name}" differs from ${fixture.against}`); }
   }
   for (const name of want.keys()) if (!frames.some((f) => f.name === name)) problems.push(`recorded frame "${name}" not drawn`);
   return { name: `screen frames (the HUD and screens against ${fixture.against})`, ok: problems.length === 0, problems,
-           stats: { frames: `${frames.length} at 180×56, ${mismatched} mismatched` } };
+           stats: { frames: `${frames.length} at 180×56, ${frames.length - skipped} compared, ${mismatched} mismatched`,
+                    notCompared: [...NOT_COMPARED].map(([name, why]) => `${name}: ${why}`) } };
 }
 
 // tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
