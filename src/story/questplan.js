@@ -6,7 +6,8 @@
 //                                                              near enough to carry a word to, no dungeon to chart)
 //   QUEST_ORDER                                                the templates a village draws from (story/villagequests.js
 //                                                              registers each)
-//   where(run, wx, wy) → "3 spans north-east of the Tall Table" (the nearest landmark or site; "at X" on its own span)
+//   where(run, wx, wy, { skip }) → "3 spans north-east of the Tall Table" (the nearest landmark or site but `skip`;
+//                                  "at X" on its own span)
 //
 //   params = { giver: uid, giverName, village: siteId, tier, level, target?: { key, wx, wy, z }, where, place?, thing?,
 //              itemUid?, to?, toUid?, secret?, beast?, beastUid?, lost?, lostUid?, percent?, shrine? }
@@ -29,9 +30,10 @@ function dirWord(dx, dy) {
 }
 
 // The nearest named place to a span: a landmark, else a site; "N spans <dir> of <name>", or "at <name>".
-export function where(run, wx, wy) {
+export function where(run, wx, wy, { skip = null } = {}) {
   let best = null, bd = Infinity;
   for (const s of run.sites?.values() || []) {
+    if (s.id === skip) continue;   // (a place named for itself: "the Bone Hollow, 2 spans east of Reedwick")
     const d = cheb(s.at, { wx, wy }) * 2 + (s.kind === "landmark" ? 0 : 1);   // a landmark wins a tie
     if (d < bd || (d === bd && s.id < best.id)) { bd = d; best = s; }
   }
@@ -69,7 +71,7 @@ export function planQuest(run, site, v, template, rng) {
       if (!den && !spans.length) return null;
       const t = den ? { wx: den.at.wx, wy: den.at.wy } : rng.pick(spans);
       return { ...base, thing: rng.pick(T.things), itemUid: `${id}:thing`, target: span(t, den ? 1 : 0),
-               place: den ? den.name : "the wilds", where: where(run, t.wx, t.wy) };
+               place: den ? den.name : "the wilds", where: where(run, t.wx, t.wy, { skip: den?.id }) };
     }
     case "carry": {
       const others = [...run.sites.values()].filter((s) => s.kind === "village" && s.id !== site.id && cheb(s.at, site.at) <= 10

@@ -17,7 +17,7 @@ export const QUESTS = {
   templates: {
     recover: {
       title: "Recover {thing}", need: "navigation",
-      offer: "Our {thing} was carried off to {place}, {where}. Bring it home and {village} won't forget it.",
+      offer: "Someone carried off {thing}, ours, to {place}, {where}. Bring it home and {village} won't forget it.",
       text: "{giver} of {village} wants {thing} back. It was carried off to {place}, {where}.",
       done: "That's it. That's really it. Put it here, gently.",
     },
@@ -29,8 +29,8 @@ export const QUESTS = {
     },
     readFloor: {
       title: "Read the floor at {place}", need: "flat",
-      offer: "There's a mosaic in the green at {place}, {where}. Read it from above, as the old ones did, and tell me what it says.",
-      text: "{giver} of {village} wants the reading of the mosaic at {place}, {where}. It reads only on the map.",
+      offer: "There's a mosaic in the green at {place}. Read it from above, as the old ones did, and tell me what it says.",
+      text: "{giver} of {village} wants the reading of the mosaic in the green at {place}, span ({wx}, {wy}). It reads only on the map.",
       done: "Say it again, slowly. Yes. That's what my grandmother said it said.",
     },
     pray: {
@@ -53,7 +53,7 @@ export const QUESTS = {
     },
     hunt: {
       title: "Hunt {beast}", need: "politics",
-      offer: "{beast} has been taking our animals. It lairs {where}. Kill it and bring us the news.",
+      offer: "There's a beast we call {beast}, and it has been taking our animals. It lairs {where}. Kill it and bring us the news.",
       text: "{giver} of {village} wants {beast} dead. It was last seen {where}.",
       done: "Dead? Truly? Then we sleep tonight.",
     },
@@ -65,8 +65,8 @@ export const QUESTS = {
     },
     chart: {
       title: "Chart {place}", need: "the map",
-      offer: "Nobody has mapped {place}, {where}. Walk it until your map holds {percent} in a hundred of it, and show me.",
-      text: "{giver} of {village} wants {place} charted: {percent}% of it on your map. It lies {where}.",
+      offer: "Nobody has mapped {place}. Walk it until your map holds {percent} in a hundred of it, or all of it you can reach, and show me.",
+      text: "{giver} of {village} wants {place} charted: {percent}% of it on your map, or all you can reach. It lies at span ({wx}, {wy}).",
       done: "Look at that. Every turn of it. I'll copy it tonight.",
     },
   },
