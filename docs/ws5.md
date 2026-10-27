@@ -31,6 +31,11 @@ inventoryKey(game, code) → seconds | 0 | null | "throw" | { aim: it }   // { a
 inventoryClick(game, cell) · inventoryWheel(game, sign) · useSelected(game) · equip(game, it, index) → bool
 unequipPart(game, partId) → seconds          // the Equipment tab's E: into the pack (cursed sticks; the main hand's
                                              // weapon stays until another replaces it: request 4)
+equip(game, it, index, part = defaultPart)   // E in the pack; on an empty part the Equipment tab's E shows the pack
+                                             // "for" that part (game.invFor) and E there puts it on that part: the
+                                             // second finger, the folding rack's second back, the off hand. E alone
+                                             // keeps the parent's one ring at a time.
+// "drop" { e, item } on the bus when X drops something (bodymods: what ran in the pack stops)
 swapWeapons(game) → seconds · packFilters(p) → [{ id, label, n }] · packWeight(p) · bodyRows(game) · partLabel(part)
 setBodyNote(fn)                              // fn(game, p) → the line over the Equipment tab's parts
 INVENTORY_KEYS · drawInventory(game)
@@ -52,9 +57,11 @@ drinkPotion(game, effect) · readScroll(game, effect)        // as before, dispa
 ```js
 canInstall(game, p, item, partId) → { ok, reason }   // kind, genotype (only the plumb), station (game.truing unset),
                                                      // part (no socket), slot, taken, twice, grade { need, have }
-install(game, p, item, partId, { free, paid }) → { ok, reason, time, fee, item }   // fee 25 glim × grade (funds),
-                                                     // a world hour by skipTime (hunted: nothing paid or fitted)
-uninstall(game, p, partId) → { ok, item, reason, destroyed, dropped }   // only with game.truing (the curse lock)
+install(game, p, item, partId, { free, paid, waive }) → { ok, reason, time, fee, item }   // fee 25 glim × grade
+                                                     // (funds), a whole world hour by skipTime ("hunted", "dead":
+                                                     // nothing paid or fitted); waive: no fee, still the station and hour
+uninstall(game, p, partId) → { ok, item, reason, destroyed, dropped }   // only with game.truing (the curse lock); a
+                                                     // whole world hour, as fitting
 withTruing(game, { at: "cradle", x, y, z } | { at: "surgeon", c }, fn)   // the station context while fn runs
 gradeOf(p) · gradeUsed(p) · gradeFree(p) · trueMarks(p) · gradeCost(p) · raiseGrade(game, p) → { ok, reason, cost }
 installedImplants(e) → [{ partId, item, def }] · socketsFor(e, item) · implantEffect(e, effect) → bool
@@ -66,7 +73,7 @@ IMPLANT_VALUE(grade) → glim (400 … 2,000)
 // (true-marks held). The grade used is counted from what is installed, never stored (R3).
 // Item kinds: implant { kind, id }; credit { kind, count } (a true-mark: walked over, counted into p.credits).
 // Abilities (source "implant"): planeShunt (Flat 4 s, every 40 s), jumpBack (an explored tile, every 100 s),
-// dialSpine (everything else "stilled" 5 s, once a world day). Status: "stilled" (noAct, noMove).
+// dialSpine (everything else "stilled" 5 s, once a world day: 1,440 s at any WIL). Status: "stilled" (noAct, noMove).
 // Bus: "install" { e, item, partId }, "uninstall" { e, item, partId, destroyed }, "grade" { e, grade }.
 ```
 
@@ -85,15 +92,18 @@ identifyChance(p, it) → { known, partial, broke }   identify(game, it)   exami
 useArtifact(game, p, it) → seconds | { aim: it }     aimArtifact(game, p, it)     fireArtifact(game, p, it, target)
 cellOf(it) · chargeOf(it) · cellMax(cell) · needs(it) · loadCell(game, p, it) · fillCell(game, p, cell) → glim
 rechargeCells(game, p, t0, t1) · chargeText(game, cell) · artifactName(it) · markHoles(zone, x, y, r)
-makeArtifact(id, rand) · makeCell(id, rand, full) · randomBodyMod(rand, level)   // loot for WS10, WS6b, C
+makeArtifact(id, rand) · makeCell(id, rand, full) · randomBodyMod(rand, level)   // loot for WS10, WS6b, C (never
+                                                                                   // a true-mark: bible §10.4)
 ARTIFACTS[id] = { name, vague, class, complexity, charge, per?, cells?, sturdy?, target?, consumed?, bonus?, value, info }
 CELLS[id] = { name, charge, recharge: "glim" | "sun" | "dark" | null, value, info }
 // Kinds: artifact { kind, id, known: false | "class" | true, cell: { id, charge } | null, on?, mark?, broken? };
 // cell { kind, id, charge }. Built: plumb-bob, quicksilver level, echo-bell, lantern-mote (switched on: torch +0.4,
-// 10 charge a minute), glimgun (2d6 fire, a glim a shot), fold-knife, recall bead, lancet, still-dial.
+// 10 charge a minute), glimgun (2d6 fire, a glim a shot), fold-knife, recall bead, lancet (stops at a wall),
+// still-dial. An aimed one with no target (cancelled, or nothing in sight on the map) does nothing and costs nothing.
 // Sun and dark cells gain 50 a minute on "clock:tick" (exact over skipTime); a glim cell fills from the purse at
 // a glim per 100 charge; an artifact with too little charge takes the fullest fitting cell from the pack.
-// A bonus source "artifacts" gives what a switched-on artifact lends.
+// What a switched-on artifact lends is a status "running:<id>" (the lantern-mote's light; HUD "LANTERN-MOTE"),
+// kept in line with the pack by syncRunning(game, p): on "drop" at once, on every clock tick otherwise.
 ```
 
 ### Stations and services (`bodymods/stations.js`)
@@ -101,8 +111,9 @@ CELLS[id] = { name, charge, recharge: "glim" | "sun" | "dark" | null, value, inf
 ```js
 CRADLE = B.STATION           // blocks.js's reserved id 38 ("cradle"): registerUse(CRADLE, useCradle, { label })
 useCradle(game, x, y, z)     // E in 3D, walking into it on the map: the Truing Cradle screen for the plumb
-SERVICES = ["fitImplant", "removeImplant", "identifyArtifact", "rechargeCell"]   // talk.js registerService ids:
-// a surgeon (the Cradle's rules, fee and hour), a tinker (10 glim × complexity; a glim per 100 charge)
+SERVICES = ["fitImplant", "removeImplant", "identifyArtifact", "rechargeCell", "drainCell"]   // talk.js registerService
+// ids: a surgeon (the Cradle's rules, fee and hour); a tinker (10 glim × complexity; a glim cell refilled at a glim per
+// 100 charge; any cell drained into the purse at 100 charge a glim, as far as the purse holds)
 ```
 
 ### Screens
@@ -110,7 +121,7 @@ SERVICES = ["fitImplant", "removeImplant", "identifyArtifact", "rechargeCell"]  
 ```js
 // screens/equipment.js: registers "inventory" (inventory.js's draw and keys; P0's screens/inventory.js still gives
 // openInv and inventoryAction) and "truing" (the Cradle: sockets, implants in the pack, raise the grade)
-openTruing(game, at) · truingRows(game)
+openTruing(game, at) · truingRows(game)    // at.waive: no fee (the Square's free fittings)
 // screens/examine.js: MODE "examine"
 openExamine(game, data) → bool   // data: an inspect payload { zone, x, y, z, creature?, item?, block?, open } or { item }
 examineLines(game, subject) · examineSubjects(data) · bonusWords(bonuses)
@@ -221,12 +232,34 @@ examineLines(game, subject) · examineSubjects(data) · bonusWords(bonuses)
       if ((await mode()) !== "map") problems.push(`truing by ${how}: ${how === "keys" ? "Esc" : "a right click"} led to ${await mode()}, not back to the map`);
     }
     ```
+19. **`player.js` (WS4) and `light.js` (WS3): the lantern-mote's light.** Bible §13.4: "a light of radius 6 that follows
+    you". WS5 gives it as the status `running:lanternMote` (torch +0.4), which `torchRange` ignores with the torch out.
+    With that status on, `torchRange` and `torchPower` should give at least 6 tiles of light whatever the torch does,
+    and `light.js inDark` should count you as lit (it is light without burning glim, the mote's whole use).
+20. **WS6a: the body and reputation (bible §10.4).** Each implant fitted gives the Plan +25 (up to +100): on the bus's
+    "install" (and "uninstall", if taking one out should give it back). The Square's free fittings for the Plumb at
+    Assize ≥ Warm: whoever opens the Square's Cradle passes `openTruing(game, { at: "cradle", …, waive: true })`
+    (`install`'s `waive`; WS10 places that Cradle).
+21. **WS8 / C: the plumb-line ear's immunity to the Askew's folds** (bible §13.6): `implantEffect(e, "plumbEar")` where
+    the Askew fold you.
+22. **Nothing to do, for the record (WS8, WS4):** aimed artifacts ask `abilities.requestTarget`; once WS4 applies WS8's
+    request 1, the map asks the target screen (a tile for the fold-knife, Esc a cancel, which now costs nothing).
+23. **Old messages, kept as they are (golden and the screen frames record them):** "You put on the The Mantle of Angles."
+    and "You pick up 2 throwing knifes." (both in p0-done, found by the old-game verification). A fix belongs with the
+    content pass that may change recorded lines.
 
 ## Handoff
 
 **Updated:** 2026-10-27, local session, on `ws/ws5`. **WS5 is built and its acceptance passes** (`check-items`,
 `browser-ws5`); the independent verification is the next step, then the tag `p1-ws5`.
 
-- **Request 2 is applied** (the coordinator's leave): check-screen-frames passes with 39 frames compared.
-- **Next step:** the verification (gate, the old game in both views, spec and code), fixes one commit each, then
-  `docs/sessions/ws5.md` §7 and the tag.
+- **Request 2 is applied** with the coordinator's approval: check-screen-frames passes with 39 frames compared.
+- **The verification is done** (three independent verifiers and my own screenshot check: 22 findings, each fixed in its
+  own commit with an assertion that fails without it, or turned into a request): `docs/sessions/ws5.md` §7.
+- **A stray file outside the repository**: `C:\OTTOMR~1\placeholder-never-written.txt` (1 byte, "x") was written by
+  mistake during the verification fixes (a mistyped scratch path); the safety check stopped the removal of its folder.
+  Delete `C:\OTTOMR~1` by hand.
+- **Next step (the integrator):** merge `refs/heads/ws/ws5` after WS9 (§8.5's order now: WS9, WS5, …); union the two
+  `NOT_COMPARED` maps (request 2); apply request 18 to browser-0d1 and request 3 to throwing.js; decide G (request 17).
+  Then `node tools/check-items.mjs`, `tools/browser-ws5.mjs` (`node tools/serve.mjs 8645`), browser-0d1 and the
+  dependency items "WS5 examine from L" and "WS5 implant surgery".
