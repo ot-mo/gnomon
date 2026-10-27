@@ -116,9 +116,11 @@ job does. For a timed gate number, run that check alone on an idle machine and a
 
 ## Waiting on the user
 
-- **The Lamplighter of Cassin's purse** (`docs/sessions/ws4.md` deviation 2): its 250 glim doesn't fit the 200 purse
-  everyone starts with (DECISIONS), so WS4 gave it the 500 flask (a little more than the bible: the flask sells);
-  the other way is 200 glim in the 200 purse (50 less than the bible's 250). WS4 left it to you (balance, C2/C4).
+Nothing.
+
+- **The Lamplighter of Cassin's purse** (`docs/sessions/ws4.md` deviation 2): settled by the user in WS4a's session on
+  2026-10-27: it keeps the 500 purse that holds its 250 glim, as built (recorded on `ws/ws4` in `95f8fcc`; it reaches
+  `integration` with `p1-ws4b`).
 
 Decided by the user on 2026-10-27 (given to the coordinating session in chat: "Do recommend for 1 and two and put
 legend in pause card key list"), each now a carried item below:
