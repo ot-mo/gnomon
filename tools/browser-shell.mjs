@@ -9,7 +9,9 @@
 // then by clicks; on the map I and J by keys and by clicks on their words in the header, closed by Esc / J
 // and by "I close" / a click; the cube (game.onCube) and its pages; the pause card under them, closed by a
 // click (which takes the pointer lock); losing the lock (document.exitPointerLock) opens pause, and I, J
-// and Tab work from it; so does a lock request refused (Esc closing the inventory over 3D); Tab and Esc between the views, "Tab: 3D" clicked; Pell by keys (his pack, Esc
+// and Tab work from it; so does a lock request refused (Esc closing the inventory over 3D); Tab and Esc between the views, "Tab: 3D" clicked;
+// WS9's log (H on the map and in 3D, closed by H, Esc and a click) and options (Esc on the pause card, a click on its
+// "Esc: options" line, closed by Esc; since the WS9 merge); Pell by keys (his pack, Esc
 // back, Esc out) and by clicks (an answer, the services tab, "Esc back", "Esc to leave"); a level gained
 // (1, and a click on a perk); stairs (the "DEPTH n" beat); death (R, and a click on "Press R…"). Also a text
 // field pushed for the test takes "m", "Ö" and "M" from real keys without toggling the music. Fails on any
@@ -168,6 +170,25 @@ try {
     await key("Tab"); await expect("map", "Tab in 3D");
     await key("Escape"); await expect("explore", "Esc on the map");
     await key("Tab"); await expect("map", "Tab in 3D (again)");
+
+    // WS9's two screens (docs/ws9.md request 11, at the WS9 merge): the log by H on the map and in 3D, closed by H, Esc
+    // and a click; the options by Esc on the pause card and by a click on its "Esc: options" line, closed by Esc.
+    await key("KeyH"); await expect("log", "H on the map");
+    await key("KeyH"); await expect("map", "H in the log");
+    await key("KeyH"); await click("Messages ("); await expect("map", "a click in the log");
+    await key("Tab"); await expect("explore", "Tab into 3D");
+    await key("KeyH"); await expect("log", "H in 3D");
+    await key("Escape"); await expect("explore", "Esc in the log over 3D");
+    await page.evaluate(() => { if (document.pointerLockElement) document.exitPointerLock(); });
+    await frames(5);
+    if ((await mode()) !== "pause") await page.evaluate(() => window.game.debug.lockChange(false));
+    await expect("pause", "the lock let go");
+    await key("Escape"); await expect("options", "Esc on the pause card");
+    await key("Escape"); await expect("pause", "Esc in the options");
+    await page.waitForTimeout(900);   // (the card's line comes after its beat, pause.js HINT_AFTER)
+    await click("Esc: options"); await expect("options", "a click on the card's \"Esc: options\"");
+    await key("Escape"); await expect("pause", "Esc in the options again");
+    await key("Tab"); await expect("map", "Tab from the pause card");
 
     // Pell: keys, then clicks.
     await page.evaluate(async () => {

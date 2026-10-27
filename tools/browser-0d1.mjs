@@ -161,8 +161,10 @@ try {
     };
     await won("keys");
     await won("mouse");
-    // The title screen (0D2): the page opens on it without ?quick=1; Enter, then a click on "New quick game",
-    // start a run (its intro).
+    // The title screen (0D2; WS9's since the WS9 merge): the page opens on it without ?quick=1; Enter, then a click on
+    // its first item, start a run (its intro): "New game" while WS4's wizard is registered, which it opens with the
+    // title's seed and mode (WS4 #12) and whose keys begin the run (End on the mutations' list, Tab on the name, Enter),
+    // else "New quick game".
     for (const how of ["keys", "mouse"]) {
       await page.goto(`${here.base}/index.html?silent=1&seed=1234`);
       await page.waitForFunction(() => window.game && window.game.mode === "title");
@@ -172,10 +174,20 @@ try {
         canvasBackend.present = (chars, colors, cols, rows) => { present(chars, colors, cols, rows); window.__frame = { chars: chars.slice(), cols, rows }; };
       });
       await frames(page, 2);
-      if (how === "keys") await page.keyboard.press("Enter"); else await click("New quick game");
+      const first = await page.evaluate(async () => ((await import("/src/screens.js")).screenFor("create") ? "New game" : "New quick game"));
+      if (how === "keys") await page.keyboard.press("Enter"); else await click(first);
       await frames(page, 2);
+      if ((await mode()) === "create") {
+        reached.add("create");
+        for (let k = 0; k < 20 && (await mode()) === "create"; k++) {
+          const step = await page.evaluate(async () => (await import("/src/screens/create.js")).wizard().step);
+          if (step === "track") await page.keyboard.press("End"); else if (step === "name") await page.keyboard.press("Tab");
+          await page.keyboard.press("Enter");
+          await frames(page, 2);
+        }
+      }
       const after = await mode();
-      if (after !== "story") problems.push(`title by ${how}: ${how === "keys" ? "Enter" : "a click on New quick game"} led to ${after}, not the intro`);
+      if (after !== "story") problems.push(`title by ${how}: ${how === "keys" ? "Enter" : `a click on ${first}`} (and the wizard) led to ${after}, not the intro`);
       else reached.add("title");
     }
     // The target screen (WS8's, merged at p2-ws8): from the new run's intro to the map, L opens the look cursor;
