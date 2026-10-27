@@ -544,6 +544,19 @@ function lost(G, problems) {
   const opt = talker && talkTo(game, talker)?.options?.find((o) => o.label === "Which way am I?");
   if (!opt) problems.push("lost: no \"Which way am I?\" when talking");
   else { opt.go(); if (isLost(game)) problems.push("lost: asking the way didn't help"); }
+  // Flying when you set out takes 10 points off the step's lost chance, though the flight is over when you arrive.
+  {
+    const g5 = fresh(G, 66, G.game.world), W5 = g5.run.world;
+    const u = W5.tiles.find((v) => v.terrain === "forest" && !v.roadWidth && !v.riverWidth && !v.landmark
+      && W5.neighbours(v.wx, v.wy).some((n) => !canStep(W5, n, v.wx - n.wx, v.wy - n.wy) && !W5.tileAt(n.wx, n.wy).roadWidth));
+    const n = W5.neighbours(u.wx, u.wy).find((m) => !canStep(W5, m, u.wx - m.wx, u.wy - m.wy) && !W5.tileAt(m.wx, m.wy).roadWidth);
+    goTo(g5, n.wx, n.wy); enterWorldMap(g5);
+    addStatus(g5, g5.player, "flying", { t: 20 });
+    const r5 = worldStep(g5, u.wx - n.wx, u.wy - n.wy, { confirm: true, drop: false });
+    const want = Math.max(0, u.lostChance * (isNight(g5) ? OW().nightLost : 1) - OW().flyingLost);
+    out.flying = { chance: r5.chance?.lost, want, stillFlying: hasStatus(g5.player, "flying") };
+    if (!near(r5.chance?.lost ?? -1, want)) problems.push(`lost: flying when you set out: chance ${r5.chance?.lost}, want ${want}`);
+  }
   // It runs out.
   relost(game.zone.key);
   skipTime(game, OW().lostFor + 1, { interruptible: false });

@@ -5,7 +5,9 @@
 //                                    × 2 at night, × 0.25 in a terrain you have Terrain lore for, − 0.02 a point of
 //                                    INT modifier, − bonus(navigation) (a compass-ring 0.05), − 0.10 flying; 0 along
 //                                    a road or a river edge, onto a road span, and on fast travel. learn: a step
-//                                    really taken (Terrain lore may learn the terrain); the info panel only asks
+//                                    really taken (Terrain lore may learn the terrain); the info panel only asks.
+//                                    flying: you set out flying (worldStep reads it before the hours pass: a 20 s
+//                                    flight is long over after a step of hours)
 //   getLost(game, key)               you are lost, in zone `key` (the zone you were crossing into)
 //   isLost(game) · findBearings(game, line)
 //
@@ -47,14 +49,14 @@ function hasLore(game, terrain, learn) {
   return true;
 }
 
-export function lostChance(game, to, edge = {}, { fast = false, learn = false } = {}) {
+export function lostChance(game, to, edge = {}, { fast = false, learn = false, flying = statusFlag(game.player, "flying") } = {}) {
   const t = tileOf(game, to.wx, to.wy), O = OW(), p = game.player;
   if (!t || fast || edge.road || edge.river || isRoadSpan(t)) return 0;
   let c = t.lostChance || 0;
   if (!(c > 0)) return 0;
   if (isNight(game)) c *= O.nightLost;
   if (hasLore(game, t.terrain, learn)) c *= 1 - O.loreLost;
-  c -= O.intLost * mod(p, "int") + bonus(p, "navigation") + (statusFlag(p, "flying") ? O.flyingLost : 0);
+  c -= O.intLost * mod(p, "int") + bonus(p, "navigation") + (flying ? O.flyingLost : 0);
   return Math.max(0, Math.min(1, c));
 }
 

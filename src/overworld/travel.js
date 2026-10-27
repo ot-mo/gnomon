@@ -39,6 +39,7 @@ import { pushMode, popMode, setMode } from "../screens.js";
 import { changeZone, cachedZone, makeZone, getZone, arrivalPoint, zoneKey, ZONE_LOADER } from "../zones.js";
 import { hostilesTo } from "../creatures.js";
 import { bonus } from "../stats.js";
+import { statusFlag } from "../status.js";
 import { refreshView } from "../turns.js";
 import { OW, atlas, roll, spanKey, tileOf, hourSeconds, playerTier, edgeBetween, canStep } from "./state.js";
 import { isLost, lostChance, getLost } from "./lost.js";
@@ -104,7 +105,7 @@ export function worldStep(game, dx, dy, { confirm = false, fast = false, drop = 
     trip.prompt = { kind: "tier", dx, dy, to, line: `${regionName(game, t)} is tier ${t.tier}, far beyond you. Go on?` };
     return { ok: false, why: "tier", confirm: "tier", from, to };
   }
-  const hours = stepHours(game, from, to, edge);
+  const hours = stepHours(game, from, to, edge), flying = statusFlag(game.player, "flying");   // as you set out
   const sk = skipTime(game, hours * hourSeconds(), { interruptible: false, reason: "travel" });
   const res = { ok: true, from, to, hours, seconds: sk.elapsed, lost: false, encounter: null, site: null, dropped: false, dead: false };
   trip.wx = to.wx; trip.wy = to.wy; trip.came = { dx, dy }; trip.moved = true; trip.cursor = null;
@@ -116,7 +117,7 @@ export function worldStep(game, dx, dy, { confirm = false, fast = false, drop = 
   }
   sight(game, to.wx, to.wy);
   if (t.travel !== "drop") {
-    const lc = lostChance(game, to, edge, { fast, learn: true });
+    const lc = lostChance(game, to, edge, { fast, learn: true, flying });
     res.chance = { lost: lc, encounter: encounterChance(game, t, { fast }) };
     if (lc > 0 && roll(game) < lc) res.lost = true;
     else res.encounter = rollEncounter(game, to, { fast });
