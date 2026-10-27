@@ -443,6 +443,13 @@ export async function run(env) {
       const root = talk.talkTo(game, c), pack = root.options.find((o) => /what you have/.test(o.label))?.go();
       if (root.text !== builders.GREET.merchant.disliked || !pack || pack.shop) fail(`a ${temper} Drover merchant at Cold: "${root.text}", the pack ${JSON.stringify(pack?.shop ?? pack?.text)}`);
     }
+    // A grudge makes a Grey talker curt, and curt never says "New face." (met or not).
+    {
+      game.state.rep = {};
+      const g = person("mira", "villager", "survey"); g.brain = { grudges: { player: 1 } };
+      const text = talk.talkTo(game, g).text;
+      if (text !== builders.GREET.villager.disliked) fail(`a Grey villager with a grudge, met for the first time: "${text}"`);
+    }
     // A talker with no faction (the roles work for anyone).
     for (const role of builders.ROLES) {
       const w = builders.walkDialogue(game, person("rook", role, null));

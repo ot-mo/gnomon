@@ -135,7 +135,7 @@ export function buildDialogue(role) {
     }
     if (role === "merchant") options.unshift({ label: "Show me what you have.", go: () => shopOf(game, c, curt, back) });
     const greet = GREET[role][curt ? "disliked" : st.band] ?? GREET[role].indifferent;
-    return node(first && st.band === "indifferent" ? `${greet} New face.` : greet, [...options, bye()]);
+    return node(first && !curt && st.band === "indifferent" ? `${greet} New face.` : greet, [...options, bye()]);
   };
 }
 
