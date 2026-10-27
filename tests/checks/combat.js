@@ -48,7 +48,7 @@ import { guardianThink } from "../../src/guardians.js";
 import { pushPlayerOut } from "../../src/monsters.js";
 import { mapStep, passTime, refreshView, startTravel, travelStep } from "../../src/turns.js";
 import { overrideRules, RULES } from "../../src/rules.js";
-import { invalidateStats, mod, maxHp, av as armourValue } from "../../src/stats.js";
+import { invalidateStats, mod, maxHp, av as armourValue, bonusTable } from "../../src/stats.js";
 import { makeBody } from "../../src/body.js";
 import { makeRng, distance } from "../../src/rng.js";
 import { WEAPONS, ARMOURS, useItem } from "../../src/items.js";
@@ -168,10 +168,17 @@ export function checkCombat({ game, startRun, srcFiles }) {
     stand(5.5, 5.5);
     r = row("you, weapon 2 STR too heavy", p, gob8, { ...sword, req: 12 }, {});   // STR reads 10 in the legacy stat set
     expect(r.m === -4, `a weapon 2 STR too heavy gives ${r.m}, want −4`);
-    p.innate = { crit: 0.1 }; invalidateStats(p);
+    // innate is the player's list of ability ids (abilities.js), not bonuses: stats.js reads e.bonuses (request 11).
+    {
+      const had = p.innate;
+      p.innate = ["foldStep"]; invalidateStats(p);
+      expect(!Object.keys(bonusTable(p)).some((k) => /^\d+$/.test(k)), `innate ["foldStep"] read as bonuses: ${JSON.stringify(bonusTable(p))}`);
+      p.innate = had; invalidateStats(p);
+    }
+    p.bonuses = { crit: 0.1 }; invalidateStats(p);
     r = row("you with +10% crit vs goblin L8", p, gob8, sword, {});
     expect(critNat(p) === 18, `a +10% crit bonus crits from ${critNat(p)}, want 18`);
-    delete p.innate; invalidateStats(p);
+    delete p.bonuses; invalidateStats(p);
     for (const [lv, agi] of [[1, 16], [6, 16], [12, 14], [20, 18], [20, 8]]) {
       setAgi(agi);
       const c = mk("goblin", lv);
@@ -202,7 +209,7 @@ export function checkCombat({ game, startRun, srcFiles }) {
     {
       setAgi(10);
       const far = mk("goblin", 8);
-      far.innate = { dv: 20 }; invalidateStats(far);
+      far.bonuses = { dv: 20 }; invalidateStats(far);
       far.hp = far.maxHp = 1e9;
       expect(toHitMod(game, p, far, sword, {}) + 19 <= dvOf(game, far), `the out-of-reach row isn't out of reach: mod ${toHitMod(game, p, far, sword, {})}, DV ${dvOf(game, far)}`);
       const rng = makeRng(77);
@@ -288,14 +295,14 @@ export function checkCombat({ game, startRun, srcFiles }) {
       expect(av0 === 0 && bites.every((x) => x.soaked === 0), `with nothing worn your AV is ${av0} and blows were soaked`);
       expect(Math.abs(bPlain - wantBite) <= DT && Math.abs(bCrit - wantBite * RULES.d20.crit) <= DT * 4,
         `a level-5 goblin's blow on you: mean ${bPlain.toFixed(3)} (want ${wantBite}), crits ${bCrit.toFixed(3)} (want ${wantBite * RULES.d20.crit})`);
-      p.innate = { armour: 4 }; invalidateStats(p);
+      p.bonuses = { armour: 4 }; invalidateStats(p);
       const av4 = armourValue(p);
       bites = onYou();
       const ySoaks = bites.map((x) => x.soaked), yCounts = [0, 1, 2, 3, 4].map((v) => ySoaks.filter((s) => s === v).length / ySoaks.length);
       expect(av4 === 4 && yCounts.every((c) => Math.abs(c - 0.2) <= 0.02),
         `your AV ${av4} soaks ${yCounts.map((c) => c.toFixed(3))} of 0..4, want 0.2 each`);
       expect(bites.every((x) => x.dmg >= 0 && x.dmg <= (x.crit ? RULES.d20.crit : 1) * 5), "a blow on you did more than its range (×crit) allows");
-      delete p.innate; p.body = savedBody; invalidateStats(p);
+      delete p.bonuses; p.body = savedBody; invalidateStats(p);
       stats.damage.onYou = { plain: +bPlain.toFixed(3), crit: +bCrit.toFixed(3), want: wantBite, soak: yCounts.map((c) => +c.toFixed(3)) };
       game.effects.length = 0;
     }
@@ -1141,7 +1148,7 @@ export async function checkAiDepth(ctx) {
       spitter.innate = ["ws8Spit"]; spitter.cd = Infinity;
       spitter.status.pinned = { t: Infinity, mag: 1, src: null, acc: 0 };
       const tough = addCreature(z, spawnCreature("goblin", 10, 8, FLOOR_Z, { rng: () => 0.5, level: 3, state: "chase" }));
-      tough.innate = { dv: 2 };   // (stats.js: a creature's own bonuses; not abilities)
+      tough.bonuses = { dv: 2 };   // (stats.js: a creature's own bonuses; innate is its abilities)
       const t0 = game.time;
       for (let k = 0; k < 7 * 20; k++) { game.time += 1 / 20; updateCreatures(game, 1 / 20, Infinity); }
       const times = used.map((u) => +(u.time - t0).toFixed(2));
@@ -1201,9 +1208,9 @@ export async function checkAiDepth(ctx) {
       stats.log = [...lines, run.logged[n]];
       // The other lines: your armour turning a blow, your bolt by its noun, one creature slaying another.
       const more = [];
-      p.innate = { armour: 1000 }; invalidateStats(p); p.hp = 1e6;
+      p.bonuses = { armour: 1000 }; invalidateStats(p); p.hp = 1e6;
       let k = run.logged.length; resolveAttack(game, g, p, naturalSpec(g), { view: "map", rng: () => 0.5 }); more.push(run.logged.slice(k).join(" | "));
-      delete p.innate; invalidateStats(p); p.hp = maxHp(p);
+      delete p.bonuses; invalidateStats(p); p.hp = maxHp(p);
       g.hp = 1e9;
       k = run.logged.length; resolveAttack(game, p, g, { kind: "missile", dmg: [3, 3], acc: 0, ench: 0, material: 0, noun: "bolt" }, { view: "map", rng: () => 0.75, aimed: true }); more.push(run.logged.slice(k).join(" | "));
       g.hp = 1;

@@ -200,8 +200,8 @@ export function updateCreatures(game, dt, radius = Infinity) {
 
       m.think -= dt;
       if (m.think <= 0) { m.think = 0.25; perceive(game, m, t); }
-      // (abilities.js reads innate as ability ids; stats.js lets a creature's innate be its own bonuses: only a list
-      // is asked here, so those don't throw. Integration request 11.)
+      // (innate is abilities.js's list of ability ids; a creature's own bonuses are stats.js's e.bonuses since the
+      // integrator took request 11. Only a list is asked here all the same.)
       if ((Array.isArray(m.innate) || (m.body && !m.innate)) && useAbilities(game, m, dt) && !zone.creatures.includes(m)) continue;
 
       const foe = m.state === "chase" ? null : foeOf(game, m);

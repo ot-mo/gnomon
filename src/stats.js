@@ -71,7 +71,10 @@ registerBonusSource("statuses", function* (e) {
   if (!e.status) return;
   for (const id in e.status) { const b = statusBonus(id, e.status[id], e); if (b) yield b; }
 });
-registerBonusSource("innate", (e) => (e.innate ? [e.innate] : []));   // creatures' own bonuses (0C)
+// An entity's own bonus table, e.bonuses (0C; a creature's natural DV, say). Not e.innate: that is abilities.js's list
+// of ability ids (the player's ["foldStep"], a creature's for ai.js), which this source used to add up as a table
+// with a key "0" (WS8's integration request 11).
+registerBonusSource("innate", (e) => (e.bonuses ? [e.bonuses] : []));
 
 // --- The cache --------------------------------------------------------------------------------
 // Per entity: { epoch, table }. A table is built on the first bonus() after invalidateStats(e)
