@@ -15,7 +15,7 @@
 // Timing: 20 levels are generated first and not counted (the JIT warming up), then the percentiles
 // are over all counted levels. Budget: p95 ≤ 40 ms (TECH_DESIGN §6.7, 0A1 gate).
 import { generateDungeonLevel, validateDungeonLevel, legacyParams, LEGACY_GUARDIANS, LEGACY_LEVELS, DUNGEON_THEMES, GIMMICKS } from "../../src/gen/dungeon.js";
-import { stampVault, buildVault, pickVault, registerLegend, vaultById, VAULTS, GUARDIAN_HALLS, BOSS_HALLS, LAIR_HALLS, RELIC_HALLS, STAMP_DEFAULTS } from "../../src/gen/vaults.js";
+import { stampVault, buildVault, pickVault, registerLegend, vaultById, VAULTS, GUARDIAN_HALLS, BOSS_HALLS, LAIR_HALLS, RELIC_HALLS, STAMP_DEFAULTS, BOTTOM_LOOT } from "../../src/gen/vaults.js";
 import { Zone, B, FLOOR_Z } from "../../src/world.js";
 import { makeRng, seedFor } from "../../src/rng.js";
 import { canTalk } from "../../src/creatures.js";
@@ -267,6 +267,8 @@ export function siteLevelProblems(f, p) {
   if (p.final && p.bottom?.kind === "legend") {
     const c = f.creatures.find((m) => m.uid === p.bottom.uid);
     if (!c || c.flags?.legend !== p.bottom.uid || c.level !== p.bottom.legend.level || !c.named) out.push("legend: its owner isn't made right");
+    // (Its hoard: a body mod once WS5 has filled BOTTOM_LOOT.bodyMod, since the WS10 merge.)
+    if (BOTTOM_LOOT.bodyMod && !(f.bottomLoot?.bodyMod && f.items.some((it) => ["artifact", "cell", "implant"].includes(it.kind)))) out.push("legend: no body mod at its bottom");
   }
   if (p.final && p.bottom?.kind === "relic") {
     const r = p.bottom.relic, loot = f.bottomLoot || {};

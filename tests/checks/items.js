@@ -523,6 +523,19 @@ export function checkItems(m) {
         m.keys.dispatchKey(game, "Escape");
       }
     }
+    // WS10's seams (at its merge): a lair's owner guards a body mod (gen/vaults.js BOTTOM_LOOT.bodyMod, drawn from the
+    // site's stream), and only a fitted metronome heart shows the beat (traps.js BEAT_SIGHT).
+    {
+      const kinds = new Set(), draw = m.rng.makeRng(41);
+      for (let k = 0; k < 60; k++) kinds.add(m.vaults.BOTTOM_LOOT.bodyMod?.(draw, 12)?.kind);
+      p = fresh();
+      const without = m.traps.BEAT_SIGHT.has(game);
+      p.body.implants.body = { kind: "implant", id: "metronomeHeart" }; m.stats.invalidateStats(p);
+      const withHeart = m.traps.BEAT_SIGHT.has(game);
+      delete p.body.implants.body; m.stats.invalidateStats(p);
+      stats.ws10Seams = `body mods ${[...kinds].sort().join(", ")}; the beat ${without} without, ${withHeart} with a metronome heart`;
+      if (![...kinds].every((k) => ["artifact", "cell", "implant"].includes(k)) || kinds.size < 2 || without || !withHeart) fail(`WS10's seams: ${stats.ws10Seams}`);
+    }
     // A save round trip.
     p = fresh(); p.license = { grade: 8 }; p.credits = 3;
     const r1 = { kind: "implant", id: "foldingRack" }, r2 = { kind: "implant", id: "levelEye" };
@@ -1043,7 +1056,7 @@ export async function run(env) {
     load("events", "events.js"), load("renderMap", "renderMap.js"), load("interact", "interact.js"), load("talk", "talk.js"),
     load("currency", "currency.js"), load("creatures", "creatures.js"), load("world", "world.js"), load("rules", "rules.js"),
     load("status", "status.js"), load("abilities", "abilities.js"), load("codec", "save/codec.js"), load("rng", "rng.js"),
-    load("time", "time.js"), load("effects", "effects.js"), load("player", "player.js"), load("merchants", "social/merchants.js"), load("throwing", "throwing.js"), load("ui", "ui.js"), load("combat", "combat.js"), load("torch", "torch.js"),
+    load("time", "time.js"), load("effects", "effects.js"), load("player", "player.js"), load("merchants", "social/merchants.js"), load("vaults", "gen/vaults.js"), load("traps", "traps.js"), load("throwing", "throwing.js"), load("ui", "ui.js"), load("combat", "combat.js"), load("torch", "torch.js"),
   ]);
   m.implantTable = (await env.src("content/items/implants.js")).IMPLANTS;
   m.artifactTable = (await env.src("content/items/artifacts.js")).ARTIFACTS;
