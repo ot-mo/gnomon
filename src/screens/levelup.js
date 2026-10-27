@@ -2,7 +2,8 @@
 // The game waits.
 //   The legacy set: the parent's card (hud.js drawLevelUp): one of three perks, four at a milestone; 1-4 or a click.
 //   The attribute set (bible §10.7): the card says what the level gave (max HP, a crease, an attribute point: the
-//   level's point is credited when its card opens); with a point to spend it first asks which attribute it raises
+//   level's point is credited when its card opens) and, for the Bent, the creases there are to spend (the sheet, K,
+//   spends them: screens/charsheet.js); with a point to spend it first asks which attribute it raises
 //   (or keeps it for a later card), then
 //   offers the powers (leveling.js offerPowers: 3, or 4 at INT 18+, a major among them at levels 5, 10, 15…).
 //   ↑↓ (W S) choose, Enter (E, Space) take, a digit picks a row, a click takes it.
@@ -106,6 +107,11 @@ function drawCard(game) {
   S.text(x0 + ((w - title.length) >> 1), y0 + 1, title, ...UI.title);
   const gains = card.gains.join(" · ");
   if (gains) S.text(x0 + ((w - gains.length) >> 1), y0 + 2, gains.slice(0, w - 2), ...UI.info);
+  // The Bent's creases (bible §10.3): spent any time on the sheet (K), on a new mutation or a level of one.
+  if (!card.gift && GENOTYPES[p.genotype]?.track === "mutations") {
+    const c = `${p.creases || 0} crease${p.creases === 1 ? "" : "s"} to spend: K, the sheet, buys mutations and their levels.`;
+    S.text(x0 + Math.max(1, (w - c.length) >> 1), y0 + 3, c.slice(0, w - 2), ...UI.dim);
+  }
   const head = power ? (card.gift ? "" : "Choose a power:") : `An attribute point${p.attrPoints > 1 ? ` (${p.attrPoints} to spend)` : ""}: raise which?`;
   S.text(x0 + 3, y0 + 4, head, ...UI.text);
   card.sel = Math.max(0, Math.min(rows.length - 1, card.sel | 0));

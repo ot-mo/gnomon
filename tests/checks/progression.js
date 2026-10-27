@@ -771,7 +771,16 @@ export async function checkProgression(m) {
       PM.gainMutation(game, g, "gills");
       if (rep("clatter") !== 150) fail(`Gills gained in play: clatter ${rep("clatter")}, want 150 (50 + 100)`);
       if (g.hotbar.includes("gills")) fail("a mutation without an ability went on the hotbar");
-      out.economy = "12 creases, 4 a mutation, 1 a level, the cap 1/2/3/10 at levels 1/3/5/18, refusals, EGO's levels, reputation";
+      // The level-up card tells the Bent the creases there are to spend, and where.
+      const lv = bentIn([], { view: "map" });
+      lv.creases = 3;
+      L.gainXp(game, 20, { source: "quest" });
+      step(1 / 60);
+      frame();
+      const card = Array.from({ length: capture.rows }, (_, y) => rowText(y)).join("\n");
+      if (game.mode !== "levelup" || !card.includes("4 creases to spend: K, the sheet")) fail(`the level-up card doesn't tell the Bent of the 4 creases (in ${game.mode})`);
+      for (let k = 0; k < 4 && game.mode === "levelup"; k++) press("Digit1");
+      out.economy = "12 creases, 4 a mutation, 1 a level, the cap 1/2/3/10 at levels 1/3/5/18, refusals, EGO's levels, reputation, the card's creases";
     }
 
     // 7.4 Every active mutation in both views, through the real hotbar key.
