@@ -127,7 +127,7 @@ export function randomEquipment(rand, depth, luck = 0) {
   const weight = (tier) => (tier === maxTier ? 4 : tier === maxTier - 1 ? 2 : 1);
   const pool = [
     ...Object.entries(WEAPONS).filter(([, w]) => w.tier > 0 && w.tier <= maxTier).map(([id, w]) => [{ kind: "weapon", id }, weight(w.tier)]),
-    ...Object.entries(ARMOURS).filter(([, a]) => a.tier > 0 && a.tier <= maxTier).map(([id, a]) => [{ kind: "armour", id }, weight(a.tier)]),
+    ...Object.entries(ARMOURS).filter(([, a]) => a.tier > 0 && a.tier <= maxTier && !a.slot).map(([id, a]) => [{ kind: "armour", id }, weight(a.tier)]),
   ];
   const it = { ...weighted(rand, pool), ench: 0, known: false };
   const roll = rand(), size = 1 + Math.floor(rand() * Math.min(4, 1 + depth / 5));
