@@ -1,46 +1,24 @@
-// Surface zones: one world span's ground, 80×48×16 (TECH_DESIGN §5.3, the P0 stub that WS2 grows).
+// Surface zones: one world span's ground, 80×48×16 (TECH_DESIGN §5.3; owner WS2).
 //
-//   worldFns(world, seed) → W           the world functions of one run, cached: everything a seam needs
-//     W.heightAt(gx, gy) → int          ground height in blocks above the datum (stand = FLOOR_Z + height)
-//     W.columnAt(gx, gy) → { height, cliff, water, ground }   the same with what made it
-//     W.treeAt(cx, cy) → tree | null    the tree of 3×3-tile world cell (cx, cy): { gx, gy, base, trunk }
-//     W.portsOf(wx, wy) → [port]        where roads and rivers cross the span's open edges
-//   heightAt(world, seed, gx, gy), treeAt(world, seed, cx, cy), portsOf(world, seed, wx, wy)   the same, uncached
 //   generateSurface(run, wx, wy) → Zone the span's surface zone (unsealed), validated, up to 10 attempts
 //   surfaceSteps(run, wx, wy) → iterator   the same work in stages (0D1): each next() does one stage
 //                                       (a few ms) and the last returns { done: true, value: Zone }, so
-//                                       3D prefetch can spread a zone over frames; same zone, same bits
-//   validateSurface(zone) → string[]    the §5.3 item 9 rules the stub can break (empty: fine)
+//                                       3D prefetch can spread a zone over frames; same zone, same bits.
+//                                       Each stage also builds one world-function band of the zone's
+//                                       apron ahead of the swap (gen/apron.js, WS3 #6)
+//   validateSurface(zone) → string[]    the §5.3 item 9 rules (empty: fine)
 //   dungeonRectFor(entrance) → rect     where the dungeon's 48×48 levels sit under the surface (§5.5)
-//   buildApronBand(run, zone, side, neighbour) → band   one apron band (world.js), registered as
-//                                       APRON_BUILDERS.surface by world/zonegen.js
-//   SURFACE_RULES                       the numbers
+//   forgetWorld(world)                  drop everything kept for a world (world functions, ports, apron bands):
+//                                       call it when its spans change in a run (the Lengthening turns spans
+//                                       to Shade), before any zone is made again
 //   BIOME_BUILDERS, SITE_BUILDERS       TECH_DESIGN §1.4's registries, re-exported: biome id → (ctx) => void from
-//                                       gen/biomes/index.js (WS2; empty in P0), site kind → (ctx, site) => void
-//                                       from world/sites.js (where 0A2 put it, so this file can read it)
-// WS2's split of this file (0D2 stubs): gen/terrain.js (the world functions), gen/ports.js (edgePorts),
-// gen/apron.js (the band builder) re-export what is here today; WS2 moves the code into them.
-//
-// World coordinates: column x of span wx is gx = wx·80 + x (row y of span wy: gy = wy·48 + y), so two
-// zones that share an edge compute the same values for every column near it. A world function is a
-// pure function of (run seed, gx, gy) and the fixed world: integer hashes, + − × ÷, floor and sqrt only
-// (R6), so it gives the same bits in every engine. Retries re-roll only the zone's own features
-// (river bends, fords, sinkholes), never a world function.
-//
-// The height (heightAt), in order:
-//   relief  fbm noise of wavelength 24 and 12 tiles (two octaves) times 3 × the terrains' relief, blended bilinearly between
-//           the four nearest span centres. Its slope stays under 1 block per tile, so rounding never
-//           makes a 2-block step between 4-neighbours: the map (where heights are invisible) stays walkable.
-//   cliffs  a separate mask raises small areas by 5 (≥ 4, so even across the relief the step at a cliff's
-//           foot is 4 or more and the map draws it as a wall). No cliff within 10 tiles of a port or a
-//           landmark's flattened ground.
-//   rivers  a river comes in from its port straight for 8 tiles on both sides of the edge (the approach);
-//           the ground within d tiles of that channel is at most d high, so its banks slope down to the
-//           water, which sits at the datum on rock (it never drops you a level; every body floats on it).
-//   flatten world.flatten (fixed landmark footprints): inside the rect and its 2-tile skirt the ground is
-//           the landmark's datum; beyond it the height may differ from the datum by at most 1 block per
-//           tile, so the natural ground comes back within the 4-tile falloff (3 blocks of relief, 3 tiles).
-// Clamping with distances keeps every step at most 1 block, the property the slope rule needs.
+//                                       gen/biomes/index.js, site kind → (ctx, site) => void from world/sites.js
+//                                       (where 0A2 put it, so this file can read it)
+// Re-exported from the modules they live in, so a caller can import them from here as before:
+//   worldFns, heightAt, treeAt, SURFACE_RULES   gen/terrain.js (the world functions: the height, cliffs, rivers'
+//                                               channels, the flatten mask, trees)
+//   portsOf                                     gen/ports.js (edgePorts is there too)
+//   buildApronBand                              gen/apron.js (APRON_BUILDERS.surface, registered by world/zonegen.js)
 //
 // A zone then adds its own features, each 2 tiles or more from an open edge except where it meets a
 // port: the road from each road port to the hub (the site's door, or the zone centre), carved so that
@@ -48,182 +26,28 @@
 // a ford; trees from treeAt (a canopy that crosses an edge is built whole by both zones); the landmark's
 // plan or the site; the dungeon entrance (a STAIRS block, zone.entrance) and, when a dungeon lies below,
 // sinkholes inside zone.dungeonRect.
-import { Zone, B, FLOOR_Z, SURFACE, standWith, apronRect } from "../world.js";
-import { makeRng, seedFor, hashInt, hashFloat, seededNoise, fbm, distance } from "../rng.js";
+import { Zone, B, FLOOR_Z, SURFACE, standWith } from "../world.js";
+import { KIND } from "../blocks.js";
+import { makeRng, seedFor, distance } from "../rng.js";
 import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../pathing.js";
-import { SIDES, SIDE_STEP, FLATTEN_SKIRT } from "../world/worldmodel.js";
+import { SIDES, FLATTEN_SKIRT } from "../world/worldmodel.js";
 import { SITE_BUILDERS, dungeonParams } from "../world/sites.js";
 import { generateDungeonLevel } from "./dungeon.js";
 import { zoneSeed } from "../world/run.js";
 import { stampVault } from "./vaults.js";
+import { worldFns, heightAt, treeAt, SURFACE_RULES, forgetWorldFns } from "./terrain.js";
+import { portsOf, forgetPorts } from "./ports.js";
+import { buildApronBand, apronBandSteps, forgetBands } from "./apron.js";
 export { SITE_BUILDERS } from "../world/sites.js";
 export { BIOME_BUILDERS } from "./biomes/index.js";
+export { worldFns, heightAt, treeAt, SURFACE_RULES, portsOf, buildApronBand };
 
-export const SURFACE_RULES = {
-  reliefWave: 24,     // tiles: the relief noise's base wavelength; its second octave is half that, 12 (§5.3: at least 12)
-  maxRelief: 3,       // blocks: the relief's amplitude at relief 1 (§5.3: at most 3)
-  cliffRise: 5,       // blocks a cliff raises its area by
-  cliffWave: 9,       // tiles: the size of the cliff mask's blobs
-  cliffArea: 0.12,    // how much of the mask rises at cliffs 1 (the threshold is 1 − cliffArea × cliffs)
-  cliffClear: 10,     // tiles: no cliffs this close to a port or a landmark's flattened ground
-  approach: 8,        // tiles: a river runs straight in from its port this far on both sides of an edge
-  treeCell: 3,        // tiles: one tree candidate per 3×3-tile world cell
-  treeClear: 3,       // tiles: no tree this close to a port's channel
-  edgeKeep: 2,        // tiles: zone-local features keep this far from open edges (§5.1 e)
-  maxStand: 12,       // standable ground at most 12 blocks above the datum (DECISIONS: heights)
-  minNav: 0.9,        // at least 90% of the ground in one piece, under the map's step rules
-  maxSteps: 4,        // unplanned 2-block steps allowed
-  attempts: 10,
-};
 const R = SURFACE_RULES;
 const ZW = SURFACE.w, ZD = SURFACE.d;
-
-// --- World functions ----------------------------------------------------------------------------
-const fnCache = new WeakMap();   // world → Map(seed → W), the last few seeds only
-
-export function worldFns(world, seed) {
-  let bySeed = fnCache.get(world);
-  if (!bySeed) fnCache.set(world, (bySeed = new Map()));
-  const hit = bySeed.get(seed >>> 0);
-  if (hit) return hit;
-  const W = makeWorldFns(world, seed >>> 0);
-  if (bySeed.size >= 4) bySeed.delete(bySeed.keys().next().value);
-  bySeed.set(seed >>> 0, W);
-  return W;
-}
-export const heightAt = (world, seed, gx, gy) => makeWorldFns(world, seed >>> 0).heightAt(gx, gy);
-export const treeAt = (world, seed, cx, cy) => makeWorldFns(world, seed >>> 0).treeAt(cx, cy);
-export const portsOf = (world, seed, wx, wy) => makeWorldFns(world, seed >>> 0).portsOf(wx, wy);
-
 const clampInt = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const floorDiv = (a, b) => Math.floor(a / b);
 
-function makeWorldFns(world, seed) {
-  const { w: WW, h: WH } = world;
-  const sRelief = seedFor(seed, "relief") | 0, sCliff = seedFor(seed, "cliffs") | 0;
-  // Per-span terrain parameters (spans off the map take the nearest one's).
-  const n = WW * WH, relief = new Float64Array(n), cliffs = new Float64Array(n), trees = new Float64Array(n);
-  const ground = new Uint8Array(n);
-  for (const t of world.tiles) {
-    const T = world.terrains[t.terrain] || {}, i = t.wx + t.wy * WW;
-    relief[i] = T.relief ?? 0.3; cliffs[i] = T.cliffs ?? 0; trees[i] = T.trees ?? 0;
-    ground[i] = B[T.ground] ?? B.GRASS;
-  }
-  const spanIndex = (tx, ty) => clampInt(tx, 0, WW - 1) + clampInt(ty, 0, WH - 1) * WW;
-  // Bilinear blend of a per-span value between the four nearest span centres.
-  const blend = (arr, gx, gy) => {
-    const u = (gx + 0.5) / ZW - 0.5, v = (gy + 0.5) / ZD - 0.5;
-    const tx = Math.floor(u), ty = Math.floor(v), fx = u - tx, fy = v - ty;
-    const a = arr[spanIndex(tx, ty)], b = arr[spanIndex(tx + 1, ty)], c = arr[spanIndex(tx, ty + 1)], d = arr[spanIndex(tx + 1, ty + 1)];
-    return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
-  };
-
-  // Ports: for each open edge with a road or river, where it crosses (§5.3 item 3). Both spans of an
-  // edge compute it from the same canonical edgeId, so they agree.
-  const portCache = new Map();
-  function portsOf(wx, wy) {
-    const key = `${wx},${wy}`;
-    if (portCache.has(key)) return portCache.get(key);
-    const out = [], t = world.tileAt(wx, wy);
-    if (t)
-      for (const side of SIDES) {
-        if (!world.edgeOpen(wx, wy, side)) continue;
-        const [dx, dy] = SIDE_STEP[side], o = world.tileAt(wx + dx, wy + dy);
-        const opp = { n: "s", e: "w", s: "n", w: "e" }[side];
-        const edgeId = world.edgeId(wx, wy, side), length = side === "n" || side === "s" ? ZW : ZD;
-        let road = null;
-        if (t.road[side] && o.road[opp]) {
-          const width = clampInt(Math.max(t.roadWidth, o.roadWidth) || 2, 2, 3);
-          road = { side, kind: "road", edgeId, width, along: 8 + (hashInt(seed, edgeId) % (length - 16)) };
-          out.push(road);
-        }
-        if (t.river[side] && o.river[opp]) {
-          const width = clampInt(Math.max(t.riverWidth, o.riverWidth) || 3, 3, 5);
-          let along = 8 + (hashInt(seed, edgeId, "river") % (length - 16));
-          // A road and a river on one edge cross it apart (the same on both sides: it reads only edge data).
-          if (road && along + width + 2 > road.along && along < road.along + road.width + 2)
-            along = 8 + ((along - 8 + road.width + width + 4) % (length - 16));
-          out.push({ side, kind: "river", edgeId, width, along });
-        }
-      }
-    portCache.set(key, out);
-    return out;
-  }
-  // A port's channel (rivers) or approach (roads) in world coordinates: the port's tiles along the edge,
-  // `approach` tiles deep into each of the two spans. { x0, y0, x1, y1 } inclusive.
-  function channel(wx, wy, p) {
-    const A = R.approach, ox = wx * ZW, oy = wy * ZD;
-    if (p.side === "n" || p.side === "s") {
-      const ey = p.side === "n" ? oy : oy + ZD;   // the first row of the span below the edge
-      return { x0: ox + p.along, x1: ox + p.along + p.width - 1, y0: ey - A, y1: ey + A - 1 };
-    }
-    const ex = p.side === "w" ? ox : ox + ZW;
-    return { x0: ex - A, x1: ex + A - 1, y0: oy + p.along, y1: oy + p.along + p.width - 1 };
-  }
-  const rectDist = (r, gx, gy) => distance(Math.max(0, r.x0 - gx, gx - r.x1), Math.max(0, r.y0 - gy, gy - r.y1));
-
-  // The landmark footprints (world.flatten) near each span, in world coordinates with their skirt.
-  const flatNear = new Map();
-  function flattenNear(wx, wy) {
-    const key = `${wx},${wy}`;
-    if (flatNear.has(key)) return flatNear.get(key);
-    const out = world.flatten.filter((f) => Math.abs(f.wx - wx) <= 1 && Math.abs(f.wy - wy) <= 1).map((f) => ({
-      z: f.z, x0: f.wx * ZW + f.rect.x - FLATTEN_SKIRT, y0: f.wy * ZD + f.rect.y - FLATTEN_SKIRT,
-      x1: f.wx * ZW + f.rect.x + f.rect.w - 1 + FLATTEN_SKIRT, y1: f.wy * ZD + f.rect.y + f.rect.d - 1 + FLATTEN_SKIRT,
-    }));
-    flatNear.set(key, out);
-    return out;
-  }
-
-  function columnAt(gx, gy) {
-    const wx = floorDiv(gx, ZW), wy = floorDiv(gy, ZD);
-    let raw = R.maxRelief * blend(relief, gx, gy) * fbm(sRelief, gx / R.reliefWave, gy / R.reliefWave, 2);
-    let near = Infinity, water = 0;
-    const ports = portsOf(wx, wy);
-    const chans = [];
-    for (const p of ports) {
-      const c = channel(wx, wy, p), d = rectDist(c, gx, gy);
-      near = Math.min(near, d);
-      if (p.kind === "river") chans.push([p, c, d]);
-    }
-    const flats = flattenNear(wx, wy);
-    for (const f of flats) near = Math.min(near, rectDist(f, gx, gy));
-    let cliff = 0;
-    if (near >= R.cliffClear) {
-      const c = blend(cliffs, gx, gy);
-      if (c > 0 && seededNoise(sCliff, gx / R.cliffWave, gy / R.cliffWave) > 1 - R.cliffArea * c) cliff = R.cliffRise;
-    }
-    raw += cliff;
-    for (const [p, c, d] of chans) {
-      raw = Math.min(raw, d);
-      if (d === 0) {   // in the channel: shallow at its two sides, deep between
-        const across = p.side === "n" || p.side === "s" ? gx - c.x0 : gy - c.y0;
-        water = across === 0 || across === p.width - 1 ? 1 : 2;
-      }
-    }
-    for (const f of flats) {
-      const d = rectDist(f, gx, gy);
-      raw = Math.max(f.z - d, Math.min(f.z + d, raw));
-    }
-    const height = Math.max(0, Math.floor(raw + 0.5));
-    return { height: water ? 0 : height, cliff: cliff > 0 && height >= R.cliffRise ? 1 : 0, water,
-             ground: ground[spanIndex(wx, wy)], near };
-  }
-
-  // The tree of world cell (cx, cy), or null. The trunk sits somewhere in the cell's 3×3 tiles; the
-  // canopy is the 3×3 around it, so it may reach one tile into the next zone (both zones build it).
-  function treeAt(cx, cy) {
-    const C = R.treeCell;
-    const gx = cx * C + (hashInt(seed, "treeX", cx, cy) % C), gy = cy * C + (hashInt(seed, "treeY", cx, cy) % C);
-    if (!(hashFloat(seed, "tree", cx, cy) < blend(trees, gx, gy))) return null;
-    const col = columnAt(gx, gy);
-    if (col.cliff || col.water || col.near < R.treeClear) return null;
-    for (const f of flattenNear(floorDiv(gx, ZW), floorDiv(gy, ZD))) if (rectDist(f, gx, gy) < 2) return null;
-    return { gx, gy, base: FLOOR_Z + col.height, trunk: 4 + (hashInt(seed, "treeH", cx, cy) % 2) };
-  }
-
-  return { seed, world, portsOf, channel, columnAt, heightAt: (gx, gy) => columnAt(gx, gy).height, treeAt };
-}
+export function forgetWorld(world) { forgetWorldFns(world); forgetPorts(world); forgetBands(world); }
 
 // --- Where the dungeon sits ---------------------------------------------------------------------
 // Levels are 48×48 and the surface 80×48: the levels sit centred under the entrance (§5.5).
@@ -245,12 +69,25 @@ function sitesOf(run, wx, wy) {
 }
 
 export function generateSurface(run, wx, wy) {
-  const it = surfaceSteps(run, wx, wy);
+  const it = zoneSteps(run, wx, wy);
   for (;;) { const r = it.next(); if (r.done) return r.value; }
 }
 
-// The stages: the world layer, then buildSurface's (yields between its numbered steps), then validation.
+// The staged make (3D prefetch): the zone's stages, each also building one of the world-function bands its
+// apron will want (gen/apron.js apronBandSteps), so the frame that swaps into it finds them made (WS3 #6);
+// bands left over when the zone is done take a stage each. The zone is generateSurface's, bit for bit.
 export function* surfaceSteps(run, wx, wy) {
+  const inner = zoneSteps(run, wx, wy);
+  let r = inner.next();
+  if (r.done) return r.value;
+  const bands = apronBandSteps(run, wx, wy);
+  for (; !r.done; r = inner.next()) { bands.next(); yield r.value; }
+  for (const side of bands) yield `apron ${side}`;
+  return r.value;
+}
+
+// The stages: the world layer, then buildSurface's (yields between its numbered steps), then validation.
+function* zoneSteps(run, wx, wy) {
   const world = run.world, tile = world.tileAt(wx, wy);
   if (!tile) return null;
   const W = worldFns(world, run.seed), seed = zoneSeed(run, wx, wy, 0);
@@ -299,6 +136,7 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
   zone.landmarkId = L?.id || null;
   zone.hasSky = true;
   zone.outdoor = true;
+  zone.liquid = W.liquidOf(wx, wy);   // one liquid per span: its river's, else its biome's
   for (const s of SIDES) zone.edges[s] = world.edgeOpen(wx, wy, s);
   const H = Int16Array.from(base.H), water = Uint8Array.from(base.water);
   const plan = new Uint8Array(n);       // columns a plan or site builder writes
@@ -342,6 +180,15 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
   else if (rect) hub = { x: rect.x + (rect.w >> 1), y: rect.y + rect.d + 1 };
   else hub = { x: ZW >> 1, y: ZD >> 1 };
   hub.x = clampInt(hub.x, R.edgeKeep, ZW - 1 - R.edgeKeep); hub.y = clampInt(hub.y, R.edgeKeep, ZD - 1 - R.edgeKeep);
+  // Never on a cliff or in the world's water (a road carved up to a cliff top would be a map wall the road
+  // ends in, and a way onto the cliff in 3D): the nearest plain ground instead. A plan's door stays put.
+  if (!(planAt && planDef.hub)) {
+    const plain = (x, y) => keep(x, y) && !base.cliff[x + y * ZW] && !base.water[x + y * ZW];
+    if (!plain(hub.x, hub.y)) {
+      const to = NEAR.find(([dx, dy]) => plain(hub.x + dx, hub.y + dy));
+      if (to) hub = { x: hub.x + to[0], y: hub.y + to[1] };
+    }
+  }
 
   // 3. Rivers: the bends between the approaches (or a lake), then banks that slope down to the water.
   const rivers = base.ports.filter((p) => p.kind === "river");
@@ -445,12 +292,23 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
       zone.set(x, y, top, road[i] ? B.ROAD : base.ground[i]);
     }
 
+  // The columns the zone's own features changed from the world functions (an apron built from them
+  // differs there until this zone is in memory, §6.1): heights, water, roads, the footprint and the plan;
+  // below, a tree that gave way or stands on ground the zone moved, with its canopy, and sinkholes.
+  // zone.gen.local; a zone-local builder marks its own columns too.
+  const local = new Uint8Array(n);
+  for (let i = 0; i < n; i++) if (H[i] !== base.H[i] || water[i] !== base.water[i] || road[i] || reserved[i] || plan[i]) local[i] = 1;
+  const markTree = (t) => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (t.x + dx >= 0 && t.y + dy >= 0 && t.x + dx < ZW && t.y + dy < ZD) local[t.x + dx + (t.y + dy) * ZW] = 1;
+  };
+
   // 6. Trees. A tree whose canopy stays inside the zone gives way to the zone's own things; one that
   //    crosses an edge never does (the world function keeps those clear of ports), so both zones have it.
   const scenery = new Uint8Array(n);   // columns whose standing spot is on scenery (a tree, a wall's top)
   for (const t of base.trees) {
     const ti = t.x + t.y * ZW, inside = t.x >= 1 && t.y >= 1 && t.x < ZW - 1 && t.y < ZD - 1;
-    if (inside && (road[ti] || water[ti] || reserved[ti] || plan[ti] || (t.x === hub.x && t.y === hub.y))) continue;
+    if (inside && (road[ti] || water[ti] || reserved[ti] || plan[ti] || (t.x === hub.x && t.y === hub.y))) { markTree(t); continue; }
+    if (inside && local[ti]) markTree(t);
     buildTree(zone, inside ? { ...t, base: FLOOR_Z + H[ti] } : t, scenery);   // (banks may have lowered an inner one's ground)
   }
 
@@ -505,6 +363,7 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
         if (distance(x - e.x, y - e.y) < 5 || NEXT4.some(([dx, dy]) => water[x + dx + (y + dy) * ZW])) continue;
         if (below && !below(x - r.ox, y - r.oy)) continue;
         for (let z = 0; z < zone.h; z++) zone.set(x, y, z, B.AIR);
+        local[i] = 1;
         made++;
       }
     }
@@ -517,7 +376,7 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
   yield "refresh";
   zone.spawn = spawn || pickAnchor(zone, hub, scenery);
   zone.gen = { ports: base.ports.map((p) => ({ ...p, tiles: Array.from({ length: p.width }, (_, k) => portTile(p, k)) })),
-               keyPoints, scenery, cliff: base.cliff, worldWater: base.water, plan, planAt, hub, entranceGated };
+               keyPoints, scenery, cliff: base.cliff, worldWater: base.water, plan, planAt, hub, entranceGated, local };
   return zone;
 }
 
@@ -707,85 +566,53 @@ function pickAnchor(zone, hub, scenery) {
 }
 const isStairs = (zone, i) => { const g = zone.blocks[i + (FLOOR_Z - 1) * zone.w * zone.d]; return g === B.STAIRS || g === B.STAIRS_UP; };
 
-// --- The apron (TECH_DESIGN §6.1) ------------------------------------------------------------------
-// One band of zone.apron (world.js apronRect gives its place): `side` is "n", "e", "s", "w" or a corner
-// ("ne", "nw", "se", "sw"). With the neighbour zone in memory (neighbour, the span that way) the band is
-// a copy of its blocks, so you walk onto exactly the ground you will stand on; without it, the band is
-// built from the world functions: the ground of columnAt, the world's water, and every tree of treeAt.
-// The neighbour's own features (its road's bends, a plan, a village) appear only once it is in memory.
-export function buildApronBand(run, zone, side, neighbour = null) {
-  const r = apronRect(zone, side), { w, d, h } = zone, n = r.bw * r.bd;
-  const blocks = new Uint8Array(n * h);
-  const dx = side.includes("w") ? -1 : side.includes("e") ? 1 : 0, dy = side.includes("n") ? -1 : side.includes("s") ? 1 : 0;
-  if (neighbour && neighbour.w === w && neighbour.d === d && neighbour.h === h) {
-    // The band in the neighbour's coordinates starts at (x0 − dx·w, y0 − dy·d); copy it row by row.
-    const sx = r.x0 - dx * w, sy = r.y0 - dy * d, src = neighbour.blocks;
-    for (let z = 0; z < h; z++)
-      for (let ly = 0; ly < r.bd; ly++) {
-        const from = sx + (sy + ly) * w + z * w * d;
-        blocks.set(src.subarray(from, from + r.bw), ly * r.bw + z * n);
-      }
-    return { ...r, blocks, from: "zone" };
-  }
-  const W = worldFns(run.world, run.seed), ox = zone.wx * ZW, oy = zone.wy * ZD;
-  const at = (x, y, z) => x - r.x0 + (y - r.y0) * r.bw + z * n;
-  for (let ly = 0; ly < r.bd; ly++)
-    for (let lx = 0; lx < r.bw; lx++) {
-      const x = r.x0 + lx, y = r.y0 + ly, c = W.columnAt(ox + x, oy + y);
-      if (c.water) {
-        for (let z = 0; z < FLOOR_Z - 1; z++) blocks[at(x, y, z)] = B.ROCK;
-        blocks[at(x, y, FLOOR_Z - 1)] = c.water === 2 ? B.WATER_DEEP : B.WATER_SHALLOW;
-        continue;
-      }
-      const top = FLOOR_Z - 1 + c.height;
-      for (let z = 0; z < top; z++) blocks[at(x, y, z)] = B.ROCK;
-      blocks[at(x, y, top)] = c.ground;
-    }
-  // Trees whose canopy touches the band, built the way buildTree builds them.
-  const C = R.treeCell, inBand = (x, y) => x >= r.x0 && y >= r.y0 && x < r.x0 + r.bw && y < r.y0 + r.bd;
-  const put = (x, y, z, b) => { if (inBand(x, y) && z < h && !blocks[at(x, y, z)]) blocks[at(x, y, z)] = b; };
-  for (let cy = floorDiv(oy + r.y0 - 1, C); cy <= floorDiv(oy + r.y0 + r.bd, C); cy++)
-    for (let cx = floorDiv(ox + r.x0 - 1, C); cx <= floorDiv(ox + r.x0 + r.bw, C); cx++) {
-      const t = W.treeAt(cx, cy);
-      if (!t) continue;
-      const x = t.gx - ox, y = t.gy - oy, top = t.base + t.trunk;
-      if (x < r.x0 - 1 || y < r.y0 - 1 || x > r.x0 + r.bw || y > r.y0 + r.bd) continue;
-      for (let ty = -1; ty <= 1; ty++)
-        for (let tx = -1; tx <= 1; tx++) { put(x + tx, y + ty, top - 1, B.LEAVES); put(x + tx, y + ty, top, B.LEAVES); }
-      put(x, y, top + 1, B.LEAVES);
-      if (inBand(x, y)) for (let z = t.base; z < top; z++) blocks[at(x, y, z)] = B.TRUNK;
-    }
-  return { ...r, blocks, from: "world" };
-}
-
-// --- Validation (§5.3 item 9, the rules the stub can break) ----------------------------------------
-// Needs zone.gen (what generation knew); a zone without it is checked for holes and heights only.
+// --- Validation (§5.3 item 9) -----------------------------------------------------------------------
+// Needs zone.gen (what generation knew); a zone without it is checked for holes, heights, water and
+// navigability only.
+//
+// Navigability is the map's (§5.3: "under the map's step rules", pathing.js): the ground is every column
+// you can stand on that the map doesn't draw as a wall, and it is reached from the anchor with the map's
+// steps, never across a wall. The map draws ground 4 or more blocks up as wall (world.js computeKinds), so
+// cliff tops are no map ground: counted apart (zone.ground3d: ground only 3D could reach, by a ramp or a climb a
+// builder makes; a bare cliff of 5 has none), never against the zone. zone.navigability
+// is the share reached.
+// Water: every column holding water holds it at the datum, with rock under it (it never drops you a level).
 export function validateSurface(zone) {
   const problems = [], { w, d } = zone, g = zone.gen;
   if (!zone.hasDerived) zone.refresh();
-  const stand = zone.stand, open = standWith(zone, "open");
+  const stand = zone.stand, kind = zone.kind, open = standWith(zone, "open");
+  for (let i = 0; i < w * d; i++) if (kind[i] === KIND.WALL) open[i] = -1;   // the map never walks on a wall
   const ax = Math.floor(zone.spawn.x), ay = Math.floor(zone.spawn.y);
   const dist = reachable(open, w, d, ax, ay, PLAYER_STEP_UP, PLAYER_DROP);
   const scenery = g?.scenery || new Uint8Array(w * d);
-  const ground = (i) => stand[i] >= 0 && !scenery[i];
+  const ground = (i) => stand[i] >= 0 && !scenery[i] && kind[i] !== KIND.WALL;
   const reach = (x, y) => x >= 0 && y >= 0 && x < w && y < d && dist[x + y * w] >= 0;
   if (stand[ax + ay * w] < 0) problems.push("the anchor is not on standable ground");
 
   // Holes only over a dungeon, inside its rect; no standable ground above 12.
   const r = zone.dungeonRect;
-  let total = 0, reached = 0;
+  let total = 0, reached = 0, ground3d = 0, high = 0, badWater = 0;
+  const blocks = zone.blocks, layer = w * d, datum = (FLOOR_Z - 1) * layer, WS = B.WATER_SHALLOW, WD = B.WATER_DEEP;
+  // Water: off the datum anywhere (one flat pass over the other layers), or at it without rock under it.
+  for (let j = 0; j < blocks.length; j++) if ((blocks[j] === WS || blocks[j] === WD) && (j < datum || j >= datum + layer)) badWater++;
+  for (let i = 0; i < layer; i++)
+    if (blocks[datum + i] === WS || blocks[datum + i] === WD)
+      for (let u = 0; u < datum; u += layer) if (blocks[u + i] !== B.ROCK) { badWater++; break; }
   for (let i = 0; i < w * d; i++) {
     const x = i % w, y = (i - x) / w;
-    if (!zone.get(x, y, 0) && !zone.get(x, y, FLOOR_Z - 1)) {
+    if (!blocks[i] && !blocks[i + (FLOOR_Z - 1) * layer]) {
       if (!zone.hasBelow || !r || x < r.ox || y < r.oy || x >= r.ox + r.w || y >= r.oy + r.d) { problems.push(`a hole at (${x}, ${y}) outside the dungeon's rect`); break; }
     }
-    if (!ground(i)) continue;
-    if (stand[i] > FLOOR_Z + R.maxStand) problems.push(`standable ground at (${x}, ${y}) is ${stand[i] - FLOOR_Z} blocks up`);
+    if (stand[i] >= 0 && !scenery[i] && stand[i] > FLOOR_Z + R.maxStand) high++;
+    if (!ground(i)) { if (stand[i] >= 0 && !scenery[i]) ground3d++; continue; }
     total++;
     if (dist[i] >= 0) reached++;
   }
+  if (high) problems.push(`${high} columns of standable ground more than ${R.maxStand} blocks up`);
+  if (badWater) problems.push(`${badWater} columns of water off the datum or without rock under it`);
   const nav = total ? reached / total : 0;
   zone.navigability = nav;
+  zone.ground3d = ground3d;
   if (nav < R.minNav) problems.push(`navigability ${(100 * nav).toFixed(1)}% (want ${100 * R.minNav}%)`);
   if (!g) return problems;
 
@@ -818,6 +645,10 @@ export function validateSurface(zone) {
         const b = top >= 0 ? zone.get(x, y, top) : 0;
         if (b === B.WATER_SHALLOW || b === B.WATER_DEEP || (stand[x + y * w] < 0 && !zone.get(x, y, FLOOR_Z))) problems.push("the entrance is in or next to water or a drop");
       }
+  // A road the map draws as wall (carved up onto a cliff).
+  let roadWalls = 0;
+  for (let i = 0; i < w * d; i++) if (kind[i] === KIND.WALL && stand[i] > 0 && zone.blocks[i + (stand[i] - 1) * w * d] === B.ROAD) roadWalls++;
+  if (roadWalls) problems.push(`${roadWalls} road columns the map draws as wall`);
   // Unplanned 2-block steps (a cliff's foot and a plan's walls are planned).
   let steps = 0;
   for (let y = 0; y < d; y++)
