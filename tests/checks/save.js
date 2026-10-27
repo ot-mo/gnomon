@@ -278,6 +278,12 @@ async function checkSections({ game, startRun, inputHandlers, runSession, fresh,
     if (!(await slow.get("zones", ["s", "1,2,0"]))) fail("a commit never landed");
     await slow.put("zones", { slot: "t", key: "0,0,0" });
     if ((await slow.list("zones", { slot: "s" })).length !== 1) fail("list by slot");
+    // Transactions commit in the order they were opened, as IndexedDB's do: the first held up, the second at once.
+    const ord = memoryAdapter();
+    const first = ord.tx(async (t) => { await tick(30); await t.put("slots", { id: "o", n: 1 }); });
+    const second = ord.tx(async (t) => { await t.put("slots", { id: "o", n: 2 }); });
+    await Promise.all([first, second]);
+    if ((await ord.get("slots", "o")).n !== 2) fail("memory transactions committed out of the order they were opened (the first held up landed last)");
     const copy = memoryAdapter({ from: slow.dump() });
     if ((await copy.list("zones")).length !== 2) fail("dump → from lost rows");
     const idb = idbAdapter();
@@ -1130,6 +1136,7 @@ async function ws9Sections(ctx) {
       const n0 = problems.length;
       compare(`woken at the checkpoint (${k + 1})`, atCp, await digestGame(game, ["0,0,0", "0,0,1"]));
       if (after.join() !== "0,0,0,0,0,1" || left.length || game.zone.key !== "0,0,1") fail(`the restore (${k + 1}): rows ${after.join(" ")}, copies ${left.join(" ")}, woke in ${game.zone.key}`);
+      if (saveStatus(game).unclean !== 0 || (await slotOf(cs, cid)).live !== SESSION) fail(`woken (${k + 1}): unclean ${saveStatus(game).unclean}, live ${(await slotOf(cs, cid)).live} (a restore leaves the slot clean)`);
       wakes.push(problems.length === n0 ? "identical" : "DIFFERS");
       playing(game, "map");
       game.debug.enterZone("0,0,2", "down"); playing(game, "map");
@@ -1190,6 +1197,28 @@ async function ws9Sections(ctx) {
       const n1 = problems.length;
       compare(`${how}, then death and C in the new store`, atCp, await digestGame(game, ["0,0,0", "0,0,1"]));
       res.push(`${how}: rows ${rows.join(" ")}, copies ${copies.join(" ") || "none"}, woke ${problems.length === n1 ? "identical" : "DIFFERENT"}`);
+    }
+    // A save to another store while the old store still has a save in flight that copies a zone written before the
+    // checkpoint (its first write since): the new slot gets that copy too (it waits for the old slot's writes), and
+    // death and C there give the zone back as at the checkpoint.
+    {
+      const A = memoryAdapter({ latency: 80 }), B = memoryAdapter();
+      freshRun(1234, { store: A, mode: "commonsLamp" });
+      await settle();
+      for (const [key, how] of [["0,0,1", "down"], ["0,0,2", "down"], ["0,0,3", "down"]]) { game.debug.enterZone(key, how); playing(game, "map"); await settle(); }
+      await checkpoint(game); await whenWritten(game);
+      const atCp = await digestGame(game, ["0,0,2"]);
+      game.debug.enterZone("0,0,2", "up"); playing(game, "map");
+      frames(40);   // its save (the keep of 0,0,2 in it) asked for and in flight, held 80 ms
+      await saveGame(game, { store: B });
+      useStore(B);
+      const copiesB = await rowsOf(B, game.saving.slotId, "checkpointZones");
+      game.hurtPlayer(99999, "a test");
+      await game.saving.restoring;
+      await wakeAtCheckpoint(game);
+      const n3 = problems.length;
+      compare("a save to another store with a copy on write in flight in the old one: woken there", { ...atCp, state: "", player: "", run: "", ids: "" }, { ...(await digestGame(game, ["0,0,2"])), state: "", player: "", run: "", ids: "" });
+      res.push(`a save to another store with the old store's copy of 0,0,2 in flight: the new one's copies ${copiesB.join(" ")}, woken ${problems.length === n3 ? "with 0,0,2 as at the checkpoint" : "CHANGED"}`);
     }
     RULES.auto = false;
     // A run on the real world, loaded while new runs are built on the test world.
