@@ -47,6 +47,7 @@ const REP_EDGES = [-600, -250, 250, 600];   // hated ≤ −600 < disliked ≤ �
 export const REP_MIN = -1000, REP_MAX = 1000;
 
 export function band(rep) {
+  if (Number.isNaN(rep)) return "indifferent";
   if (rep <= REP_EDGES[0]) return "hated";
   if (rep <= REP_EDGES[1]) return "disliked";
   if (rep < REP_EDGES[2]) return "indifferent";
@@ -66,10 +67,10 @@ export function repOf(game, factionId) {
   return game.state?.rep?.[factionId] ?? baseRep(game, factionId);
 }
 export function addRep(game, factionId, n, reason = null) {
-  if (!game.state) return 0;
+  if (!game.state) return repOf(game, factionId);
   const rep = (game.state.rep ||= {});
   const from = repOf(game, factionId);
-  if (!Number.isFinite(n)) return from;   // (bad content: a repOnKill that isn't a number)
+  if (typeof n !== "number" || Number.isNaN(n)) return from;   // (bad content: a repOnKill that isn't a number; ±Infinity clamps)
   const step = Math.sign(n) * Math.round(Math.abs(n));   // halves away from zero, the same both ways (−2.5 → −3, +2.5 → +3)
   rep[factionId] = Math.max(REP_MIN, Math.min(REP_MAX, from + step));
   if (rep[factionId] !== from) emit(game, "rep", { faction: factionId, n: rep[factionId] - from, from, rep: rep[factionId], reason });

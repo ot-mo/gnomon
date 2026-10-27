@@ -230,6 +230,8 @@ export async function run(env) {
       const down = F.addRep(game, "kites", -2.5) - h0, up = F.addRep(game, "kites", 2.5) - (h0 + down);
       if (down !== -3 || up !== 3) fail(`addRep ±2.5 moved ${down} and ${up}, want -3 and 3`);
       if (F.addRep(game, "kites", NaN) !== h0 || !Number.isFinite(F.repOf(game, "kites"))) fail(`addRep(NaN) left kites at ${F.repOf(game, "kites")}`);
+      if (F.addRep(game, "survey", -Infinity) !== -1000 || F.band(NaN) !== "indifferent") fail(`addRep(−Infinity) → ${F.repOf(game, "survey")}, band(NaN) → ${F.band(NaN)}`);
+      if (F.addRep({ player: game.player }, "assize", 5) !== F.baseRep({ player: game.player }, "assize")) fail("addRep with no state doesn't give the rep");
       const e = seen.find((x) => x.faction === "assize");
       if (!e || e.n !== 300 || e.from !== -100 || e.rep !== 200 || e.reason !== "background") fail(`the rep event: ${JSON.stringify(e)}`);
     } finally { off(); }
