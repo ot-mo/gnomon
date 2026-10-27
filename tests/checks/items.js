@@ -314,7 +314,7 @@ export function checkItems(m) {
       if (IM.gradeUsed(p) !== 2 || IM.gradeFree(p) !== 0) fail(`${view}: grade ${IM.gradeUsed(p)} used, ${IM.gradeFree(p)} free (want 2, 0)`);
       want(`${view}: a second implant over the grade`, withC(() => IM.canInstall(game, p, { kind: "implant", id: "tallyEye" }, "face")), "grade");
     }
-    if (!same(fit.map, fit["3d"]) || fit.map.dt !== IM.FITTING_TIME || fit.map.fee !== 50 || fit.map.torch !== 0.333) fail(`fitting: map ${JSON.stringify(fit.map)}, 3D ${JSON.stringify(fit["3d"])} (want 60 s, 50 glim, torch +1/3 in both)`);
+    if (!same(fit.map, fit["3d"]) || fit.map.dt !== 60 || fit.map.fee !== 50 || fit.map.torch !== 0.333) fail(`fitting: map ${JSON.stringify(fit.map)}, 3D ${JSON.stringify(fit["3d"])} (want 60 s, 50 glim, torch +1/3 in both)`);
     stats.fitting = fit;
     // Refusals that cost nothing: no purse, a hunt.
     p = fresh();
@@ -433,7 +433,7 @@ export function checkItems(m) {
       const data = m.screens.modeData(game);
       data.list.sel = k;
       m.keys.dispatchKey(game, "Enter", false, "");
-      if (p.body.implants.face !== it || game.time - t2 < IM.FITTING_TIME) fail(`${view}: Enter on the dark lens in the Cradle: ${p.body.implants.face ? "in" : "not in"}, ${game.time - t2} s`);
+      if (p.body.implants.face !== it || game.time - t2 < 60) fail(`${view}: Enter on the dark lens in the Cradle: ${p.body.implants.face ? "in" : "not in"}, ${game.time - t2} s`);
       data.list.sel = m.equipment.truingRows(game).findIndex((r) => r.kind === "socket" && r.part.id === "face");
       m.keys.dispatchKey(game, "Enter", false, "");
       if (p.body.implants.face || !p.inv.includes(it)) fail(`${view}: Enter on the face socket didn't take the dark lens out`);
