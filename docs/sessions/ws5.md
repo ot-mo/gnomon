@@ -82,8 +82,10 @@ In `docs/ws5.md` "Public API" (exact signatures).
 
 ## 5. Known issues
 
-- **check-screen-frames**: the 8 "… inventory" frames differ from p0-0c (the rebuilt screen); the other 39 match.
-  Request 2 is with the coordinator (see the Handoff in `docs/ws5.md`).
+- ~~check-screen-frames~~: the 8 "… inventory" frames differ from p0-0c (the rebuilt screen); with the coordinator's
+  leave they are listed by name in `NOT_COMPARED` (request 2, `4ab2702`), the other 39 match, and check-items §8 checks
+  the new screen in those 8 states.
+- **G** is bound to the map legend on `integration` (WS3's merge), which shadows WS5's pick-up on the map: request 17.
 - check-perf under load (three other sessions running): `refresh` ×1.36 and the dungeon frame ×1.17 against p0-done in
   one run; WS5 changes neither `zone.refresh()` nor the renderers (§8 has the re-timing).
 
