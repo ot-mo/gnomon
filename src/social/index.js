@@ -10,13 +10,13 @@
 //
 // WS6a also owns factions.js (repOf, addRep, band, attitude: §2.11) and talk.js; WS6b owns dialogue.js. The
 // screens factions, trade and ritual are in screens/ (screens/index.js imports every screen).
-// P0: registers nothing, so the game plays as before. Remove STUB when WS6a or WS6b registers its parts here.
-import "./reputation.js";
-import "./builders.js";
+// WS6a: reputation.js subscribes the rep events, builders.js registers the role dialogues, content/factions.js
+// the factions, and screens/factions.js the factions screen (P). WS6b's parts below are still its stubs.
+export { offend, killed, witnessesOf, offender } from "./reputation.js";
+export { buildDialogue, standingOf, walkDialogue, checkNode, ROLES } from "./builders.js";
 import "./shrines.js";
 import "./backings.js";
 export { openTrade, priceOf } from "./merchants.js";
 export { openRitual } from "./ritual.js";
 export { voiceFor } from "./voices.js";
 export { liquidAt } from "./liquids.js";
-export const STUB = "WS6a";
