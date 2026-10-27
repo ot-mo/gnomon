@@ -539,6 +539,39 @@ export async function run(env) {
         if (k1?.splash !== true || k1?.src !== P9 || !k2 || k2.splash) fail(`the kill payload's splash: ${stats.splash} (want thorns true with you as the source, a blow false)`);
       } finally { off(); }
     }
+    // Mortal villagers (WS6a #1, at the WS7b merge): a talker whose type has hp (WS7's villagers) can be struck. On the
+    // map a bump talks; Shift + the direction strikes it (a fellow in sight: rep and grudges); out for you, a bump strikes
+    // it; killed, a talker's death is a named kill. A legacy person (no hp) still only talks, Shift or not.
+    {
+      fresh(1234, { genotype: "bent" });
+      const P10 = p(), zone = game.zone, tx = Math.floor(P10.x), ty = Math.floor(P10.y);
+      const free = (x, y) => zone.stand[x + y * zone.w] === P10.z && !creatures.creatureAt(zone, x, y);
+      const side = [[1, 0], [0, 1], [-1, 0], [0, -1]].find(([dx, dy]) => free(tx + dx, ty + dy) && free(tx - dx, ty - dy));
+      const v = creatures.addCreature(zone, creatures.spawnCreature("villageWarden", tx + side[0], ty + side[1], P10.z, { level: 3 }));
+      const wit = creatures.addCreature(zone, creatures.spawnCreature("villageLeech", tx - side[0], ty - side[1], P10.z, { level: 3 }));
+      v.faction = { hollowmere: 1 }; wit.faction = { hollowmere: 1 };
+      const r0 = F.repOf(game, "hollowmere"), hp0 = v.hp, out = [];
+      game.mode = "map"; game.view = "map";
+      turns.mapStep(game, side[0], side[1]);
+      out.push(`bump: ${game.mode}`);
+      const talked = game.mode === "talk";
+      while (game.mode !== "map") keys.dispatchKey(game, "Escape");
+      turns.mapStep(game, side[0], side[1], { force: true });
+      const struck = { hp: v.hp, rep: F.repOf(game, "hollowmere"), att: F.attitude(game, v, P10), wit: F.attitude(game, wit, P10), mode: game.mode };
+      out.push(`Shift: hp ${hp0} → ${struck.hp}, Hollowmere ${r0} → ${struck.rep}, ${struck.att} / ${struck.wit}`);
+      v.hp = Math.min(v.hp, 1);
+      for (let k = 0; k < 20 && zone.creatures.includes(v); k++) turns.mapStep(game, side[0], side[1]);
+      const killed = !zone.creatures.includes(v), rk = F.repOf(game, "hollowmere");
+      out.push(`out for you, bumps: ${killed ? "killed" : "alive"}, Hollowmere ${rk}`);
+      const mira = creatures.addCreature(zone, creatures.spawnCreature("mira", tx + side[0], ty + side[1], P10.z, { level: 5 }));
+      turns.mapStep(game, side[0], side[1], { force: true });
+      out.push(`Shift on a legacy person: ${game.mode}, touchable ${creatures.touchable(game, mira)}`);
+      while (game.mode !== "map") keys.dispatchKey(game, "Escape");
+      stats.mortal = out.join("; ");
+      if (!(hp0 > 0) || !talked || !(struck.hp < hp0) || struck.mode !== "map" || struck.rep !== r0 + rep.REP_RULES.attackPenalty || struck.att !== "hostile" || struck.wit !== "hostile" ||
+          !killed || rk !== r0 + rep.REP_RULES.attackPenalty + rep.REP_RULES.namedKillPenalty || mira.hp !== undefined || creatures.touchable(game, mira))
+        fail(`mortal villagers: ${stats.mortal}`);
+    }
     // An implant fitted in play (WS5 #20, bible §10.4): the Plan +25 each, the first four only; taking one out, or a
     // creature's fitting, moves nothing.
     {

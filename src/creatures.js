@@ -78,12 +78,16 @@ export function spawnCreature(type, tx, ty, z, opts = {}) {
   const level = opts.level ?? 1;
   const vis = { flat: !!t.flat, ghostly: !!t.ghostly, statue: !!t.statue };
   if (t.talks || opts.talk) {
+    // A mortal one (WS7's villagers: the type has hp; WS6a #1) can be struck and killed like a monster: its health
+    // (level-scaled as a monster's), the fields a blow reads; it neither fights back nor moves (people's brains).
+    const hp = t.hp > 0 ? Math.round(t.hp * (1 + 0.06 * (level - 1))) : undefined;
     return {
       id: nextEntityId(), uid: opts.uid ?? null, type, name: opts.name ?? t.name, glyph: t.glyph, color: t.color,
       w: t.w || (t.statue ? 1.0 : 0.75), h: t.h || (t.statue ? 1.6 : 1.7),
       tx, ty, nx: tx, ny: ty, p: 0, x: tx + 0.5, y: ty + 0.5, z, level, state: "idle",
       talk: { dialogue: opts.talk?.dialogue ?? type, state: opts.talk?.state ?? {}, met: false },
       vis, status: {}, cooldowns: {},
+      ...(hp ? { hp, maxHp: hp, bonus: Math.floor((level - 1) / 4), armour: t.armour || 0, xp: t.xp || 0, cd: 0, hurt: 0, lost: 0 } : {}),
     };
   }
   const rand = opts.rng;
@@ -150,7 +154,7 @@ export const ghostOffMap = (game, c) => isGhostly(c) && (!c.talk?.met || (!!game
 export const theOf = (c) => (c?.named ? c.name : `the ${c?.name}`);
 export const TheOf = (c) => (c?.named ? c.name : `The ${c?.name}`);
 export function touchable(game, target, attacker = game.player, { blade = false } = {}) {
-  if (canTalk(target) || target.brain?.arriving > 0) return false;   // (arriving: still on its way in, ai.js)
+  if ((canTalk(target) && !(target.hp > 0)) || target.brain?.arriving > 0) return false;   // (people: only a mortal one; arriving: still on its way in, ai.js)
   if (attacker !== game.player) return true;
   if (ghostHidden(game, target)) return false;
   if (statusFlag(attacker, "flat")) return isFlat(target);

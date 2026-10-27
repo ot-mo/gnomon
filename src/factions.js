@@ -119,7 +119,7 @@ const leaderOf = (game, c) => {
 // Sees in the dark: perceives a ghost (bible §15.4, "Perception rules for faction fights"); ghosts do too.
 const darkSight = (c) => isGhostly(c) || !!(c.darkSight || typeOf(c)?.darkSight);
 // A talker without health can't be struck, by you or by anything else (creatures.js touchable).
-const unstrikable = (c) => !!c.talk && !(c.hp > 0);
+const unstrikable = (c) => !!c.talk && !(c.maxHp > 0);   // (mortal by its maxHp: a dying one, hp at 0 in its last blow's events, is still one)
 const temperOf = (c, mine) => c.brain?.temperament || typeOf(c)?.temperament || factions()[mine[0][0]].temperament || "neutral";
 
 // How a's factions (weighted) regard you: any membership of weight ≥ 0.25 whose band is hated makes it

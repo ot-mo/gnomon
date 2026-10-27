@@ -161,8 +161,9 @@ export function mapStep(game, dx, dy, { force = shiftHeld() } = {}) {
 
   // Walking into someone talks to them (it takes no time). A ghost you haven't met (or, under the sky,
   // one standing in daylight) is just a cold spot in the way: you'd have to see it in 3D, in the dark.
+  // A mortal one (a villager with health: WS6a #1) is struck instead when it is out for you, or with Shift.
   const m = creatureAt(zone, nx, ny);
-  if (m && canTalk(m)) {
+  if (m && canTalk(m) && !(m.hp > 0 && (force || attitude(game, m, p) === "hostile"))) {
     if (ghostOffMap(game, m)) game.log("The air here is icy, as if someone were standing in your way. Someone you can't see from up here.", [150, 210, 240]);
     else if (flat && !isFlat(m)) game.log(`${m.name} can't hear you from the Plane. Only the Flatfolk can.`, [220, 220, 230]);
     else game.onTalk(m);
