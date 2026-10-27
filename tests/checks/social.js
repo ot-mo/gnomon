@@ -139,6 +139,20 @@ export async function run(env) {
     const want2 = [[monster, fol, "hostile"], [fol, monster, "hostile"], [fol, p(), "friendly"], [p(), fol, "friendly"], [fol, fol2, "friendly"],
       [monster, flatFol, "unaware"], [deep, fol, "neutral"], [calm, fol, "hostile"]];
     for (const [a, b, want] of want2) { const got = F.attitude(game, a, b); if (got !== want) fail(`followers: ${a === p() ? "you" : a.brain?.leader ? "your follower" : a.type} → ${b === p() ? "you" : b.brain?.leader ? "your follower" : b.type}: ${got}, want ${want}`); }
+    // A cycle of leaders (a bug elsewhere) answers rather than overflowing the stack; so does a cycle of parents.
+    {
+      const x = mob(null, null), y = mob(null, null), d = mob(null, null);
+      creatures.addCreature(game.zone, x); creatures.addCreature(game.zone, y);
+      x.brain = { leader: y.id }; y.brain = { leader: x.id };
+      let got;
+      try { got = F.attitude(game, x, d); } catch (err) { got = err.message; }
+      if (got !== "neutral") fail(`a cycle of leaders: ${got}`);
+      creatures.removeCreature(game.zone, x); creatures.removeCreature(game.zone, y);
+      F.registerFaction("test:loopA", { parent: "test:loopB" }); F.registerFaction("test:loopB", { parent: "test:loopA" });
+      try { got = F.relation("test:loopA", "hollowmere"); } catch (err) { got = err.message; }
+      finally { delete F.FACTIONS["test:loopA"]; delete F.FACTIONS["test:loopB"]; }
+      if (got !== 0) fail(`a cycle of parents: ${got}`);
+    }
     // Creature against creature.
     const hm = mob("hollowmere"), hm2 = mob("hollowmere"), az = mob("assize"), cl = mob("clatter"), sv = mob("survey"), rb = mob("rustbacks");
     // The Assize hates Hollowmere through the Bent (a parent group); Hollowmere hates the Rustbacks, not back.

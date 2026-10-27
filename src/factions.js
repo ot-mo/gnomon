@@ -97,11 +97,11 @@ export function membershipsOf(c) {
   return m.list;
 }
 
-export function relation(f, g) {
+export function relation(f, g, depth = 0) {
   const F = factions()[f];
-  if (!F) return 0;
+  if (!F || depth > 8) return 0;   // (a cycle of parents in bad content ends here)
   for (let o = g, n = 0; o && n < 8; o = factions()[o]?.parent, n++) if (F.relations?.[o] !== undefined) return F.relations[o];
-  return F.parent && F.parent !== f ? relation(F.parent, g) : 0;
+  return F.parent && F.parent !== f ? relation(F.parent, g, depth + 1) : 0;
 }
 
 const idOf = (game, e) => (e === game.player ? "player" : e.id);
@@ -127,18 +127,22 @@ export function bandToward(game, c) {
   return band(mine.reduce((s, [id, w]) => s + repOf(game, id) * w, 0) / total);
 }
 
-export function attitude(game, a, b) {
+// depth: how many leaders deep the question has gone; a chain longer than MAX_DEPTH (a cycle of leaders, which
+// only a bug makes) answers neutral instead of recursing for ever.
+const MAX_DEPTH = 6;
+export function attitude(game, a, b, depth = 0) {
   const player = game.player;
   if (a === b) return "friendly";
+  if (depth > MAX_DEPTH) return "neutral";
   // You: hostile to whatever is hostile to you; your followers are yours.
-  if (a === player) return followsPlayer(b) ? "friendly" : attitude(game, b, player) === "hostile" ? "hostile" : "neutral";
+  if (a === player) return followsPlayer(b) ? "friendly" : attitude(game, b, player, depth + 1) === "hostile" ? "hostile" : "neutral";
   // A follower shares its leader's attitudes (and is friendly to its leader and to the rest of its side).
   const leader = leaderOf(game, a);
   if (leader && leader !== a) {
     if (leader === b || (b !== player && b.brain?.leader === a.brain.leader)) return "friendly";
     if (a.brain?.grudges?.[idOf(game, b)]) return "hostile";
-    if (leader === player) return attitude(game, b, player) === "hostile" ? "hostile" : "neutral";   // your side
-    return attitude(game, leader, b);
+    if (leader === player) return attitude(game, b, player, depth + 1) === "hostile" ? "hostile" : "neutral";   // your side
+    return attitude(game, leader, b, depth + 1);
   }
   // The house rule: the plane and the dark are things only the player crosses.
   if (b !== player) {
@@ -147,7 +151,7 @@ export function attitude(game, a, b) {
   }
   if (a.brain?.grudges?.[idOf(game, b)]) return unstrikable(a) ? "wary" : "hostile";
   // Whatever is out for you is out for your followers too (WS8's request 2).
-  if (followsPlayer(b) && attitude(game, a, player) === "hostile") return "hostile";
+  if (followsPlayer(b) && attitude(game, a, player, depth + 1) === "hostile") return "hostile";
 
   const mine = membershipsOf(a);
   if (b === player) {
