@@ -25,7 +25,7 @@
 //      banned word (check-names' list).
 //   6. The old game under the legacy set: the quick start's player has no origin; a level gives +3 HP with the
 //      parent's line and opens the parent's card ("Choose a gift"); offerPerks draws only the parent's 25.
-import { findHits } from "./names.js";
+import { findHits, DENY } from "./names.js";
 
 const NAME = "progression";
 
@@ -522,7 +522,19 @@ export async function checkProgression(m) {
     if (long) fail(`${long} suggested names have a word over 9 letters or pass ${C.NAME_MAX}`);
     const { hits } = findHits([{ file: "names", text: names.join("\n") }]);
     if (hits.length) fail(`suggested names with banned words: ${hits.slice(0, 5).map((h) => `${h.term} in "${h.text}"`).join("; ")}`);
-    out.names = `${names.length} suggested, ${new Set(names).size} different, 0 banned`;
+    // Every word the parts can make (onset, maybe a middle, a final), and every family: none holds a banned term, as a
+    // word or inside one (the generator itself rejects nothing, so its tables must be clean).
+    const words = [];
+    for (const c of Object.values(C.NAME_PARTS.cultures))
+      for (const o of c.onsets) for (const mid of ["", ...c.middles]) for (const f of c.finals) words.push(o + mid + f);
+    words.push(...C.NAME_PARTS.families);
+    const lower = words.map((w) => w.toLowerCase());
+    const terms = DENY.flatMap((d) => (d.qualifier === "mode" ? [] : [d.term.toLowerCase().replace(/[^a-z]/g, "")])).filter((t) => t.length >= 3);
+    const inside = lower.flatMap((w) => terms.filter((t) => w.includes(t)).map((t) => `${t} in ${w}`));
+    if (inside.length) fail(`name parts make banned words: ${inside.slice(0, 5).join("; ")}`);
+    const asWords = findHits([{ file: "name parts", text: words.join("\n") }]).hits;
+    if (asWords.length) fail(`name parts make banned words: ${asWords.slice(0, 5).map((h) => h.term).join("; ")}`);
+    out.names = `${names.length} suggested, ${new Set(names).size} different, 0 banned; all ${words.length} words the parts make clean`;
   }
 
   // --- 6. The old game ---------------------------------------------------------------------------------------------

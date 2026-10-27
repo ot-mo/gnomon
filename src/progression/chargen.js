@@ -180,6 +180,9 @@ for (const c of Object.values(CULTURES)) for (const k of ["onsets", "middles", "
 // The Plumb's families are their Levels' old drafting words (given name + family + Level: "Aurel Strade-Orrum").
 const FAMILIES = ["Strade", "Quint", "Dell", "Ashlar", "Corbel", "Plinth", "Lintel", "Mullion", "Gauge", "Quoin"];
 const BACKGROUND_CULTURE = { droversChild: "drovers", mesaRunner: "drovers" };   // raised on the roads and the Steps
+// The parts, for check-progression: it makes every word they can and holds each to bible §15.11 (the deny-list can't
+// live here, or check-names would find its words in src/), so the generator has nothing to reject.
+export const NAME_PARTS = { cultures: CULTURES, families: FAMILIES };
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
 function word(culture, rng) {
