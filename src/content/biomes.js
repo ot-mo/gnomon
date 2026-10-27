@@ -17,7 +17,8 @@
 //               down to them; a deep middle from radius 3
 //   props       { count, kinds: [[prop, weight]] }: non-blocking sprites (PROPS below), zone.props
 //   lights      { count, post }: lamp posts (a `post` column 2 blocks high with a lamp on top: the outdoor light
-//               sources, the commons lamps of the Flats)
+//               sources, the commons lamps of the Flats). Each lamp floods its light when the zone refreshes
+//               (about a millisecond), so they stay few
 //   plateaus    the chance of one deliberate 3D-only plateau (and the same chance again of a second; at most
 //               SURFACE_RULES.jumpSpots): 2 blocks above everything round it, a stepping stone a tile's gap away,
 //               a reward on top (§5.3 item 8)
@@ -135,7 +136,6 @@ export const BIOMES = {
     rocks: { block: "METAL", count: [2, 5], tall: 0.6 },
     ponds: { count: [0, 1], radius: [2, 2] },
     props: { count: [4, 10], kinds: [["scrap", 4], ["bones", 1]] },
-    lights: { count: [0, 2], post: "METAL" },
     plateaus: 0.35, ramps: [1, 2], caches: 0.4,
     spawns: [["lensSentry", 2], ["beatSpider", 3], ["girderGolem", 1], ["rustbackBrute", 3], ["rustOoze", 2]], wildlife: [2, 4],
   },

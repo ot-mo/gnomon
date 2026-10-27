@@ -29,7 +29,7 @@
 // dressing (gen/biomes: ponds, ramps up the cliffs, 3D-only plateaus, rocks, lamps, props, and what the
 // biome adds of its own); the landmark's plan, its builder (gen/biomes/landmarks.js, while it has no plan)
 // or the site; the dungeon entrance (a STAIRS block, zone.entrance) and, when a dungeon lies below,
-// sinkholes inside zone.dungeonRect; last, the wildlife, on ground the anchor reaches.
+// sinkholes inside zone.dungeonRect; last, once the zone validates, the wildlife, on ground the anchor reaches.
 //
 // zone.gen (what generation knew, not saved) adds for 2b: planned (columns whose faces of 2 or more are
 // meant: ramps, plateaus, posts), jump (a plateau's top: ground only 3D reaches), plateaus, ramps and caches
@@ -115,6 +115,11 @@ function* zoneSteps(run, wx, wy) {
     yield "retry";
   }
   zone.problems = problems;   // empty unless every attempt failed (check-landmarks reports it)
+  // The wildlife, once the zone stands: the biome's spawn table, on map ground the anchor reaches (the reach
+  // validateSurface measured; creatures change no block, so the verdict holds).
+  const { dress, mapReach } = zone.gen;
+  if (dress.biome.spawns?.length) populate(dress, mapReach);
+  delete zone.gen.dress; delete zone.gen.mapReach;
   return zone;
 }
 
@@ -409,15 +414,10 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
   yield "refresh";
   zone.spawn = spawn || pickAnchor(zone, hub, scenery, ctx.jump);
 
-  // 10. Wildlife: the biome's spawn table, on map ground the anchor reaches (the map's rules, as validateSurface).
-  if (ctx.biome.spawns?.length) {
-    const open = standWith(zone, "open");
-    for (let i = 0; i < n; i++) if (zone.kind[i] === KIND.WALL) open[i] = -1;
-    populate(ctx, reachable(open, ZW, ZD, Math.floor(zone.spawn.x), Math.floor(zone.spawn.y), PLAYER_STEP_UP, PLAYER_DROP));
-  }
+  // (The wildlife comes once the zone validates, zoneSteps: it needs the map's reach, which validation measures.)
   zone.gen = { ports: base.ports.map((p) => ({ ...p, tiles: Array.from({ length: p.width }, (_, k) => portTile(p, k)) })),
                keyPoints, scenery, cliff: base.cliff, worldWater: base.water, plan, planAt, hub, entranceGated, local,
-               planned: ctx.planned, jump: ctx.jump, ...ctx.made };
+               planned: ctx.planned, jump: ctx.jump, ...ctx.made, dress: ctx };
   return zone;
 }
 
@@ -634,7 +634,8 @@ export function validateSurface(zone) {
   for (let i = 0; i < w * d; i++) if (kind[i] === KIND.WALL) open[i] = -1;   // the map never walks on a wall
   const ax = Math.floor(zone.spawn.x), ay = Math.floor(zone.spawn.y);
   const dist = reachable(open, w, d, ax, ay, PLAYER_STEP_UP, PLAYER_DROP);
-  const scenery = g?.scenery || new Uint8Array(w * d);
+  if (g?.dress) g.mapReach = dist;   // (during generation: the wildlife's ground, zoneSteps)
+  const scenery = g?.scenery || new Uint8Array(w * d), jump = g?.jump || new Uint8Array(w * d);
   const ground = (i) => stand[i] >= 0 && !scenery[i] && kind[i] !== KIND.WALL;
   const reach = (x, y) => x >= 0 && y >= 0 && x < w && y < d && dist[x + y * w] >= 0;
   if (stand[ax + ay * w] < 0) problems.push("the anchor is not on standable ground");
@@ -654,7 +655,7 @@ export function validateSurface(zone) {
       if (!zone.hasBelow || !r || x < r.ox || y < r.oy || x >= r.ox + r.w || y >= r.oy + r.d) { problems.push(`a hole at (${x}, ${y}) outside the dungeon's rect`); break; }
     }
     if (stand[i] >= 0 && !scenery[i] && stand[i] > FLOOR_Z + R.maxStand) high++;
-    if (!ground(i) || g?.jump?.[i]) { if (stand[i] >= 0 && !scenery[i]) ground3d++; continue; }   // (a plateau's top: 3D's)
+    if (!ground(i) || jump[i]) { if (stand[i] >= 0 && !scenery[i]) ground3d++; continue; }   // (a plateau's top: 3D's)
     total++;
     if (dist[i] >= 0) reached++;
   }
