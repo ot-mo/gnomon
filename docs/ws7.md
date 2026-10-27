@@ -205,7 +205,14 @@ campaign.js) and `zone:prepare` (villagequests.js); the creature types of `conte
     Bible §9.4's heights (stilts, ledges, canopy platforms, the Stacks' storeys) are a style's blocks only: every
     village stands on the datum (`docs/sessions/ws7.md` 7b deviation 3). The dish, the commons lamp's services and the
     shrine's rewards are content.
-17. **`tests/checks/determinism.js` (P0's), optional:** add `src/story/villages.js`, `questplan.js` and
+17. **The dependency table, pray quests and murals by view (WS3, WS8):** on this branch only a mosaic shrine's prayer
+    can be made in play. A relief or pillar shrine and a lintel are read through `inspect` in 3D, which only WS8's look
+    cursor sends (the map hover is the only sender here). A rune shrine and an empty village's doorstep rune are
+    outdoors: they read in the dark, which needs WS3's day and night (`light.js daylight` is 1 at every hour on this
+    branch). The hall's doorstep rune is under a roof, so it reads by day with the torch out. After the merge, rerun
+    `node tools/check-story.mjs`, then in the browser: a pray quest at a relief shrine by L in 3D, and one at a rune
+    shrine at night with the torch out. check-story's pray case is a pillar shrine (seed 1), by the look cursor's payload.
+18. **`tests/checks/determinism.js` (P0's), optional:** add `src/story/villages.js`, `questplan.js` and
     `village-site.js` to its `Math.random` scan; check-story scans them meanwhile.
 
 ## Handoff
