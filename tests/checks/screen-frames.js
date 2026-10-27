@@ -78,13 +78,17 @@ function framesOf({ game, startRun, inputHandlers, addStatus, frameHash, seedRan
 // coordinator for its workstream and confirmed by the integrator at the merge; the fixture is never re-recorded):
 //   WS3 (p2-ws3): the victory card, drawn over the outdoor map; tests/checks/render.js checks the card itself.
 //   WS5 (p2-ws5): the 8 inventory frames; tests/checks/items.js checks the new inventory in the same 8 states.
+//   WS9 (p2-ws9): the 4 pause cards in 3D (the user's decision, 2026-10-27); tests/checks/save.js section 20 checks the card in those states.
 const WS5_INVENTORY = "the inventory screen is rewritten by WS5 (TECH_DESIGN §2: inventory.js rewritten); tests/checks/items.js holds it";   // WS5
+const WS9_PAUSE = "the pause card names L look, V fire, the hotbar and the map legend's key (the user's decision, 2026-10-27); tests/checks/save.js section 20 holds the card in this state, and the other frames and golden (b) stay held";   // WS9
 export const NOT_COMPARED = new Map([
   ["victory card", "drawn over the temple span's surface map, which WS3's outdoor looks change; the underground frames and golden (b) stay held"],
   ["seed 99 depth 3 3d inventory", WS5_INVENTORY], ["seed 99 depth 3 map inventory", WS5_INVENTORY],     // WS5
   ["seed 99 depth 11 3d inventory", WS5_INVENTORY], ["seed 99 depth 11 map inventory", WS5_INVENTORY],   // WS5
   ["seed 31 depth 3 3d inventory", WS5_INVENTORY], ["seed 31 depth 3 map inventory", WS5_INVENTORY],     // WS5
   ["seed 31 depth 11 3d inventory", WS5_INVENTORY], ["seed 31 depth 11 map inventory", WS5_INVENTORY],   // WS5
+  ["seed 99 depth 3 3d pause card", WS9_PAUSE], ["seed 99 depth 11 3d pause card", WS9_PAUSE],             // WS9
+  ["seed 31 depth 3 3d pause card", WS9_PAUSE], ["seed 31 depth 11 3d pause card", WS9_PAUSE],             // WS9
 ]);
 
 export function checkScreenFrames(frames, fixture) {
