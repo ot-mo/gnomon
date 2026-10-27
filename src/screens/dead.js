@@ -90,7 +90,7 @@ function drawRecap(game) {
 
 const showing = (game) => (game.uiTime || 0) - recap.since >= RECAP_AFTER;
 function act(game, code) {
-  if (code === "KeyR") { const mode = recap.mode; game.newRun(); if (game.state) game.state.mode = mode; return true; }
+  if (code === "KeyR") { game.newRun({ mode: recap.mode }); return true; }
   if (!showing(game)) return false;
   if (code === "KeyT") { import("./title.js").then((t) => t.openTitle(game)); return true; }
   if (code === "KeyC" && recap.ending === "checkpoint" && recap.restored && !recap.waking) {
@@ -113,8 +113,8 @@ registerScreen("won", {
   draw(game) { drawPlay(game); drawWon(game); },
   key(game, code, repeat) {
     if (code !== "KeyR") return false;
-    if (!repeat) game.newRun();
+    if (!repeat) game.newRun({ mode: game.state?.mode });   // (the run's mode carried on, as the death card's R does)
     return true;
   },
-  mouse(game, button, cell) { if (button === 0 && at(cell)?.key === "KeyR") game.newRun(); },
+  mouse(game, button, cell) { if (button === 0 && at(cell)?.key === "KeyR") game.newRun({ mode: game.state?.mode }); },
 });

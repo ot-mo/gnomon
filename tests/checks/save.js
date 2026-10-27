@@ -484,13 +484,17 @@ async function checkSections({ game, startRun, inputHandlers, runSession, fresh,
     // The first item: "New quick game" on p0-done, "New game" once WS4's wizard is registered (p2-ws4a), which it opens
     // with the title's seed and mode (WS4 #12; at the WS9 merge); the wizard by Enter alone starts the run in that mode.
     const wizard = !!screenFor("create"), first = wizard ? "New game" : "New quick game";
+    // The run's mode is in its state from the start, before its first zone:enter (and so its first save): startRun's
+    // { mode } (WS4 #4 with WS9 #2, at the WS9 merge; before, it was set after startRun returned).
+    const atStart = [], offStart = on("zone:enter", (g, ev) => { if (ev.how === "start") atStart.push(g.state?.mode); });
     const begun = async (how, want) => {
+      atStart.length = 0;
       if (wizard) {
         if (game.mode !== "create") { fail(`${how} on "${first}": mode ${game.mode}, not the wizard`); return; }
         await throughWizard(game, key);
       }
-      if (game.mode !== "story" || !game.player || game.zone?.key !== "0,0,0" || game.state?.mode !== want)
-        fail(`${how} on "${first}": mode ${game.mode}, zone ${game.zone?.key}, the run's mode ${game.state?.mode} (want ${want})`);
+      if (game.mode !== "story" || !game.player || game.zone?.key !== "0,0,0" || game.state?.mode !== want || atStart[0] !== want)
+        fail(`${how} on "${first}": mode ${game.mode}, zone ${game.zone?.key}, the run's mode ${game.state?.mode} (at its first zone:enter ${atStart[0]}; want ${want})`);
       else ways++;
     };
     await openTitle(game);
@@ -506,6 +510,7 @@ async function checkSections({ game, startRun, inputHandlers, runSession, fresh,
     await openTitle(game);
     click(first);
     await begun("a click", "pilgrim");
+    offStart();
     await openTitle(game); key("ArrowDown"); key("Enter");   // (the mode line once more: One Wick again, as section 17 expects it)
     // Continue: by ↓ Enter, by 2, by a click; each loads the newest slot.
     for (const how of ["keys", "digit", "click"]) {

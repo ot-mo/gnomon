@@ -35,7 +35,7 @@ import { makeBody } from "../body.js";
 import { ITEM_KINDS, addToInventory } from "../items.js";
 import { setPurse, purseCap, CURRENCY } from "../currency.js";
 import { addRep } from "../factions.js";
-import { quickPlayer, nextRunPlayer } from "../player.js";
+import { quickPlayer } from "../player.js";
 import { startRun, randomSeed } from "../game.js";
 import { GENOTYPES } from "../content/genotypes.js";
 import { BACKGROUNDS, LEVELS } from "../content/backgrounds.js";
@@ -217,10 +217,7 @@ export function suggestName(genotype, background, rng) {
 
 // --- Starting the run ------------------------------------------------------------------------------------------
 export function beginRun(game, choices, { seed } = {}) {
-  const p = makeCharacter(choices);
-  nextRunPlayer(p);   // startRun's makePlayer() hands this character to the run instead of the quick start's
-  try { startRun(seed ?? randomSeed()); } finally { nextRunPlayer(null); }
-  game.state.mode = choices.mode;   // (WS9's title newGame does the same; docs/ws4.md, integration requests)
+  startRun(seed ?? randomSeed(), undefined, { mode: choices.mode, player: makeCharacter(choices) });
   for (const [faction, n] of Object.entries(BACKGROUNDS[choices.background].rep || {})) addRep(game, faction, n, "background");
   const village = BACKGROUNDS[choices.background].villageRep;   // the Bent villages, one pool until WS7 gives each its faction
   if (village) addRep(game, "bentVillages", village, "background");

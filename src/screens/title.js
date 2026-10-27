@@ -96,8 +96,7 @@ export function openTitle(game) {
 }
 
 export function newGame(game, { seed = randomSeed(), mode = "oneWick" } = {}) {
-  startRun(seed);
-  game.state.mode = RUN_MODES[mode] ? mode : "oneWick";   // (before the run's first save, half a second on)
+  startRun(seed, undefined, { mode: RUN_MODES[mode] ? mode : "oneWick" });   // (in the run's state from its start)
   return game;
 }
 

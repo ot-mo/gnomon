@@ -28,14 +28,8 @@ export function jumpSpeed(p) {
 const FLY_SPEED = 4;               // blocks per second up (Space) or down (C) while flying
 const EPS = 0.001;
 
-// A new run's player (game.js startRun): the quick start's, or the character the creation wizard made for this
-// run (progression/chargen.js beginRun hands it over with nextRunPlayer, and takes it back after startRun).
-let madeForNextRun = null;
-export function nextRunPlayer(p) { madeForNextRun = p; }
-export function makePlayer() {
-  if (madeForNextRun) { const p = madeForNextRun; madeForNextRun = null; return p; }
-  return quickPlayer();
-}
+// A new run's player when none is handed in (game.js startRun's `player`: the creation wizard's): the quick start's.
+export function makePlayer() { return quickPlayer(); }
 
 // The quick start: the parent game's hero (and the shape every made character starts from).
 export function quickPlayer() {

@@ -86,7 +86,7 @@ export const game = {
   onCube() { onCube(this); },                    // you touched the Rotation Cube: the world turns
   onTalk(npc) { openTalk(this, npc); },
   forceMapView() { forceMapView(this); },        // pressed flat (status.js, bible §10.2): the map until it ends
-  newRun() { startRun(randomSeed()); },          // R on the death or victory card
+  newRun(opts) { startRun(randomSeed(), undefined, opts); },   // R on the death or victory card ({ mode }: carried on)
 
   // A tip shown once per run.
   hint(id, text) {
@@ -217,14 +217,15 @@ export function resumeRun(game, { seed, run, state, player, view }) {
   game.paused = false;
 }
 
-// A new game on `seed` (quick start: no character to make yet), at the world's start landmark.
-export function startRun(seed, world = game.world) {
+// A new game on `seed`, at the world's start landmark. mode: the run mode (state.mode: WS9's title, WS4's wizard, R
+// on the death card); player: the character WS4's wizard made (progression/chargen.js beginRun), else the quick start's.
+export function startRun(seed, world = game.world, { mode = null, player = null } = {}) {
   game.seed = seed;
   game.run = buildRun(seed, world);
   // Day 1, 06:00; you start knowing the potion of healing.
   attachState(game, { seed, time: 0, world: { id: game.run.world.id, version: game.run.world.version }, uids: {}, zonePatches: {}, zoneLeft: {},
-                      ident: { known: { potion: { healing: 1 }, scroll: {} }, aura: {} } });
-  game.player = makePlayer();
+                      ident: { known: { potion: { healing: 1 }, scroll: {} }, aura: {} }, ...(mode ? { mode } : {}) });
+  game.player = player || makePlayer();
   if (world.startPurse) setPurse(game.player, world.startPurse);
   runLooks(game, seed);
   resetRuntime(game);
