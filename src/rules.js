@@ -47,7 +47,7 @@ const CORE = {
               // a rest of an hour clears the first two.
               secondWind: 300, firstBlock: 120, foldingStrike: 10, restClears: 3600 },
   price: { buy: 1.5, buyPerMod: 0.1, sell: 0.3, sellPerMod: 0.05, minBuy: 0.2,   // value × (1.5 − 0.1·EGO mod − step) …
-           levelStep: 15 },                                                  // … × (1 + level / 15) (currency.js priceLevel)
+           levelStep: 15, haggle: 0.8 },                                     // … × (1 + level / 15) (currency.js priceLevel); the Haggler × 0.8
   carry: { perStr: 15 },
   encumbrance: false,
   regen: { base: 60 },                                 // attribute set: 1 HP per base / (1 + 0.1 (TOU mod + WIL mod)) s

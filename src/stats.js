@@ -158,7 +158,9 @@ export function priceMul(game, e, trader = null) {
   if (legacy()) return { buy: hasKey(e.perks, "haggler") ? RULES.legacy.haggle : 1, sell: RULES.legacy.sellShare };
   const P = RULES.price, m = mod(e, "ego") + bonus(e, "price"), step = trader?.repStep || 0;
   const sell = Math.max(0, P.sell + P.sellPerMod * m + step / 2);
-  return { buy: Math.max(P.minBuy, sell, P.buy - P.buyPerMod * m - step), sell };
+  // The Haggler buys a fifth cheaper (bible §10.8), never under what the trader pays you (no buying to sell back).
+  const haggle = hasKey(e.perks, "haggler") ? P.haggle : 1;
+  return { buy: Math.max(P.minBuy, sell, (P.buy - P.buyPerMod * m - step) * haggle), sell };
 }
 
 export const contentLevel = (level) => Math.min(level, RULES.level.contentMax);

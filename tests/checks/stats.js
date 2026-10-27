@@ -215,6 +215,14 @@ export function checkStats({ game, startRun, inventory, mechanics, gate = null }
     e.attrs.wil = 40; expect("cooldown at WIL 40 (floor)", at(St.cooldownMul), 0.2);
     expect("buy at EGO 16", St.priceMul(game, e).buy, 1.5); expect("sell at EGO 16", St.priceMul(game, e).sell, 0.3);
     e.attrs.ego = 20; expect("buy at EGO 20", St.priceMul(game, e).buy, 1.3); expect("sell at EGO 20", St.priceMul(game, e).sell, 0.4);
+    // The Haggler (WS4's integration request 7): a fifth off buying, never under what the trader pays you.
+    {
+      const perks = e.perks;
+      e.perks = { haggler: 1 }; St.invalidateStats(e);
+      expect("the Haggler's buy at EGO 20", St.priceMul(game, e).buy, 1.3 * 0.8); expect("the Haggler's sell at EGO 20", St.priceMul(game, e).sell, 0.4);
+      e.attrs.ego = 40; expect("the Haggler's buy at EGO 40 (the sell price)", St.priceMul(game, e).buy, St.priceMul(game, e).sell);
+      e.attrs.ego = 20; e.perks = perks; St.invalidateStats(e);
+    }
     expect("mental level at EGO 20, level 1", at(St.mentalLevel), 3);
     expect("carry at STR 16", at(St.carryCap), 240);
     undoSet();
