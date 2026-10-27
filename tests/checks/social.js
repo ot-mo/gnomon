@@ -1110,6 +1110,11 @@ export async function run(env) {
       if (s !== "any" && !liquids.liquidDef(s)) fail(`${f.id}'s sacrament ${s} isn't in content/liquids.js`);
     }
     if (!liquids.isSacrament("unlit", "brine") || liquids.isSacrament("assize", "brine") || !liquids.isSacrament("noonVigil", "water")) fail("isSacrament");
+    // A vial never backs or holds money (DECISIONS: glim is a counter): vials of glim in the pack aren't funds, can't
+    // pay, and sell as glass.
+    p().funds = 5; p().inv = [{ kind: "vial", effect: "glim", count: 3 }];
+    if (currency.funds(p()) !== 5 || currency.pay(game, p(), 6) || p().inv[0].count !== 3) fail(`vials of glim count as money: funds ${currency.funds(p())}`);
+    if (merchants.priceOf(game, p().inv[0], null, "sell") !== merchants.priceOf(game, { kind: "vial", effect: "" }, null, "sell")) fail("a vial of glim sells for more than its glass");
     const L = (await m("content/liquids.js")).LIQUIDS;
     stats.liquids = `${Object.keys(L).length} liquids (every faction's sacrament among them); a vial filled with brine; fresh water +2 HP; ink, Flat`;
   }
