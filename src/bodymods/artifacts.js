@@ -288,8 +288,8 @@ const EFFECTS = {
     if (!c || !touchable(game, c) || ghostHidden(game, c)) { game.log("The glimgun spits a bolt of burning glim into the dark.", [255, 160, 70]); return true; }
     const vs = elementVs(c, "fire"), dmg = Math.max(1, Math.round(d6(2) * (vs === "resist" ? 0.5 : vs === "weak" ? 1.5 : 1)));
     game.log(`A bolt of burning glim hits the ${c.name}${vs === "weak" ? " (it burns well)" : vs === "resist" ? " (it barely singes)" : ""}.`, [255, 160, 70]);
-    applyDamage(game, c, dmg, { color: [255, 160, 70] });
-    if (c.hp > 0 && vs !== "resist") addStatus(game, c, "burning", { t: 3 });
+    applyDamage(game, c, dmg, { src: p, color: [255, 160, 70] });
+    if (c.hp > 0 && vs !== "resist") addStatus(game, c, "burning", { t: 3, src: "player" });
     return true;
   },
   foldKnife(game, p, it, target) {
@@ -334,7 +334,7 @@ const EFFECTS = {
       if (Math.abs((c.x - p.x) * dy - (c.y - p.y) * dx) <= 0.5 + (c.w || 0.6) / 2) hits.push(c);
     }
     game.log(hits.length ? `A black beam lances out and through the ${hits.map((c) => c.name).join(", ")}.` : "A black beam lances out and hits nothing.", [190, 170, 255]);
-    for (const c of hits) applyDamage(game, c, d6(3), { color: [190, 170, 255] });
+    for (const c of hits) applyDamage(game, c, d6(3), { src: p, color: [190, 170, 255] });
     return true;
   },
   stillDial(game, p) {

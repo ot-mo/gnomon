@@ -381,7 +381,7 @@ export function updateClouds(game, dt) {
   for (const c of zone.clouds) {
     c.time -= dt;
     for (const m of bodies(game))
-      if (touchable(game, m) && Math.hypot(m.x - c.x, m.y - c.y) <= c.r && Math.abs(m.z - c.z) < 2.5) addStatus(game, m, "poisoned", { t: 2, mag: 2, stack: "max" });
+      if (touchable(game, m) && Math.hypot(m.x - c.x, m.y - c.y) <= c.r && Math.abs(m.z - c.z) < 2.5) addStatus(game, m, "poisoned", { t: 2, mag: 2, stack: "max", src: c.src });
     if (touchesYou(game, null) && Math.hypot(p.x - c.x, p.y - c.y) <= c.r && Math.abs(p.z + 1 - c.z) < 2.5) {
       if (!hasStatus(p, "poisoned")) game.log("You're in the poison cloud!", [150, 210, 80]);
       addStatus(game, p, "poisoned", { t: 2, stack: "max" });

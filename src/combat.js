@@ -208,7 +208,7 @@ const flatSoak = (m, dmg, pierce = false) => Math.max(1, dmg - (pierce ? 0 : m.a
 const soakRoll = (rng, avv) => (avv >= 0 ? Math.floor(rng() * (avv + 1)) : -Math.floor(rng() * (-avv + 1)));
 
 // Damage from something other than a blow (a bomb, spikes, a scroll): no to-hit roll. Returns what it did.
-export function applyDamage(game, m, dmg, { src = game.player, color = [255, 255, 255], label = null, deathText = null } = {}) {
+export function applyDamage(game, m, dmg, { src = null, color = [255, 255, 255], label = null, deathText = null } = {}) {
   if (!touchable(game, m, src || game.player)) return 0;
   if (CREATURE_TYPES[m.type].guardian === "colossus" && !colossusCore(game, m)) dmg = Math.min(dmg, 2);
   dmg = flatSoak(m, dmg);
@@ -216,8 +216,9 @@ export function applyDamage(game, m, dmg, { src = game.player, color = [255, 255
   if (m.hp <= 0) killMonster(game, m, deathText || `You slay the ${m.name}.`, true, isPlayer(game, src), src);
   return dmg;
 }
-// (The 0B name, for spikes, bombs and scrolls.)
-export const damageMonster = (game, m, dmg, color, deathText) => applyDamage(game, m, dmg, { color, deathText });
+// (The 0B name, for spikes and bombs: yours, as in the parent. applyDamage itself has no source unless one is
+// given: harm that isn't yours moves no rep, social/reputation.js. WS10's spikes are to pass none.)
+export const damageMonster = (game, m, dmg, color, deathText) => applyDamage(game, m, dmg, { src: game.player, color, deathText });
 
 // A blow that has landed on you (after the to-hit): the amulet, armour, thorns, venom, burns, drain.
 // The legacy order exactly (its Math.random draws). crit: null for the legacy set (hurtPlayer tells it the
@@ -320,11 +321,11 @@ function yourBladeLanded(game, p, m, dmg, { crit, el, vs, core, rng, soak, line 
     else game.log(`${line ? line(false) : `You ${crit ? "smash" : "hit"} the ${m.name} (${dmg}).`}${vs === "weak" ? " It's weak to that!" : ""}`, [230, 230, 230]);
     if (vs === "resist") game.log(`The ${m.name} shrugs off the ${{ fire: "flames", frost: "frost", shock: "lightning", holy: "light" }[el]}.`, [170, 170, 190]);
     else {
-      if (el === "fire") { if (!hasStatus(m, "burning")) game.log(`The ${m.name} catches fire!`, ELEMENTS.fire.color); addStatus(game, m, "burning", { t: 3, stack: "refresh" }); }
+      if (el === "fire") { if (!hasStatus(m, "burning")) game.log(`The ${m.name} catches fire!`, ELEMENTS.fire.color); addStatus(game, m, "burning", { t: 3, stack: "refresh", src: "player" }); }
       if (el === "frost") addStatus(game, m, "chilled", { t: 3, stack: "refresh" });
     }
     const poison = bonus(p, "poisonHit");
-    if (poison > 0) addStatus(game, m, "poisoned", { t: poison, mag: 2, stack: "max" });
+    if (poison > 0) addStatus(game, m, "poisoned", { t: poison, mag: 2, stack: "max", src: "player" });
   }
   if (el === "shock" && vs !== "resist") {
     // Lightning jumps to the nearest other creature within 3 tiles that you can see.
@@ -366,14 +367,14 @@ function legacyBlow(game, att, tgt, spec, ctx, result) {
     const crit = R() < RULES.legacy.crit;
     const base = roll(R, spec.dmg[0], spec.dmg[1]) + spec.plus;
     const name = tgt.name;
-    const dmg = applyDamage(game, tgt, base * (crit ? 2 : 1), { color: crit ? [255, 220, 80] : [255, 255, 255] });
+    const dmg = applyDamage(game, tgt, base * (crit ? 2 : 1), { src: p, color: crit ? [255, 220, 80] : [255, 255, 255] });
     game.log(`Your knife ${crit ? "sinks deep into" : "hits"} the ${name} (${dmg}).`, [220, 220, 230]);
     Object.assign(result, { crit, dmg, killed: tgt.hp <= 0 });
   } else if (isPlayer(game, att) && spec.kind === "missile") {   // (no parent counterpart: a thrown knife's rules)
     const crit = R() < RULES.legacy.crit;
     const base = roll(R, spec.dmg[0], spec.dmg[1]) + (spec.ench || 0);
     const name = tgt.name;
-    const dmg = applyDamage(game, tgt, base * (crit ? 2 : 1), { color: crit ? [255, 220, 80] : [255, 255, 255] });
+    const dmg = applyDamage(game, tgt, base * (crit ? 2 : 1), { src: p, color: crit ? [255, 220, 80] : [255, 255, 255] });
     game.log(`Your ${spec.noun || "shot"} ${crit ? "sinks deep into" : "hits"} the ${name} (${dmg}).`, [220, 220, 230]);
     Object.assign(result, { crit, dmg, killed: tgt.hp <= 0 });
     if (!result.killed && spec.onHit && game.zone.creatures.includes(tgt)) spec.onHit(game, tgt, result);

@@ -18,6 +18,7 @@ import { uidWhere, killUid } from "./zones.js";
 import { emit } from "./events.js";
 import { CREATURE_TYPES, spawnCreature, addCreature, removeCreature, isFlat, ghostHidden, canTalk } from "./creatures.js";
 import { hasKey } from "./keyset.js";
+import { membershipsOf } from "./factions.js";
 
 // What an elite leaves behind: always something, sometimes gear, a ring or an amulet.
 function eliteLoot(depth, luck = 0) {
@@ -28,13 +29,16 @@ function eliteLoot(depth, luck = 0) {
 
 // byPlayer: you killed it (by blade, fire or lightning), so you get its XP.
 // How a status hurts (status.js): you through hurtPlayer (quietly, as poison always did); a creature
-// flashes, and dies with the status's own line.
+// flashes, and dies with the status's own line. The XP is yours whoever gave it (the parent's rule); the kill
+// is yours (the "kill" event's src, so the rep) only when you gave it: src "player" on your blade's fire and
+// poison, your artifacts, your poison cloud. Nobody's: drowning, a trap's gas.
 setStatusHarm((game, e, n, id) => {
   const def = STATUS_DEFS[id];
   if (e === game.player) { game.hurtPlayer(n, def?.cause || id, true); return; }
   e.hp -= n;
   e.hurt = 0.1;
-  if (e.hp <= 0 && game.zone?.creatures.includes(e)) killMonster(game, e, def?.killed?.(e) || `The ${e.name} dies.`);
+  if (e.hp <= 0 && game.zone?.creatures.includes(e))
+    killMonster(game, e, def?.killed?.(e) || `The ${e.name} dies.`, true, true, e.status?.[id]?.src === "player" ? game.player : null);
 });
 
 export function killMonster(game, m, message, dropLoot = true, byPlayer = true, src = byPlayer ? game.player : null) {
@@ -78,7 +82,7 @@ export function killMonster(game, m, message, dropLoot = true, byPlayer = true, 
     for (const [x, y] of spots.slice(0, 2)) addCreature(zone, spawnCreature(t.splits, x, y, zone.stand[x + y * zone.w], { rng: Math.random, state: "chase", level: zone.level }));
     if (spots.length) game.log(`The ${m.name} splits in two!`, m.color);
   }
-  emit(game, "kill", { c: m, src, uid: m.uid ?? null, factions: m.factions || [] });
+  emit(game, "kill", { c: m, src, uid: m.uid ?? null, factions: membershipsOf(m).map(([id]) => id) });
 }
 
 // Monsters are solid: push the player out of any they overlap.

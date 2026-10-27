@@ -162,7 +162,7 @@ export function splash(game, effect, ctx) {
 
 Object.assign(SPLASH, {
   poison(game, { x, y, z, r }) {
-    game.zone.clouds.push({ x, y, z, r, time: 6, kind: "poison" });
+    game.zone.clouds.push({ x, y, z, r, time: 6, kind: "poison", src: "player" });   // (your throw: throwing.js shatter)
     game.log("A cloud of poison gas billows out!", [150, 210, 80]);
   },
   paralysis(game, { near, youToo, names }) {

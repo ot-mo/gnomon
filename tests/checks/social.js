@@ -454,6 +454,53 @@ export async function run(env) {
       }
       stats.throughCombat = got.join("; ");
     }
+    // Harm's source (request 2, at the merge): a Survey member dying of poison you gave (src "player": your blade's,
+    // your cloud's) is your kill, one dying of a trap's gas nobody's (no rep; the XP stays the parent's either way);
+    // the "kill" payload names the victim's factions; applyDamage given no source moves nothing.
+    {
+      const status = await m("status.js"), seen = [];
+      const off = events.on("kill", (g, e) => seen.push(e));
+      try {
+        const got = [];
+        for (const [how, src] of [["yours", "player"], ["a trap's", undefined]]) {
+          fresh(1234, { genotype: "bent" });
+          const P5 = p(), v = mob({ survey: 0.6, drovers: 0.4 }, "docile"), w = mob("survey", "docile");
+          Object.assign(v, { x: P5.x + 0.8, y: P5.y, z: P5.z, hp: 1 }); Object.assign(w, { x: P5.x + 0.8, y: P5.y + 0.5, z: P5.z });
+          creatures.addCreature(game.zone, v); creatures.addCreature(game.zone, w);
+          const r0 = F.repOf(game, "survey"), xp0 = P5.xp;
+          status.addStatus(game, v, "poisoned", { t: 30, mag: 2, src });
+          for (let k = 0; k < 40 && game.zone.creatures.includes(v); k++) status.tickStatuses(game, v, 0.25);
+          const dead = !game.zone.creatures.includes(v), kill = seen.find((e) => e.c === v);
+          got.push(`${how} poison: survey ${r0} → ${F.repOf(game, "survey")}, xp +${P5.xp - xp0}, factions ${kill?.factions?.join("+")}`);
+          const want = src ? r0 + Math.round(rep.REP_RULES.killPenalty * 0.6) : r0;
+          if (!dead || F.repOf(game, "survey") !== want || !(P5.xp > xp0) || kill?.factions?.join() !== "survey,drovers")
+            fail(`a death by ${how} poison: ${got.at(-1)}, dead ${dead} (want survey ${want}, some XP, factions survey+drovers)`);
+        }
+        fresh(1234, { genotype: "bent" });
+        const P6 = p(), v = mob("survey", "docile"), w = mob("survey", "docile");
+        Object.assign(v, { x: P6.x + 0.8, y: P6.y, z: P6.z, hp: 500, maxHp: 500 }); Object.assign(w, { x: P6.x + 0.8, y: P6.y + 0.5, z: P6.z });
+        creatures.addCreature(game.zone, v); creatures.addCreature(game.zone, w);
+        const r0 = F.repOf(game, "survey");
+        combat.applyDamage(game, v, 3);
+        if (F.repOf(game, "survey") !== r0 || v.brain?.grudges || w.brain?.grudges)
+          fail(`applyDamage with no source: survey ${r0} → ${F.repOf(game, "survey")}, grudges ${JSON.stringify([v.brain?.grudges, w.brain?.grudges])}`);
+        // Your thrown poison's cloud marks the poison yours; a trap's gas (no src) leaves it nobody's.
+        {
+          const fx = await m("effects.js"), throwing = await m("throwing.js");
+          fresh(1234, { genotype: "bent" });
+          const P7 = p(), a = mob("survey", "docile"), b = mob("survey", "docile");
+          Object.assign(a, { x: P7.x + 4, y: P7.y, z: P7.z }); Object.assign(b, { x: P7.x - 4, y: P7.y, z: P7.z });
+          creatures.addCreature(game.zone, a); creatures.addCreature(game.zone, b);
+          fx.splash(game, "poison", { x: a.x, y: a.y, z: a.z + 1, r: 1.5, near: [], youToo: false, names: [] });
+          game.zone.clouds.push({ x: b.x, y: b.y, z: b.z + 1, r: 1.5, time: 8, kind: "poison" });
+          throwing.updateClouds(game, 0.1);
+          const sa = status.statusOf(a, "poisoned")?.src, sb = status.statusOf(b, "poisoned");
+          got.push(`clouds: yours ${sa}, a trap's ${sb?.src ?? null}`);
+          if (sa !== "player" || !sb || sb.src) fail(`poison clouds: your thrown one's poison src ${sa} (want player), a trap's ${sb ? sb.src : "no poison"} (want none)`);
+        }
+        stats.harmSource = got.join("; ");
+      } finally { off(); }
+    }
     stats.offend = `follower's blow ${rep.REP_RULES.attackPenalty}, at the hostile 0, unseen 0`;
   }
 
