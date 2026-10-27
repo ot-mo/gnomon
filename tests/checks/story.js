@@ -197,6 +197,13 @@ export async function run(env) {
     for (let l = lv0; l < p.level; l++) gained += xpToNext(l);
     if (journal.journalOf(game).triangulated["ishvalet:3"] === undefined || gained !== want || journal.journalOf(game).notes.length !== notes0 + 1)
       fail(`three accounts: triangulated ${journal.journalOf(game).triangulated["ishvalet:3"]}, XP +${gained} (want ${want}), notes ${journal.journalOf(game).notes.length - notes0}`);
+    // The journal keeps history ids by year (§2.14), whatever order they were learned in.
+    SEC.learnSecret(game, "hist:noon:2:deep", "talk", { quiet: true });
+    SEC.learnSecret(game, "hist:ammaruth:1:dark", "talk", { quiet: true });
+    SEC.learnSecret(game, "hist:ishvalet:1:flat", "talk", { quiet: true });
+    const order = journal.journalOf(game).order.history.join();
+    if (order !== "hist:ishvalet:1:flat,hist:ishvalet:3:flat,hist:ishvalet:3:deep,hist:ishvalet:3:dark,hist:ammaruth:1:dark,hist:noon:2:deep")
+      fail(`order.history: ${order}`);
     // The cult pass, on a real-world run (learnSecret needs only the run, the journal and the log).
     const keep = { run: game.run, state: game.state.journal };
     game.run = RUN.buildRun(42, real);

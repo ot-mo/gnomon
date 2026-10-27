@@ -152,6 +152,13 @@ export function muralSecret(run, text) {
   return MURALS.get(run).get(text) || null;
 }
 
+// When an account's event happened, for the journal's order: its year; Noon's after every Hour's, in her order.
+function dateOf(run, id) {
+  const def = secretDef(run, id);
+  if (def?.ref?.noon) return 1e6 + def.ref.noon;
+  return def ? historyOf(run, def).e?.year ?? 2e6 : 2e6;
+}
+
 // --- Learning -------------------------------------------------------------------------------------------------------
 export function learnSecret(game, id, source = "talk", { quiet = false } = {}) {
   const def = secretDef(game.run, id);
@@ -165,7 +172,10 @@ export function learnSecret(game, id, source = "talk", { quiet = false } = {}) {
     if (!quiet) game.log?.(`You learn where ${secretTitle(game.run, def)} lies: span (${def.at.wx}, ${def.at.wy}). (J: journal)`, [150, 220, 255]);
     startVisit(game, def, quiet);
   } else if (def.kind === "history") {
-    if (!J.order.history.includes(id)) J.order.history.push(id);
+    if (!J.order.history.includes(id)) {   // §2.14: ids by year (Noon's after the Hours'; a flat, deep, dark account in that order)
+      J.order.history.push(id);
+      J.order.history.sort((a, b) => dateOf(game.run, a) - dateOf(game.run, b) || READINGS.indexOf(a.split(":").pop()) - READINGS.indexOf(b.split(":").pop()));
+    }
     if (!quiet) game.log?.(`A reading for your journal: ${secretTitle(game.run, def)}. (J: journal)`, [150, 220, 255]);
     triangulate(game, def);
   }
