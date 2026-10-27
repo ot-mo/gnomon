@@ -1176,6 +1176,21 @@ async function ws9Sections(ctx) {
       if (left.join() !== "0,0,0") fail(`a run saved into another run's slot id: the slot holds ${left.join(" ")} (want 0,0,0, the new run's)`);
       stats.reusedSlot = `a run saved into another run's slot id: the slot holds ${left.join(" ")} (the old run's 0,0,1-0,0,3 gone)`;
     }
+    // A load that fails (the zone you were in won't read) marks nothing: the slot is as it was.
+    {
+      const bs = memoryAdapter();
+      freshRun(1234, { store: null });
+      const bm = await saveGame(game, { store: bs, clean: true });
+      const rec = await bs.get("zones", [bm.id, "0,0,0"]);
+      await bs.put("zones", { ...rec, blocks: { raw: "AAAA" } });
+      startRun(4321); game.pages = null;
+      let err = "";
+      try { await loadGame(bm.id, { store: bs }); } catch (e) { err = e.message; }
+      await tick(5);
+      const after = await bs.get("slots", bm.id);
+      if (!err || after.live !== null || after.unclean !== 0) fail(`a load that failed (${err || "it loaded"}): the slot's live ${after.live}, unclean ${after.unclean}`);
+      stats.failedLoad = `a load whose zone wouldn't read (${err.slice(0, 60)}) left the slot as it was (live null, unclean 0)`;
+    }
     stats.exportImport = `export → import → load ${problems.length === n0 ? "identical" : "DIFFERENT"}; the same file twice: 2 slots, twice more at once: 4; refused: ${bad.join(", ")} and a file that isn't JSON`;
     stats.acrossStores = res.join("; ");
     stats.worlds = `the real world's run (${rks.join(" ")}) loaded ${problems.length === n2 ? "identical" : "DIFFERENT"} on "${game.run.world.id}" with new runs still on "${testWorld.world.id}"; an unknown world refused`;

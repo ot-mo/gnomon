@@ -608,11 +608,11 @@ export async function loadGame(slotId, { game = theGame, store, version = VERSIO
   for (const r of zones) { sv.committed.add(r.key); sv.stored.set(r.key, r.savedAt); }
   // Keys with a copy, or first written after the checkpoint: their next write keeps nothing.
   if (sv.cp) sv.kept = new Set([...(await st.list("checkpointZones", { slot: slotId })).map((r) => r.key), ...zones.filter((r) => (r.cp ?? 0) >= sv.cp).map((r) => r.key)]);
-  // This session holds the slot now (and the count goes in at once).
-  submit(game, sv, { rows: [{ op: { op: "put", store: "slots", value: { ...stored, live: SESSION, unclean } } }] }).catch((e) => failed(game, sv, "marking the slot live", e));
   const p = game.player;
   const entered = await changeZone(game, where, { how: "load", at: { x: p.x, y: p.y, z: p.z, yaw: p.yaw }, keepFacing: true, keepMotion: true });
   if (!entered) throw new Error(`loadGame: couldn't read ${where} back`);
+  // This session holds the slot now, the zone read (and the count goes in at once). A load that failed marks nothing.
+  submit(game, sv, { rows: [{ op: { op: "put", store: "slots", value: { ...stored, live: SESSION, unclean } } }] }).catch((e) => failed(game, sv, "marking the slot live", e));
   setMode(game, playMode(game), null, { pointer: false });
   if (game.view !== "map") pushMode(game, "pause", null, { pointer: false });
   SAVE_STATS.loads++;
