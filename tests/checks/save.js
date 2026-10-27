@@ -1160,6 +1160,18 @@ async function ws9Sections(ctx) {
     let unknown = "";
     try { await loadGame("nowhere", { store: rw }); } catch (e) { unknown = e.message; }
     if (!/world "nowhere"/.test(unknown)) fail(`a save of an unknown world: ${unknown || "loaded"}`);
+    // A run saved into a slot id another run used: none of that run's rows stay.
+    {
+      const os = memoryAdapter();
+      freshRun(1234, { store: null });
+      for (const k of ["0,0,1", "0,0,2", "0,0,3"]) { game.debug.enterZone(k, "down"); playing(game, "map"); }
+      await saveGame(game, { store: os, slotId: "slot-A" });
+      freshRun(55, { store: null });
+      await saveGame(game, { store: os, slotId: "slot-A" });
+      const left = await rowsOf(os, "slot-A");
+      if (left.join() !== "0,0,0") fail(`a run saved into another run's slot id: the slot holds ${left.join(" ")} (want 0,0,0, the new run's)`);
+      stats.reusedSlot = `a run saved into another run's slot id: the slot holds ${left.join(" ")} (the old run's 0,0,1-0,0,3 gone)`;
+    }
     stats.exportImport = `export → import → load ${problems.length === n0 ? "identical" : "DIFFERENT"}; the same file twice: 2 slots; refused: ${bad.join(", ")} and a file that isn't JSON`;
     stats.acrossStores = res.join("; ");
     stats.worlds = `the real world's run (${rks.join(" ")}) loaded ${problems.length === n2 ? "identical" : "DIFFERENT"} on "${game.run.world.id}" with new runs still on "${testWorld.world.id}"; an unknown world refused`;

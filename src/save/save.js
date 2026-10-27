@@ -162,7 +162,9 @@ function savingFor(game, store, slotId) {
   if (sv && sv.store === store && (!slotId || sv.slotId === slotId)) return sv;
   // A new slot (or store) for this run carries its checkpoint and its unclean count.
   const id = slotId || newSlotId(game);
-  return (game.saving = newSaving(id, Date.now(), store, sv ? { cp: sv.cp, cpRecord: sv.cpRecord && { ...sv.cpRecord, id }, unclean: sv.unclean } : {}));
+  game.saving = newSaving(id, Date.now(), store, sv ? { cp: sv.cp, cpRecord: sv.cpRecord && { ...sv.cpRecord, id }, unclean: sv.unclean } : {});
+  game.saving.fresh = true;   // (its first write clears the slot: an id given may be another run's)
+  return game.saving;
 }
 
 const pend = (sv, key, savedAt) => { sv.pending.set(key, (sv.pending.get(key) || 0) + 1); sv.stored.set(key, savedAt); };
@@ -344,7 +346,10 @@ function writeSave(game, { reason = "manual", store, slotId, clean = false, chec
     autoFor(game).want = null;
     for (const w of waiting.splice(0)) (w.game === game ? answered : waiting).push(w);
   }
-  const job = { rows: [...(cpSave ? [{ op: { op: "clear", store: "checkpointZones", slot: sv.slotId } }] : []), ...carry, ...held, ...rows, { slot: json }],
+  // A slot this run starts writing to: whatever rows it held (another run's, saved under that id before) go first.
+  const clear = sv.fresh ? ["zones", "checkpointZones"].map((store) => ({ op: { op: "clear", store, slot: sv.slotId } })) : [];
+  sv.fresh = false;
+  const job = { rows: [...clear, ...(cpSave && !clear.length ? [{ op: { op: "clear", store: "checkpointZones", slot: sv.slotId } }] : []), ...carry, ...held, ...rows, { slot: json }],
                 checkpoint: cpSave ? n : 0, epoch: n, before: moved ? old.queue : null };
   job.after = (e) => {
     if (e && clean) { sv.quitting = false; waiting.push(...answered); }   // (the session goes on: so do they)
