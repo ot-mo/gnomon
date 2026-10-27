@@ -559,6 +559,18 @@ async function villages7b(env, { fail, stats, test, real, json, startRun, game }
   const leader = z.creatures.find((c) => c.villageRole === "leader");
   if (!leader.named || !leader.readings?.length || leader.readings.some((id) => !SEC.secretDef(game.run, id)) || !Array.isArray(leader.opinions) || !Array.isArray(leader.teaches))
     fail(`the leader for the Kindling: ${json({ named: leader.named, readings: leader.readings, opinions: leader.opinions, teaches: leader.teaches })}`);
+  // A save of the village zone and back (the WS9 codec): the cast keeps its village, role and the Kindling's fields; the
+  // murals, zone.village and the flags come back; the giver still offers its quest.
+  {
+    const codec = await env.src("save/codec.js");
+    const rec = await codec.finishZone(codec.snapshotZone(z, { slot: "check", savedAt: 1 }));
+    const back = await codec.decodeZone(JSON.parse(json(rec)));
+    const keepK = (c) => json([c.uid, c.village, c.villageRole, c.readings, c.opinions, c.teaches, c.faction, c.named, c.talk?.dialogue]);
+    const lost = z.creatures.filter((c) => c.village).filter((c) => keepK(back.creatures.find((b) => b.uid === c.uid) || {}) !== keepK(c));
+    if (lost.length || json(back.murals) !== json(z.murals) || json(back.village) !== json(z.village)) fail(`a saved village loses ${lost.map((c) => c.name)}${json(back.murals) !== json(z.murals) ? ", its murals" : ""}${json(back.village) !== json(z.village) ? ", zone.village" : ""}`);
+    const g2 = back.creatures.find((c) => c.villageRole === "questGiver");
+    if (v.quest && !talk.talkTo(game, g2).options.some((o) => /anything I can do/.test(o.label))) fail("a reloaded quest-giver offers nothing");
+  }
   SEC.learnSecret(game, leader.readings[0], "ritual", { quiet: true });
   const JS = await env.src("screens/journal.js");
   if (!JS.journalLines(game, 1, 200).some(([t]) => t.includes(v.founding[0].text.slice(0, 30)))) fail("a village tale isn't in the Locations tab");

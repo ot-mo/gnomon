@@ -37,6 +37,7 @@ import { VILLAGES } from "../content/villages.js";
 import { villageOf, villageFaction, eventById } from "./villages.js";
 import { registerDialogue, dialogueIds, node, bye } from "../talk.js";
 import { VILLAGERS } from "../content/creatures/villagers.js";
+import { registerCreatureField } from "../save/codec.js";
 
 const W = 24, D = 16;               // the village footprint (world/sites.js SITE_SHAPES.village)
 const WALL_H = 3;                   // walls 3 blocks high, the roof slab on top (z = FLOOR_Z + 3)
@@ -235,6 +236,11 @@ on("zone:enter", (game, ev) => {
     : `You come to ${v.name}. Everyone here seems to be ${v.culture.activity}. (+${xp} XP)`, [200, 230, 160]);
   if (game.player) leveling.gainXp(game, xp, { source: "village" });
 });
+
+// What a saved villager keeps beyond the codec's own whitelist (save/codec.js CREATURE_FIELDS): its village and role
+// (the quest talk options read them), the Kindling's readings, opinions and teaches, and a quest's own marks.
+export const VILLAGER_FIELDS = ["village", "villageRole", "readings", "opinions", "teaches", "questBeast", "lostFrom"];
+for (const f of VILLAGER_FIELDS) registerCreatureField(f);
 
 // What a villager says when no one has written its conversation (talk.js dispatches on c.talk.dialogue, the type's id
 // by default): WS6a's role dialogues (social/builders.js ROLES) when they are registered, which they are before this
