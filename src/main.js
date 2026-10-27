@@ -19,7 +19,7 @@ addEventListener("resize", S.resize);
 
 document.title = TITLE;
 window.game = game;   // poke at it from the browser console (game.debug has handy functions)
-useStore(memoryAdapter());   // saves stay in memory (this page only) until WS9's IndexedDB
+useStore(memoryAdapter());   // a ?quick=1 game's saves stay in memory (the browser tools); the title opens IndexedDB and moves it there (WS9 #1)
 // The title screen (New quick game / Continue), or with ?quick=1 straight into a new quick game (?seed=N).
 if (FLAGS.quick) startRun(FLAGS.seed ?? randomSeed());
 else openTitle(game);
