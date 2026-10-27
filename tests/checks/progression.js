@@ -92,9 +92,13 @@ export async function checkProgression(m) {
       "another genotype's background": { background: "archivistOfVey" }, "a point unspent": { attrs: { ...good.attrs, ego: good.attrs.ego - 1 } },
       "a point too many": { attrs: { ...good.attrs, ego: good.attrs.ego + 1 } }, "23 in one": { attrs: { ...good.attrs, str: 23 } },
       "below the base": { attrs: { ...good.attrs, str: 9 } }, "a fraction": { attrs: { ...good.attrs, str: 17.5 } },
-      "no name": { name: "  " }, "a 25-letter name": { name: "Å".repeat(25) }, "no mode": { mode: "classic" },
+      "no name": { name: "  " }, "a 25-letter name": { name: "Å".repeat(25) }, "no mode": { mode: "pressed" },
+      "a newline in the name": { name: "Ann\nMari" }, "a NUL in the name": { name: "Ann\u0000" },
+      "a direction mark in the name": { name: "Ann\u202e" }, "a lone combining mark for a name": { name: "\u0301" },
       "an unknown mutation": { mutations: ["wings"] }, "an implant for the Bent": { implant: "tallyEye" },
     };
+    for (const name of ["Åsa Öberg-Ärla", "Zé", "Ess", "7", "Aurel Strade-Orrum", "Å".repeat(24)])
+      if (C.validateChoices({ ...good, name }).length) fail(`validateChoices refused the name ${JSON.stringify(name)}: ${C.validateChoices({ ...good, name })}`);
     let refused = 0;
     for (const [what, change] of Object.entries(bad)) {
       const c = { ...good, ...change };

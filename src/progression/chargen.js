@@ -108,6 +108,8 @@ export function validateChoices(c = {}) {
   const name = String(c.name ?? "").trim();
   if (!name) out.push("no name");
   else if ([...name].length > NAME_MAX) out.push(`the name is longer than ${NAME_MAX} letters`);
+  else if (/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(name)) out.push("the name holds a control character");   // (a newline, NUL, a direction mark)
+  else if (!/[\p{L}\p{N}]/u.test(name)) out.push("the name has no letter in it");
   if (!RUN_MODES.includes(c.mode)) out.push(`no run mode ${JSON.stringify(c.mode)} (${RUN_MODES.join(", ")})`);
   if (bg && bg.glim > (bg.purse || CURRENCY.startPurse)) out.push(`${bg.name}'s ${bg.glim} glim doesn't fit its purse`);
   return out;
