@@ -105,7 +105,7 @@ screenshots of three biomes in the browser (`?silent=1`, port 8652).
   spans change in a run), and the re-exports above, `BIOME_BUILDERS`, `SITE_BUILDERS`.
 - A surface zone has `zone.liquid` (one liquid per span), `zone.navigability` (the map's: ground the map draws as a
   wall, 4 or more up, isn't map ground), `zone.ground3d` (ground the map draws as wall: cliff tops, which only 3D can reach and only by a way up a
-  builder makes; none in 2a), and `zone.gen.local` (a
+  builder makes: 2a's own features make none, though a landmark plan may, Kettle Mesa's on seed 1), and `zone.gen.local` (a
   `Uint8Array` w·d: the columns the zone's own features changed from the world functions, which an apron built from
   them doesn't show; not saved).
 
