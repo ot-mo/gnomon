@@ -161,6 +161,9 @@ export async function run(env) {
         const a = SEC.makeSecrets(r1), b = SEC.makeSecrets(r2);
         const c = SEC.makeSecrets(RUN.restoreRun(JSON.parse(json(RUN.serializeRun(r1))), W));
         if (json([...a]) !== json([...b]) || json([...a]) !== json([...c])) fail(`seed ${seed} ${W.id}: the secrets differ between two builds or after a save`);
+        // The run's own step makes them (world/run.js, since the WS7a merge), so a save carries them as they are.
+        const kept = RUN.restoreRun(JSON.parse(json(RUN.serializeRun(r1))), W).secrets;
+        if (json([...r1.secrets]) !== json([...a]) || json([...kept]) !== json([...a])) fail(`seed ${seed} ${W.id}: run.secrets (${r1.secrets.size}, ${kept.size} after a save) isn't makeSecrets' ${a.size}`);
         else stable++;
         total += a.size;
         for (const id of a.keys()) if (!FORMS.some((f) => f.test(id))) fail(`seed ${seed} ${W.id}: secret id "${id}"`);

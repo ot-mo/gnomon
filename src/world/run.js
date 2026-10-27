@@ -20,9 +20,10 @@ import { compileWorld } from "./worldmodel.js";
 import { placeSites, placeLegends } from "./sites.js";
 import { generateHistory } from "../story/history.js";
 import { makeVillages } from "../story/villages.js";
+import { makeSecrets } from "../story/secrets.js";
 
 export const RUN_VERSION = 1;   // the shape of a saved run
-export const GEN_VERSION = 2;   // bumps whenever buildRun would make a different run from the same seed (2: WS10's sites and legends)
+export const GEN_VERSION = 3;   // bumps whenever buildRun would make a different run from the same seed (2: WS10's sites and legends; 3: WS7's generated history and secrets)
 export const RUN_STATS = { builds: 0 };
 const MAPS = ["sites", "sitesAt", "villages", "factions", "relations", "legends", "secrets"];
 
@@ -41,7 +42,7 @@ export const RUN_STEPS = [
     run.relations = new Map();
   } },
   { id: "legends", run: (run) => { run.legends = placeLegends(run); } },   // WS10: every lair's owner, by uid
-  { id: "secrets", run: (run) => { run.secrets = new Map(); } },   // WS7: every learnable secret of the run
+  { id: "secrets", run: (run) => { run.secrets = makeSecrets(run); } },   // WS7: every learnable secret of the run
 ];
 
 const asModel = (world) => (world?.tileAt ? world : compileWorld(world));
