@@ -13,6 +13,7 @@ are in `docs/ws9.md`.
 | `5a6d069` `e4d7645` | Fixes the new check sections found while being written; `check-save` sections 9-18 |
 | `497506f` `d2077b2` `ff95e62` `7e30c80` | The unload save's transaction committed at once (a browser finding); keep only on a key's first write since a checkpoint; the title's warning for a slot another session holds; `check-save --browser` |
 | `212f42c` … `14bd5c2` | The verification's fixes (§5), one commit each |
+| `e1f2f2f` `cce9477` `11c0ec5` `d9f4675` `8d41280` `8188c0d` | The user's decisions of 2026-10-27: the pause card names L look, V fire, the hotbar and the map legend's comma (on a line of its own under P0's key line); the four "… 3d pause card" frames left out of `check-screen-frames` by name (`// WS9`); integration requests 12 and 13 |
 
 ## 1. What was built
 
@@ -148,4 +149,31 @@ passes at `14bd5c2`.
 
 ## 6. Rechecks
 
-(the run-all and the browser gates after the fixes, and the timed checks on an idle machine against `p0-done`: below)
+### The timed checks, alone, against `p0-done`
+
+Each run alone (WS4b and WS6a resumed beside this session: runs 1 and 3 started once no other check was running, run
+2's count didn't read; nothing else of this session's ran), `check-perf --against p0-done --rounds 3` (4 runs of
+each tree, alternating) and
+`check-dungeons` three times in alternation, this tree and `p0-done`'s (`git archive p0-done`). WS9 changes no file
+the timed checks time but `hud.js` (3D frame: the hotbar and debug segments) and the save's updates: no generation,
+no renderer, no map step.
+
+| Run | Load | `check-perf` against `p0-done` | `check-dungeons` p95 (ms), HEAD / `p0-done` |
+|---|---|---|---|
+| 1 | The user's training job (8 workers), CPU 100% | Every timing 1.1-2× either tree's, both trees over budget; the ratios contradict each other (gen.surface ×2.00, gen.dungeon ×1.99, but skipTime ×0.80) | 154 / 261, 237 / 130, 228 / 292: both FAIL, neither slower |
+| 2 | The training job off, CPU 14% | **FAIL on gen.surface.max only**: 154.04 ms against 131.52 (×1.17), one sample (the max). Every other ratio within ×1.15: frame.outdoor p50 23.49 / 23.37 (×1.01; over 17 on both trees, the machine's, not failed), frame.dungeon 12.22 / 12.49 (×0.98), refresh 7.74 / 7.78 (×0.99), apron 0.16 / 0.16, gen.surface p95 37.74 / 28.16 (×1.34, within its 60 budget), gen.dungeon p95 36.04 / 38.08 (×0.95), buildRun 0.48 / 0.48, restoreRun 0.25 / 0.24, passTime 7.12 / 7.52 (×0.95), mapStep 1.64 / 1.49 (×1.10), skipTime 0.06 / 0.05 | 26.97 / 27.23, 28.01 / 27.71, 27.91 / 25.64: all PASS |
+| 3 | The training job off, CPU 20%, 0 other checks | **PASS**: gen.surface p95 28.78 / 27.40 (×1.05), gen.surface.max 115.05 / 122.56 (×0.94); frame.outdoor over 17 on both trees again (the machine's, not failed) | (not rerun) |
+
+Run 2's gen.surface.max is noise: WS9 has no code in surface generation (`git diff p0-done` touches no generator), and
+run 3 reads it ×0.94. WS9's own cost a 3D frame, measured directly (Node, 3 rounds of 20,000 calls: the hotbar segment, and the
+updates with and without WS9's three): 0.14 µs with 1 creature, **2.12 µs** with 60 (as passTime's, all beyond 10 tiles)
+(the hotbar's look for a hunter within 10 tiles 1.96 µs, the save's updates about 0.15 µs), against a 17 ms budget.
+The absolute budgets are the integrator's to confirm on an idle machine (frame.outdoor reads 23 ms on both trees here).
+
+### The final gates at `323e32e` (the code tagged: only `docs/ws9.md` and this file change after it)
+
+| Gate | Result |
+|---|---|
+| `node tools/run-all.mjs` | **37 of 37 pass** (126.1 s, 11 at a time, the training job off). Its `check-perf` against `p0-0d1`: frame.outdoor p50 22.92 / 23.48 (×0.98; over 17 on both, not failed), frame.dungeon ×1.00, refresh ×0.98, gen.surface p95 ×0.61, gen.dungeon ×1.01, restoreRun 0.32 / 0.27 (×1.19, within its 50 ms budget). `check-screen-frames`: 47 drawn, 43 compared, 0 mismatched (the four pause cards left out by name). |
+| `NODE_PATH="$(npm root -g)" node tools/browser-0d1.mjs --against p0-done` | **FAIL on "modes never reached: options, log" only**, as expected (integration request 11: `browser-shell`, P0's, doesn't know the two new modes). Everything else passes: the shell at 1280×720 and 600×300 (43 mode changes each, the pointer lock taken and lost, audio silenced), 14 of 16 modes by keys and clicks, the HUD at 100×30 (13 segments, `hotbar` among them; `check-hud` in the browser passes), 27 golden frames underground, 0 mismatched. Frame time against `p0-done` (ms a tick at 1280×720, 40 blocks of 40 ticks, alternating; CPU 16%): under/3d p50 10.00 / 10.10 (−1.2%), under/map 1.40 / 1.40 (−2.2%), surface/3d 9.70 / 9.80 (−1.1%), surface/map 1.20 / 1.20 (−2.3%). |
+| `NODE_PATH="$(npm root -g)" node tools/check-save.mjs --browser` | **Pass**, every step: reload (0,0,0 at 24.5,6.5, 0 unclean), crash (warned, 1 counted), two tabs (refused, then continued), One Wick (slot deleted, a grave), the Commons Lamp (C woke at checkpoint 2 in 0,0,1), export and import (40,650 B, 1 → 2 slots), `?debug=1`, the options and the log by keys and clicks, the IndexedDB adapter, `?silent=1` (only its zero-gain sink reached the speakers). No server left on 8649, no browser open. |

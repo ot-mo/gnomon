@@ -120,32 +120,24 @@ changes when it lands.
 
 ## Handoff
 
-**Paused 2026-10-27 at the user's request (near the usage limit), before the tag.** Branch `ws/ws9`, last commit
-`8188c0d`, pushed; nothing uncommitted, no server or browser left running. **Not tagged**: `p1-ws9` doesn't exist yet.
+**Done, 2026-10-27: tagged `p1-ws9`** (annotated) on branch `ws/ws9`, pushed with the tag. Nothing uncommitted, no
+server or browser left running. Not merged into `main`: the integrator merges it (it meets everything since
+`p0-done`).
 
-- **Done:** everything in TECH_DESIGN §8.3 "WS9" and the six open items from Phase 0, the independent verification (two
-  verifiers) and its fixes (`docs/sessions/ws9.md` §5: one commit per finding, each with a check that fails without it),
-  and the user's two decisions relayed on 2026-10-27 (the pause card names L look, V fire, the hotbar and the map
+- **Done:** everything in TECH_DESIGN §8.3 "WS9" and the six open items from Phase 0 (`docs/sessions/ws9.md` §2), the
+  independent verification (two verifiers) and its fixes (§5: one commit per finding, each with a check that fails
+  without it), and the user's two decisions of 2026-10-27 (the pause card names L look, V fire, the hotbar and the map
   legend's comma; the four "… 3d pause card" frames left out by name: integration requests 12, 13).
-- **Last results:** `node tools/run-all.mjs` **37 of 37** at `d9f4675` (151.8 s; the CPU at 22-38%). After it only the
-  card's legend key changed (`8d41280`, `8188c0d`): `check-hud`, `check-screen-frames` (47 drawn, 43 compared, 0
-  mismatched), `check-shell` and `check-save` pass at `8188c0d`. `NODE_PATH="$(npm root -g)" node tools/check-save.mjs
-  --browser` passes at `d9f4675` (all steps; the card's line text isn't among them). The old browser gates pass at
-  `14bd5c2`: browser-0d2, browser-silent, browser-shell (and again at `11c0ec5` with the new card), browser-0c,
-  browser-gate.
-- **Next step, in order:**
-  1. On a quiet machine (no other session's checks or browsers; the user's training job off: see the memory note on
-     timing), `node tools/check-perf.mjs --against p0-done --rounds 2` and `node tools/check-dungeons.mjs` alone. The
-     last loaded run read `refresh` ×1.32 and `gen.dungeon` ×1.24 against `p0-done` while the run-all a few minutes
-     before read them ×0.96 and ×0.98 against `p0-0d1`; WS9 has no code in either path. Record the numbers in
-     `docs/sessions/ws9.md` §6.
-  2. `node tools/run-all.mjs` at the final HEAD: green.
-  3. `NODE_PATH="$(npm root -g)" node tools/browser-0d1.mjs --against p0-done`: it is expected to fail only on "modes
-     never reached: options, log" (integration request 11); record its frame-time lines in §6. Then
-     `node tools/check-save.mjs --browser` once more at the final HEAD.
-  4. Write `docs/sessions/ws9.md` §6 (the rechecks: the numbers above), commit and push.
-  5. Tag `p1-ws9` on `ws/ws9` (annotated) and `git push origin p1-ws9`.
-- **Surprising:** the main checkout's shell cwd moves to `C:UsersOtto MörnerCodegnomon` after a `cd` into the
-  scratchpad: always `cd` back into the worktree (or use `git -C`). Under load headless Chromium sometimes fails a
-  module request (`net::ERR_NO_BUFFER_SPACE`): rerun. `main` already has WS3 and WS8 merged (`p2-ws3`, `p2-ws8`)
-  with WS3's own `NOT_COMPARED` in `tests/checks/screen-frames.js`: the integrator joins the lists.
+- **Last results** (§6): `node tools/run-all.mjs` 37 of 37 at `323e32e`; `check-save --browser` passes; `browser-0d1
+  --against p0-done` fails only on "modes never reached: options, log" (integration request 11), its frame times 1-2%
+  under `p0-done`'s. The timed checks alone against `p0-done`, three runs: under the user's training job (CPU 100%)
+  the ratios contradict each other; with it off, one run failed gen.surface.max alone (154 against 132 ms, ×1.17, one
+  sample; WS9 has no generation code) and the next passed everything (gen.surface.max ×0.94); `check-dungeons` PASS
+  in all three alternating rounds. WS9's own cost a 3D frame: 2.12 µs with 60 creatures.
+- **For the integrator:** integration requests 1-13 above, in particular 11 (`browser-shell` learns `options` and
+  `log`), 12 (join WS9's `NOT_COMPARED` entries with WS3's) and 13 (the card's L, V and comma come true with WS8's and
+  WS3's bindings). frame.outdoor reads 23 ms against its 17 ms budget on both trees on this machine: the absolute
+  budgets are to be confirmed on an idle machine before `main` moves.
+- **Surprising:** the shell's cwd moves to the main checkout (`gnomon`) after a `cd` into the scratchpad: always
+  `cd` back into the worktree (or use `git -C`). Under load headless Chromium sometimes fails a module request
+  (`net::ERR_NO_BUFFER_SPACE`): rerun.
