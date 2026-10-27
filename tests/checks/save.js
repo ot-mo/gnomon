@@ -1277,8 +1277,13 @@ async function ws9Sections(ctx) {
     await title.openTitle(game);
     const warned = title.titleState().warnings.join(" ");
     if (!/last session ended without a save \(2 times\)/.test(warned) || !/older version/.test(warned)) fail(`the title's warnings: ${warned}`);
+    {   // At 100×30 every warning shows whole (on more rows when it must).
+      const shown = text().replace(/\s+/g, " ");
+      for (const w of title.titleState().warnings) if (!shown.includes(w.replace(/\s+/g, " ").slice(-30))) fail(`the title at 100×30 cuts a warning: "${w}"`);
+    }
     pick("Load a save"); key("Enter");
     let t = text();
+    if (!t.includes("2 unclean")) fail("the Load list at 100×30 cuts a slot's unclean count");
     if (title.titleState().view !== "load" || !t.includes("seed 55") || !t.includes("seed 4242")) fail(`Load a save: ${t.replace(/\s+/g, " ").slice(0, 160)}`);
     key("KeyX", "x"); await tick(5);
     const exported = /Exported/.test(title.titleState().busy);

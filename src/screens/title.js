@@ -23,7 +23,7 @@
 //   importText(game, text) → Promise<id>   an exported file's text into the store (the picker's other half)
 import * as S from "../screen.js";
 import { registerScreen, setMode, pushMode, screenFor } from "../screens.js";
-import { UI, list, listKey, listWheel, listAt, keyHelp, textInput, drawTextInput, at } from "../ui.js";
+import { UI, list, listKey, listWheel, listAt, keyHelp, textInput, drawTextInput, at, wrap } from "../ui.js";
 import { FLAGS, TITLE, VERSION } from "../config.js";
 import { startRun, randomSeed } from "../game.js";
 import { listSlots, loadGame, deleteSlot, exportSlot, importSlot, RUN_MODES, SESSION, openSaves, storageLeft, moveSlot, currentStore, slotsOpenElsewhere } from "../save/index.js";
@@ -58,7 +58,8 @@ export function titleItems() {
 
 function warnings() {
   const out = [];
-  if (!menu.persistent) out.push(`Saves last only while this page is open: ${menu.reason || "the browser keeps no IndexedDB here"}.`);
+  // (The browser's own words only with ?debug=1: they name its internals.)
+  if (!menu.persistent) out.push(`Saves last only while this page is open: the browser keeps none here (a private window, or storage turned off)${FLAGS.debug && menu.reason ? ` (${menu.reason})` : ""}.`);
   if (menu.left !== null && menu.left < LOW_STORAGE) out.push(`Less than 10 MB of storage is left for saves (${(menu.left / 1048576).toFixed(1)} MB).`);
   const s = menu.slots[0];
   if (s && s.genVersion !== undefined && s.genVersion !== VERSION.gen) out.push("This save was made by an older version: where new ground meets old, the land may not line up.");
@@ -177,7 +178,8 @@ function drawMain() {
   const it = items[menu.sel];
   if (it?.id === "mode") S.text(x + 2, y, RUN_MODES[menu.mode].note.slice(0, w - 2), ...UI.info);
   y += 2;
-  for (const line of warn) { S.text(Math.max(1, x - 8), y++, line.slice(0, S.cols - 2), ...UI.bad); }
+  const ww = Math.min(S.cols - 4, 96), wx = (S.cols - ww) >> 1;   // (whole, on as many rows as they take)
+  for (const line of warn) for (const part of wrap(line, ww)) if (y < S.rows - 3) S.text(wx, y++, part, ...UI.bad);
   if (menu.busy) S.text((S.cols - menu.busy.length) >> 1, ++y, menu.busy.slice(0, S.cols - 2), ...UI.info);
   if (menu.error) S.text(2, ++y, menu.error.slice(0, S.cols - 4), ...UI.bad);
   if (FLAGS.debug) S.text(1, S.rows - 2, `slots ${menu.slots.map((s) => s.id).join(" ") || "none"} · ${currentStore()?.kind ?? "no store"}${menu.left !== null ? ` · ${(menu.left / 1048576).toFixed(0)} MB free` : ""}`.slice(0, S.cols - 2), ...UI.help);
@@ -194,8 +196,9 @@ function drawLoad() {
   list(menu.load, { x, y: top + 2, w, h, items: menu.slots, empty: "Nothing is saved.", row: (s, i, r) => {
     if (r.sel) S.text(r.x, r.y, ">", ...UI.mark);
     const day = Math.floor(minutesAt(Number(s.time) || 0) / 1440) + 1;
-    const text = `${who(s)} · level ${s.character?.level ?? 1} · ${RUN_MODES[s.mode]?.name ?? s.mode} · seed ${s.seed} · day ${day} · ${ago(s.updated)}` +
-      `${s.unclean ? ` · ${s.unclean} unclean` : ""}${FLAGS.debug ? ` · ${s.id}` : ""}`;
+    // (What tells two saves apart first, so a narrow screen cuts the least of it.)
+    const text = `${who(s)} · level ${s.character?.level ?? 1} · ${RUN_MODES[s.mode]?.name ?? s.mode}${s.unclean ? ` · ${s.unclean} unclean` : ""} · ${ago(s.updated)}` +
+      ` · day ${day} · seed ${s.seed}${FLAGS.debug ? ` · ${s.id}` : ""}`;
     S.text(r.x + 2, r.y, text.slice(0, r.w - 2), ...(r.sel ? UI.sel : UI.text));
   } });
   const y = top + 3 + h;
