@@ -6,7 +6,6 @@
 //                     {to} {beast} {lost} {view} {shrine} {percent}; `need` is the view or system the bible says it asks
 //   QUESTS.things     what a village can lose (bible §9.6 #1, #7: carried off, or set up somewhere high)
 //   QUESTS.beasts     a named beast's epithets (#9)
-//   QUESTS.directions the eight compass words, from east anticlockwise
 //   QUESTS.words      the word a village sends another (#2), and the two answers you can carry back
 //   QUESTS.campaign   { intro: [page], starter: [step], beats: [beat] } (bible §10.5's starter chain, §11's eleven beats)
 //     page = { title?, text }
@@ -74,7 +73,6 @@ export const QUESTS = {
   things: ["the bell's tongue", "the founders' tile", "the lamp's first wick", "the reeve's dial", "the village longback's bell",
     "the drowned bell's clapper", "the shrine's salt stone", "the old weaver's shuttle", "the ink-pot of the founders", "the noon peg"],
   beasts: ["the Gnawer", "Old Sour-Tooth", "the Reed Thief", "the Night Grinder", "the Whistler", "Long Jaw"],
-  directions: ["east", "north-east", "north", "north-west", "west", "south-west", "south", "south-east"],
   words: {
     word: "We'll share the eel weirs this year, if you'll share your lamp oil.",
     answers: [

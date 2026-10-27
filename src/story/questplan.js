@@ -18,9 +18,14 @@ export const QUEST_ORDER = ["recover", "carry", "readFloor", "pray", "climb", "f
 const RANGE = [2, 5];   // spans from the village for an outward target
 
 const cheb = (a, b) => Math.max(Math.abs(a.wx - b.wx), Math.abs(a.wy - b.wy));
+// The compass word for a step (dx, dy) (north is up: wy grows southward). Plain arithmetic, no trigonometry: generation
+// must give the same bits in every engine (check-determinism). A diagonal when neither leg is over twice the other.
 function dirWord(dx, dy) {
-  const a = Math.atan2(-dy, dx);   // north is up (wy grows southward)
-  return QUESTS.directions[((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8];
+  const ax = Math.abs(dx), ay = Math.abs(dy);
+  const ns = dy < 0 ? "north" : "south", ew = dx > 0 ? "east" : "west";
+  if (ax > 2 * ay) return ew;
+  if (ay > 2 * ax) return ns;
+  return `${ns}-${ew}`;
 }
 
 // The nearest named place to a span: a landmark, else a site; "N spans <dir> of <name>", or "at <name>".
