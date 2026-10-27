@@ -35,6 +35,7 @@ import { B, FLOOR_Z } from "./world.js";
 import { EYE, RADIUS, HEIGHT } from "./player.js";
 import { noise2 } from "./rng.js";
 import { sfx } from "./sfx.js";
+import { splash } from "./effects.js";
 import { maxHp } from "./stats.js";
 import { addStatus, hasStatus, statusFlag } from "./status.js";
 import { hasKey } from "./keyset.js";
@@ -307,7 +308,7 @@ const bodies = (game) => game.zone.creatures.filter((c) => !canTalk(c) && !(c.br
 
 // A potion smashes at (x, y, z) and splashes everything within SPLASH blocks.
 function shatter(game, effect, x, y, z) {
-  const { zone, player: p } = game;
+  const p = game.player;
   const color = POTION_COLORS[game.potionColor[effect]];
   const known = game.knownPotions.has(effect);
   game.knownPotions.add(effect);
@@ -318,50 +319,7 @@ function shatter(game, effect, x, y, z) {
   const youToo = touchesYou(game, null) && Math.hypot(p.x - x, p.y - y) <= SPLASH && Math.abs(p.z + 1 - z) < 2.5;   // (flat: it splashes over you)
   const names = () => near.map((m) => m.name).join(", ");
 
-  switch (effect) {
-    case "poison":
-      zone.clouds.push({ x, y, z, r: SPLASH, time: 6, kind: "poison" });
-      game.log("A cloud of poison gas billows out!", [150, 210, 80]);
-      break;
-    case "paralysis":
-      for (const m of near) addStatus(game, m, "stunned", { t: 6, stack: "refresh" });
-      if (near.length) game.log(`The ${names()} ${near.length > 1 ? "freeze" : "freezes"} in place!`, [200, 120, 255]);
-      if (youToo) { addStatus(game, p, "paralyzed", { t: 3, stack: "max" }); game.log("The fumes reach you too: you can't move!", [200, 120, 255]); }
-      break;
-    case "darkness": case "shadows":
-      for (const m of near) { addStatus(game, m, "blinded", { t: 10, stack: "refresh" }); if (m.state === "chase") m.state = "wander"; }
-      game.log(near.length ? `Darkness swallows the ${names()}. They've lost track of you.` : "A pool of darkness spreads and fades.", [130, 120, 170]);
-      break;
-    case "descent": {
-      // The floor melts away: a 3×3 pit (never under stairs). Whatever stands there falls.
-      // Not on the last floor: there's nothing below it.
-      if (!zone.hasBelow) { game.log("The floor shimmers, but holds. Something wards it.", [180, 170, 140]); break; }
-      const cx = Math.floor(x), cy = Math.floor(y);
-      for (let ty = cy - 1; ty <= cy + 1; ty++)
-        for (let tx = cx - 1; tx <= cx + 1; tx++) {
-          const g = zone.get(tx, ty, FLOOR_Z - 1);
-          if (tx < 1 || ty < 1 || tx >= zone.w - 1 || ty >= zone.d - 1) continue;
-          if (g === B.STAIRS || g === B.STAIRS_UP || zone.get(tx, ty, FLOOR_Z)) continue;   // stairs, or a wall here
-          zone.set(tx, ty, 0, B.AIR);
-          zone.set(tx, ty, FLOOR_Z - 1, B.AIR);
-          zone.holeSeen[tx + ty * zone.w] = 1;
-        }
-      zone.refresh();
-      game.log("The floor melts away into a pit!", [180, 170, 140]);
-      break;
-    }
-    case "healing":
-      for (const m of near) m.hp += 12;
-      if (near.length) game.log(`The ${names()} ${near.length > 1 ? "look" : "looks"} healthier. Oops.`, [230, 90, 110]);
-      if (youToo) { p.hp = Math.min(maxHp(p), p.hp + 6); game.log("Some of it splashes on you. (+6 HP)", [230, 90, 110]); }
-      break;
-    case "haste":
-      for (const m of near) addStatus(game, m, "hasted", { t: 12, stack: "refresh" });
-      if (near.length) game.log(`The ${names()} ${near.length > 1 ? "speed" : "speeds"} up! That was a mistake.`, [255, 240, 120]);
-      break;
-    default:
-      game.log("It splashes harmlessly.", [170, 170, 170]);
-  }
+  splash(game, effect, { x, y, z, r: SPLASH, near, youToo, names });   // effects.js SPLASH: the parent's cases, line for line
 }
 
 // Lit bombs on the ground count down; when one goes off, any close by go off with it.
