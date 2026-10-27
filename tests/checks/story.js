@@ -780,7 +780,13 @@ async function campaign7b(env, { fail, stats, real, test, json, game, startRun }
   if (!CAM.CAMPAIGN.intro.length || CAM.CAMPAIGN.starter.length !== 5) fail("the intro or the starter chain");
   if (CAM.introPages(RUN.buildRun(1, test)) !== INTRO || CAM.introPages(RUN.buildRun(1, real)) !== CAM.CAMPAIGN.intro) fail("introPages");
   // The test world: none of it.
+  // The pages startRun opens (WS7b #11, at the merge): the parent's INTRO on the test world, the campaign's on the real one.
+  startRun(3, real);
+  const introReal = game.mode === "story" && game.pages?.list;
   startRun(3);
+  const introTest = game.mode === "story" && game.pages?.list;
+  if (introTest !== INTRO || introReal !== CAM.CAMPAIGN.intro)
+    fail(`startRun's intro: test world ${introTest === INTRO ? "INTRO" : introTest?.[0]?.title}, real world ${introReal === CAM.CAMPAIGN.intro ? "the campaign's" : introReal?.[0]?.title}`);
   if (game.quests.some((q) => q.template === "beat") || game.state.campaign?.started != null || CAM.beginCampaign(game)) fail("the campaign started on the test world");
   // The real world (the run and the bus; zones are stand-ins with a landmark and a floor).
   const keep = { run: game.run, quests: game.quests, campaign: game.state.campaign };

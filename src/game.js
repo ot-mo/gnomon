@@ -41,7 +41,7 @@ import { makeRng } from "./rng.js";
 import { toggleMusic, updateMusic } from "./music.js";
 import { unlockAudio, audioFrame } from "./audio.js";
 import { sfx, toggleSounds, setListener } from "./sfx.js";
-import { INTRO } from "./story/legacy.js";
+import { introPages } from "./story/campaign.js";   // the parent's INTRO on the test world, the campaign's elsewhere (WS7b)
 import "./content/legacy/encounters.js";   // the parent game's people: dialogues, quests, Pell's services
 import { openTalk, talkKey, storyKey, openStory } from "./dialogue.js";
 import { statusFlag, cooldownLeft, startCooldown } from "./status.js";
@@ -233,7 +233,7 @@ export function startRun(seed, world = game.world) {
   game.view = "map";
   game.paused = false;
   setMode(game, "map", null, { pointer: false });
-  openStory(game, INTRO, () => {
+  openStory(game, introPages(game.run), () => {
     refreshView(game);
     game.log("You wake in your little room in the temple. Maren is waiting in the main hall, to the south.", [255, 220, 140]);
   });
