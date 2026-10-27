@@ -521,6 +521,24 @@ export async function run(env) {
         stats.harmSource = got.join("; ");
       } finally { off(); }
     }
+    // A kill that wasn't your aim (WS6b request 2, at its merge): a creature dying on your thorns is told { splash: true }
+    // in the "kill" payload (the Kindling's oaths let it pass, social/ritual.js); a blow's kill is not.
+    {
+      const seen = [], off = events.on("kill", (g, e) => seen.push(e));
+      try {
+        fresh(1234, { genotype: "bent" });
+        const P9 = p(), combat2 = combat, st = await m("stats.js");
+        const t = mob(null, null); Object.assign(t, { x: P9.x + 0.8, y: P9.y, z: P9.z, hp: 1 }); creatures.addCreature(game.zone, t);
+        P9.bonuses = { ...(P9.bonuses || {}), thorns: 5 }; st.invalidateStats(P9);
+        combat2.hitPlayer(game, t, 1, "the goblin", "the goblin's blow", false, () => 0.5, 0);
+        delete P9.bonuses.thorns; st.invalidateStats(P9);
+        const u = mob(null, null); Object.assign(u, { x: P9.x + 0.8, y: P9.y, z: P9.z, hp: 1 }); creatures.addCreature(game.zone, u);
+        monsters.killMonster(game, u, "test");
+        const k1 = seen.find((e) => e.c === t), k2 = seen.find((e) => e.c === u);
+        stats.splash = `thorns ${k1 ? k1.splash : "no kill"}, a blow ${k2 ? !!k2.splash : "no kill"}`;
+        if (k1?.splash !== true || k1?.src !== P9 || !k2 || k2.splash) fail(`the kill payload's splash: ${stats.splash} (want thorns true with you as the source, a blow false)`);
+      } finally { off(); }
+    }
     // An implant fitted in play (WS5 #20, bible §10.4): the Plan +25 each, the first four only; taking one out, or a
     // creature's fitting, moves nothing.
     {

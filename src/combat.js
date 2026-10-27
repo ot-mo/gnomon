@@ -247,7 +247,7 @@ export function hitPlayer(game, m, dmg, source, blocked, ranged = false, rng = M
   const thorns = bonus(p, "thorns");
   if (thorns > 0 && !ranged && m.hp > 0 && game.zone.creatures.includes(m)) {
     hurtCreature(game, m, thorns, `${thorns}`, [150, 200, 90], p);
-    if (m.hp <= 0) killMonster(game, m, `The ${m.name} dies on your thorns.`);
+    if (m.hp <= 0) killMonster(game, m, `The ${m.name} dies on your thorns.`, true, true, p, { splash: true });
   }
   if (m.burns) {   // a salamander's bite sets you smouldering: 1 damage a second
     // The legacy set keeps the parent's bite exactly: poison, the same stream as venom (Thick blood halves
@@ -339,7 +339,7 @@ function yourBladeLanded(game, p, m, dmg, { crit, el, vs, core, rng, soak, line 
       const arc = soak(other, Math.max(1, Math.ceil(dmg / 2)));
       hurtCreature(game, other, arc, `${arc}`, ELEMENTS.shock.color, p);
       game.log(`Lightning arcs to the ${other.name} (${arc}).`, ELEMENTS.shock.color);
-      if (other.hp <= 0) killMonster(game, other, `The ${other.name} is struck down.`);
+      if (other.hp <= 0) killMonster(game, other, `The ${other.name} is struck down.`, true, true, p, { splash: true });
     }
   }
   return killed;

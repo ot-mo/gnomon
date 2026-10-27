@@ -41,7 +41,9 @@ setStatusHarm((game, e, n, id) => {
     killMonster(game, e, def?.killed?.(e) || `The ${e.name} dies.`, true, true, e.status?.[id]?.src === "player" ? game.player : null);
 });
 
-export function killMonster(game, m, message, dropLoot = true, byPlayer = true, src = byPlayer ? game.player : null) {
+// splash: a kill that was not your aim (thorns, a lightning arc: combat.js), told in the "kill" payload so the
+// Kindling's oaths can let it pass (social/ritual.js, bible §3.3); the XP and the rep are yours as for any kill.
+export function killMonster(game, m, message, dropLoot = true, byPlayer = true, src = byPlayer ? game.player : null, { splash = false } = {}) {
   const { zone } = game;
   const t = CREATURE_TYPES[m.type];
   removeCreature(zone, m);
@@ -82,7 +84,7 @@ export function killMonster(game, m, message, dropLoot = true, byPlayer = true, 
     for (const [x, y] of spots.slice(0, 2)) addCreature(zone, spawnCreature(t.splits, x, y, zone.stand[x + y * zone.w], { rng: Math.random, state: "chase", level: zone.level }));
     if (spots.length) game.log(`The ${m.name} splits in two!`, m.color);
   }
-  emit(game, "kill", { c: m, src, uid: m.uid ?? null, factions: membershipsOf(m).map(([id]) => id) });
+  emit(game, "kill", { c: m, src, uid: m.uid ?? null, factions: membershipsOf(m).map(([id]) => id), ...(splash ? { splash: true } : {}) });
 }
 
 // Monsters are solid: push the player out of any they overlap.
