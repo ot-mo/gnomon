@@ -974,8 +974,9 @@ export async function run(env) {
     const sold = sig();
     events.emit(game, "zone:enter", { zone: game.zone, away: 2 * day - 1, how: "walk", first: false, from: null });
     if (sig() !== sold) fail("restocked after less than two world days away");
-    events.emit(game, "zone:enter", { zone: game.zone, away: null, how: "load", first: false, from: null });
-    if (sig() !== sold) fail("restocked on a load");
+    // A load sends the time since you last left this zone as `away` (zones.js): three days in a village, then a load.
+    events.emit(game, "zone:enter", { zone: game.zone, away: 3 * day, how: "load", first: false, from: null });
+    if (sig() !== sold) fail("restocked on a load (away three days since you last left)");
     game.time += 2 * day;
     events.emit(game, "zone:enter", { zone: game.zone, away: 2 * day, how: "walk", first: false, from: null });
     const after = t.talk.state.stock;

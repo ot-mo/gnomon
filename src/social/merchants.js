@@ -124,8 +124,10 @@ export function ensureStock(game, c) {
   return st.stock || [];
 }
 
-on("zone:enter", (game, { zone, away }) => {
-  if (!zone?.creatures || !(away >= restockSeconds())) return;
+// A load isn't an arrival: its `away` is the time since you last left the zone you were standing in, so a save made
+// after two days in a village would refill every shop on loading it.
+on("zone:enter", (game, { zone, away, how }) => {
+  if (how === "load" || !zone?.creatures || !(away >= restockSeconds())) return;
   for (const c of zone.creatures) if (c.talk?.state?.stock && isMerchant(c)) restock(game, c);
 });
 
