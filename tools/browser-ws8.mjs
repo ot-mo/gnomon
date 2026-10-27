@@ -59,7 +59,7 @@ try {
     z.edges = { n: null, s: null, e: null, w: null }; z.hasSky = true; z.refresh(); z.spawn = { x: 6.5, y: 10.5, z: W.FLOOR_Z, yaw: 0 }; z.seal();
     Z.enterZone(game, z, { how: "start" });
     z.seen.fill(1);
-    const pin = (c) => { c.hp = c.maxHp = 1e6; c.cd = Infinity; c.status.pinned = { t: Infinity, mag: 1, src: null, acc: 0 }; return c; };
+    const pin = (c) => { c.hp = c.maxHp = 1e6; c.cd = 1e9; c.status.pinned = { t: 1e9, mag: 1, src: null, acc: 0 }; return c; };   // (finite: WS9's saves take the zone, JSON has no Infinity)
     window.__gob = pin(C.addCreature(z, C.spawnCreature("goblin", 11, 10, W.FLOOR_Z, { rng: Math.random, level: 3, state: "chase" })));
     window.__orc = pin(C.addCreature(z, C.spawnCreature("orc", 13, 13, W.FLOOR_Z, { rng: Math.random, level: 5, state: "chase" })));
     window.__pal = A.recruit(game, C.addCreature(z, C.spawnCreature("goblin", 5, 10, W.FLOOR_Z, { rng: Math.random, level: 3 })));
