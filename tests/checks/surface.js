@@ -62,7 +62,7 @@ import { FAMILY_GLYPHS } from "./creatures.js";
 import { KIND } from "../../src/blocks.js";
 import { Zone, B, FLOOR_Z, SURFACE, APRON_SIDES, standWith } from "../../src/world.js";
 import { SIDE_STEP } from "../../src/world/worldmodel.js";
-import { makeRng } from "../../src/rng.js";
+import { makeRng, distance } from "../../src/rng.js";
 
 const ZW = SURFACE.w, ZD = SURFACE.d, ZH = SURFACE.h;
 const q = (sorted, p) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))];
@@ -363,7 +363,7 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
 // [seed, wx, wy, what was wrong there] (docs/sessions/ws2.md, Part 2b §4).
 const REGRESSIONS = [
   [42, 20, 9, "a ramp up a cliff a site's skirt had pulled down to 3"],
-  [1, 14, 10, "a shrub buried in a barrow"], [42, 31, 6, "a sinkhole under a prop"], [1, 34, 6, "a Stacks floor plan's stone outline on stone, marked local"], [1, 20, 15, "bones inside a crag"], [42, 10, 9, "a cache's scrap by the edge"],
+  [1, 14, 10, "a shrub buried in a barrow"], [42, 17, 20, "a pack's hound within 10 tiles of the anchor"], [42, 31, 6, "a sinkhole under a prop"], [1, 34, 6, "a Stacks floor plan's stone outline on stone, marked local"], [1, 20, 15, "bones inside a crag"], [42, 10, 9, "a cache's scrap by the edge"],
 ];
 
 // --- 10. Dressing, zone by zone ---------------------------------------------------------------------------
@@ -424,6 +424,7 @@ function dressing(z, t, out, fail, at, W) {
     out.creatures++; b.creatures++;
     if (!onMap(c.tx, c.ty) || c.tx < R.edgeKeep || c.ty < R.edgeKeep || c.tx >= w - R.edgeKeep || c.ty >= d - R.edgeKeep)
       fail(`${at}: the ${c.type} at (${c.tx}, ${c.ty}) stands where the map doesn't reach, or by an edge`);
+    if (distance(c.tx - Math.floor(z.spawn.x), c.ty - Math.floor(z.spawn.y)) < 10) fail(`${at}: the ${c.type} at (${c.tx}, ${c.ty}) is within 10 tiles of the anchor`);
   }
   const propTiles = new Set();
   for (const p of z.props) {

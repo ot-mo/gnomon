@@ -351,8 +351,9 @@ export function spawnPick(rng, spawns, level) {
   return list[list.length - 1][0];
 }
 
-// The zone's wildlife: data.wildlife creatures or packs, each on map ground the anchor reaches (dist ≥ 0), 12 or
-// more tiles from it, off water, footprints and features, inside the keep; a pack's members within 2 tiles.
+// The zone's wildlife: data.wildlife creatures or packs, each on map ground the anchor reaches (dist ≥ 0), off
+// water, footprints and features, inside the keep; a pack's first 12 or more tiles from the anchor, the rest
+// within 2 tiles of it and 10 or more from the anchor.
 export function populate(ctx, dist, data = ctx.biome) {
   const { rng, zone } = ctx, W = zone.w, ax = Math.floor(zone.spawn.x), ay = Math.floor(zone.spawn.y);
   if (!data.spawns?.length) return;
@@ -369,7 +370,7 @@ export function populate(ctx, dist, data = ctx.biome) {
     const t = CREATURE_TYPES[type], size = t.group ? roll(rng, t.group) : 1;
     for (let m = 0; m < size; m++) {
       const [x, y] = m === 0 ? spot : [spot[0] + rng.int(-2, 2), spot[1] + rng.int(-2, 2)];
-      if (m > 0 && !ok(x, y)) continue;
+      if (m > 0 && (!ok(x, y) || distance(x - ax, y - ay) < 10)) continue;
       ctx.placeCreature(type, x, y, { state: rng.chance(0.5) ? "wander" : "idle" });
     }
   }
