@@ -1270,6 +1270,8 @@ export async function checkProgression(m) {
       const defect = rowsNow[di].defect;
       press("Enter");
       if (!W.wizard().mutations.includes(defect)) fail(`wizard 4b: Enter on the defect ${defect} didn't take it`);
+      const afterDefect = shown().filter((r) => typeof r === "string");
+      if (JSON.stringify(afterDefect) !== JSON.stringify(second)) fail(`wizard 4b: taking the defect ${defect} drew other offers: ${afterDefect}, were ${second}`);
       const name = MU[defect].name;
       click(`* ${name}`); if (W.wizard().mutations.includes(defect)) click(`* ${name}`);
       if (W.wizard().mutations.includes(defect)) fail(`wizard 4b: two clicks on the taken ${defect} didn't give it back`);
