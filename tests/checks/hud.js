@@ -196,7 +196,7 @@ export function checkHud({ game, startRun, inputHandlers, hud, renderMap, events
     fresh();
     const want = ["slam", "items", "markers", "route", "areas", "damage", "people", "sightings", "you"];
     if (renderMap.mapOverlays().join() !== want.join()) fail(`overlays: ${renderMap.mapOverlays()}`);
-    if (renderMap.describers().join() !== "tile,people,items,sightings,markers") fail(`describers: ${renderMap.describers()}`);
+    if (renderMap.describers().join() !== "tile,people,items,sightings,murals,markers") fail(`describers: ${renderMap.describers()}`);   // WS7: P0's five and WS7's "murals" (story/murals.js), nothing else
     const z = game.zone, p = game.player, tx = Math.floor(p.x), ty = Math.floor(p.y);
     z.seen[tx + ty * z.w] = 1;
     let drew = 0;

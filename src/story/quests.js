@@ -4,9 +4,11 @@
 //                                   stages: { [stage]: { on: { [eventType]: (game, q, ev) → nextStage | null } } },
 //                                   start = first stage, onComplete?(game, q) }
 //                                 Registering subscribes the bus to every event type its stages listen for.
-//   startQuest(game, id, { title, text, vars, giver, target, quiet }) → q | null   (null: already given)
+//   startQuest(game, templateId, { id, title, text, vars, giver, target, quiet }) → q | null   (null: already given)
 //                                 q = { id, template, title, text, giver, target, stage, vars, reward, done,
-//                                       failed, log } (JSON only), in game.quests; emits "quest:start" { q }
+//                                       failed, log } (JSON only), in game.quests; emits "quest:start" { q }.
+//                                 id: the quest's own id when one template makes several ("visit:loc:…", WS7);
+//                                 the template's id otherwise (the legacy quests)
 //   advanceQuest(game, q, next, { quiet })   "done" | "failed" | a stage name; emits "quest:done" or "quest:stage"
 //   finishQuest(game, id, title = null, { quiet })
 //                                 a giver says it's done: emits "quest:report" { id, quiet }, which a legacy
@@ -48,11 +50,11 @@ function route(game, type, ev) {
   }
 }
 
-export function startQuest(game, id, { title, text = "", vars = {}, giver = null, target = null, quiet = false } = {}) {
+export function startQuest(game, templateId, { id = templateId, title, text = "", vars = {}, giver = null, target = null, quiet = false } = {}) {
   if (game.quests.some((q) => q.id === id)) return null;
-  const t = TEMPLATES.get(id);
-  if (!t) throw new Error(`no quest template "${id}"`);
-  const q = { id, template: id, title: title ?? id, text, giver, target, stage: t.start,
+  const t = TEMPLATES.get(templateId);
+  if (!t) throw new Error(`no quest template "${templateId}"`);
+  const q = { id, template: templateId, title: title ?? id, text, giver, target, stage: t.start,
               vars, reward: null, done: false, failed: false, log: [] };
   if (!title && t.title) q.title = t.title(game, q);
   if (!text && t.text) q.text = t.text(game, q);
