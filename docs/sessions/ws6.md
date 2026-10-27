@@ -207,7 +207,7 @@ Served by `node tools/serve.mjs 8646`, `?silent=1` and the zero-gain sink, no co
 - The old game: `browser-0c` PASS for seeds 1234 and 7 (legacy and d20 fights in both views, Pell's talk, shop,
   services, back to talk, 0 errors); `browser-shell` PASS at 1280×720 and 600×300 (43 mode changes each);
   `browser-0d2 --all`: boot with 153 modules and no console error, with and without `quick=1`; imports 1 of 1;
-  `test-world.html?all=1` social ok, body failing on the sample line (§6).
+  `test-world.html?all=1` social ok, body failing on the sample line until `4c35f3b` (§6).
 
 ## 4. Deviations
 

@@ -252,9 +252,11 @@ each letter is spoken in `voiceFor(c) ?? c.type`. `builders.js`'s merchant answe
 
 ## Integration requests (6b)
 
-1. **`tests/checks/body.js` (P0's; asked of the coordinator):** its own item-kind sample list needs WS6b's two kinds,
-   one line like WS5's: `out.push({ kind: "vial", effect: "brine", count: 1 }, { kind: "coinage", effect: "glim", count: 3 });   // WS6b`.
-   Until then `check-body` fails "registered kind vial / coinage has no sample in the check".
+1. **Applied, `tests/checks/body.js` (P0's; the coordinator agreed):** `samples()` gets one line for WS6b's two
+   kinds, `out.push({ kind: "vial", effect: "brine", count: 1 }, { kind: "coinage", effect: "glim", count: 3 });   // WS6b`
+   (`4c35f3b`, as WS5 and WS8 did), and `tests/checks/content.js` `ITEM_SAMPLES` the same two (`599ad65`). DECISIONS:
+   a vial holds a liquid for a tonic or a sacrament and never backs or holds money (a vial of glim isn't funds, can't
+   pay and sells as glass: check-social §14); `coinage` is the item backing only, used if content ever asks for it.
 2. **`combat.js` (WS8), oathbreaking:** thorns (`killMonster(…, "dies on your thorns")`) and the lightning arc
    (`"is struck down"`) kill with you as the source; bible §3.3 says splash doesn't count. Have `killMonster` pass
    `splash: true` in the "kill" payload for those two (ritual.js already skips such a kill).
@@ -286,8 +288,8 @@ each letter is spoken in `voiceFor(c) ?? c.type`. `builders.js`'s merchant answe
 ### For the integrator (merging `p1-ws6b`)
 
 - Requests (6b) 1-8 above. For play: **2** (thorns and the lightning arc as splash in combat.js's "kill", or a flame-kin
-  caught by an arc makes you the Snuffer) and **3** (the Snuffer's look in 3D). Request 1 (check-body's sample line)
-  is in this branch if the coordinator allowed it (see "Part 6b" §6), else it is yours at the merge.
+  caught by an arc makes you the Snuffer) and **3** (the Snuffer's look in 3D). Request 1 (check-body's and
+  check-content's sample lines) is applied on this branch.
 - Files outside §8.4's WS6b list: `tests/checks/content.js` (one `ITEM_SAMPLES` line, `// WS6b`, `599ad65`),
   `content/factions.js` (WS6a's: the Flatfolk's and the Plan's voice ranges), `social/builders.js` (WS6a's: the
   merchant opens the trade screen; walkDialogue accepts `{ trade }` and `{ ritual }`), `tools/browser-ws6.mjs` (WS6's).
