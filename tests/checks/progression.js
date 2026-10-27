@@ -212,9 +212,11 @@ export async function checkProgression(m) {
         // Orrum +1 natural armour, Cassin neither.
         const LEVEL_WANT = { vey: { examine: 3, av: 0 }, orrum: { examine: 0, av: 1 }, cassin: { examine: 0, av: 0 } };
         const want = LEVEL_WANT[B.level] || { examine: 0, av: 0 };
-        const armour = { clothes: 0, leather: 1, chain: 2 }[B.kit.equip.body?.id] ?? 0, wantAv = armour + want.av;
+        // (The free implant, fitted since the WS9 merge, adds its own: WS5's table, not the one under test.)
+        const own = (g === "plumb" && m.implants.IMPLANTS[B.implant]?.bonus) || {};
+        const armour = { clothes: 0, leather: 1, chain: 2 }[B.kit.equip.body?.id] ?? 0, wantAv = armour + want.av + (own.av || 0);
         if (st.av(p) !== wantAv) fail(`${what}: AV ${st.av(p)}, want ${wantAv}`);
-        if (st.bonus(p, "examine") !== want.examine) fail(`${what}: examine +${st.bonus(p, "examine")}, want +${want.examine}`);
+        if (st.bonus(p, "examine") !== want.examine + (own.examine || 0)) fail(`${what}: examine +${st.bonus(p, "examine")}, want +${want.examine + (own.examine || 0)}`);
         if ((g === "plumb") !== !!B.level) fail(`${what}: a ${g} with Level ${B.level}`);
         if (p.level !== 1 || p.xp !== 0 || p.maxHpGain !== 0 || p.attrPoints !== 0) fail(`${what}: level ${p.level}, xp ${p.xp}, gains ${p.maxHpGain}, points ${p.attrPoints}`);
         if (p.funds !== B.glim || p.funds > (p.purse || 200) || (B.purse && p.purse !== B.purse)) fail(`${what}: ${p.funds} glim in a ${p.purse} purse, want ${B.glim}`);
@@ -228,6 +230,10 @@ export async function checkProgression(m) {
         if (p.inv.length !== packWant) fail(`${what}: ${p.inv.length} stacks in the pack, want ${packWant}`);
         if (g === "bent" ? p.creases !== 12 || "grade" in p : p.grade !== 2 || "creases" in p || p.origin.implant !== B.implant)
           fail(`${what}: creases ${p.creases}, grade ${p.grade}, implant ${p.origin?.implant}`);
+        // ...and the Plumb starts with that implant fitted (no Truing Cradle at creation: found unfitted at the WS9 merge).
+        const inBody = Object.values(p.body.implants || {}).filter(Boolean).map((it) => it.id);
+        if (g === "plumb" && (!p.origin.fitted || JSON.stringify(inBody) !== JSON.stringify([B.implant])))
+          fail(`${what}: the free implant ${B.implant} fitted ${p.origin.fitted}, in the body ${JSON.stringify(inBody)}`);
         if (p.name !== "Ylva Ärlig" || p.genotype !== g || p.background !== bg) fail(`${what}: ${p.name}, ${p.genotype}, ${p.background}`);
         const jp = codec.jsonProblems(p);
         if (jp.length) fail(`${what}: not plain JSON: ${jp.slice(0, 3).join("; ")}`);

@@ -43,7 +43,7 @@ import { MUTATIONS } from "../content/mutations.js";
 import { IMPLANTS } from "../content/items/implants.js";
 import { TREES } from "../content/powers.js";
 import { gainMutation, isDefect, creasesSpent, mutationRep } from "./mutations.js";
-import { canInstall, install } from "../bodymods/implants.js";
+import { canInstall, install, socketsFor } from "../bodymods/implants.js";
 
 export const RUN_MODES = ["oneWick", "commonsLamp", "pilgrim"];
 export const NAME_MAX = 24;
@@ -179,8 +179,9 @@ export function makeCharacter(choices) {
     const id = choices.implant ?? bg.implant ?? null;
     p.origin.implant = id;
     const item = id && IMPLANTS[id] ? { kind: "implant", id } : null;
-    const part = item && (IMPLANTS[id].parts?.[0] ?? null);
-    if (item && part && canInstall(null, p, item, part)?.ok) { install(null, p, item, part); p.origin.fitted = true; }
+    const part = item && (socketsFor(p, item).find((q) => !p.body.implants[q]) ?? null);   // (a part of the body, not a part type: the knuckles go on "hands")
+    // (free: no Truing Cradle, fee or hour on the table at creation; without it the station was asked for: never fitted)
+    if (item && part && canInstall(null, p, item, part, { free: true })?.ok) { install(null, p, item, part, { free: true }); p.origin.fitted = true; }
   }
   p.hp = maxHp(p);
   return p;
