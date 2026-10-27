@@ -137,7 +137,7 @@ export async function run(env) {
     fol.brain = { leader: "player" }; fol2.brain = { leader: "player" };
     const flatFol = mob(null, null, { type: "flatling" }); flatFol.brain = { leader: "player" };
     const want2 = [[monster, fol, "hostile"], [fol, monster, "hostile"], [fol, p(), "friendly"], [p(), fol, "friendly"], [fol, fol2, "friendly"],
-      [monster, flatFol, "unaware"], [deep, fol, "neutral"], [calm, fol, "hostile"]];
+      [monster, flatFol, "unaware"], [flatFol, monster, "unaware"], [fol, flat, "unaware"], [deep, fol, "neutral"], [calm, fol, "hostile"]];
     for (const [a, b, want] of want2) { const got = F.attitude(game, a, b); if (got !== want) fail(`followers: ${a === p() ? "you" : a.brain?.leader ? "your follower" : a.type} → ${b === p() ? "you" : b.brain?.leader ? "your follower" : b.type}: ${got}, want ${want}`); }
     // A cycle of leaders (a bug elsewhere) answers rather than overflowing the stack; so does a cycle of parents.
     {

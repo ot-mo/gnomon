@@ -136,18 +136,19 @@ export function attitude(game, a, b, depth = 0) {
   if (depth > MAX_DEPTH) return "neutral";
   // You: hostile to whatever is hostile to you; your followers are yours.
   if (a === player) return followsPlayer(b) ? "friendly" : attitude(game, b, player, depth + 1) === "hostile" ? "hostile" : "neutral";
-  // A follower shares its leader's attitudes (and is friendly to its leader and to the rest of its side).
+  // A follower is friendly to its leader and to the rest of its side.
   const leader = leaderOf(game, a);
-  if (leader && leader !== a) {
-    if (leader === b || (b !== player && b.brain?.leader === a.brain.leader)) return "friendly";
-    if (a.brain?.grudges?.[idOf(game, b)]) return "hostile";
-    if (leader === player) return attitude(game, b, player, depth + 1) === "hostile" ? "hostile" : "neutral";   // your side
-    return attitude(game, leader, b, depth + 1);
-  }
-  // The house rule: the plane and the dark are things only the player crosses.
+  if (leader && leader !== a && (leader === b || (b !== player && b.brain?.leader === a.brain.leader))) return "friendly";
+  // The house rule: the plane and the dark are things only the player crosses (followers included).
   if (b !== player) {
     if (isFlat(a) !== isFlat(b)) return "unaware";
     if (isGhostly(a) !== isGhostly(b) && !(darkSight(a) && darkSight(b))) return "unaware";
+  }
+  // Otherwise a follower shares its leader's attitudes.
+  if (leader && leader !== a) {
+    if (a.brain?.grudges?.[idOf(game, b)]) return "hostile";
+    if (leader === player) return attitude(game, b, player, depth + 1) === "hostile" ? "hostile" : "neutral";   // your side
+    return attitude(game, leader, b, depth + 1);
   }
   if (a.brain?.grudges?.[idOf(game, b)]) return unstrikable(a) ? "wary" : "hostile";
   // Whatever is out for you is out for your followers too (WS8's request 2).
