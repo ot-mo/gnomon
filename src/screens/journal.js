@@ -1,6 +1,6 @@
 // The journal (J; TECH_DESIGN §4.2 `journal`, owner WS7): tabs Quests · Locations · Histories (n of m known, by date) ·
 // Gossip · Notes. J or Esc closes it; Tab, ← → or 1-5 change the tab; ↑ ↓ (W S), PgUp PgDn, Home End and the wheel
-// scroll; a click on a tab opens it, a click anywhere else closes the journal. Drawing never changes the game's state.
+// scroll; a click on a tab opens it, a click anywhere else (or any other button) closes the journal. Drawing never changes the game's state.
 //
 //   openJournal(game)                  J (or a click on "J: journal"): open it over the view you are in
 //   JOURNAL_TABS                       the tab names, in order
@@ -30,6 +30,7 @@ export function journalLines(game, tab, width) {
   const learned = (kind) => Object.keys(J.secrets).map((id) => secretDef(run, id)).filter((d) => d?.kind === kind);
   if (tab === 0) {   // Quests: the parent's journal, as it was
     const active = game.quests.filter((q) => !q.done && !q.failed), done = game.quests.filter((q) => q.done);
+    const failed = game.quests.filter((q) => q.failed && !q.done);
     if (!game.quests.length) put("Nothing yet.", C.dim);
     for (const q of active) {
       put(q.title, C.head);
@@ -39,6 +40,8 @@ export function journalLines(game, tab, width) {
     }
     if (done.length) put("Done:", [120, 200, 130]);
     for (const q of done) put("  ✓ " + q.title, C.done);
+    if (failed.length) put("Failed:", [200, 120, 110]);
+    for (const q of failed) put("  ✗ " + q.title, [170, 120, 115]);
   } else if (tab === 1) {   // Locations
     const locs = learned("location");
     if (!locs.length) put("No places learned yet. Talk to people, read the floors, listen to rumours.", C.dim);
@@ -129,8 +132,7 @@ registerScreen("journal", {
     return journalKey(game, code);
   },
   mouse(game, button, cell) {
-    if (button !== 0) return;
-    const p = at(cell);
+    const p = button === 0 ? at(cell) : null;   // any other button closes it, as before
     if (p && p.tab !== undefined) { view(game).tab = p.tab; view(game).top = 0; }
     else popMode(game);
   },
