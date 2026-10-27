@@ -3,10 +3,11 @@
 //
 //   worldFns(world, seed) → W           the world functions of one run, cached (the last few seeds)
 //     W.heightAt(gx, gy) → int          ground height in blocks above the datum (stand = FLOOR_Z + height)
-//     W.columnAt(gx, gy) → { height, cliff, water, ground, near }   the same with what made it
+//     W.columnAt(gx, gy) → { height, cliff, tier, water, ground, near }   the same with what made it
 //     W.treeAt(cx, cy) → tree | null    the tree of 3×3-tile world cell (cx, cy): { gx, gy, base, trunk }
 //     W.portsOf(wx, wy) → [port]        where roads and rivers cross the span's open edges (gen/ports.js)
 //     W.channel(wx, wy, port) → rect    a port's straight approach in world coordinates
+//     W.liquidOf(wx, wy) → liquid id    what the span's surface water holds: its river's, else its biome's
 //   heightAt(world, seed, gx, gy), treeAt(world, seed, cx, cy)   the same, uncached
 //   SURFACE_RULES                       the numbers (gen/surface.js re-exports them)
 //
@@ -22,17 +23,30 @@
 //           makes a 2-block step between 4-neighbours: the map (where heights are invisible) stays walkable.
 //   cliffs  a separate mask raises small areas by 5 (≥ 4, so even across the relief the step at a cliff's
 //           foot is 4 or more and the map draws it as a wall). No cliff within 10 tiles of a port or a
-//           landmark's flattened ground.
+//           landmark's flattened ground. Where the biome stacks them (content/biomes.js cliffTiers 2: the Rust
+//           Steps' mesas) the mask's cores rise 5 more, a mesa on a mesa (`tier` 2). The map draws all ground
+//           4 or more blocks up as wall (world.js computeKinds), so cliff tops are 3D ground: the map's
+//           navigability leaves them out (gen/surface.js validateSurface).
 //   rivers  a river comes in from its port straight for 8 tiles on both sides of the edge (the approach);
 //           the ground within d tiles of that channel is at most d high, so its banks slope down to the
 //           water, which sits at the datum on rock (it never drops you a level; every body floats on it).
 //   flatten world.flatten (fixed landmark footprints): inside the rect and its 2-tile skirt the ground is
 //           the landmark's datum; beyond it the height may differ from the datum by at most 1 block per
 //           tile, so the natural ground comes back within the 4-tile falloff (3 blocks of relief, 3 tiles).
-// Clamping with distances keeps every step at most 1 block, the property the slope rule needs.
+// Clamping with distances keeps every step at most 1 block, the property the slope rule needs. Last, no
+// ground stands more than 12 blocks above the datum (DECISIONS: heights).
+//
+// A tree's trunk is 4-5 blocks with a 3×3 canopy on top; on high ground it is shorter, so its top leaf stays
+// in the zone's 16 blocks (scenery at most 14 above the datum, DECISIONS), and none grows where that leaves
+// under 3. No world tile's span carries an elevation of its own (the world model's `elev`): ground 4 blocks up
+// would be a map wall, so the surface's own relief is all the height the map can show.
+//
+// Liquids (DECISIONS: one per span, no mixing): a river carries its own (gen/ports.js, the same on both sides
+// of each edge), and a span with a river holds that one everywhere; any other span the biome's.
 import { B, FLOOR_Z, SURFACE } from "../world.js";
 import { seedFor, hashInt, hashFloat, seededNoise, fbm, distance } from "../rng.js";
 import { FLATTEN_SKIRT } from "../world/worldmodel.js";
+import { biomeOf } from "../content/biomes.js";
 import { portTable } from "./ports.js";
 
 export const SURFACE_RULES = {
@@ -41,6 +55,7 @@ export const SURFACE_RULES = {
   cliffRise: 5,       // blocks a cliff raises its area by
   cliffWave: 9,       // tiles: the size of the cliff mask's blobs
   cliffArea: 0.12,    // how much of the mask rises at cliffs 1 (the threshold is 1 − cliffArea × cliffs)
+  cliffArea2: 0.05,   // how much of it rises a second time where the biome stacks cliffs (cliffTiers 2)
   cliffClear: 10,     // tiles: no cliffs this close to a port or a landmark's flattened ground
   approach: 8,        // tiles: a river runs straight in from its port this far on both sides of an edge
   treeCell: 3,        // tiles: one tree candidate per 3×3-tile world cell
@@ -77,10 +92,11 @@ function makeWorldFns(world, seed) {
   const sRelief = seedFor(seed, "relief") | 0, sCliff = seedFor(seed, "cliffs") | 0;
   // Per-span terrain parameters (spans off the map take the nearest one's).
   const n = WW * WH, relief = new Float64Array(n), cliffs = new Float64Array(n), trees = new Float64Array(n);
-  const ground = new Uint8Array(n);
+  const stacked = new Float64Array(n), ground = new Uint8Array(n);
   for (const t of world.tiles) {
     const T = world.terrains[t.terrain] || {}, i = t.wx + t.wy * WW;
     relief[i] = T.relief ?? 0.3; cliffs[i] = T.cliffs ?? 0; trees[i] = T.trees ?? 0;
+    stacked[i] = biomeOf(t.biome).cliffTiers >= 2 ? cliffs[i] : 0;
     ground[i] = B[T.ground] ?? B.GRASS;
   }
   const spanIndex = (tx, ty) => clampInt(tx, 0, WW - 1) + clampInt(ty, 0, WH - 1) * WW;
@@ -132,10 +148,18 @@ function makeWorldFns(world, seed) {
     }
     const flats = flattenNear(wx, wy);
     for (const f of flats) near = Math.min(near, rectDist(f, gx, gy));
-    let cliff = 0;
+    let cliff = 0, tier = 0;
     if (near >= R.cliffClear) {
       const c = blend(cliffs, gx, gy);
-      if (c > 0 && seededNoise(sCliff, gx / R.cliffWave, gy / R.cliffWave) > 1 - R.cliffArea * c) cliff = R.cliffRise;
+      if (c > 0) {
+        const m = seededNoise(sCliff, gx / R.cliffWave, gy / R.cliffWave);
+        if (m > 1 - R.cliffArea * c) {
+          tier = 1;
+          const c2 = blend(stacked, gx, gy);
+          if (c2 > 0 && m > 1 - R.cliffArea2 * c2) tier = 2;
+          cliff = tier * R.cliffRise;
+        }
+      }
     }
     raw += cliff;
     for (const [p, c, d] of chans) {
@@ -149,8 +173,9 @@ function makeWorldFns(world, seed) {
       const d = rectDist(f, gx, gy);
       raw = Math.max(f.z - d, Math.min(f.z + d, raw));
     }
-    const height = Math.max(0, Math.floor(raw + 0.5));
-    return { height: water ? 0 : height, cliff: cliff > 0 && height >= R.cliffRise ? 1 : 0, water,
+    const height = Math.min(R.maxStand, Math.max(0, Math.floor(raw + 0.5)));
+    const isCliff = cliff > 0 && height >= R.cliffRise;
+    return { height: water ? 0 : height, cliff: isCliff ? 1 : 0, tier: isCliff ? tier : 0, water,
              ground: ground[spanIndex(wx, wy)], near };
   }
 
@@ -163,8 +188,19 @@ function makeWorldFns(world, seed) {
     const col = columnAt(gx, gy);
     if (col.cliff || col.water || col.near < R.treeClear) return null;
     for (const f of flattenNear(floorDiv(gx, ZW), floorDiv(gy, ZD))) if (rectDist(f, gx, gy) < 2) return null;
-    return { gx, gy, base: FLOOR_Z + col.height, trunk: 4 + (hashInt(seed, "treeH", cx, cy) % 2) };
+    // The top leaf (base + trunk + 1) stays below the zone's roof, SURFACE.h.
+    const trunk = Math.min(4 + (hashInt(seed, "treeH", cx, cy) % 2), SURFACE.h - 2 - FLOOR_Z - col.height);
+    if (trunk < 3) return null;
+    return { gx, gy, base: FLOOR_Z + col.height, trunk };
   }
 
-  return { seed, world, portsOf, channel, columnAt, heightAt: (gx, gy) => columnAt(gx, gy).height, treeAt };
+  // The span's liquid: a river's (the lowest id if two rivers meet, so every caller agrees), else the biome's.
+  function liquidOf(wx, wy) {
+    let out = null;
+    for (const p of portsOf(wx, wy)) if (p.kind === "river" && (out === null || p.liquid < out)) out = p.liquid;
+    const t = world.tileAt(wx, wy);
+    return out || (t ? biomeOf(t.biome).liquid : "water");
+  }
+
+  return { seed, world, portsOf, channel, columnAt, heightAt: (gx, gy) => columnAt(gx, gy).height, treeAt, liquidOf };
 }

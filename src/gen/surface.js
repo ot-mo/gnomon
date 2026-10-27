@@ -22,6 +22,7 @@
 // plan or the site; the dungeon entrance (a STAIRS block, zone.entrance) and, when a dungeon lies below,
 // sinkholes inside zone.dungeonRect.
 import { Zone, B, FLOOR_Z, SURFACE, standWith } from "../world.js";
+import { KIND } from "../blocks.js";
 import { makeRng, seedFor, distance } from "../rng.js";
 import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../pathing.js";
 import { SIDES, FLATTEN_SKIRT } from "../world/worldmodel.js";
@@ -115,6 +116,7 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
   zone.landmarkId = L?.id || null;
   zone.hasSky = true;
   zone.outdoor = true;
+  zone.liquid = W.liquidOf(wx, wy);   // one liquid per span: its river's, else its biome's
   for (const s of SIDES) zone.edges[s] = world.edgeOpen(wx, wy, s);
   const H = Int16Array.from(base.H), water = Uint8Array.from(base.water);
   const plan = new Uint8Array(n);       // columns a plan or site builder writes
@@ -523,34 +525,53 @@ function pickAnchor(zone, hub, scenery) {
 }
 const isStairs = (zone, i) => { const g = zone.blocks[i + (FLOOR_Z - 1) * zone.w * zone.d]; return g === B.STAIRS || g === B.STAIRS_UP; };
 
-// --- Validation (§5.3 item 9, the rules the stub can break) ----------------------------------------
-// Needs zone.gen (what generation knew); a zone without it is checked for holes and heights only.
+// --- Validation (§5.3 item 9) -----------------------------------------------------------------------
+// Needs zone.gen (what generation knew); a zone without it is checked for holes, heights, water and
+// navigability only.
+//
+// Navigability is the map's (§5.3: "under the map's step rules", pathing.js): the ground is every column
+// you can stand on that the map doesn't draw as a wall, and it is reached from the anchor with the map's
+// steps, never across a wall. The map draws ground 4 or more blocks up as wall (world.js computeKinds), so
+// cliff tops are 3D-only ground: counted apart (zone.ground3d), never against the zone. zone.navigability
+// is the share reached.
+// Water: every column holding water holds it at the datum, with rock under it (it never drops you a level).
 export function validateSurface(zone) {
   const problems = [], { w, d } = zone, g = zone.gen;
   if (!zone.hasDerived) zone.refresh();
-  const stand = zone.stand, open = standWith(zone, "open");
+  const stand = zone.stand, kind = zone.kind, open = standWith(zone, "open");
+  for (let i = 0; i < w * d; i++) if (kind[i] === KIND.WALL) open[i] = -1;   // the map never walks on a wall
   const ax = Math.floor(zone.spawn.x), ay = Math.floor(zone.spawn.y);
   const dist = reachable(open, w, d, ax, ay, PLAYER_STEP_UP, PLAYER_DROP);
   const scenery = g?.scenery || new Uint8Array(w * d);
-  const ground = (i) => stand[i] >= 0 && !scenery[i];
+  const ground = (i) => stand[i] >= 0 && !scenery[i] && kind[i] !== KIND.WALL;
   const reach = (x, y) => x >= 0 && y >= 0 && x < w && y < d && dist[x + y * w] >= 0;
   if (stand[ax + ay * w] < 0) problems.push("the anchor is not on standable ground");
 
   // Holes only over a dungeon, inside its rect; no standable ground above 12.
   const r = zone.dungeonRect;
-  let total = 0, reached = 0;
+  let total = 0, reached = 0, ground3d = 0, high = 0, badWater = 0;
+  const blocks = zone.blocks, layer = w * d;
   for (let i = 0; i < w * d; i++) {
     const x = i % w, y = (i - x) / w;
-    if (!zone.get(x, y, 0) && !zone.get(x, y, FLOOR_Z - 1)) {
+    if (!blocks[i] && !blocks[i + (FLOOR_Z - 1) * layer]) {
       if (!zone.hasBelow || !r || x < r.ox || y < r.oy || x >= r.ox + r.w || y >= r.oy + r.d) { problems.push(`a hole at (${x}, ${y}) outside the dungeon's rect`); break; }
     }
-    if (!ground(i)) continue;
-    if (stand[i] > FLOOR_Z + R.maxStand) problems.push(`standable ground at (${x}, ${y}) is ${stand[i] - FLOOR_Z} blocks up`);
+    for (let z = 0; z < zone.h; z++) {
+      const b = blocks[i + z * layer];
+      if ((b === B.WATER_SHALLOW || b === B.WATER_DEEP) && z !== FLOOR_Z - 1) { badWater++; break; }
+      if (z === FLOOR_Z - 1 && (b === B.WATER_SHALLOW || b === B.WATER_DEEP))
+        for (let u = 0; u < z; u++) if (blocks[i + u * layer] !== B.ROCK) { badWater++; break; }
+    }
+    if (stand[i] >= 0 && !scenery[i] && stand[i] > FLOOR_Z + R.maxStand) high++;
+    if (!ground(i)) { if (stand[i] >= 0 && !scenery[i]) ground3d++; continue; }
     total++;
     if (dist[i] >= 0) reached++;
   }
+  if (high) problems.push(`${high} columns of standable ground more than ${R.maxStand} blocks up`);
+  if (badWater) problems.push(`${badWater} columns of water off the datum or without rock under it`);
   const nav = total ? reached / total : 0;
   zone.navigability = nav;
+  zone.ground3d = ground3d;
   if (nav < R.minNav) problems.push(`navigability ${(100 * nav).toFixed(1)}% (want ${100 * R.minNav}%)`);
   if (!g) return problems;
 
