@@ -153,7 +153,7 @@ let slotSeq = 0;
 const newSlotId = (game) => `${GAME_ID}-${game.seed}-${Date.now().toString(36)}${(slotSeq++).toString(36)}`;
 function newSaving(slotId, created, store, { cp = 0, cpRecord = null, unclean = 0 } = {}) {
   return { slotId, created, store, committed: new Set(), pending: new Map(), stored: new Map(), queue: Promise.resolve(), jobs: [],
-           failed: [], cp, cpRecord, unclean, dead: false, live: SESSION, last: null };
+           failed: [], cp, cpRecord, unclean, dead: false, live: SESSION, last: null, held: [] };
 }
 function savingFor(game, store, slotId) {
   const sv = game.saving;
@@ -236,7 +236,7 @@ function landed(game, sv, job) {
 function submit(game, sv, job) {
   job.absorbed = null;
   sv.jobs.push(job);
-  for (const r of job.rows) if (r.zone) pend(sv, r.zone, r.savedAt);
+  for (const r of job.rows) if (r.zone && !r.pended) pend(sv, r.zone, r.savedAt);
   const standDown = async () => { if (!job.absorbed) return false; try { await job.absorbed; return true; } catch { return false; } };
   // The job's own bookkeeping (job.after) runs inside the queue, so whenWritten settles after it.
   const done = sv.queue.then(async () => {
@@ -291,6 +291,11 @@ function writeSave(game, { reason = "manual", store, slotId, clean = false, chec
     if (sv.cp) for (const k of old.kept || []) carry.push({ carry: { store: old.store, slot: old.slotId, key: k, into: "checkpointZones", maybe: true } });
     for (const c of carry) if (c.carry.into === "zones") pend(sv, c.carry.key, old.stored.get(c.carry.key) ?? now);
   }
+  // The zones you left since the last save, written behind with this slot record (writeZone): with a checkpoint,
+  // part of its baseline. (Saved to another slot, they are snapshotted afresh above.)
+  if (moved) for (const r of old.held.splice(0)) unpend(old, r.zone);
+  const held = sv.held.splice(0);
+  if (cpSave) for (const r of held) { r.keep = false; r.copy = true; sv.kept.add(r.zone); }
   const n = cpSave ? sv.cp + 1 : sv.cp;
   const keys = new Map(sv.stored);
   for (const r of rows) keys.set(r.zone, now);
@@ -308,7 +313,7 @@ function writeSave(game, { reason = "manual", store, slotId, clean = false, chec
     json = JSON.stringify(rec);
   }
   sv.live = clean ? null : SESSION;
-  const job = { rows: [...(cpSave ? [{ op: { op: "clear", store: "checkpointZones", slot: sv.slotId } }] : []), ...carry, ...rows, { slot: json }],
+  const job = { rows: [...(cpSave ? [{ op: { op: "clear", store: "checkpointZones", slot: sv.slotId } }] : []), ...carry, ...held, ...rows, { slot: json }],
                 checkpoint: cpSave ? n : 0, before: moved ? old.queue : null };
   job.after = (e) => {
     for (const c of carry) if (c.carry.into === "zones") { unpend(sv, c.carry.key); if (!e) sv.committed.add(c.carry.key); }
@@ -323,12 +328,18 @@ function writeSave(game, { reason = "manual", store, slotId, clean = false, chec
   return done.then(() => ({ id: sv.slotId, updated: now, zones: keys.size, reason, ...(cpSave ? { checkpoint: n } : {}) }));
 }
 
-// Write-behind: the zone you leave, after every other zone:leave handler (the clock catches up first).
+// Write-behind: the zone you leave, after every other zone:leave handler (the clock catches up first), snapshotted
+// then and there. With the automatic saves on it is held and goes into the next slot record's job (the change's own
+// save, half a second on, or the unload save), in one transaction: the store never holds a zone newer than its slot,
+// so no load mixes two moments (an item dropped after a save isn't both in the pack and on the floor), whichever
+// screen is up when the page goes. It counts as pending meanwhile (it can't leave memory). Without them (Node
+// checks), it is written at once, as in Phase 0.
 export function writeZone(game, zone) {
   const sv = game.saving;
   if (!sv || sv.dead) return null;
   let row;
   try { row = zoneRow(sv, zone, Date.now()); } catch (e) { failed(game, sv, `snapshotting ${zone.key}`, e); return null; }
+  if (autoOn(game)) { pend(sv, row.zone, row.savedAt); row.pended = true; sv.held.push(row); return null; }
   return submit(game, sv, { rows: [row] }).catch((e) => failed(game, sv, `writing ${zone.key}`, e));
 }
 on("zone:leave", (game, { zone }) => { writeZone(game, zone); }, { priority: -100 });
@@ -393,7 +404,7 @@ export function unloadSave(game) {
     keys.set(row.zone, now);
     const slot = snapshotSlot(game, { id: sv.slotId, created: sv.created, updated: now, zones: [...keys].map(([key, savedAt]) => ({ key, savedAt })),
       live: null, unclean: sv.unclean, checkpoint: sv.cpRecord || undefined });
-    own = { rows: [row, { slot: slot.json }] };
+    own = { rows: [...sv.held.splice(0), row, { slot: slot.json }] };
     sv.stored.set(row.zone, now);
   } catch (e) { failed(game, sv, "the unload save's snapshot", e); return null; }
   // Every job not yet begun, then this one: their ops at once (uncompressed), in order, in one transaction.
@@ -460,6 +471,7 @@ export function endRun(game, { cause = game.deathCause } = {}) {
   const sv = game.saving;
   if (!sv || sv.dead) return Promise.resolve(null);
   sv.dead = true;
+  for (const r of sv.held.splice(0)) unpend(sv, r.zone);   // (the zones left since the last save: this life is over)
   for (const w of waiting.splice(0)) if (w.game === game) w.reject(new Error("saveGame: the run this save was asked for has ended")); else waiting.push(w);
   if (checkpoints(game) && sv.cpRecord) {
     sv.restoring = submit(game, sv, { rows: [], run: (st) => writeRestore(st, sv.slotId, sv.cpRecord, sv.unclean) })

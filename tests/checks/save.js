@@ -823,7 +823,7 @@ async function ws9Sections(ctx) {
   // --- 11. The Continue hazard ---------------------------------------------------------------------------------
   {
     const out = [];
-    for (const auto of [false, true]) {
+    for (const [auto, busy] of [[false, false], [true, false], [true, true]]) {
       RULES.auto = auto;
       const st = memoryAdapter();
       freshRun(1234, { store: auto ? st : null });
@@ -838,15 +838,17 @@ async function ws9Sections(ctx) {
       playing(game, "map");
       if (bombs(game.zone.items) <= bombs((await st.get("zones", [m.id, L1]))?.items)) fail(`hazard (${auto ? "WS9" : "P0"}): the bomb wasn't dropped`);
       game.debug.enterZone("0,0,2", "down"); playing(game, "map");
+      if (busy) pushMode(game, BUSY, null, { pointer: false });   // (a story page, talk, the "DEPTH n" beat: no save under it)
       await settle();
       startRun(4321); game.pages = null;   // the page dies with nothing more written; then Continue
       await loadGame(m.id, { store: st });
       const n = bombs(game.player.inv) + bombs((await getZone(game, L1)).items);
-      out.push(`${auto ? "with the save on a completed zone change" : "P0 (no automatic saves)"}: ${n} bombs after the load, ${before} before the drop (loaded in ${game.zone.key})`);
-      if (auto && n !== before) fail(`the Continue hazard: ${n} bombs after the load, ${before} before the drop`);
+      out.push(`${auto ? `with the automatic saves${busy ? ", a busy screen up before the change's save" : ""}` : "P0 (no automatic saves)"}: ${n} bombs after the load, ${before} before the drop (loaded in ${game.zone.key})`);
+      if (auto && n !== before) fail(`the Continue hazard${busy ? " (a busy screen up before the change's save)" : ""}: ${n} bombs after the load, ${before} before the drop`);
+      if (busy && game.zone.key !== L1) fail(`the Continue hazard (a busy screen): loaded in ${game.zone.key}, not ${L1} (the last save)`);
       if (!auto && n === before) notes.push("11: the hazard didn't show without the automatic saves (the check's premise)");
     }
-    stats.continueHazard = `${out.join("; ")}. Left: the moment between leaving a zone and its change's save landing (${RULES.afterChange} s, then the write); the unload save covers a page that is closed in it`;
+    stats.continueHazard = `${out.join("; ")}. The zone you leave is written with the next slot record, so a load is one moment: the last save's (with a busy screen up, before the change)`;
     RULES.auto = true;
   }
 
@@ -1040,7 +1042,7 @@ async function ws9Sections(ctx) {
     await settle();
     const wrote = Object.fromEntries(Object.keys(b).map((k) => [k, cs.stats.byStore[k] - b[k]]));
     const cid = game.saving.slotId, cp2 = game.saving.cp, kept2 = (await rowsOf(cs, cid, "checkpointZones")).join(" ");
-    if (cp1 !== 1 || cp2 !== 2 || wrote.slots !== 1 || kept2 !== "0,0,1") fail(`checkpoints: at the start ${cp1}, on leaving the temple ${cp2}; it wrote ${JSON.stringify(wrote)}; copies after it: ${kept2 || "none"} (want 0,0,1, the zone it was made in)`);
+    if (cp1 !== 1 || cp2 !== 2 || wrote.slots !== 1 || kept2 !== "0,0,0 0,0,1") fail(`checkpoints: at the start ${cp1}, on leaving the temple ${cp2}; it wrote ${JSON.stringify(wrote)}; copies after it: ${kept2 || "none"} (want 0,0,0 0,0,1: the zone left and the zone it was made in)`);
     const atCp = await digestGame(game, ["0,0,0", "0,0,1"]);
     const route = [["0,0,2", "down"], ["0,0,3", "down"], ["0,0,2", "up"], ["0,0,1", "up"], ["0,0,2", "down"]];
     for (const [key, how] of route) {
@@ -1051,8 +1053,8 @@ async function ws9Sections(ctx) {
       await settle();
     }
     const rows = await rowsOf(cs, cid), copies = await rowsOf(cs, cid, "checkpointZones");
-    if (game.saving.cp !== 2 || copies.join() !== "0,0,1" || rows.join() !== "0,0,0,0,0,1,0,0,2,0,0,3")
-      fail(`after 5 zone changes: checkpoint ${game.saving.cp}, rows ${rows.join(" ")}, copies ${copies.join(" ")} (want 0,0,1: written before the checkpoint, overwritten after)`);
+    if (game.saving.cp !== 2 || copies.join() !== "0,0,0,0,0,1" || rows.join() !== "0,0,0,0,0,1,0,0,2,0,0,3")
+      fail(`after 5 zone changes: checkpoint ${game.saving.cp}, rows ${rows.join(" ")}, copies ${copies.join(" ")} (want 0,0,0 0,0,1: the checkpoint's own)`);
     const wakes = [];
     for (let k = 0; k < 2; k++) {
       game.hurtPlayer(99999, "a test");
@@ -1068,7 +1070,7 @@ async function ws9Sections(ctx) {
       await settle();
     }
     stats.checkpoints = `One Wick: death took the slot and its rows, a grave written ("a test"), no save after (90 frames, the unload refused). ` +
-      `The Commons Lamp: checkpoint 1 at the run's start, 2 on leaving the temple (the visit wrote ${wrote.slots} slot record and ${wrote.zones} zone rows, the temple written behind and level 1, the zone it was made in; the checkpoint dropped checkpoint 1's copies and kept its own zone's at once: copies ${kept2}); ` +
+      `The Commons Lamp: checkpoint 1 at the run's start, 2 on leaving the temple (the visit wrote ${wrote.slots} slot record and ${wrote.zones} zone rows, the temple left and level 1, in one transaction, and kept those two as its copies: ${kept2}; checkpoint 1's copies dropped); ` +
       `5 zone changes (hostiles killed, hp lost): rows ${rows.join(" ")}, copies ${copies.join(" ")}; death → C ×2: ${wakes.join(", ")} to the checkpoint, 0,0,2 and 0,0,3 gone from the store`;
   }
 
