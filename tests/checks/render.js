@@ -45,6 +45,9 @@
 //      where it passes behind you) and standing on the ground; none in the test world or underground.
 //  13. Every creature is drawn whatever its attitude: a beast 3 tiles ahead at noon draws as your follower too, and a
 //      flat one that follows you still casts its shadow (3D drew only the creatures hostile to you).
+//  14. The dressing's props (WS2b's zone.props, drawn since the WS2b merge): on a span near the start, every prop on a
+//      seen tile shows its glyph on the map (under items, creatures and you), none on a tile the map draws as wall; a
+//      prop three tiles ahead at noon changes the 3D frame, and only locally.
 import { checkGolden } from "./golden.js";
 
 export async function checkRender(m) {
@@ -771,6 +774,56 @@ export async function checkRender(m) {
     stats.creatures = seen;
   }
 
+  // --- 14. The dressing's props (WS2b's zone.props, drawn since the WS2b merge) ---------------------------------------
+  {
+    fresh(4242);
+    game.time = T(12);
+    const PR = m.biomes?.PROPS;
+    // A span near the start with a prop three tiles east of a straight run at its height (nothing standing on it).
+    let zp = null, pick = null;
+    for (const key of ["0,0,0", "1,0,0", "0,1,0", "1,1,0", "2,0,0", "0,2,0", "2,1,0", "1,2,0", "2,2,0", "3,0,0", "3,1,0", "0,3,0"]) {
+      if (key !== game.zone.key) game.debug.enterZone(key, "start");
+      const z = game.zone;
+      pick = (z.props || []).find((pr) => {
+        const x = Math.floor(pr.x), y = Math.floor(pr.y), h = z.stand[x + y * z.w];
+        return h >= 0 && x >= 4 && [1, 2, 3].every((k) => z.stand[x - k + y * z.w] === h) && !z.creatures.some((c) => Math.floor(c.x) === x && Math.floor(c.y) === y);
+      });
+      if (pick) { zp = z; break; }
+    }
+    if (expect(zp && PR, `a prop with a straight run west of it on the start's spans (${PR ? "none found" : "no PROPS"})`)) {
+      // The map: every prop on a seen tile the map doesn't draw as wall shows its glyph, unless an item, a creature or you
+      // stand on it; a cliff top's don't.
+      zp.seen.fill(1); game.view = "map"; game.mode = "map"; game.paused = false;
+      Object.assign(p(), { x: zp.spawn.x, y: zp.spawn.y });
+      renderMap.mapView.top = 2; renderMap.renderMap(game); S.present();
+      const mv = renderMap.mapView, covered = (x, y) => zp.items.some((it) => Math.floor(it.x) === x && Math.floor(it.y) === y)
+        || zp.creatures.some((c) => Math.floor(c.x) === x && Math.floor(c.y) === y) || (Math.floor(p().x) === x && Math.floor(p().y) === y)
+        || zp.markers.some((mk) => mk.x === x && mk.y === y);
+      let shown = 0, want = 0, onWall = 0, wallDrawn = 0;
+      for (const pr of zp.props) {
+        const x = Math.floor(pr.x), y = Math.floor(pr.y), sx = (x - mv.tx0) * 2, sy = mv.top + y - mv.ty0;
+        if (sx < 0 || sx >= capture.cols || sy < mv.top || sy >= capture.rows - 1 || covered(x, y)) continue;
+        const ch = capture.chars[sy * capture.cols + sx];
+        if (zp.kind[x + y * zp.w] === world.KIND.WALL) { onWall++; if (ch === PR[pr.kind].glyph) wallDrawn++; continue; }
+        want++; if (ch === PR[pr.kind].glyph) shown++;
+      }
+      expect(want > 0 && shown === want && wallDrawn === 0, `props on the map: ${shown} of ${want} shown, ${wallDrawn} of ${onWall} on wall tiles drawn`);
+      // 3D: three tiles west of the prop facing it at noon, the frame differs with the props and without, only locally.
+      const x = Math.floor(pick.x), y = Math.floor(pick.y);
+      stand(x - 3 + 0.5, y + 0.5, 0, -0.25); Object.assign(p(), { z: zp.stand[x + y * zp.w] });
+      const shot = () => { frame3d(); return { chars: capture.chars.slice(), colors: capture.colors.slice() }; };
+      const withProps = shot(), keep = zp.props;
+      zp.props = [];
+      const without = shot();
+      zp.props = keep;
+      let changed = 0;
+      for (let i = 0; i < capture.cols * capture.rows; i++)
+        if (withProps.chars[i] !== without.chars[i] || [0, 1, 2].some((k) => withProps.colors[i * 3 + k] !== without.colors[i * 3 + k])) changed++;
+      expect(changed > 0 && changed < 0.05 * capture.cols * capture.rows, `a ${pick.kind} three tiles ahead in 3D: ${changed} cells change with the props drawn`);
+      stats.props = { zone: zp.key, props: zp.props.length, map: `${shown} of ${want} shown, ${onWall} on wall tiles not drawn`, ahead: pick.kind, cells3d: changed };
+    }
+  }
+
   // --- 9. Golden (b) --------------------------------------------------------------------------------------------
   if (m.golden) {
     const g = checkGolden(m.golden.api, m.golden.fixtures, { only: ["frames"] });
@@ -785,14 +838,14 @@ export async function checkRender(m) {
 export async function run(env) {
   const scr = await env.screen({ cols: 180, rows: 56 });
   const load = (p) => env.src(p);
-  const [g, clock, light, raycast, render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, sfx, creatures, keys] = await Promise.all(
+  const [g, clock, light, raycast, render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, sfx, creatures, keys, biomes] = await Promise.all(
     ["game.js", "clock.js", "light.js", "raycast.js", "render3d.js", "renderMap.js", "zones.js", "turns.js", "world.js", "rules.js", "music.js",
-     "content/moods.js", "content/liquids.js", "content/world/worldmap.js", "sfx.js", "creatures.js", "keys.js"].map(load));
+     "content/moods.js", "content/liquids.js", "content/world/worldmap.js", "sfx.js", "creatures.js", "keys.js", "content/biomes.js"].map(load));
   const fixtures = { frames: await env.json("tests/fixtures/golden/frames.json") };
   const { currentApi } = await import("../golden/current-api.js");
   const S = await load("screen.js");
   const result = await checkRender({ game: g.game, startRun: g.startRun, S, capture: scr.capture, frameHash: scr.frameHash, clock, light, raycast,
-    render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, creatures, keys, golden: null, seedRandom: env.seedRandom, resize: scr.resize, sfx });
+    render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, creatures, keys, biomes, golden: null, seedRandom: env.seedRandom, resize: scr.resize, sfx });
   // Golden (b) last: its api reseeds Math.random and replaces the run.
   const api = await currentApi({ load, capture: scr.capture, frameHash: scr.frameHash }, env.seedRandom);
   const gold = checkGolden(api, fixtures, { only: ["frames"] });

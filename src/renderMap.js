@@ -23,6 +23,7 @@ import { slamState } from "./guardians.js";
 import { resistText } from "./combat.js";
 import { liquidAt } from "./social/liquids.js";
 import { LIQUIDS } from "./content/liquids.js";
+import { PROPS } from "./content/biomes.js";
 
 export const mapView = { panX: 0, panY: 0, hover: null, tx0: 0, ty0: 0, top: 2 };
 
@@ -238,8 +239,15 @@ registerMapOverlay("slam", (game, { zone, onScreen, toScreen }) => {
     }
 }, { order: 10 });
 
-// Items you've seen, your markers.
+// Items you've seen, over the dressing's props you've seen (WS2b: one glyph each, never on a tile the map draws as
+// wall, as a cliff top's are 3D's); your markers.
 registerMapOverlay("items", (game, { zone, onScreen, toScreen }) => {
+  for (const pr of zone.props || []) {
+    const tx = Math.floor(pr.x), ty = Math.floor(pr.y), P = PROPS[pr.kind], i = tx + ty * zone.w;
+    if (!P || !zone.seen[i] || zone.kind[i] === KIND.WALL || !onScreen(tx, ty)) continue;
+    const [sx, sy] = toScreen(tx, ty);
+    S.put(sx, sy, P.glyph, ...P.color);
+  }
   for (const item of zone.items) {
     const tx = Math.floor(item.x), ty = Math.floor(item.y);
     if (!zone.seen[tx + ty * zone.w] || !onScreen(tx, ty)) continue;

@@ -28,6 +28,7 @@ import { creatureSprite, canTalk, talkersIn, isFlat } from "./creatures.js";
 import { guardianSprites } from "./guardians.js";
 import { spikeSprites } from "./traps.js";
 import { itemSprite } from "./items.js";
+import { PROPS } from "./content/biomes.js";
 import { projectileSprites } from "./throwing.js";
 import { EYE, torchRange, torchPower } from "./player.js";
 import { FLOOR_Z, B, BLOCKS } from "./world.js";
@@ -590,6 +591,8 @@ function drawSprites(game) {
       art: ["c"], palette: { c: [[90, 230, 255], 1.6] }, beacon: true,
     });
   }
+  // The dressing's props (WS2b: shrubs, reeds, bones, webs…), standing on the ground; what is drawn after them covers them.
+  for (const pr of zone.props || []) { const sp = propSprite(pr); if (sp) drawSprite(game, sp); }
   // (Flat beings only cast a shadow; a ghostly guardian is only there with your torch out.)
   // Monsters, then the guardians' extras, then people (the order the parent game drew them in).
   for (const m of beastsIn(zone, game.player)) { const sp = creatureSprite(game, m); if (sp) drawSprite(game, sp); }
@@ -598,6 +601,15 @@ function drawSprites(game) {
   for (const sp of spikeSprites(game)) drawSprite(game, sp);
   for (const item of zone.items) drawSprite(game, itemSprite(game, item, game.time));
   for (const s of projectileSprites(game)) drawSprite(game, s);   // knives and potions in flight, gas clouds
+}
+
+// A prop (zone.props { x, y, z, kind }, its picture content/biomes.js PROPS[kind]): PROP_CELL tiles for each character of
+// its art, so a five-wide shrub is 0.7 of a tile across.
+const PROP_CELL = 0.14;
+function propSprite(pr) {
+  const P = PROPS[pr.kind];
+  if (!P?.art) return null;
+  return { x: pr.x, y: pr.y, z: pr.z, w: P.art[0].length * PROP_CELL, h: P.art.length * PROP_CELL, art: P.art, palette: P.palette };
 }
 
 function drawSprite(game, s) {
