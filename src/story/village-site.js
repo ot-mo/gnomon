@@ -209,9 +209,9 @@ export function buildVillage(ctx, site) {
 }
 
 // The village's skill (bible §9.2: one power from one tree, taught through the Kindling): the first power of that
-// tree in WS4's POWERS (content/powers.js) once it has them; none before.
+// tree in WS4's POWERS (content/powers.js) that works today (one with `needs` is never offered until it's gone); none before.
 function teachesFor(skill) {
-  const found = Object.entries(powers.POWERS || {}).find(([, p]) => String(p.tree || "").toLowerCase() === skill);
+  const found = Object.entries(powers.POWERS || {}).find(([, p]) => String(p.tree || "").toLowerCase() === skill && !p.needs);
   return found ? [found[0]] : [];
 }
 

@@ -296,7 +296,7 @@ export function ritualRows(game, c) {
     } });
   for (const key of c.teaches || typeOf(c)?.teaches || []) {
     const P = leveling.PERKS[key];
-    if (!P) continue;
+    if (!P || P.needs) continue;   // (a power still waiting on its needs is never offered: content/powers.js)
     const r = leveling.perkRank(p, key) + 1;
     if (r > (P.max || 1)) continue;
     rows.push({ id: `power:${key}`, label: `Learn ${leveling.perkLabel(p, key)}`, n: M.power[Math.min(r, 3) - 1], run: () => {

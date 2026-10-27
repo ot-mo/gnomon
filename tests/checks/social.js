@@ -1063,7 +1063,7 @@ export async function run(env) {
     // The flame-kin menu: rep as currency, the +120 cap, the floor, recruiting, the best item, a power.
     setup();
     const k = named("mira", "merchant", "drovers", { near: [1, 0], name: "Dov", level: 5 });
-    k.teaches = ["swimmer", "tough"];
+    k.teaches = ["swimmer", "tough", "repair"];   // (repair waits on its needs: never offered)
     ritual.performRite(game, k, "tracing");
     // The run's own secrets, learned as a player would (WS7's journal since the WS7a merge: its entries say only when
     // and how you learned each; kind, reading and text are the run's): deep readings of three events, a dark one of a
@@ -1077,6 +1077,7 @@ export async function run(env) {
     const ids = rows().map((r) => r.id);
     for (const w of [`give:${A.id}`, `give:${G.id}`, "power:swimmer", "power:tough", "recruit", "best"]) if (!ids.includes(w)) fail(`the flame-kin menu lacks ${w}: ${ids.join(", ")}`);
     if (ids.includes(`give:${Bd.id}`)) fail("the Drovers (deep) want a dark reading");
+    if (ids.includes("power:repair")) fail("the flame-kin menu teaches Repair, a power still waiting on its needs");
     const label = rows().find((r) => r.id === `give:${A.id}`)?.label || "";
     if (!label.includes(SEC.secretText(game.run, A))) fail(`a reading's row doesn't tell its account: "${label}"`);
     const rep0 = F.repOf(game, "drovers");

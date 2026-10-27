@@ -449,8 +449,8 @@ async function villages7b(env, { fail, stats, test, real, json, startRun, game }
   const F = await env.src("factions.js"), journal = await env.src("story/journal.js"), events = await env.src("events.js");
   const SEC = await env.src("story/secrets.js"), talk = await env.src("talk.js"), { xpToNext } = await env.src("leveling.js");
   const counts = { test: 0, real: 0 }, seen = { styles: new Set(), shrines: new Set(), templates: new Set() };
-  let n = 0, empty = 0, attempts = 0, maps = 0, lintels = 0, runes = 0, cast = 0, twice = 0, mortals = 0;
-  const codec = await env.src("save/codec.js"), facs = {};
+  let n = 0, empty = 0, attempts = 0, maps = 0, lintels = 0, runes = 0, cast = 0, twice = 0, mortals = 0, teaching = 0;
+  const codec = await env.src("save/codec.js"), POW = await env.src("content/powers.js"), facs = {};
   const times = [];
   for (const W of [test, real]) for (let seed = 1; seed <= 20; seed++) {
     const run = RUN.buildRun(seed, W);
@@ -480,6 +480,10 @@ async function villages7b(env, { fail, stats, test, real, json, startRun, game }
         if (c.talk?.dialogue !== r.dialogue || c.name !== r.name || c.faction?.[v.factionId] !== 1 || !(second >= 0.25 && second <= 0.5)
           || !(creatures.typeOf(c).hp > 0) || !(c.hp > 0) || c.maxHp !== c.hp || c.glyph !== "@" || c.level !== v.level)
           fail(`${tag}: ${r.uid} is ${json({ d: c.talk?.dialogue, name: c.name, f: c.faction, hp: creatures.typeOf(c).hp, level: c.level, own: c.hp })}`);
+        if (c.teaches?.length) {   // (found at the WS7b merge: an artificing village's leader taught Repair, which waits on WS5)
+          teaching++;
+          if (c.teaches.some((id) => !POW.POWERS[id] || POW.POWERS[id].needs)) fail(`${tag}: ${r.uid} teaches ${c.teaches} (a power still waiting on its needs)`);
+        }
         if (r === v.roles[0]) {   // mortal (WS6a #1, at the merge): a struck one keeps its health through a save
           const back = codec.rebuildCreature(JSON.parse(json(codec.trimCreature({ ...c, hp: c.hp - 1 }))), z);
           if (back.hp !== c.hp - 1 || back.maxHp !== c.maxHp || !creatures.touchable(game, back, {})) fail(`${tag}: ${r.uid} reloaded with hp ${back.hp} of ${back.maxHp}`);
@@ -532,7 +536,7 @@ async function villages7b(env, { fail, stats, test, real, json, startRun, game }
   }
   stats.villages = `${n} villages (test world ${counts.test}, real world ${counts.real}: no regions there before C1) on every village site of 20 seeds, ` +
     `${empty} abandoned; surfaces valid on ${attempts} attempts (p50 ${times[n >> 1]?.toFixed(1)} ms, max ${times[n - 1]?.toFixed(1)}); ${cast} villagers placed and reachable; ` +
-    `the run's factions villageFaction's (${Object.entries(facs).map(([k, x]) => `${x} under ${k}`).join(", ")}); ${mortals} villagers mortal through a save; ` +
+    `the run's factions villageFaction's (${Object.entries(facs).map(([k, x]) => `${x} under ${k}`).join(", ")}); ${mortals} villagers mortal through a save; ${teaching} leaders teaching a power that works today; ` +
     `${maps} mosaic, ${lintels} lintel and ${runes} rune murals on their blocks; records alike made alone and in ${pairs} pairs with another village taken away, ${twice} zones alike made twice; ` +
     `styles ${[...seen.styles].join(", ")}; shrines ${[...seen.shrines].join(", ")}; ${seen.templates.size} of 9 templates drawn`;
 
