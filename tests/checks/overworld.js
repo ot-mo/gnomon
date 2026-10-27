@@ -716,6 +716,20 @@ function discovery(G, scr, problems) {
       out.sight = true;
     }
   }
+  // Fast travel asks about no hidden site: a journey onto a span counted visited whose site isn't found, at a
+  // hidden-site chance of 1, arrives without a prompt and records nothing.
+  {
+    const g7 = fresh(G, 77, G.game.world), W7 = g7.run.world, A7 = atlas(g7);
+    const s7 = [...g7.run.sites.values()].find((x) => x.kind !== "landmark" && !A7.found[x.id]);
+    const n7 = W7.neighbours(s7.at.wx, s7.at.wy).find((v) => !canStep(W7, v, s7.at.wx - v.wx, s7.at.wy - v.wy));
+    goTo(g7, n7.wx, n7.wy); enterWorldMap(g7);
+    A7.visited[spanKey(s7.at.wx, s7.at.wy)] = 0;
+    const undo = [overrideRules("overworld", { hiddenSite: 1 }), swap(W7.tileAt(s7.at.wx, s7.at.wy), { encounterRate: 0, lostChance: 0 })];
+    let r7;
+    try { r7 = fastTravel(g7, s7.at, { confirm: true }); } finally { undo.forEach((u) => u()); }
+    out.fastHidden = { steps: r7.steps, prompt: g7.trip?.prompt?.kind || null };
+    if (!r7.ok || g7.trip?.prompt || g7.trip?.wx !== s7.at.wx || A7.found[s7.id]) problems.push(`discovery: fast travel asked about a hidden site (${JSON.stringify(out.fastHidden)})`);
+  }
   // Travellers: a rumour of a site near by, pinned.
   {
     const g2 = fresh(G, 72, G.game.world), W2 = g2.run.world;
