@@ -27,7 +27,8 @@
 // killed one never comes back; the legend's looks and mutations are put back on (legendLooks).
 import { resolveAttack, naturalSpec } from "./combat.js";
 import { emit, on } from "./events.js";
-import { claimUid, uidWhere, zoneState, killUid } from "./zones.js";
+import { claimUid, uidWhere, zoneState } from "./zones.js";
+import { killMonster } from "./monsters.js";
 import { legendLooks } from "./content/creatures/legends.js";
 import { registerAIHook } from "./ai.js";
 import { spawnCreature, addCreature, removeCreature } from "./creatures.js";
@@ -248,9 +249,24 @@ registerAIHook("legend:twicePressed", (game, m, dt) => {
   return false;
 });
 
+// The Saint in a lamp's or a lit brazier's glow burns as a shade does (fearLight's rate), and burnt away it dies
+// as if slain: your kill (you lit the fire), its experience and its uid dead for good.
+function burnsInLight(game, m, dt) {
+  if (lightAt(game, game.zone, m.x, m.y, m.z + 0.6).lamp < 0.3) return false;
+  m.lightBurn = (m.lightBurn || 0) + dt * 6;
+  m.hurt = 0.1;
+  if (m.lightBurn < 1) return false;
+  const n = Math.floor(m.lightBurn);
+  m.lightBurn -= n;
+  m.hp -= n;
+  if (m.hp > 0) return false;
+  killMonster(game, m, `${m.name} burns away in the firelight.`, true, true);
+  return true;
+}
+
 registerAIHook("legend:lamplessSaint", (game, m, dt) => {
   const zone = game.zone;
-  if (fearLight(game, m, dt)) { killUid(game, m.uid); return true; }   // burnt away: as dead as a slain one
+  if (burnsInLight(game, m, dt)) return true;
   if (m.state !== "chase") return false;
   m.g ||= { snuff: SAINT_SNUFF };
   if ((m.g.snuff -= dt) > 0) return false;

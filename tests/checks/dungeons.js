@@ -484,9 +484,11 @@ export async function checkLegends({ seed = 7 } = {}) {
   z.set(sx, sy + 1, FLOOR_Z, B.BRAZIER_LIT);
   z.refresh();
   let ticks = 0;
+  const xp0 = game.player.xp, xpOwed = sc.xp;
   while (z.creatures.includes(sc) && ticks < 600) { AI_HOOKS["legend:lamplessSaint"](game, sc, 0.1, new Int32Array(z.w * z.d)); ticks++; }
-  stats.saint = `burnt away after ${(ticks / 10).toFixed(1)} s by a lit brazier; uid ${uidWhere(game, saint.uid)}`;
+  stats.saint = `burnt away after ${(ticks / 10).toFixed(1)} s by a lit brazier; uid ${uidWhere(game, saint.uid)}; XP ${xp0} → ${game.player.xp} (owed ${xpOwed})`;
   if (z.creatures.includes(sc) || uidWhere(game, saint.uid) !== "dead") problems.push(`a Lampless Saint by a lit brazier: still there ${z.creatures.includes(sc)}, uid ${uidWhere(game, saint.uid)}`);
+  if (!(game.player.xp > xp0 || game.player.level > 1)) problems.push(`a Lampless Saint burnt away gave no experience (${xp0} → ${game.player.xp})`);
   stats.cases = 6;
   return { name: "legends", ok: problems.length === 0, problems, stats };
 }
