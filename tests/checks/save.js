@@ -1374,6 +1374,31 @@ async function ws9Sections(ctx) {
       compare("a failed copy on write, made by the next write: woken", { ...atCp, state: "", player: "", run: "", ids: "" }, { ...(await digestGame(game, ["0,0,2"])), state: "", player: "", run: "", ids: "" });
       if (!fs2.fails || !copies.includes("0,0,2")) fail(`a failed copy on write: ${fs2.fails} failed, copies ${copies.join(" ")}`);
       out.push(`a failed copy on write (${fs2.fails} failed write) made by 0,0,2's next write: woken with 0,0,2 ${problems.length === n0 ? "as at the checkpoint" : "CHANGED"}`);
+      // A checkpoint's own save fails, and play goes on (its writes landing): the run goes back to the last checkpoint
+      // written, and death and C wake there, exactly.
+      armed = false;
+      const fs3 = failing((ops) => armed && ops.some((o) => o.op === "clear"));
+      freshRun(1234, { store: fs3, mode: "commonsLamp" });
+      await settle();
+      await go("0,0,1", "down");                     // checkpoint 2, on leaving the temple
+      const at2 = await digestGame(game, ["0,0,0", "0,0,1"]), cp2 = game.saving.cp;
+      await go("0,0,2", "down"); await go("0,0,3", "down");
+      armed = true;
+      let refused = "";
+      await checkpoint(game).catch((e) => { refused = e.message; });
+      armed = false;
+      const cpAfter = game.saving.cp;
+      await go("0,0,2", "up"); await go("0,0,1", "up"); await go("0,0,2", "down");
+      const stored = (await fs3.get("slots", game.saving.slotId)).checkpoint?.n;
+      game.hurtPlayer(99999, "a test");
+      await game.saving.restoring;
+      let woke = "";
+      try { await wakeAtCheckpoint(game); woke = game.zone.key; } catch (e) { woke = `refused: ${e.message}`; }
+      const n1 = problems.length;
+      if (woke === "0,0,1") compare("a failed checkpoint save, then death and C", at2, await digestGame(game, ["0,0,0", "0,0,1"]));
+      if (!refused || cpAfter !== cp2 || stored !== cp2 || woke !== "0,0,1")
+        fail(`a failed checkpoint save: ${refused || "it resolved"}; the run's checkpoint ${cpAfter} after it (want ${cp2}), the stored slot's ${stored}; woke ${woke}`);
+      out.push(`a checkpoint whose save failed: the run back on checkpoint ${cpAfter}, the slot's ${stored} after more play; death and C woke in ${woke} ${problems.length === n1 ? "as at it" : "CHANGED"}`);
     } finally { console.error = quiet; RULES.auto = false; }
     stats.failedWrites = out.join("; ");
   }

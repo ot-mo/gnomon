@@ -242,7 +242,7 @@ function unwrite(game, sv, job) {
     sv.committed.delete(r.zone);
     if (r.keep || r.copy) sv.kept?.delete(r.zone);
   }
-  if (!sv.dead && game.saving === sv) requestSave(game, "retry", { delay: SAVE_RULES.retry });
+  if (!sv.dead && game.saving === sv) requestSave(game, "retry", { delay: SAVE_RULES.retry, backoff: true });
 }
 function submit(game, sv, job) {
   job.absorbed = null;
@@ -252,6 +252,8 @@ function submit(game, sv, job) {
   // The job's own bookkeeping (job.after) runs inside the queue, so whenWritten settles after it.
   const done = sv.queue.then(async () => {
     if (job.before) await job.before.catch(() => {});   // (another slot's writes, before its records are copied)
+    // Made under a checkpoint whose own save failed: it would write that checkpoint's rows and record (failedCheckpoint).
+    if (sv.badCp?.has(job.epoch) || job.rows.some((r) => r.zone && sv.badCp?.has(r.cp))) throw new Error("its checkpoint's save failed");
     if (await standDown()) return;
     if (job.run) { job.issued = true; await job.run(sv.store); return; }
     const ops = await opsOf(sv, job, false);
@@ -290,6 +292,7 @@ function writeSave(game, { reason = "manual", store, slotId, clean = false, chec
   // baseline (cp: the last checkpoint's number, so the first overwrite after it keeps them).
   const zones = [...game.zones.values()].filter((z) => visited(game, z) && (z === game.zone || moved || (!sv.committed.has(z.key) && !sv.pending.has(z.key))));
   if (moved && sv.cp) sv.kept = new Set(old.kept || []);   // (the copies come over below, and the rows as they stand)
+  const prev = cpSave ? { cp: sv.cp, cpRecord: sv.cpRecord, kept: new Set(sv.kept || []) } : null;   // (if this one fails)
   if (cpSave) sv.kept = new Set();   // (the last checkpoint's copies go: this one keeps its own)
   const rows = zones.map((z) => zoneRow(sv, z, now, cpSave ? { keep: false, copy: true } : {}));
   // A run saved to another slot (or store) than before: the old slot's records come over, so the new slot has
@@ -307,7 +310,8 @@ function writeSave(game, { reason = "manual", store, slotId, clean = false, chec
   if (moved) for (const r of old.held.splice(0)) unpend(old, r.zone);
   const held = sv.held.splice(0);
   if (cpSave) for (const r of held) { r.keep = false; r.copy = true; sv.kept.add(r.zone); }
-  const n = cpSave ? sv.cp + 1 : sv.cp;
+  const n = cpSave ? Math.max(sv.cp, sv.cpTop || 0) + 1 : sv.cp;   // (a number is never used twice, a failed one included)
+  if (cpSave) sv.cpTop = n;
   const keys = new Map(sv.stored);
   for (const r of rows) keys.set(r.zone, now);
   let slotSnap;
@@ -333,9 +337,10 @@ function writeSave(game, { reason = "manual", store, slotId, clean = false, chec
     for (const w of waiting.splice(0)) (w.game === game ? answered : waiting).push(w);
   }
   const job = { rows: [...(cpSave ? [{ op: { op: "clear", store: "checkpointZones", slot: sv.slotId } }] : []), ...carry, ...held, ...rows, { slot: json }],
-                checkpoint: cpSave ? n : 0, before: moved ? old.queue : null };
+                checkpoint: cpSave ? n : 0, epoch: n, before: moved ? old.queue : null };
   job.after = (e) => {
     if (e && clean) { sv.quitting = false; waiting.push(...answered); }   // (the session goes on: so do they)
+    if (e && cpSave) failedCheckpoint(game, sv, n, prev);
     for (const c of carry) if (c.carry.into === "zones") { unpend(sv, c.carry.key); if (!e) sv.committed.add(c.carry.key); }
     sv.last = { reason, at: Date.now(), ok: !e };
     if (e) { failed(game, sv, `saving slot ${sv.slotId}`, e); return; }
@@ -350,6 +355,15 @@ function writeSave(game, { reason = "manual", store, slotId, clean = false, chec
   return meta;
 }
 
+// A checkpoint whose save failed: the run goes back to the last one that was written (the store still has it, and its
+// copies), and every job made since under the failed one is set aside when its turn comes (submit), its zones written
+// afresh by the save asked for again; so are the zones left since, held under it. The next settlement makes a new one.
+function failedCheckpoint(game, sv, n, prev) {
+  (sv.badCp ||= new Set()).add(n);
+  if (sv.cp === n) { sv.cp = prev.cp; sv.cpRecord = prev.cpRecord; sv.kept = prev.kept; }
+  sv.held = sv.held.filter((r) => { if (r.cp !== n) return true; unpend(sv, r.zone); sv.committed.delete(r.zone); return false; });
+}
+
 // Write-behind: the zone you leave, after every other zone:leave handler (the clock catches up first), snapshotted
 // then and there. With the automatic saves on it is held and goes into the next slot record's job (the change's own
 // save, half a second on, or the unload save), in one transaction: the store never holds a zone newer than its slot,
@@ -362,7 +376,7 @@ export function writeZone(game, zone) {
   let row;
   try { row = zoneRow(sv, zone, Date.now()); } catch (e) { failed(game, sv, `snapshotting ${zone.key}`, e); return null; }
   if (autoOn(game)) { pend(sv, row.zone, row.savedAt); row.pended = true; sv.held.push(row); return null; }
-  return submit(game, sv, { rows: [row] }).catch((e) => failed(game, sv, `writing ${zone.key}`, e));
+  return submit(game, sv, { rows: [row], epoch: row.cp }).catch((e) => failed(game, sv, `writing ${zone.key}`, e));
 }
 on("zone:leave", (game, { zone }) => { writeZone(game, zone); }, { priority: -100 });
 
@@ -375,12 +389,12 @@ function autoFor(game) {
   return a;
 }
 const autoOn = (game) => SAVE_RULES.auto && !!(game.run && game.state && game.player) && !game.saving?.dead && !game.saving?.quitting && !!(game.saving || currentStore());
-export function requestSave(game, reason, { delay = 0, checkpoint: cp = false } = {}) {
+export function requestSave(game, reason, { delay = 0, checkpoint: cp = false, backoff = false } = {}) {
   const a = autoFor(game), at = (game.uiTime || 0) + delay;
   // (Several asked for become one, at the latest of their times: a change's half second holds off a periodic one. A
   // retry's wait doesn't hold off a new one.)
-  const later = a.want && a.want.reason !== "retry" ? Math.max(a.want.at, at) : at;
-  a.want = { reason: a.want ? `${a.want.reason}+${reason}` : reason, at: later, checkpoint: !!(a.want?.checkpoint || cp) };
+  const later = a.want && !a.want.backoff ? Math.max(a.want.at, at) : at;
+  a.want = { reason: a.want ? `${a.want.reason}+${reason}` : reason, at: later, checkpoint: !!(a.want?.checkpoint || cp), backoff: backoff && (!a.want || a.want.backoff) };
 }
 // A settlement: a surface span whose site (a landmark or a village) is a checkpoint (world/sites.js).
 function settlement(game, key) {
@@ -429,7 +443,7 @@ export function unloadSave(game) {
     keys.set(row.zone, now);
     const slot = snapshotSlot(game, { id: sv.slotId, created: sv.created, updated: now, zones: [...keys].map(([key, savedAt]) => ({ key, savedAt })),
       live: null, unclean: sv.unclean, checkpoint: sv.cpRecord || undefined });
-    own = { rows: [...sv.held.splice(0), row, { slot: slot.json }] };
+    own = { rows: [...sv.held.splice(0), row, { slot: slot.json }], epoch: sv.cp };
     sv.stored.set(row.zone, now);
   } catch (e) { failed(game, sv, "the unload save's snapshot", e); return null; }
   // Every job not yet begun, then this one: their ops at once (uncompressed), in order, in one transaction.
