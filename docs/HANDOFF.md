@@ -3,42 +3,27 @@
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
 **Updated:** 2026-10-27, the integrator (local session), on `integration`. **Phase 1 is running and Phase 2's
-integration has started: WS3, WS8 and WS4a are merged (`p2-ws3`, `p2-ws8`, `p2-ws4a`); the next is whichever
-`p1-*` tag lands next (WS9, WS5 and WS4b are running).** From here on only the integrator edits this file
+integration has started: WS3, WS8, WS4a and WS5 are merged (`p2-ws3`, `p2-ws8`, `p2-ws4a`, `p2-ws5`); the next is
+whichever `p1-*` tag lands next (WS9, WS4b and WS6a are running).** From here on only the integrator edits this file
 and moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p2-ws4a` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8` and
-  `p1-ws4a` with their integration requests; `p2-ws3` and `p2-ws8` before it). `main` is fast-forwarded to it. Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams'
+- **Last tag:** `p2-ws5` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+  `p1-ws4a` and `p1-ws5` with their integration requests; `p2-ws3`, `p2-ws8` and `p2-ws4a` before it). `main` is fast-forwarded to it. Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams'
   `p1-*` tags are on GitHub.
 - **Branch:** `integration`, in the worktree `C:\Users\Otto Mörner\Code\gnomon-wt\integration` (serves on port
   8660). Nothing is half finished.
-- **Done:** Phase 0 (0A1 … 0D2, notes in `docs/sessions/0A1.md` … `0D2.md`); WS3, WS8 and WS4a (`docs/ws3.md`,
-  `docs/ws8.md`, `docs/ws4.md`, `docs/sessions/ws3.md`, `ws8.md`, `ws4.md` "Part 4a"), merged. The merges' own numbers are under "Integration log" below.
+- **Done:** Phase 0 (0A1 … 0D2, notes in `docs/sessions/0A1.md` … `0D2.md`); WS3, WS8, WS4a and WS5 (`docs/ws3.md`,
+  `docs/ws8.md`, `docs/ws4.md`, `docs/ws5.md`, `docs/sessions/ws3.md`, `ws8.md`, `ws4.md` "Part 4a", `ws5.md`), merged. The merges' own numbers are under "Integration log" below.
 - **Checks:** `node tools/run-all.mjs`, 37 checks (about 2 minutes on an idle machine, 4 with three workstreams
   running; the timed ones, `check-dungeons`, `check-status`, `check-stats` and `check-perf`, alone at the end; since
   WS3, `check-perf` runs the render check first). Browser (headless Playwright, audio silenced,
   `NODE_PATH="$(npm root -g)"`): `browser-0d2.mjs`, `browser-0d1.mjs`, `browser-gate.mjs`, `browser-silent.mjs`, and
   with `node tools/serve.mjs <port>` running, `browser-shell.mjs` and `browser-0c.mjs` (`--port <port>`); each
-  workstream's own (`browser-ws8.mjs` from WS8, `browser-ws4.mjs` from WS4). `tools/README.md` has every command and what each check proves.
+  workstream's own (`browser-ws8.mjs` from WS8, `browser-ws4.mjs` from WS4, `browser-ws5.mjs` from WS5). `tools/README.md` has every command and what each check proves.
 
 ## Next step
-
-**WIP (2026-10-27, the integrator stopped at a usage limit): the WS5 merge is half done on `integration`; `p2-ws5` is
-not tagged and `main` is still at `p2-ws4a`.** Done so far: `p1-ws5` merged (`791938e`; the sample lines of WS8 and
-WS5 both kept; `NOT_COMPARED` the union of WS3's 1 and WS5's 8 frames, 38 compared, 0 mismatched); findings fixed:
-the map legend moved from G to the comma (`f170d6d`, §4.3 gives G to WS5's pick-up; WS9 told), two Plumb backgrounds'
-implant ids matched to WS5's table (`4e36991`; WS4b told to copy it), WS8's look tests now expect WS5's examine
-(`c820d2e`, "WS5 examine from L" pinned); WS5's requests applied: 3 (`24432f0`), 5 (`9b616ac`), 6 (`fb3e737`, a
-`breath` bonus key), 7 (`0b95d2a`), 13 (`d73cdf5`), 14 (the commit after it). **Left:** WS5's request 15 (README and
-§8.4: `browser-ws5`, `screens/inventory.js`, check-items' row) and 18 (`browser-0d1`'s tour: examine and the Truing
-Cradle; `docs/ws5.md` has the block; put it after the `create` block); requests 8 and 9 (gyro wrists, juggler's arm,
-survey lens, grip soles) as the integrator's own follow-up; record the carried ones (4 to WS4b and WS9, 10 to WS4b,
-11 to WS6b, 12 to WS10, 16 with golden (b)'s retirement, 19 to WS4b with `light.js`, 20 to WS6a, 21 to C); then
-`run-all`, `check-perf` alone against `p0-done`, the browser checks (`browser-ws5` among them, serve on 8660),
-the integration log entry, the tag `p2-ws5` and `main`'s fast-forward.
-
 
 **The integrator:** wait for the coordinator's message; merge each `p1-*` tag as it lands, in §8.5's
 order (WS9, WS3, WS8, WS5, WS4, WS6a, WS6b, WS10, WS2, WS7, WS1). For each: read `docs/<ws>.md` and
@@ -76,9 +61,9 @@ tags; WS1, which builds on the most, last):
 | 1 | WS9 Persistence and shell | `ws9`, `ws/ws9` | running (since 2026-10-26) |
 | 2 | WS3 Rendering outdoors and presentation | `ws3`, `ws/ws3` | tagged `p1-ws3` (51785f7); **merged, `p2-ws3`** (2026-10-27) |
 | 3 | WS8 Combat depth, AI and targeting | `ws8`, `ws/ws8` | tagged `p1-ws8` (c9638c0); **merged, `p2-ws8`** (2026-10-27) |
-| 4 | WS5 Body mods, items and equipment UI | `ws5`, `ws/ws5` | running (since 2026-10-27) |
+| 4 | WS5 Body mods, items and equipment UI | `ws5`, `ws/ws5` | tagged `p1-ws5` (058bbbc); **merged, `p2-ws5`** (2026-10-27) |
 | 5 | WS4a → WS4b Character creation and progression | `ws4`, `ws/ws4` | WS4a tagged `p1-ws4a` (dc22850), **merged, `p2-ws4a`** (2026-10-27); WS4b running |
-| 6 | WS6a → WS6b Factions, dialogue builders → trade, the Kindling, backings | `ws6`, `ws/ws6` | queued |
+| 6 | WS6a → WS6b Factions, dialogue builders → trade, the Kindling, backings | `ws6`, `ws/ws6` | WS6a running (since 2026-10-27) |
 | 7 | WS10 Dungeon sites, lairs and legends | `ws10`, `ws/ws10` | queued |
 | 8 | WS2a → WS2b Surface generation | `ws2`, `ws/ws2` | queued |
 | 9 | WS7a → WS7b Knowledge: history, villages, quests | `ws7`, `ws/ws7` | queued |
@@ -146,7 +131,7 @@ legend in pause card key list"), each now a carried item below:
 - **The d20 balance at tiers 5-8:** no retune now. Revisit with WS8's TTK tables (`node tools/check-combat.mjs --only
   ttk`) once WS4's powers and C4's gear exist, and settle it before or at the flip at WS4's merge, showing the user
   the tables then.
-- **The map's key hints** (L look, V fire, G legend, hotbar key 1): in WS9's pause card key list (WS9 has been told).
+- **The map's key hints** (L look, V fire, `,` legend, hotbar key 1): in WS9's pause card key list (WS9 has been told).
 
 ## Carried integration requests (by owner)
 
@@ -163,7 +148,13 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   the comment there); thriftyWick `bonus: () => ({ torchCost: -0.5 })` without `needs`; haggler without `needs`
   (priceMul reads it now); Lampskin, if 4b adds it, the same way. WS4 #4, `game.js startRun(seed, world, { mode,
   player })` (with WS9 #2), at the later of WS4b's and WS9's merges: then `chargen.js beginRun` calls it so and
-  `player.js` drops `nextRunPlayer`.
+  `player.js` drops `nextRunPlayer`. From WS5: #4, bare hands in `player.js` (`attackTime`, `weaponReach` read
+  `WEAPONS[wielded(p).id]` and fail with nothing in the main hand; then `inventory.js unequipPart`'s "the main hand's
+  weapon stays" can go, with WS9's `hud.js drawSword`); #10, a Plumb's free implant fitted through `grantImplant(p, id)`
+  (the ids now match WS5's table, `4e36991`, which 4b was asked to copy), the Readhand mutation calls
+  `identify(game, it)`, Keen fingers is `bonus(examine)`, implant abilities come through the "implant" source; #19,
+  the lantern-mote's light (status `running:lanternMote`): `player.js torchRange`/`torchPower` give at least 6 tiles
+  with it on, and the integrator's `light.js inDark` counts you lit, at the same merge.
 - **The flip** (§8.5; WS8 #9, WS4 #13), at WS4b's merge (all of WS4 and WS8 in; the coordinator holds it until then): `RULES.stats = "attributes"` and
   `RULES.combat = "d20"` (DECISIONS: d20, not §8.5's "dice") by default; golden (a) retires; `check-legacyfights`
   then needs `overrideRules("combat", "legacy")` around its fights (its fixture is the parent's); WS8's TTK tables
@@ -182,10 +173,24 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   witnesses. WS4 #8: the starting reputation by genotype (bible §15.4: the Assize −700 Bent / −100 Plumb, the Plan
   −100 / +100) from `game.player.genotype`; Pilgrim's "most factions start at 0 or above" (bible §10.1); `beginRun`
   adds each background's changes with `addRep`; the Aspirant's −50 with the Bent villages
-  (`BACKGROUNDS.aspirantOfTheRule.villageRep`, WS6a or WS7).
+  (`BACKGROUNDS.aspirantOfTheRule.villageRep`, WS6a or WS7). WS5 #20: each implant fitted gives the Plan +25 (at most
+  +100) on the bus's "install" (and back on "uninstall" if so decided); the Square's free fittings at Assize ≥ Warm
+  pass `openTruing(game, { at: "cradle", …, waive: true })` (WS10 places that Cradle).
 - **WS10** (at its merge): WS8 #3, spikes rise through a flat you harmlessly (bible §10.2): `traps.js updateSpikes`
-  skips you when `!touchesYou(game, null)` (creatures.js).
-- **WS5** (at its merge): WS4 #9, the six free implants the Plumb backgrounds name (`tallyEye`, `plumbLineEar`,
+  skips you when `!touchesYou(game, null)` (creatures.js). WS5 #12: Truing Cradles are `B.STATION` blocks (Benchmark,
+  the Metronome, the Square; stations by region rules); Hour-site bottoms give true-marks (`{ kind: "credit", count }`)
+  and artifacts (`randomBodyMod`). WS5 #9's metronome heart (`beatSight`: the next spikes, presses and hands in 3D)
+  goes with WS10's traps.
+- **WS6b** (at its merge): WS5 #11, the trade screen lists `registerService` rows as P0's shop does: a surgeon's
+  `fitImplant` and `removeImplant`, a tinker's `identifyArtifact` and `rechargeCell` (Old Ottilie, Detail C at
+  Benchmark); stock can include implants, artifacts and cells (`randomBodyMod`, `IMPLANT_VALUE`).
+- **The integrator's own backlog** (WS5's requests in merged workstreams' files, new behaviour rather than wiring, so
+  not rushed into the merge): #8 in `throwing.js`, gyro wrists (`gyroWrists`: thrown things fly flat, +2 damage) and
+  the juggler's arm (`jugglerArm`: up to four knives at once); #9, the survey lens (`surveyLens`: 3D fills the map twice
+  as far; `render3d.js`/`raycast.js`'s marking reach) and grip soles (`gripSoles`: no knockback, and climbing 2 on the
+  map, `turns.js`). Each implant does nothing of that until then (it fits, costs grade, shows its text). Also WS5 #21,
+  the plumb-line ear against the Askew's folds, once the Askew exist (C).
+- **WS5** (merged at `p2-ws5`; what was carried to it): WS4 #9, the six free implants the Plumb backgrounds name (`tallyEye`, `plumbLineEar`,
   `truesteelKnuckles`, `levelEye`, `lampCrown`, `darkLens`), each costing at most 2, with `parts`; `makeCharacter` fits
   one with `canInstall(null, p, item, part)` and `install(null, p, item, part)` (no game at creation); the kits'
   wants (copper, iron, bone, a reed cloak, an examining kit, stilt sandals, a theodolite, a snuffer, a map case, ink
@@ -197,8 +202,10 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   assertion allow it on the start span (outdoors); WS3 #7, the held weapon at night (`hud.js:326-328`) lit by
   `light.lightAt(...).sky` (sky × daylight), not the raw sky light. **The recorded frames** (the user's decision above): exclude by exact name only the
   frames WS9's HUD, pause and death screens change, each with its reason, WS9's own check holding the new screens,
-  golden (b) held. **The key hints** L (look), V (fire), G (legend) and hotbar key 1 on the pause card's key list: if
+  golden (b) held. **The key hints** L (look), V (fire), `,` (the map legend; it was G until the WS5 merge, WS9 told) and hotbar key 1
+  on the pause card's key list: if
   WS9 tags without them, add them at the merge (`screens/pause.js` is WS9's, merged by then) or carry the request on.
+  WS5 #4: `hud.js drawSword` with bare hands (with WS4b's `player.js` part).
   WS4 #12 and #13: WS9's title pushes `"create"` with `{ seed, mode }` (the wizard is registered on `integration`
   since `p2-ws4a`), and the wizard can read `save.js RUN_MODES` instead of its own copy; but **the wizard is for the
   attribute set**, so if WS9 merges before the flip, its title stays on the quick game (or hides New game) until the
@@ -221,6 +228,47 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p2-ws5`** (2026-10-27): `p1-ws5` (058bbbc) merged into `integration` (`791938e`). Three conflicts, all in P0 checks
+and each resolved by keeping both sides: `tests/checks/body.js` and `content.js` (WS8's and WS5's sample lines for
+their new kinds, #1), `tests/checks/screen-frames.js` (`NOT_COMPARED` the union of WS3's "victory card" and WS5's 8
+"… inventory" frames, each by exact name with its reason, both coordinator-approved; all 9 names are recorded frames;
+38 of 47 compared, 0 mismatched). The integrator's pause for the usage limit fell inside this merge (`a22986d`, a WIP
+handoff); it went on afterwards from there.
+- Verification findings, one commit each with an assertion that fails without it: the map legend's G took WS5's
+  pick-up (§4.3 gives G to WS5): the legend is on the comma (`f170d6d`; WS9 told for the pause card); two Plumb
+  backgrounds named implants WS5 built under other ids (`plumbLineEar`, `truesteelKnuckles` → `plumbEar`, `knuckles`),
+  and check-progression's implant test assumed an empty table (`4e36991`; WS4b told to copy it); WS8's look tests
+  expected the map back after a confirm, which now opens WS5's examine (`c820d2e`), and `browser-ws8` the same in the
+  browser (`ae62bb6`: eleven steps failed after Enter; it now expects examine and Esc back, seeds 1234 and 7 pass).
+- Applied, each with an assertion that fails without it: #3 (`24432f0`, a thrown potion through `effects.js splash`);
+  #5 (`9b616ac`, the glim heart's `torchCost` −1); #6 (`fb3e737`, a bonus key `breath`, the bellows lung's 1: the first
+  harm under water at 21 s, not 11; the HUD "AIR 20s"); #7 (`0b95d2a`, fists 1-2, gauntlets 1-4, truesteel knuckles 2-8
+  that crush); #13 (`d73cdf5`, STATION is the "Truing Cradle", `¤` on the map outdoors); #14 (`90dd371`, `examineScore`
+  is bible §13.4's `mod(int) + bonus(examine)`, WS5's identify roll uses it); #15 (`c8b1721`, README rows, §8.4 gives WS5
+  `screens/inventory.js` and `browser-ws5`); #17 (the G finding above); #18 (`52f7d91`, `browser-0d1`'s tour reaches
+  examine and the Truing Cradle: 18 of 18 modes). Carried (above): #4, #10, #19 to WS4b; #4 to WS9; #9's metronome
+  heart and #12 to WS10; #11 to WS6b; #20 to WS6a; #21 to C; #8 and #9 to the integrator's backlog; #16 with golden
+  (b); #22, #23 nothing.
+- Dependency table: "WS5 examine from L" against WS8's real look cursor (`c820d2e`): a confirm on the map, LL, a
+  click and L in 3D each open examine on what was looked at, and Esc goes back (fails with examine's inspect
+  listener cut). "WS5 implant surgery" waits for WS6b's trade screen.
+- Checks: `run-all` at `c8b1721` 35 of 37 (312 s, the CPU at 100%: the user's training job's python processes,
+  Discord, Defender; no other session's checks), the two failures timed only (`check-dungeons` p95 56.4 against 40;
+  `check-perf`). Alone against `p0-done` (`--rounds 3`) the machine stayed at 100% and `p0-done` itself read 2-3×
+  over its budgets (its outdoor frame 56 ms against its usual 23), so the ratios were noise; alone against `p2-ws4a`
+  (the tree before WS5; 5 rounds each way, alternating, 99-100%): **PASS**, every item within ×1.15 of it (outdoor
+  frame ×0.91, the bake ×0.82, dungeon frame ×1.07, refresh ×0.99, surface generation p95 ×1.10, dungeon generation
+  p95 ×0.52, passTime ×0.90, map step ×1.06). WS5's per-tick work (cells, running artifacts, the plumb-line ear: a scan
+  of what you carry, once a tick, for you only) is microseconds. The absolute budgets were last met alone at
+  `p2-ws4a`; recheck them on a quiet machine at the next merge. Golden mechanics 86, frames 27, 0 mismatched; screen
+  frames 38 of 47 compared, 0 mismatched; the bot, the legacy fights, determinism; check-items, check-combat,
+  check-progression, check-status. Browser (`tools/serve.mjs 8660`, `?silent=1`, 0 console errors): `browser-ws5`
+  (60 things scroll, the filter, the Equipment tab, examine from L and from an inspect, the Cradle fits a lamp crown
+  by Enter); `browser-0d1 --against p0-done` 18 of 18 modes, the HUD at 100×30, golden (b) 27 of 27, per tick
+  underground +2.3% and +0.4%, within its 5%, surface 3D −10.2%; `browser-ws4` (both sizes); `browser-ws8` (1234, 7,
+  after the fix); `browser-gate` (1234, 7); `browser-0c`; `browser-shell`; `browser-0d2 --all` (34 of 34 in
+  `test-world.html`); `browser-silent`.
 
 **`p2-ws4a`** (2026-10-27): `p1-ws4a` (dc22850) merged into `integration` (e765e50), no conflicts; WS4a changed no
 P0 check or fixture (only its own `tests/checks/progression.js` and `tools/check-progression.mjs`, and a new
@@ -359,6 +407,10 @@ its §8.4 files and two P0 checks).
 - **WS8 (merged; what's left):** `passTime` costs ×1.2-1.7 `p0-done`'s in WS8's alternating measure (p50 4-5 ms
   against a 12 ms budget); the look line is all L shows until WS5's examine screen opens on `inspect`; monsters ignore
   your followers until struck (WS6a, carried), spikes hurt a flat you (WS10, carried).
+- **WS5 (merged; what's left):** the backlog above (#8, #9); the item glyphs in the map legend (#16: `♦` implant,
+  `Θ` artifact, `≡` cell, `¶` true-mark) wait with the underground legend for golden (b)'s retirement; two old lines
+  kept as golden and the frames record them (#23: "You put on the The Mantle of Angles.", "throwing knifes"); a stray
+  file outside the repository, `C:OTTOMR~1placeholder-never-written.txt` (1 byte), to delete by hand (the user).
 - **WS9:** Continue can mix two moments (zones left after the last save are written behind and read on load: an item
   dropped after the save is duplicated); §7.3's save on a completed zone change fixes it. Saves are in memory only
   (IndexedDB, periodic and unload saves, the oneWick slot deleted on death, checkpoints). Prefetch is skipped while
