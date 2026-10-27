@@ -139,7 +139,8 @@ export const BIOMES = {
     ponds: { count: [0, 1], radius: [2, 2] },
     props: { count: [4, 10], kinds: [["scrap", 4], ["bones", 1]] },
     plateaus: 0.35, ramps: [1, 2], caches: 0.4,
-    spawns: [["lensSentry", 2], ["beatSpider", 3], ["girderGolem", 1], ["rustbackBrute", 3], ["rustOoze", 2]], wildlife: [2, 4],
+    spawns: [["lensSentry", 2], ["beatSpider", 3], ["girderGolem", 1], ["rustbackBrute", 3], ["rustOoze", 2],
+             ["rustbackScav", 1]], wildlife: [2, 4],   // (the scavs: the Old Cuts, tier 2)
   },
   shade: {   // Noon's burnt shadow: runes on every stone, umbra pools, ghosts
     liquid: "umbra", sub: "ASH",
@@ -186,7 +187,9 @@ export const BIOMES = {
     props: { count: [3, 8], kinds: [["tuft", 4], ["shrub", 2]] },
     lights: { count: [0, 1], post: "STONE" },
     plateaus: 0.15,
-    spawns: [["rustbackScav", 2], ["brinehog", 2], ["cairnHound", 1]], wildlife: [0, 2],
+    // The roads cross the land at every tier (levels 2-17): what walks them, from Rustbacks and hogs to press-hounds
+    // and brutes.
+    spawns: [["rustbackScav", 2], ["brinehog", 2], ["cairnHound", 1], ["kite", 1], ["pressHound", 1], ["rustbackBrute", 1]], wildlife: [0, 2],
   },
 };
 

@@ -478,6 +478,18 @@ function builders(fail, out) {
   if (lacking.length) fail(`no builder for ${lacking.join(", ")}`);
   for (const [id, bio] of Object.entries(BIOMES))
     for (const [type] of bio.spawns || []) if (!CREATURE_TYPES[type]) fail(`biome ${id}: spawn key ${type} is no creature`);
+  // Every span you can be in has a species of its own level in its biome's table (no fallback to the nearest).
+  {
+    const world = buildRun(1, REAL_WORLD).world, gaps = new Map();
+    for (const t of world.tiles.filter((s) => s.edges === "open" || s.landmark)) {
+      const spawns = biomeFor(world, t).spawns || [];
+      if (!spawns.length) continue;
+      const ok = spawns.some(([type]) => { const T = CREATURE_TYPES[type], [lo, hi] = T?.levels || T?.depths || [1, 99]; return T && lo <= t.level && t.level <= hi; });
+      if (!ok) gaps.set(`${t.biome} level ${t.level}`, (gaps.get(`${t.biome} level ${t.level}`) || 0) + 1);
+    }
+    for (const [k, v] of gaps) fail(`no wildlife of ${k} (${v} spans)`);
+    out.levelSpans = world.tiles.length;
+  }
   for (const [id, t] of Object.entries(WILDLIFE)) {
     if (t.depths) fail(`wildlife ${id} has depths (it would join the dungeons' default pool)`);
     if (!t.levels) fail(`wildlife ${id} has no levels`);
