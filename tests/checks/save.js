@@ -1310,7 +1310,7 @@ async function ws9Sections(ctx) {
       for (const r of await st.list("zones", { slot: odd.id })) await st.put("zones", { ...r, slot: "odd" });
       let drew = "";
       try { await title.openTitle(game); drew = text(); } catch (e) { fail(`the title with a slot named 42: ${e.message}`); }
-      if (drew && !/The quick game's last session ended without a save/.test(drew)) fail(`the title with a slot named 42: "${drew.replace(/s+/g, " ").slice(0, 160)}"`);
+      if (drew && !/The quick game's last session ended without a save/.test(drew)) fail(`the title with a slot named 42: "${drew.replace(/\s+/g, " ").slice(0, 160)}"`);
       await deleteSlot("odd", { store: st });
       out.push("a slot stored with a character named 42 drew as the quick game's");
     }
@@ -1378,6 +1378,15 @@ async function ws9Sections(ctx) {
     const kept2 = game.state.mode === "commonsLamp" && game.mode === "story";
     if (!recapOk || !woke || !kept2) fail(`the recap: card first ${card.includes("YOU DIED")}, recap after its beat ${t.includes("Damage taken")} ("${t.replace(/\s+/g, " ").slice(0, 200)}"); C woke ${woke} (${game.zone?.key}); R kept the mode ${kept2}`);
     out.push(`the death card, then after ${dead.RECAP_AFTER} s the recap (cause, damage by source, C to wake); C woke at the checkpoint; R started a new Commons Lamp run`);
+    // A Pilgrim's recap says its own words (not the commons lamp's).
+    freshRun(1234, { store: st, mode: "pilgrim" });
+    await settle();
+    game.hurtPlayer(99999, "a test");
+    frames(Math.ceil(dead.RECAP_AFTER * 60) + 2);
+    await game.saving.restoring; frames(1);
+    t = text();
+    if (!t.includes("The road kept your place: C wakes you") || t.includes("commons lamp")) fail(`a Pilgrim's recap: "${t.replace(/\s+/g, " ").slice(0, 300)}"`);
+    out.push("a Pilgrim's recap: the road kept its place");
     stats.shell = out.join("; ");
     useStore(null);
   }

@@ -69,7 +69,8 @@ function drawRecap(game) {
   lines.push(["The last messages:", [200, 200, 200]]);
   for (const m of r.messages) lines.push([`  ${m.text}`.slice(0, w - 6), m.color.map((c) => c * 0.8)]);
   lines.push(["", null]);
-  const end = r.ending === "checkpoint" ? (recap.restored ? "The commons lamp kept your place: C wakes you at the last settlement." : "Finding the last settlement...")
+  const kept = r.mode === "pilgrim" ? "The road kept your place" : "The commons lamp kept your place";
+  const end = r.ending === "checkpoint" ? (recap.restored ? `${kept}: C wakes you at the last settlement.` : "Finding the last settlement...")
     : r.ending === "gone" ? "One Wick: this life is over, and its save is gone." : "This run was never saved.";
   lines.push([end, [255, 230, 140]]);
   if (recap.error) lines.push([recap.error, UI.bad]);
