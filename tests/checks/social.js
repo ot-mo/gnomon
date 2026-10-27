@@ -982,11 +982,11 @@ export async function run(env) {
     const after = t.talk.state.stock;
     if (sig() === sold || !after.some((s) => s.count > 0) || t.talk.state.stockedAt !== game.time) fail(`no restock after two world days: ${sig()}`);
     if (JSON.stringify(merchants.restock(game, t)) !== JSON.stringify(after)) fail("a restock on the same day gave other goods");
-    // Pell restocks too (from his own table).
+    // The legacy Pell keeps the parent's single pack: three days away, and his sold-out bombs stay sold out.
     const pell = person("pell", "pell", null); creatures.addCreature(game.zone, pell);
     pell.talk.state.stock = [{ item: { kind: "bomb" }, count: 0, price: 20 }];
     events.emit(game, "zone:enter", { zone: game.zone, away: 3 * day, how: "walk", first: false, from: null });
-    if (!(pell.talk.state.stock.length > 1)) fail("Pell wasn't restocked");
+    if (pell.talk.state.stock.length !== 1 || pell.talk.state.stock[0].count !== 0) fail(`the legacy Pell was restocked: ${JSON.stringify(pell.talk.state.stock).slice(0, 120)}`);
     // A builder's merchant sells its faction's sacrament, and the back shelf shows only at Bright.
     const shelf = () => merchants.tradeRows(game, t, "theirs").some((x) => x.stock.best);
     game.state.rep = { drovers: 0 };
@@ -994,7 +994,7 @@ export async function run(env) {
     game.state.rep = { drovers: 600 };
     if (!shelf()) fail("the back shelf is hidden at Bright");
     if (!t.talk.state.stock.some((s) => s.item.kind === "vial" && s.item.effect === "longbackMilk")) fail("a Drover merchant sells no longback milk");
-    stats.restock = `${after.length} rows after two world days away (none at 2 days − 1 s, none on a load); the same day, the same goods; Pell too; the back shelf at Bright only`;
+    stats.restock = `${after.length} rows after two world days away (none at 2 days − 1 s, none on a load); the same day, the same goods; the legacy Pell never; the back shelf at Bright only`;
   }
 
   // --- 13. Voices -------------------------------------------------------------------------------------------------------

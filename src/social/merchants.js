@@ -15,7 +15,7 @@
 //   tradeRow(game, c, tab, row) → { ok, line }   buy, sell or pay for one; logs the line
 //   ensureStock(game, c) · restock(game, c)  a merchant's pack (c.talk.state.stock: [{ item, count, price, best? }])
 //   registerStock(id, (game, c, rng) → stock) a stock table; c.merchant.stock (or its type's) names it, else
-//                                            "pell" for the legacy peddler, else "general"
+//                                            "general"; the legacy Pell keeps his one pack (never restocked)
 //   isMerchant(c) · bestStock(game, c) → stock row | null (the dearest thing it would sell you; the Kindling's)
 //   restockSeconds() → s                     RULES.trade.restockDays world days of game time
 //
@@ -36,7 +36,6 @@ import { typeOf } from "../creatures.js";
 import { makeRng, hashInt } from "../rng.js";
 import { standingOf } from "./builders.js";
 import { sacramentOf } from "./liquids.js";
-import { peddlerStock } from "../content/legacy/encounters.js";
 import { CONTAINERS } from "../content/items/containers.js";
 
 export const TRADE_RULES = extendRules("trade", {
@@ -83,9 +82,10 @@ export function priceNote(game, c) {
 // --- Stock -------------------------------------------------------------------------------------------------------
 const STOCKS = new Map();
 export function registerStock(id, fn) { STOCKS.set(id, fn); }
-const stockIdOf = (c) => c.merchant?.stock ?? typeOf(c)?.merchant?.stock ?? (c.type === "pell" ? "pell" : "general");
-
-registerStock("pell", (game, c, rng) => peddlerStock(rng, c.level || 0));
+const stockIdOf = (c) => c.merchant?.stock ?? typeOf(c)?.merchant?.stock ?? "general";
+// The legacy peddler keeps the parent game's rules: his pack is rolled once, where he's placed (content/legacy/
+// encounters.js peddlerStock), and never restocked, so the old game's crystals stay as rare as they were.
+const legacyPeddler = (c) => c.type === "pell" && !c.merchant?.stock;
 // A merchant of the world: tonics, knives and bombs, vials (an empty one, and its faction's sacrament), two pieces
 // of gear and an unknown potion and scroll; and on the back shelf, for Bright customers only, one piece of gear
 // four levels better (bible §3.5 "the best stock").
@@ -119,7 +119,7 @@ export function restock(game, c) {
 }
 export function ensureStock(game, c) {
   const st = (c.talk.state ||= {});
-  if (!st.stock && isMerchant(c) && c.type !== "pell") restock(game, c);   // Pell's pack is rolled where he's placed
+  if (!st.stock && isMerchant(c) && !legacyPeddler(c)) restock(game, c);
   if (st.stock && st.stockedAt === undefined) st.stockedAt = game.time || 0;
   return st.stock || [];
 }
@@ -128,7 +128,7 @@ export function ensureStock(game, c) {
 // after two days in a village would refill every shop on loading it.
 on("zone:enter", (game, { zone, away, how }) => {
   if (how === "load" || !zone?.creatures || !(away >= restockSeconds())) return;
-  for (const c of zone.creatures) if (c.talk?.state?.stock && isMerchant(c)) restock(game, c);
+  for (const c of zone.creatures) if (c.talk?.state?.stock && isMerchant(c) && !legacyPeddler(c)) restock(game, c);
 });
 
 export function bestStock(game, c) {
