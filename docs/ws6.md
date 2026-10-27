@@ -147,8 +147,8 @@ usage limit). Nothing is uncommitted.
   far villager and the Clatter trader neutral; 566 talkers walked, 13,057 nodes; 0 problems). check-imports and
   check-names pass. Baseline run-all at p0-done: 35 of 37, only timed checks failing under load (check-dungeons
   alone: p95 37 ms, passes).
-- **Exact next step (WS6a still):** 1) run `node tools/run-all.mjs` and see it green (rerun timed checks alone,
-  `check-perf --against p0-done`); a run was started at 225a41c but its result wasn't read. 2) Browser: serve
+- **Exact next step (WS6a still):** 1) run-all at 225a41c: 36 of 37 (152.7 s), only check-perf failing (timed, under load); rerun it alone
+  against p0-done (`check-perf --against p0-done`) and record the numbers. 2) Browser: serve
   `node tools/serve.mjs 8646`, run the scratch script (copy it into the scratchpad again from the session, or write
   `tools/browser-ws6.mjs` as an integration request): P in both views, a click on "Esc close", a villager struck
   on the map, a priest's dialogue; `?silent=1`. `browser-0d1` will fail "modes never reached: factions" (P0 tool):
