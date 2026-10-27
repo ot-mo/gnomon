@@ -562,15 +562,22 @@ export function checkTargeting(ctx) {
     key("ArrowLeft"); key("ArrowLeft"); key("ArrowDown");
     const moved = cursorTarget(game)?.tile;
     expect(moved?.x === 7 && moved?.y === 6, `arrows moved the cursor to ${JSON.stringify(moved)} (want 7,6)`);
+    // A confirm emits inspect { open: true }, and WS5's examine screen opens on it (the dependency table's "WS5 examine
+    // from L", since the integrator's merge of p1-ws5); Esc there goes back to where you looked from.
+    const closeExamine = (back) => { const was = game.mode; key("Escape"); return was === "examine" && game.mode === back; };
     key("Enter");
-    expect(game.mode === "map" && inspects.length === 1 && inspects[0].open === true && inspects[0].x === 7 && inspects[0].y === 6,
-      `Enter: mode ${game.mode}, ${inspects.length} inspect(s) ${JSON.stringify(inspects.map((e) => [e.x, e.y, e.open]))} (want one, open, at 7,6)`);
+    expect(game.mode === "examine" && inspects.length === 1 && inspects[0].open === true && inspects[0].x === 7 && inspects[0].y === 6,
+      `Enter: mode ${game.mode}, ${inspects.length} inspect(s) ${JSON.stringify(inspects.map((e) => [e.x, e.y, e.open]))} (want examine, one inspect, open, at 7,6)`);
+    expect(closeExamine("map"), `Esc in the examine L opened: mode ${game.mode} (want the map)`);
     key("KeyL"); key("Escape");
     expect(game.mode === "map" && inspects.length === 1, `Esc: mode ${game.mode}, ${inspects.length} inspects (want map, no new one)`);
     key("KeyL"); key("KeyL");   // L twice: a look at the nearest at once
     const lastLook = run.logged[run.logged.length - 1] || "";
     expect(inspects.length === 2 && inspects[1].creature === gob && /% to hit/.test(lastLook) && /level 3/.test(lastLook),
       `LL: ${inspects.length} inspects, creature ${inspects[1]?.creature?.name}, line "${lastLook}" (want the goblin, its level and your chance)`);
+    const examined = game.modeStack[game.modeStack.length - 1]?.data?.creature;
+    expect(game.mode === "examine" && examined === gob, `LL: examine open on ${examined?.name ?? "nothing"} (want the goblin L looked at)`);
+    expect(closeExamine("map"), `LL then Esc: mode ${game.mode} (want examine on the goblin, then the map)`);
     stats.look = { keys: "L, Tab, arrows, Enter, Esc, LL", line: lastLook };
     // --- 2. L on the map: the mouse ------------------------------------------------------------------------
     key("KeyL");
@@ -579,8 +586,9 @@ export function checkTargeting(ctx) {
     inputHandlers.onHover(c1.x, c1.y);
     const hovered = cursorTarget(game)?.tile;
     inputHandlers.onMouseDown(0, c1.x, c1.y);
-    expect(hovered?.x === 12 && hovered?.y === 7 && inspects.length === 3 && inspects[2].x === 12 && inspects[2].y === 7 && game.mode === "map",
-      `the mouse: hover put the cursor on ${JSON.stringify(hovered)}, the click emitted ${inspects.length - 2} inspect at ${JSON.stringify(inspects[2] && [inspects[2].x, inspects[2].y])}`);
+    expect(hovered?.x === 12 && hovered?.y === 7 && inspects.length === 3 && inspects[2].x === 12 && inspects[2].y === 7 && game.mode === "examine",
+      `the mouse: hover put the cursor on ${JSON.stringify(hovered)}, the click emitted ${inspects.length - 2} inspect at ${JSON.stringify(inspects[2] && [inspects[2].x, inspects[2].y])}, mode ${game.mode} (want examine)`);
+    expect(closeExamine("map"), `Esc in the examine a click opened: mode ${game.mode}`);
     key("KeyL");
     inputHandlers.onMouseDown(2, c1.x, c1.y);
     expect(game.mode === "map" && inspects.length === 3, `a right click cancels: mode ${game.mode}, inspects ${inspects.length}`);
@@ -593,8 +601,9 @@ export function checkTargeting(ctx) {
     // --- 3. L in 3D ---------------------------------------------------------------------------------------
     in3d(game); Object.assign(p, { x: 5.5, y: 5.5, z: FLOOR_Z }); aimAt(p, gob);
     key("KeyL");
-    expect(inspects.length === 4 && inspects[3].creature === gob && inspects[3].open === true && game.mode === "explore",
-      `L in 3D: ${inspects.length - 3} inspect, creature ${inspects[3]?.creature?.name} (want the goblin in the crosshair, open)`);
+    expect(inspects.length === 4 && inspects[3].creature === gob && inspects[3].open === true && game.mode === "examine",
+      `L in 3D: ${inspects.length - 3} inspect, creature ${inspects[3]?.creature?.name}, mode ${game.mode} (want the goblin in the crosshair, open, examine over 3D)`);
+    expect(closeExamine("explore"), `Esc in the examine L opened in 3D: mode ${game.mode} (want explore)`);
     stats.look3d = run.logged[run.logged.length - 1];
     // At the open sky (nothing within sight): no inspect, and a line that says so.
     { const sky = arena("ws8-sky", { sky: true, w: 16, d: 10 }); enterZone(game, sky, { how: "start" }); in3d(game);
