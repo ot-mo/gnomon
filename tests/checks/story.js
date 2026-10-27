@@ -508,7 +508,8 @@ async function villages7b(env, { fail, stats, test, real, json, startRun, game }
       if (n % 8 === 1) {   // the same zone twice: blocks, cast, murals
         const z2 = SUR.generateSurface(run, site.at.wx, site.at.wy);
         const sig = (zz) => json([zz.creatures.map((c) => [c.uid, c.type, c.tx, c.ty]), zz.murals, zz.village]);
-        if (sig(z2) !== sig(z) || Buffer.compare(Buffer.from(z.blocks), Buffer.from(z2.blocks)) !== 0) fail(`${tag}: the zone differs made twice`);
+        const sameBlocks = z.blocks.length === z2.blocks.length && z.blocks.every((b, i) => b === z2.blocks[i]);   // (no Buffer: test-world.html runs this too)
+        if (sig(z2) !== sig(z) || !sameBlocks) fail(`${tag}: the zone differs made twice`);
         twice++;
       }
     }
