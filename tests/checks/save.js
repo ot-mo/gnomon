@@ -853,7 +853,14 @@ async function ws9Sections(ctx) {
       const n0 = problems.length;
       startRun(4321); game.pages = null;
       await loadGame(fx.slotId, { store: memoryAdapter({ from: fx.dump }) });
-      compare("p0-done's v1 save, loaded here", fx.digest, await digestGame(game, fx.keys));
+      // A save made before WS1 has no atlas: WS1's discovery makes one on the load's zone:enter, holding the span loaded
+      // into and nothing else (at the WS1 merge). The rest is compared as it was; the atlas is held to that one span.
+      const atlasOnly = (d) => ({ ...d, state: strip(d.state, (v) => delete v.atlas) });
+      const loadedV1 = await digestGame(game, fx.keys), madeAtlas = JSON.parse(loadedV1.state).atlas;
+      const here = `${game.zone.wx},${game.zone.wy}`;
+      if (JSON.parse(fx.digest.state).atlas !== undefined || !madeAtlas || JSON.stringify(Object.keys(madeAtlas.visited || {})) !== JSON.stringify([here]))
+        fail(`p0-done's v1 save: the atlas a load makes is ${JSON.stringify(madeAtlas)?.slice(0, 160)}, want only ${here} visited`);
+      compare("p0-done's v1 save, loaded here", atlasOnly(fx.digest), atlasOnly(loadedV1));
       const asIs = problems.length === n0;
       let zoneRuns = 0;
       const M = { 1: { slot: (r) => ({ ...r, state: { ...r.state, migratedFrom: r.version } }), zone: (z) => { zoneRuns++; return { ...z, migratedZone: z.v ?? 1 }; } } };
@@ -862,13 +869,13 @@ async function ws9Sections(ctx) {
       const got = await digestGame(game, fx.keys);
       if (game.state.migratedFrom !== 1) fail(`v1 → v2: state.migratedFrom ${game.state.migratedFrom}`);
       if (zoneRuns !== fx.keys.length) fail(`v1 → v2: the zone migration ran ${zoneRuns} times for ${fx.keys.length} zones read (once each, as each is read)`);
-      const unmigrated = { ...got, state: strip(got.state, (v) => delete v.migratedFrom), zones: {} };
+      const unmigrated = { ...got, state: strip(got.state, (v) => { delete v.migratedFrom; delete v.atlas; }), zones: {} };   // (atlas: WS1's, above)
       for (const [k, z] of Object.entries(got.zones)) {
         if (JSON.parse(z).migratedZone !== 1) fail(`v1 → v2: zone ${k} wasn't migrated as it was read`);
         unmigrated.zones[k] = strip(z, (v) => delete v.migratedZone);
       }
       const n1 = problems.length;
-      compare("v1 → v2, everything but the migration's change", fx.digest, unmigrated);
+      compare("v1 → v2, everything but the migration's change", atlasOnly(fx.digest), unmigrated);
       const chain = migrate({ id: "c", version: 1 }, [{ key: "k" }], { to: 3, migrations: {
         1: { slot: (r) => ({ ...r, steps: [...(r.steps || []), 1] }), zone: (z) => ({ ...z, steps: [1] }) }, 2: { slot: (r) => ({ ...r, steps: [...r.steps, 2] }) } } });
       if (JSON.stringify(chain.slot.steps) !== "[1,2]" || chain.slot.version !== 3 || chain.zones[0].v !== 3 || JSON.stringify(chain.zones[0].steps) !== "[1]")
@@ -928,21 +935,29 @@ async function ws9Sections(ctx) {
     frames(2, 1); await whenWritten(game);
     const periodic = reasons(), s1 = SAVE_STATS.saves;
     if (early || periodic !== "periodic" || s1 !== s0 + 1) fail(`120 s of play: ${early} early saves, then ${s1 - s0} (${periodic})`);
+    // The travel saves: every 10 s in a saveable "world". WS1's world map isn't saveable (at the WS1 merge): a save there
+    // would load you back where the journey began, the trip itself (game.trip) not being saved; so none is made on it,
+    // and the travel saves wait for the trip to be saved (HANDOFF). A stand-in that is saveable, where there is none.
     const had = SCREENS.has("world");
     if (!had) registerScreen("world", { over: "none", saveable: true, draw() {} });
+    const worldSaves = !!screenFor("world")?.saveable;
     game.mode = "world"; game.modeStack = [];
     frames(9, 1); const early2 = SAVE_STATS.saves - s1;
     frames(2, 1); await whenWritten(game);
-    const travel = reasons();
+    const travel = reasons(), onWorld = SAVE_STATS.saves - s1;
     if (!had) SCREENS.delete("world");
     playing(game, "map");
-    if (early2 || travel !== "travel") fail(`10 s of the world map: ${early2} early saves, then ${travel}`);
+    if (worldSaves ? (early2 || travel !== "travel") : onWorld) fail(`11 s of the world map (saveable ${worldSaves}): ${early2} early saves, ${onWorld} in all, the last ${travel}`);
+    if (!worldSaves) {   // the travel save asked for there waited, and lands on the first frame back in a view
+      frames(2); await whenWritten(game);
+      if (reasons() !== "travel" || SAVE_STATS.saves !== s1 + 1) fail(`back from WS1's world map: the waiting travel save ${reasons()}, ${SAVE_STATS.saves - s1} made`);
+    }
     unloadSave(game); await whenWritten(game);
     const liveHidden = (await slotOf(st, game.saving.slotId)).live;
     pageShown(game); frames(2); await whenWritten(game);
     const back = reasons(), liveBack = (await slotOf(st, game.saving.slotId)).live;
     if (liveHidden !== null || back !== "back" || liveBack !== SESSION) fail(`hidden then back: live ${liveHidden} → ${liveBack}, the save ${back}`);
-    stats.autoSaves = `the run's first (${RULES.afterChange} s after its start); none in 119 s of play, one at 120 (periodic); none in 9 s of the world map, one at 10 (travel); back on the page (live set again)`;
+    stats.autoSaves = `the run's first (${RULES.afterChange} s after its start); none in 119 s of play, one at 120 (periodic); ${worldSaves ? "none in 9 s of the world map, one at 10 (travel)" : "none on WS1's world map (not saveable)"}; back on the page (live set again)`;
     // Prefetch: a stored span next door is read, never made.
     RULES.auto = false;
     freshRun(1234, { store: null });
