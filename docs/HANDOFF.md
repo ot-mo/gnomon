@@ -116,18 +116,16 @@ job does. For a timed gate number, run that check alone on an idle machine and a
 
 ## Waiting on the user
 
-- **The d20 balance from tier 5** (WS8, `docs/sessions/ws8.md` §3): under d20 a same-level kill costs 34-60% of your
-  health at tiers 5-8 against the parent's 25-38% (7.5-17.7% against 8.5-16.3% through tier 4, close). Creatures add
-  floor(level / 3) to hit against a DV that grows only with AGI; nothing on your side scales with level. The numbers
-  are DECISIONS' and the bible's (RULES.d20), so no workstream changed them: whether to retune (and where: the
-  creature to-hit, player DV by level, WS4's powers, C4's gear) is your call, before or at the flip (§8.5).
-- **WS9's HUD, pause and death screens will change many recorded screen frames** (the 47 of
-  `tests/checks/screen-frames.js`, P0's guard on the shell). Only WS3's "victory card" is excluded (approved for WS3,
-  drawn over the outdoor map). A blanket exclusion is not approved: at WS9's merge the integrator lists which frames
-  change and why, and asks before excluding any.
-- **Key hints on the map** (WS8 #5, WS3 #4, `0D2.md` §5's hotbar hint; WS4b's B and K to come): the map header is in golden (b)'s 27
-  underground frames, so it can't name L (look), V (fire), G (legend) or hotbar key 1 while golden (b) is held. Where
-  they go instead (the pause card's key list at WS9's merge, WS4b's sheet) or when golden (b) retires is yours.
+Nothing. The user's decisions of 2026-10-27 (given to the coordinating session in chat: "Do recommend for 1 and two
+and put legend in pause card key list"), each now a carried item below:
+
+- **WS9's recorded frames:** at WS9's merge the integrator excludes from `tests/checks/screen-frames.js`, by exact name
+  in `NOT_COMPARED`, only the frames WS9's HUD, pause and death screens change, each with its reason; WS9's own check
+  must hold the new screens; golden (b) stays held. No blanket exclusion.
+- **The d20 balance at tiers 5-8:** no retune now. Revisit with WS8's TTK tables (`node tools/check-combat.mjs --only
+  ttk`) once WS4's powers and C4's gear exist, and settle it before or at the flip at WS4's merge, showing the user
+  the tables then.
+- **The map's key hints** (L look, V fire, G legend, hotbar key 1): in WS9's pause card key list (WS9 has been told).
 
 ## Carried integration requests (by owner)
 
@@ -144,7 +142,9 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `RULES.combat = "d20"` (DECISIONS: d20, not §8.5's "dice") by default; golden (a) retires; `check-legacyfights`
   then needs `overrideRules("combat", "legacy")` around its fights (its fixture is the parent's); WS8's TTK tables
   (`node tools/check-combat.mjs --only ttk`) become the balance reference. Under d20 the map's T opens the target
-  screen, creatures flee, and the log takes the d20 lines. The user's call on the tier 5-8 balance (above) comes first.
+  screen, creatures flee, and the log takes the d20 lines. **Due before or at the flip:** the tier 5-8 balance (the
+  user's decision above): rerun `node tools/check-combat.mjs --only ttk` with WS4's powers in (and C4's gear, if it
+  exists by then), show the user the tables, and settle any retune with them before the defaults change.
 - **WS6a** (at its merge): WS8 #2, a creature hostile to you is hostile to your followers (`attitude(a, f)` with
   `f.brain.leader === "player"`: "hostile" when `attitude(a, player)` is); until then monsters ignore your
   followers until one strikes them. WS8's spatial queries (`nearestCreature`, `sees`, `witnessesOf`) are in for the
@@ -157,8 +157,10 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
 - **WS9** (at its merge): WS3 #3, register the HUD's clock segment (`hud.registerHudSegment("clock",
   render3d.CLOCK_SEGMENT)`, under the sky only) and let `tests/checks/hud.js:91`'s 180-column "parent's order"
   assertion allow it on the start span (outdoors); WS3 #7, the held weapon at night (`hud.js:326-328`) lit by
-  `light.lightAt(...).sky` (sky × daylight), not the raw sky light. The key hints above, if the user puts them on the
-  pause card.
+  `light.lightAt(...).sky` (sky × daylight), not the raw sky light. **The recorded frames** (the user's decision above): exclude by exact name only the
+  frames WS9's HUD, pause and death screens change, each with its reason, WS9's own check holding the new screens,
+  golden (b) held. **The key hints** L (look), V (fire), G (legend) and hotbar key 1 on the pause card's key list: if
+  WS9 tags without them, add them at the merge (`screens/pause.js` is WS9's, merged by then) or carry the request on.
 - **WS2** (at its merge): WS3 #5, `map` looks for the reserved TRUNK, SHALE, LEAVES, REED (blocks.js); note bible
   §15.7 reserves `♣` (speaking trees) and `^` (spikes), as blocks.js's comments say. WS3 #5 for GRASS (id 7, the
   integrator's): **not applied**: §6.5's grass `"` is the amulet's reserved glyph (bible §15.7 outranks TECH_DESIGN),
@@ -183,8 +185,8 @@ is WS3's).
   `e.bonuses`, so `innate` is ability ids only; the player's `["foldStep"]` used to sum into the bonus table as
   `{"0": "0foldStep"}`); #8 (`45816a9`: a bonus key `missileAcc` added to a shot's accuracy, the bolt-bow 1 → 3 with
   `{ missileAcc: 2 }`, the blade unchanged; Appendix A); #7 (`4e62fbb`: `tools/README.md` for check-combat's parts and
-  `browser-ws8.mjs`; §8.4 gives `browser-ws8` to WS8). Not applied: #5 (the map header is in golden (b)'s frames: for
-  the user, above; the outdoor legend's `)` row is 18 cells wide, too narrow for "missile weapons and bolts"); #9 (the
+  `browser-ws8.mjs`; §8.4 gives `browser-ws8` to WS8). Not applied: #5 (the map header is in golden (b)'s frames; the user put
+  the hints on WS9's pause card, above; the outdoor legend's `)` row is 18 cells wide, too narrow for "missile weapons and bolts"); #9 (the
   flip, at WS4's merge); #10 (nothing asked). Carried: #1 to WS4, #2 to WS6a, #3 to WS10 (above).
 - Dependency table: "WS3 night auto-map, daylight perception" rerun against WS8's real `refreshView` and
   `creatures.sees` (`d5e308d`, render.js §3: the auto-map 576 / 9 / 137 / 127 columns as before; a goblin 7.7 tiles
