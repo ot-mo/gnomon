@@ -23,7 +23,8 @@ export function drawRitual(game) {
   box(x0, y0, w, h, { edge: [220, 170, 90], title: ` THE KINDLING · ${String(c.name || "").toUpperCase()} ` });
   if (k) {
     const f = FACTIONS[k.faction], rep = repOf(game, k.faction);
-    S.text(x0 + 3, y0 + 2, `Flame-kin by ${RITES[k.rite]?.name || "a rite"}. ${f.name}: ${bandName(rep)} ${rep}.`.slice(0, w - 6), ...(f.color || UI.text));
+    const who = f.name.charAt(0).toUpperCase() + f.name.slice(1);
+    S.text(x0 + 3, y0 + 2, `Flame-kin by ${RITES[k.rite]?.name || "a rite"}. ${who}: ${bandName(rep)} ${rep}.`.slice(0, w - 6), ...(f.color || UI.text));
     S.text(x0 + 3, y0 + 3, `Still to earn from ${c.name}: ${Math.max(0, KINDLING.cap - (k.net || 0))} of ${KINDLING.cap}.`.slice(0, w - 6), ...UI.help);
   }
   const n = Math.max(1, Math.min(rs.length, h - 11));
