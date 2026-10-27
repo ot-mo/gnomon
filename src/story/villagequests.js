@@ -213,7 +213,13 @@ function placeThing(game, zone, uid, make) {
 on("zone:prepare", (game, ev) => {
   const zone = ev.zone;
   if (!game.run || !zone) return;
-  for (const { v, template, p } of targetsIn(game.run, zone.key)) {
+  // The run's planned quests that point here, and any quest given that points here (a check's, a later template's).
+  const list = [...targetsIn(game.run, zone.key)];
+  for (const q of game.quests || [])
+    if (!q.done && !q.failed && q.vars?.target?.key === zone.key && !list.some((x) => x.v.siteId === q.vars.village && x.template === q.template))
+      list.push({ v: villageOf(game.run, q.vars.village), template: q.template, p: q.vars });
+  for (const { v, template, p } of list) {
+    if (!v) continue;
     if (template === "recover" || template === "climb") {
       placeThing(game, zone, p.itemUid, () => {
         const at = template === "climb" ? zone.village?.perch : spotFor(zone, p.itemUid);

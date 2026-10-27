@@ -72,8 +72,7 @@ export function generateVillage(run, site) {
 
   // Two village events (each 1 in 20 leaves it abandoned), a government from them.
   const evs = rng.shuffle(V.events.slice()).slice(0, 2);
-  let abandoned = false;
-  for (const e of evs) if (rng() < e.abandon) abandoned = true;
+  const abandoned = villageAbandoned(run, site);
   const pact = rng.pick(PACTS), mutation = rng.pick(MUTATIONS);
   const neighbour = nearestVillage(run, site);
   const vars = { name: site.name, sacred: culture.sacred, dish: culture.dish, pactName: pact[1], mutation,
@@ -145,6 +144,14 @@ export function generateVillage(run, site) {
     if (v.quest?.template === "climb") v.layout.perch = true;
   }
   return v;
+}
+
+// Whether a village stands empty: each of its two events has its 1 in 20 (bible §9.1), on a stream of its own
+// (seedFor(seed, "run", "villages", site.id, "abandon")), so another village's quest can tell without the record.
+export function villageAbandoned(run, site) {
+  const rng = makeRng(seedFor(run.seed, "run", "villages", site.id, "abandon"));
+  const p = VILLAGES.events[0].abandon;
+  return [rng(), rng()].some((r) => r < p);
 }
 
 // Which two of the Hours' events a village shows: a stream of its own (seedFor(seed, "run", "villages", site.id,

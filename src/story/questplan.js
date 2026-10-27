@@ -12,7 +12,7 @@
 //              itemUid?, to?, toUid?, secret?, beast?, beastUid?, lost?, lostUid?, percent?, shrine? }
 import { QUESTS } from "../content/quests.js";
 import { VILLAGES } from "../content/villages.js";
-import { villageArt } from "./villages.js";   // (a cycle: villages.js imports this file; both only call at run time)
+import { villageArt, villageAbandoned } from "./villages.js";   // (a cycle: villages.js imports this file; both only call at run time)
 
 export const QUEST_ORDER = ["recover", "carry", "readFloor", "pray", "climb", "find", "hunt", "rescue", "chart"];
 const RANGE = [2, 5];   // spans from the village for an outward target
@@ -67,7 +67,8 @@ export function planQuest(run, site, v, template, rng) {
                place: den ? den.name : "the wilds", where: where(run, t.wx, t.wy) };
     }
     case "carry": {
-      const others = [...run.sites.values()].filter((s) => s.kind === "village" && s.id !== site.id && cheb(s.at, site.at) <= 10);
+      const others = [...run.sites.values()].filter((s) => s.kind === "village" && s.id !== site.id && cheb(s.at, site.at) <= 10
+        && !villageAbandoned(run, s));   // someone has to be there to answer
       if (!others.length) return null;
       others.sort((a, b) => cheb(a.at, site.at) - cheb(b.at, site.at) || (a.id < b.id ? -1 : 1));
       const to = others[0];
@@ -78,7 +79,7 @@ export function planQuest(run, site, v, template, rng) {
       const others = [...run.sites.values()].filter((s) => s.kind === "village" && s.id !== site.id && cheb(s.at, site.at) <= 10)
         .sort((a, b) => cheb(a.at, site.at) - cheb(b.at, site.at) || (a.id < b.id ? -1 : 1));
       for (const o of others) {
-        const art = villageArt(run, o);
+        const art = villageAbandoned(run, o) ? villageArt(run, o).slice(0, 1) : villageArt(run, o);   // an empty village keeps one tablet
         const e = art.find((x) => !v.history.includes(x));
         if (e) return { ...base, secret: `hist:${e}:flat`, place: o.name, target: span(o.at), where: where(run, o.at.wx, o.at.wy) };
       }
