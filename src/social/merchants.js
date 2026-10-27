@@ -12,7 +12,8 @@
 //                                            main faction, builders.js standingOf); no faction: 0
 //   priceNote(game, c) → { ego, step, buy, sell, text }   the multiplier the screen shows
 //   tradeRows(game, c, tab) → [row]          row: { it, price, count, stock?, service?, target?, label?, info?, glyph? }
-//   tradeRow(game, c, tab, row) → { ok, line }   buy, sell or pay for one; logs the line
+//   tradeRow(game, c, tab, row) → { ok, line, offer? }   buy, sell or pay for one; logs the line; offer: "theirs"
+//                                            when a full flask refused a sale
 //   ensureStock(game, c) · restock(game, c)  a merchant's pack (c.talk.state.stock: [{ item, count, price, best? }])
 //   registerStock(id, (game, c, rng) → stock) a stock table; c.merchant.stock (or its type's) names it, else
 //                                            "general"; the legacy Pell keeps his one pack (never restocked)
@@ -21,9 +22,9 @@
 //
 // Restocking: on zone:enter after `away` ≥ two world days (TECH_DESIGN §8.3), every merchant of the zone whose
 // pack has been stocked gets a fresh one, seeded by (the run's seed, the merchant, the day), so the same visit
-// always finds the same goods. A full purse can't take a sale (bible §3.1: "the trader says so and offers goods
-// instead"): the trader writes it on its slate as credit against its own goods (c.talk.state.credit), spent first
-// when you buy from it. Money is never plentiful: selling pays 0.3 of the worth at Grey, buying costs 1.5.
+// always finds the same goods. A full purse can't take a sale (bible §3.1: "a payment that would overflow your
+// flask is refused. The trader says so and offers goods instead"): nothing changes hands, and the trade screen turns
+// to the trader's goods (tradeRow answers { offer: "theirs" }). Money is never plentiful: selling pays 0.3 of the worth at Grey, buying costs 1.5.
 import { itemPrice, itemName, itemGlyph, itemInfo, addToInventory, ITEM_KINDS, randomPotion, randomScroll,
   randomEquipment, isGear } from "../items.js";
 import { buyPrice, sellPrice, priceLevel, pay, receive, formatPrice, CURRENCY } from "../currency.js";
@@ -169,7 +170,7 @@ const GOOD = [255, 215, 90], BAD = [255, 150, 120];
 
 export function tradeRow(game, c, tab, row) {
   if (!row) return { ok: false, line: "" };
-  const p = game.player, st = c.talk.state;
+  const p = game.player;
   if (tab === "services") {
     if (!pay(game, p, row.price)) return { ok: false, line: say(game, `You can't afford that (${formatPrice(row.price)}).`, BAD) };
     row.service.run(game, c, row.target);
@@ -177,21 +178,18 @@ export function tradeRow(game, c, tab, row) {
   }
   const name = itemName(game, { ...row.it, count: 1 });
   if (tab === "theirs") {
-    const credit = Math.min(st.credit || 0, row.price), cash = row.price - credit;
-    if (!pay(game, p, cash)) return { ok: false, line: say(game, `You can't afford the ${name} (${formatPrice(row.price)}).`, BAD) };
-    if (credit) st.credit -= credit;
+    if (!pay(game, p, row.price)) return { ok: false, line: say(game, `You can't afford the ${name} (${formatPrice(row.price)}).`, BAD) };
     row.stock.count--;
     if (isCrystal(row.it)) game.state.merchants.crystalsBought = (game.state.merchants.crystalsBought || 0) + 1;
     // A crystal is absorbed at once, as when you walk over one (its kind's onPickup).
     if (!ITEM_KINDS[row.it.kind]?.onPickup?.(game, p, { ...row.it })) addToInventory(p, { ...row.it, count: 1 });
-    const paid = credit ? `${formatPrice(cash)} and ${formatPrice(credit)} of credit` : formatPrice(row.price);
-    return { ok: true, line: say(game, `You buy the ${name} for ${paid}.`, GOOD) };
+    return { ok: true, line: say(game, `You buy the ${name} for ${formatPrice(row.price)}.`, GOOD) };
   }
   if (row.price <= 0) return { ok: false, line: say(game, `${c.name} doesn't want the ${name}.`, [170, 170, 170]) };
   const over = receive(game, p, row.price);
-  if (over) {   // the flask is full: what didn't fit goes on the slate, against the trader's goods
-    st.credit = (st.credit || 0) + over;
-    say(game, `"Your flask won't hold it. I'll keep ${formatPrice(over)} for you against my goods."`, [230, 200, 150]);
+  if (over) {   // the flask can't hold it all: the sale is refused (what fit goes back), and the trader offers goods
+    pay(game, p, row.price - over);
+    return { ok: false, offer: "theirs", line: say(game, `"Your flask won't hold ${formatPrice(row.price)}. Take something of mine for it instead?"`, [230, 200, 150]) };
   }
   if (row.it.count > 1) row.it.count--; else p.inv.splice(p.inv.indexOf(row.it), 1);
   return { ok: true, line: say(game, `You sell the ${name} for ${formatPrice(row.price)}.`, GOOD) };

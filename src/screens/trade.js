@@ -30,7 +30,7 @@ export function drawTrade(game) {
   const name = (c.name || typeOf(c)?.name || "the trader").toUpperCase();
   S.text(x0 + 2, y0, ` ${name} `.slice(0, w - 4), ...UI.title);
   tabs(x0 + 2, y0 + 1, TRADE_TABS, TRADE_TABS.indexOf(t.tab));
-  const purse = `your ${CURRENCY.name}: ${funds(p)}${c.talk.state?.credit ? ` · credit ${c.talk.state.credit}` : ""}`;
+  const purse = `your ${CURRENCY.name}: ${funds(p)}`;
   S.text(x0 + w - purse.length - 2, y0 + 1, purse, ...CURRENCY.color);
   S.text(x0 + 3, y0 + 2, priceNote(game, c).text.slice(0, w - 6), ...UI.help);
   const n = Math.max(1, Math.min(rs.length, h - 9));
@@ -42,7 +42,7 @@ export function drawTrade(game) {
       S.put(x + 2, y, glyph, ...color);
       const price = r.price > 0 ? formatPrice(r.price) : "-";
       S.text(x + 4, y, rowLabel(game, r).slice(0, Math.max(0, rw - price.length - 7)), ...(sel ? UI.sel : UI.text));
-      const dear = t.tab !== "yours" && r.price > funds(p) + (t.tab === "theirs" ? c.talk.state?.credit || 0 : 0);
+      const dear = t.tab !== "yours" && r.price > funds(p);
       S.text(x + rw - price.length - 1, y, price, ...(dear ? UI.bad : CURRENCY.color));
     } });
   const sel = rs[t.sel];
@@ -67,6 +67,7 @@ export function tradeChosen(game) {
   const t = game.trade, r = rows(game)[t.sel];
   const out = tradeRow(game, t.npc, t.tab, r);
   if (out.ok) sfx("gold");
+  if (out.offer) { switchTab(game, TRADE_TABS.indexOf(out.offer)); return out; }   // a full flask: their goods instead
   t.sel = Math.max(0, Math.min(t.sel, rows(game).length - 1));
   return out;
 }

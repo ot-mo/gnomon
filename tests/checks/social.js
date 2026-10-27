@@ -695,21 +695,20 @@ export async function run(env) {
       stats.backing = `item: receive 30, pay 12, pay 100 refused (18 kept), smallest stack first, overflow ${over} of ${room + 40} (room ${room})`;
     } finally { CUR.backing = old; undoEnc(); undoSet(); }
     if (currency.backingKinds().join() !== "counter,item") fail(`backings: ${currency.backingKinds().join()}, want counter,item (no liquid backing: DECISIONS)`);
-    // The counter: a sale the purse can't hold goes on the trader's slate, and buying spends it first.
+    // The counter: a sale the purse can't hold is refused whole (bible §3.1), and the screen turns to their goods.
     p().funds = currency.purseCap(p()) - 3;
     const t = named("mira", "merchant", "drovers");
     p().inv = [{ kind: "weapon", id: "mace", ench: 0, known: true }];
     const row = merchants.tradeRows(game, t, "yours")[0];
     const out = merchants.tradeRow(game, t, "yours", row);
-    const credit = t.talk.state.credit || 0;
-    if (!out.ok || p().funds !== currency.purseCap(p()) || credit !== row.price - 3) fail(`a sale into a nearly full purse: ${out.line}; funds ${p().funds}, credit ${credit} (price ${row.price})`);
-    const buy = merchants.tradeRows(game, t, "theirs").find((r) => r.price <= credit);
-    if (buy) {
-      const f0 = p().funds;
-      merchants.tradeRow(game, t, "theirs", buy);
-      if (p().funds !== f0 || t.talk.state.credit !== credit - buy.price) fail(`buying ${buy.price} with ${credit} credit: funds ${f0} → ${p().funds}, credit ${t.talk.state.credit}`);
-    } else fail(`nothing in the stock costs ${credit} or less`);
-    stats.backing += `; counter: a ${row.price}-glim sale with room for 3 → ${credit} credit, spent first`;
+    if (out.ok || out.offer !== "theirs" || p().funds !== currency.purseCap(p()) - 3 || p().inv.length !== 1)
+      fail(`a ${row.price}-glim sale into a purse with room for 3: ok ${out.ok}, offer ${out.offer}, funds ${p().funds}, pack ${p().inv.length}`);
+    game.modeStack = []; screens.setMode(game, "map", undefined, { pointer: false });
+    merchants.openTrade(game, t, "yours");
+    scrTrade.tradeChosen(game);
+    if (game.trade.tab !== "theirs") fail(`after the refused sale the trade screen shows ${game.trade.tab}, want theirs`);
+    scrTrade.closeTrade(game);
+    stats.backing += `; counter: a ${row.price}-glim sale with room for 3 refused whole, their goods offered`;
     // No fill-and-sell loop: a trader pays for a filled vial's glass only, so no liquid from a pool sells for more
     // than an empty vial costs, at Bright and EGO 24 (the best prices there are), here and at Pell's.
     {
