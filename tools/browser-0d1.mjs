@@ -14,8 +14,9 @@
 //      page without ?quick=1: Enter, then a click on "New quick game"), since WS8's merge the target screen
 //      (L on the map; Esc, a right click) and since WS4a's the creation wizard (pushed over the map as WS9's
 //      title will push it; Esc, a click on [ Back ]), and since WS5's examine (I, L; Esc, a right click) and the
-//      Truing Cradle (a Cradle block walked into; Esc, a right click), and since WS6a's the factions screen (P on
-//      the map; Esc, a click on "Esc close"), so every registered mode is reached.
+//      Truing Cradle (a Cradle block walked into; Esc, a right click), since WS6a's the factions screen (P on
+//      the map; Esc, a click on "Esc close") and since WS4b's the abilities list and the character sheet (B and K on
+//      the map; Esc, a click on [ Close ]), so every registered mode is reached.
 //   2. The HUD at 100×30 (a 600-pixel window 30 cells tall: 300 px with 10-pixel cells, 330 with Windows'
 //      11): tests/checks/hud.js in the browser (screen sizes 100×30,
 //      100×40, 180×56, 80×25), then on the real canvas with every Phase 0 segment and seven statuses on, in
@@ -207,6 +208,20 @@ try {
       const closed = await mode();
       if (closed !== "map") problems.push(`factions by ${how}: ${how === "keys" ? "Esc" : "a click on Esc close"} led to ${closed}, not back to the map`);
     }
+    // The abilities list and the character sheet (WS4b's, merged at p2-ws4b): B and K on the map open them; Esc
+    // closes each, and again a click on its [ Close ].
+    for (const [key, want] of [["KeyB", "abilities"], ["KeyK", "char"]])
+      if ((await mode()) === "map") for (const how of ["keys", "mouse"]) {
+        await page.keyboard.press(key);
+        await frames(page, 2);
+        const opened = await mode();
+        if (opened !== want) { problems.push(`${want} by ${how}: ${key.slice(3)} on the map led to ${opened}, not ${want}`); break; }
+        reached.add(want);
+        if (how === "keys") await page.keyboard.press("Escape"); else await click("[ Close ]");
+        await frames(page, 2);
+        const closed = await mode();
+        if (closed !== "map") problems.push(`${want} by ${how}: ${how === "keys" ? "Esc" : "a click on [ Close ]"} led to ${closed}, not back to the map`);
+      }
     // The creation wizard (WS4's, merged at p2-ws4a): pushed over the map with { seed, mode } as WS9's title will
     // push it (no key opens it before that title is in); Esc on its first step goes back, and again by a click on
     // its [ Back ].
