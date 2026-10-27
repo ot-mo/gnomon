@@ -132,9 +132,11 @@ on("zone:enter", (game, { zone, away, how }) => {
   for (const c of zone.creatures) if (c.talk?.state?.stock && isMerchant(c) && !legacyPeddler(c)) restock(game, c);
 });
 
+// (The back shelf counts only for a Bright customer, as on the trade screen.)
 export function bestStock(game, c) {
   let best = null;
-  for (const s of ensureStock(game, c)) if (s.count > 0 && (!best || s.price > best.price)) best = s;
+  const bright = standingOf(game, c).band === "loved";
+  for (const s of ensureStock(game, c)) if (s.count > 0 && (!s.best || bright) && (!best || s.price > best.price)) best = s;
   return best;
 }
 

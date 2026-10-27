@@ -941,6 +941,11 @@ export async function run(env) {
     const nBest = best.count, invN = p().inv.length;
     doRow("best");
     if (best.count !== nBest - 1 || p().inv.length !== invN + 1) fail("asking for the best item gave nothing");
+    if (!rows().find((r) => r.id === "best")?.why || doRow("best").ok) fail("the best item could be had twice from one pack");
+    merchants.restock(game, k); k.talk.state.stockedAt += 1;
+    if (rows().find((r) => r.id === "best")?.why) fail("the best item refused from a new pack");
+    game.state.rep.drovers = 0;
+    if (merchants.bestStock(game, k)?.best) fail("the back shelf's piece counts as the best item at Grey");
     // The floor: a cost that would take you to −250 or below is refused.
     game.state.rep.drovers = -200;
     const refused = doRow("recruit");

@@ -20,8 +20,9 @@
 // After the bond your rep with its faction is currency (the menu, screens/ritual.js): give a reading it wants +35, a
 // rumour +60; ask for one of its readings −40; learn a power it teaches −50 / −100 / −150 by rank (requirements
 // waived); recruit it −(150 + 15 × (its level − yours)), at least −60, with at most 2 Kindled followers (3 at EGO 20+);
-// buy its best item (merchants) −(value / 5), at least −10. At most +120 net from any one creature. A cost may not
-// take your rep with its faction to −250 or below (this workstream's rule: below that it wouldn't kindle with you).
+// buy its best item (merchants; once for each pack it stocks; the back shelf only at Bright) −(value / 5), at least
+// −10. At most +120 net from any one creature. A cost may not take your rep with its faction to −250 or below (this
+// workstream's rule: below that it wouldn't kindle with you).
 // A later rite with flame-kin gives nothing, or +20 with the Warm Hands power, within the cap.
 //
 // Oathbreaking: killing a flame-kin yourself ("kill" with you as the source; falls and your followers don't count)
@@ -310,8 +311,11 @@ export function ritualRows(game, c) {
       } });
   }
   if (isMerchant(c)) {
-    const best = bestStock(game, c);
-    if (best) rows.push({ id: "best", label: `Ask for the best thing it has: ${itemName(game, { ...best.item, count: 1 })}`, n: bestCost(best.item), run: () => {
+    // Once for each pack it stocks: otherwise each restock's whole pack could be had for rep, and sold for glim.
+    const best = bestStock(game, c), stockedAt = c.talk.state?.stockedAt ?? 0;
+    if (best) rows.push({ id: "best", label: `Ask for the best thing it has: ${itemName(game, { ...best.item, count: 1 })}`, n: bestCost(best.item),
+      why: k.bestAt === stockedAt ? `${c.name} has given you its best already. Come back when its pack is new.` : null, run: () => {
+      k.bestAt = stockedAt;
       best.count--;
       if (!ITEM_KINDS[best.item.kind]?.onPickup?.(game, p, { ...best.item })) addToInventory(p, { ...best.item, count: 1 });
       return `${c.name} wraps it in cloth and hands it over. No glim changes hands.`;
