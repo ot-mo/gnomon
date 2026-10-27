@@ -1114,6 +1114,8 @@ export async function run(env) {
     game.trade.sel = cheap;
     keys.dispatchKey(game, "Enter");
     if (p().funds !== f0 - rows0[cheap].price) fail(`Enter on theirs: funds ${f0} → ${p().funds}, price ${rows0[cheap].price}`);
+    keys.dispatchKey(game, "Enter", true);   // the key held: its repeat buys nothing more
+    if (p().funds !== f0 - rows0[cheap].price) fail(`a held Enter bought again: funds ${p().funds}`);
     keys.dispatchKey(game, "Tab");
     if (game.trade.tab !== "yours") fail(`Tab led to ${game.trade.tab}`);
     S.clear(); screens.drawStack(game); S.present();

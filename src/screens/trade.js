@@ -85,8 +85,8 @@ export function tradeKey(game, code) {
 
 registerScreen(MODE, {
   draw: drawTrade,
-  key(game, code, repeat) {
-    if (repeat && code === "Escape") return true;
+  key(game, code, repeat) {   // a held key never buys, sells or pays twice, nor closes
+    if (repeat && ["Escape", "Enter", "NumpadEnter", "KeyE", "Space"].includes(code)) return true;
     return tradeKey(game, code);
   },
   mouse(game, button, cell) {
