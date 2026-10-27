@@ -59,7 +59,7 @@ import { isMerchant, bestStock, snuffed } from "./merchants.js";
 
 export const KINDLING = extendRules("kindling", {
   bond: { loves: 80, likes: 40, dislikes: -40, hates: -80 }, ownReading: 40, sacrament: 20,
-  egoGain: 0.1, cap: 120, floor: -250, warmHands: 20, xp: 0.08,
+  egoGain: 0.1, cap: 120, floor: -250, warmHands: 20, xp: 0.08, crooked: 20,
   menu: { reading: 35, rumour: 60, askReading: -40, power: [-50, -100, -150], recruit: { base: 150, perLevel: 15, min: 60 },
           best: { div: 5, min: 10 } },
   followers: 2, followersAtEgo: [20, 3],
@@ -203,20 +203,26 @@ export function performRite(game, c, rite) {
   const poured = sac?.effect ?? null;
   if (sac) { takeOne(p, sac); addToInventory(p, { kind: "vial", effect: "" }); }
   const changes = {}, ego = egoFactor(game);
+  // Crooked Manner (bible §13.5): the words come out as a rude gesture, and each Kindling gains its faction 20 less
+  // (never below nothing: it is a smaller gain, not a cost).
+  const crooked = !!p.mutations?.crookedManner, less = (n) => (crooked && n > 0 ? Math.max(0, n - K.crooked) : n);
   const gain = (id, n) => { const m = n > 0 ? Math.round(n * ego) : n; if (m) { changes[id] = (changes[id] || 0) + m; } };
   if (was) {   // a later Kindling: Warm Hands' +20 (EGO's share first), within the cap
-    const room = K.cap - (was.net || 0), n = hasKey(p.perks, "warmHands") ? Math.min(Math.round(K.warmHands * ego), room) : 0;
+    const room = K.cap - (was.net || 0), n = less(hasKey(p.perks, "warmHands") ? Math.min(Math.round(K.warmHands * ego), room) : 0);
     if (n > 0) { changes[f] = n; was.net = (was.net || 0) + n; }
   } else {
     for (const [id, op] of opinionsOf(game, c)) if (FACTIONS[id] && K.bond[op]) gain(id, K.bond[op]);
     if (readingsOf(f).set.has(R.reading)) gain(f, K.ownReading);
     if (sac) gain(f, K.sacrament);
+    if (crooked && changes[f] > 0) changes[f] = less(changes[f]) || undefined;
+    if (changes[f] === undefined) delete changes[f];
     ks.kin[key] = { faction: f, name: c.name || typeOf(c)?.name, rite, at: game.time || 0, net: 0 };
     const lv = c.level || 1, xp = leveling.xpReward ? leveling.xpReward("kindling", lv) : Math.round(K.xp * leveling.xpToNext(lv));
     if (xp > 0) leveling.gainXp(game, xp, { source: "kindling" });
   }
   for (const [id, n] of Object.entries(changes)) addRep(game, id, n, "kindling");
-  const words = R.words ? `"${R.words[0]}"\n"${R.words[1]}"\n\n` : "You sit together in the dark for an hour. Nobody says anything. That's the point.\n\n";
+  const words = crooked ? `You mean to say the words. What comes out is a rude gesture, as it always does; ${c.name} takes it as kindly as anyone could.\n\n`
+    : R.words ? `"${R.words[0]}"\n"${R.words[1]}"\n\n` : "You sit together in the dark for an hour. Nobody says anything. That's the point.\n\n";
   const moved = Object.entries(changes).map(([id, n]) => `${FACTIONS[id].name} ${signed(n)}`).join(", ");
   const what = was ? (moved ? `The old flame catches again. (${moved})` : "The old flame is still lit. Nothing more comes of it.")
     : `You and ${c.name} are flame-kin.${poured ? ` You poured the ${liquidName(poured)}.` : ""}${moved ? ` (${moved})` : ""}`;

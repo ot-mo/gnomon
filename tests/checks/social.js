@@ -982,6 +982,20 @@ export async function run(env) {
     p().inv = [{ kind: "vial", effect: "glim", count: 1 }];
     bond("tracing", t1);
     if (!p().inv.some((i) => i.kind === "vial" && i.effect === "glim")) fail(`a later Kindling poured the sacrament: ${JSON.stringify(p().inv)}`);
+    // Crooked Manner (WS4 #21, at the WS6b merge): the words come out as a rude gesture and the Kindling gains its
+    // faction 20 less (Hollowmere's +40 for liking its own: +20); a later one with Warm Hands' +20 gains nothing.
+    {
+      p().mutations = { crookedManner: 1 };
+      p().inv = p().inv.filter((i) => i.kind !== "vial");   // (no sacrament to pour: the last test left one)
+      const cm = named("mira", "villager", "hollowmere", { near: [0, 1], name: "Odd" });
+      const want = expect(cm, { rite: "tracing" }), r = bond("tracing", cm);
+      p().perks = { warmHands: 1 };
+      const later = bond("tracing", cm);
+      p().perks = {}; delete p().mutations.crookedManner;
+      stats.crooked = `Hollowmere +${r.moved.hollowmere || 0} (plain +${want.hollowmere || 0}), a later one +${later.moved.hollowmere || 0}; "${r.out.text.split("\n")[0].slice(0, 60)}"`;
+      if ((r.moved.hollowmere || 0) !== Math.max(0, (want.hollowmere || 0) - 20) || !/rude gesture/.test(r.out.text) || later.moved.hollowmere)
+        fail(`Crooked Manner's Kindling: ${stats.crooked} (want 20 less, the rude gesture, nothing from Warm Hands)`);
+    }
     // The Tracing with a vial of ink: the ink is spent, not glim.
     setup();
     const t1b = named("mira", "villager", "flatfolk", { near: [1, 0], name: "Ink" });
