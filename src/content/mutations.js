@@ -57,8 +57,8 @@ export const MUTATIONS = {
   },
   lampskin: {
     name: "Lampskin", kind: "physical", cost: 4, max: 1, excludes: ["mothKissed"], planar: true,
-    info: () => "You glow: with your torch out you still see 3 tiles, but nothing dark hides you.",
-    bonus: () => ({ darkSight: 2, stealth: -0.25 }), rep: { moths: 200, lampless: -200 },
+    info: () => "You glow: your torch burns no glim, with it out you still see 3 tiles, but nothing dark hides you.",
+    bonus: () => ({ darkSight: 2, stealth: -0.25, torchCost: -1 }), rep: { moths: 200, lampless: -200 },
   },
   nightEyes: {
     name: "Night Eyes", kind: "physical", cost: 4, max: 10, excludes: ["darkFear"], planar: true,

@@ -17,9 +17,9 @@
 //   level         the Plumb's Level (LEVELS): Vey, Orrum or Cassin
 //   implant       the Plumb's free starting implant (bible §10.10), fitted through WS5's bodymods seam
 //
-// LEVELS[id] = { name, info, bonus?: { key: n }, torchCost?, script? }: each Level gives its own (bible §10.10). bonus
-// goes through the stat bus (progression/index.js); torchCost waits for a hook in torch.js (docs/ws4.md, integration
-// requests); script is the writing you can read (WS7).
+// LEVELS[id] = { name, info, bonus?: { key: n }, script? }: each Level gives its own (bible §10.10). bonus goes through
+// the stat bus (progression/index.js; Cassin's cheaper torch is its torchCost, torch.js); script is the writing you
+// can read (WS7).
 const weapon = (id) => ({ kind: "weapon", id, ench: 0, known: true });
 const armour = (id) => ({ kind: "armour", id, ench: 0, known: true });
 const healing = (count) => ({ kind: "potion", effect: "healing", count });
@@ -28,7 +28,7 @@ const CLOTHES = armour("clothes");
 export const LEVELS = {
   vey:    { name: "Vey", info: "The Archive: +3 to examine, and you read Deepwright script.", bonus: { examine: 3 }, script: "deepwright" },
   orrum:  { name: "Orrum", info: "The Forge: +1 natural armour.", bonus: { av: 1 } },
-  cassin: { name: "Cassin", info: "The Lamp: your torch costs half as much glim.", torchCost: 0.5 },
+  cassin: { name: "Cassin", info: "The Lamp: your torch costs half as much glim.", bonus: { torchCost: -0.5 } },
 };
 
 export const BACKGROUNDS = {

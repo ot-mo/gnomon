@@ -44,7 +44,7 @@ export const POWERS = {
   alchemist:    { tree: "leechcraft", name: "Alchemist",    info: "Potions of healing heal half again as much (18 HP)." },
   scholar:      { tree: "lore",      name: "Scholar",       info: "You can tell whether an unread scroll is good, neutral or bad." },
   // (Under the attribute set the price multiplier (stats.js priceMul) doesn't read it yet: docs/ws4.md, integration requests.)
-  haggler:      { tree: "parley",    name: "Haggler",       info: "Pell charges you a fifth less, for goods and services.", needs: "stats.js priceMul to read it under the attribute set" },
+  haggler:      { tree: "parley",    name: "Haggler",       info: "Pell charges you a fifth less, for goods and services." },
   thickBlood:   { tree: "hardiness", name: "Thick blood",   info: "Poison hurts you only half as often." },
   nightEyes:    { tree: "shadowcraft", name: "Night eyes",  info: "With your torch out you can still see a little way around you.", bonus: () => ({ darkSight: 2 }) },
   // Major perks: only offered at milestones (levels 5, 10, 15…).
@@ -65,15 +65,14 @@ export const POWERS = {
   highGround:   { tree: "polearm",   name: "High ground",   info: "+50% damage striking from a ledge above.", needs: "WS8" },
   brace:        { tree: "polearm",   name: "Brace",         info: "Chargers stop on your point.", needs: "WS8" },
   // (check-content holds every bonus key to stats.js BONUS_KEYS, so `bonus: () => ({ missileAcc: 2 })` comes with the key)
-  steadyHand:   { tree: "missile",   name: "Steady hand",   info: "+2 to hit with slings and bolt-bows.",
-                  needs: "missileAcc in stats.js and missiles.js (the integrator adds it at the WS8 merge, with this power's bonus)" },
+  steadyHand:   { tree: "missile",   name: "Steady hand",   info: "+2 to hit with slings and bolt-bows.", bonus: () => ({ missileAcc: 2 }) },
   pin:          { tree: "missile",   name: "Pin",           info: "Your bolts pin what they hit for 2 s.", needs: "WS8" },
   glimgunner:   { tree: "missile",   name: "Glimgunner",    info: "The glimgun costs 1 glim for every 2 shots.", needs: "a glimgun (WS8, C4)" },
   returnDisc:   { tree: "throwing",  name: "Return",        info: "Thrown discs come back to your hand.", needs: "discs (WS8, C4)" },
   roll:         { tree: "tumbling",  name: "Roll",          info: "A dodge-roll in 3D.", needs: "WS8" },
   darkBackstab: { tree: "shadowcraft", name: "Dark backstab", info: "Double damage against an unaware target while your torch is out.", needs: "WS8" },
   faintRunes:   { tree: "shadowcraft", name: "Faint runes", info: "Runes show faintly while your torch is lit.", needs: "WS3" },
-  thriftyWick:  { tree: "glimcraft", name: "Thrifty wick",  info: "Your torch costs half as much glim.", needs: "a hook in torch.js (integration request)" },
+  thriftyWick:  { tree: "glimcraft", name: "Thrifty wick",  info: "Your torch costs half as much glim.", bonus: () => ({ torchCost: -0.5 }) },
   kindleAtRange:{ tree: "glimcraft", name: "Kindle at range", info: "Light braziers from 4 tiles away.", needs: "WS10" },
   oilFire:      { tree: "glimcraft", name: "Oil fire",      info: "Set glim puddles alight.", needs: "WS6b" },
   keenEyeSites: { tree: "survey",    name: "Keen Eye",      info: "You find hidden sites twice as often on the road (20%).", needs: "WS1" },

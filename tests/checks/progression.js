@@ -1137,6 +1137,21 @@ export async function checkProgression(m) {
       C.beginRun(game, choicesFor("reedcutter", C.suggestSpread("bent", "reedcutter"), { mutations: ["crookedManner"] }), { seed: 4 });
       const reps = m.mutations.BIBLE_FACTIONS.map((f) => m.factions.repOf(game, f) - m.factions.baseRep(game, f) - (BACKGROUNDS.reedcutter.rep[f] || 0));
       if (reps.some((n) => n !== -50)) fail(`Crooked Manner: ${reps.join(", ")}`);
+      // The hooks' content halves (WS4 #2, #6, #7, #20, at the WS4b merge): a Cassin Lamplighter's torch costs half,
+      // Thrifty wick halves it, Lampskin makes it free; Steady hand +2 to hit with missile weapons; none of those four
+      // and the Haggler waits for anything (needs), so a level offers them.
+      {
+        const tc = (who) => st.bonus(who, "torchCost");
+        const lamp = C.makeCharacter(choicesFor("lamplighterOfCassin", C.suggestSpread("plumb", "lamplighterOfCassin")));
+        const sk = bentIn(["lampskin"]), plain = bentIn([]);
+        L.takePerk(game, "thriftyWick"); L.takePerk(game, "steadyHand");
+        const got = { cassin: tc(lamp), lampskin: tc(sk), thrifty: tc(game.player), steady: st.bonus(game.player, "missileAcc") };
+        out.hooks = JSON.stringify(got);
+        if (got.cassin !== -0.5 || got.lampskin !== -1 || got.thrifty !== -0.5 || got.steady !== 2 || plain !== game.player)
+          fail(`the torch and missile hooks: ${out.hooks} (want Cassin -0.5, Lampskin -1, Thrifty wick -0.5, Steady hand 2)`);
+        const waiting = ["haggler", "steadyHand", "thriftyWick"].filter((id) => POWERS[id].needs);
+        if (waiting.length) fail(`still waiting (needs), so never offered: ${waiting.join(", ")}`);
+      }
     }
 
     // 7.7 B and K at 100×30.
