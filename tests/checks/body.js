@@ -44,6 +44,7 @@ function samples() {
   out.push({ kind: "knife", count: 3 }, { kind: "bomb", count: 1 }, { kind: "key" }, { kind: "heart" }, { kind: "strength" },
     { kind: "gold", amount: 7 }, { kind: "cash", amount: 7 }, { kind: "cube" },
     { kind: "quest", id: "skull", name: "Brann's skull", info: "A ghost wants this back." }, { kind: "relic?" });
+  out.push({ kind: "implant", id: "lampCrown" }, { kind: "credit", count: 2 }, { kind: "artifact", id: "echoBell", known: false, cell: null }, { kind: "cell", id: "glim", charge: 2500 });   // WS5
   return out;
 }
 
