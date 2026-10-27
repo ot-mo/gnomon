@@ -157,7 +157,7 @@ function walk(G, name, world, steps, problems, walkSeed = 0) {
     if (!pair) continue;   // (a drop terrain: no roll is made onto it)
     const [u, v] = pair, n0 = per[terrain]?.n || 0;
     game.trip.wx = v.wx; game.trip.wy = v.wy;   // (stood beside it, as the walk would have)
-    for (let k = 0; k < need && has(terrain) < need; k++) {
+    for (let k = 0; k < 3 * need && has(terrain) < need; k++) {   // (a roll lost isn't an encounter roll: until both are enough)
       if (!take(u.wx - v.wx, u.wy - v.wy, `top-up ${k}`) || !take(v.wx - u.wx, v.wy - u.wy, `top-up ${k}`)) break;
     }
     topped[terrain] = `${n0} → ${per[terrain]?.n || 0} (${need} wanted)`;
@@ -178,7 +178,7 @@ function walk(G, name, world, steps, problems, walkSeed = 0) {
     encN += s.encN; enc += s.enc; expEnc += s.expEnc;
     rates[terrain] = { n: s.n, lost: +(s.lost / s.n).toFixed(4), want: +(s.expLost / s.n).toFixed(4), data: s.data,
                        enc: +(s.enc / Math.max(1, s.encN)).toFixed(4), wantEnc: +(s.expEnc / Math.max(1, s.encN)).toFixed(4) };
-    if (Math.min(s.n, s.encN) < enough(terrain)) { problems.push(`${name} walk: only ${s.n} rolls onto ${terrain}, ${enough(terrain)} wanted`); continue; }
+    if (Math.min(s.n, s.encN) < enough(terrain)) { problems.push(`${name} walk: only ${Math.min(s.n, s.encN)} rolls onto ${terrain} (${s.n} lost rolls, ${s.encN} encounter rolls), ${enough(terrain)} wanted`); continue; }
     if (Math.abs(s.lost - s.expLost) / s.n > 0.02) problems.push(`${name} walk: lost in ${terrain} ${rates[terrain].lost}, the data says ${rates[terrain].want} (n ${s.n})`);
     if (Math.abs(s.enc - s.expEnc) / s.encN > 0.02) problems.push(`${name} walk: encounters in ${terrain} ${rates[terrain].enc}, the data says ${rates[terrain].wantEnc} (n ${s.encN})`);
   }
