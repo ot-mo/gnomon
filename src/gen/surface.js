@@ -321,11 +321,19 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
 
   // 6. Trees. A tree whose canopy stays inside the zone gives way to the zone's own things; one that
   //    crosses an edge never does (the world function keeps those clear of ports), so both zones have it.
+  //    Clearings (the biome's `clearings`: discs of radius 6-8 inside the keep) are made first, in dense woods
+  //    the only ground the dressing finds free: an inner tree whose trunk stands in one gives way.
+  const bio = biomeFor(world, tile), clear = new Uint8Array(n), clearings = [];
+  for (let k = 0, m = rng.int(...(bio.clearings || [0, 0])); k < m; k++) {
+    const r = rng.int(6, 8), cx = rng.int(R.edgeKeep + r + 2, ZW - R.edgeKeep - r - 3), cy = rng.int(R.edgeKeep + r + 2, ZD - R.edgeKeep - r - 3);
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (distance(dx, dy) <= r + 0.5) clear[cx + dx + (cy + dy) * ZW] = 1;
+    clearings.push([cx, cy]);
+  }
   const scenery = new Uint8Array(n);   // columns whose standing spot is on scenery (a tree, a wall's top)
   const busy = new Uint8Array(n);      // what the biome's dressing must leave alone (common.js: ctx.busy)
   for (const t of base.trees) {
     const ti = t.x + t.y * ZW, inside = t.x >= 1 && t.y >= 1 && t.x < ZW - 1 && t.y < ZD - 1;
-    if (inside && (road[ti] || water[ti] || reserved[ti] || plan[ti] || (t.x === hub.x && t.y === hub.y))) { markTree(t); continue; }
+    if (inside && (road[ti] || water[ti] || reserved[ti] || plan[ti] || clear[ti] || (t.x === hub.x && t.y === hub.y))) { markTree(t); continue; }
     if (inside && local[ti]) markTree(t);
     buildTree(zone, inside ? { ...t, base: FLOOR_Z + H[ti] } : t, scenery);   // (banks may have lowered an inner one's ground)
     for (let dy = -1; dy <= 1; dy++)
@@ -340,10 +348,10 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
   for (let dy = -2; dy <= 2; dy++)
     for (let dx = -2; dx <= 2; dx++) if (hub.x + dx >= 0 && hub.y + dy >= 0 && hub.x + dx < ZW && hub.y + dy < ZD) busy[hub.x + dx + (hub.y + dy) * ZW] = 1;
   const ctx = withHelpers({
-    run, zone, tile, site, rng, level: zone.level, biome: biomeFor(world, tile), ports: base.ports, margin: R.siteMargin, hub,
-    H, water, road, cliff: base.cliff, base, busy, local, scenery, footprint: reserved,
+    run, zone, tile, site, rng, level: zone.level, biome: bio, ports: base.ports, margin: R.siteMargin, hub,
+    H, water, road, cliff: base.cliff, base, busy, local, scenery, footprint: reserved, clearings,
     planned: new Uint8Array(n), jump: new Uint8Array(n), walls: new Uint8Array(n),
-    made: { plateaus: [], ramps: [], caches: [] }, cosmetic: makeRng(seedFor(seed, "cosmetic")),
+    made: { plateaus: [], ramps: [], caches: [], ponds: [] }, cosmetic: makeRng(seedFor(seed, "cosmetic")),
   });
   builderFor(world, tile)(ctx);
 

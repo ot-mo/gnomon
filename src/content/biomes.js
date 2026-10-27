@@ -28,6 +28,8 @@
 //               (a type's `levels`); bible §15.2's spawn keys
 //   wildlife    how many creatures (or packs) a zone holds
 //   caches      the chance of a cache on a cliff top a ramp reaches (the Rustbacks' heaps on the Steps' ledges)
+//   clearings   how many discs (radius 6-8) are cleared of the zone's inner trees before they grow: in dense woods
+//               the only ground the dressing finds free (gen/surface.js step 6)
 //
 // A biome missing here takes DEFAULT_BIOME's values, and so does every span of a world whose terrains aren't the
 // real world's (content/world/terrains.js): the test world's fixture terrains share some ids ("flats") but none
@@ -41,7 +43,7 @@ export const DEFAULT_BIOME = {
   ponds: { count: [0, 0], radius: [2, 3] },
   props: { count: [2, 6], kinds: [["shrub", 3], ["tuft", 2]] },
   lights: { count: [0, 0], post: "STONE" },
-  plateaus: 0.25, ramps: [0, 0], caches: 0,
+  plateaus: 0.25, ramps: [0, 0], caches: 0, clearings: [0, 1],
   spawns: [], wildlife: [0, 0],
 };
 
@@ -112,7 +114,7 @@ export const BIOMES = {
     rocks: { block: "MOSS", count: [0, 2], tall: 0.3 },
     ponds: { count: [0, 2], radius: [2, 3] },
     props: { count: [12, 20], kinds: pleatProps },
-    plateaus: 0.3,
+    plateaus: 0.3, clearings: [1, 2],
     spawns: [["creasebeetle", 4], ["pleatSpider", 3], ["hangvine", 2], ["sporeling", 2], ["foldmonkey", 2]], wildlife: [2, 4],
   },
   deepPleat: {   // the same forest, older and darker: paper-wasp nests
@@ -120,7 +122,7 @@ export const BIOMES = {
     rocks: { block: "MOSS", count: [0, 2], tall: 0.4 },
     ponds: { count: [0, 1], radius: [2, 3] },
     props: { count: [12, 20], kinds: [["fern", 3], ["mushroom", 4], ["nest", 1], ["web", 1]] },
-    plateaus: 0.3,
+    plateaus: 0.3, clearings: [1, 2],
     spawns: [["paperWasps", 3], ["mootWalker", 2], ["creasebeetle", 3], ["hangvine", 2]], wildlife: [2, 4],
   },
   tessellate: {   // a dead-flat plain paved with the mosaics of pressed towns, readable only on the map

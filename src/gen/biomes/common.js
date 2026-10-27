@@ -125,13 +125,24 @@ function somewhere(ctx, ok, tries = 40, pad = 0) {
 
 // Ponds: a disc of the zone's liquid at the datum, deep in the middle from radius 3, the ground within 3 tiles of
 // it no higher than its distance (the rivers' banks), so no step is over 1. Only where nothing else is within the
-// banks and no cliff is near (relief alone is at most 3, so the banks meet the ground with steps of 1).
+// banks and no cliff within a tile of them (relief alone is at most 3, so the banks meet the ground with steps of
+// 1). A clearing's middle is tried first (ctx.clearings: in dense woods the only place a pond fits).
 export function ponds(ctx, spec) {
   if (!spec) return;
-  const { rng, zone, H } = ctx, W = zone.w;
+  const { rng, zone, H, cliff } = ctx, W = zone.w, spots = [...(ctx.clearings || [])];
+  const fits = (x, y, r) => {
+    for (let dy = -r - 4; dy <= r + 4; dy++)
+      for (let dx = -r - 4; dx <= r + 4; dx++) {
+        const d = distance(dx, dy), i = x + dx + (y + dy) * W;
+        if (d > r + 4) continue;
+        if (!ctx.keep(x + dx, y + dy) || cliff[i] || (d <= r + 3 && ctx.busy[i])) return false;
+      }
+    return true;
+  };
   for (let n = roll(rng, spec.count), made = 0, k = 0; made < n && k < n * 6; k++) {
-    const r = rng.int(spec.radius[0], spec.radius[1]), out = r + 4;
-    const spot = somewhere(ctx, (x, y) => ctx.freeRect(x - out, y - out, 2 * out + 1, 2 * out + 1), 12);
+    const r = rng.int(spec.radius[0], spec.radius[1]), out = r + 3;
+    const first = spots.shift();
+    const spot = (first && fits(first[0], first[1], r) ? first : null) || somewhere(ctx, (x, y) => fits(x, y, r), 12);
     if (!spot) continue;
     const [cx, cy] = spot;
     let low = true;
@@ -140,10 +151,12 @@ export function ponds(ctx, spec) {
     for (let dy = -out; dy <= out; dy++)
       for (let dx = -out; dx <= out; dx++) {
         const x = cx + dx, y = cy + dy, d = distance(dx, dy);
+        if (d > r + 3) continue;
         if (d <= r + 0.5) ctx.pool(x, y, r >= 3 && d < r - 1.5);
-        else if (d <= r + 3) { const cap = Math.floor(d - r); if (H[x + y * W] > cap) ctx.column(x, y, cap); }
+        else { const cap = Math.floor(d - r); if (H[x + y * W] > cap) ctx.column(x, y, cap); }
         ctx.occupy(x, y);
       }
+    ctx.made.ponds.push({ x: cx, y: cy, r });
     made++;
   }
 }

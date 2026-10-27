@@ -324,6 +324,16 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
     dressing(z, t, dressed, fail, `seed ${seed} (${wx}, ${wy}) ${t.terrain} (${what})`, worldFns(run.world, run.seed));
   }
 
+  // 10c. Every biome's features fire: over 20 or more sampled zones of a biome whose data asks for plateaus, ponds or
+  // ramps, some are made (dense woods leave no free ground without their clearings).
+  for (const [id, b] of Object.entries(dressed.byBiome)) {
+    const data = BIOMES[id] || {};
+    if (b.n < 20) continue;
+    if (data.plateaus > 0 && !b.plateaus) fail(`biome ${id}: no plateau in ${b.n} zones`);
+    if (data.ponds?.count?.[1] > 0 && !b.ponds) fail(`biome ${id}: no pond in ${b.n} zones`);
+    if (data.ramps?.[1] > 0 && !b.ramps) fail(`biome ${id}: no ramp in ${b.n} zones`);
+  }
+
   // 11-14.
   builders(fail, dressed);
 
@@ -382,8 +392,9 @@ export function reach3d(zone) {
 
 function dressing(z, t, out, fail, at, W) {
   const g = z.gen, { w, d } = z, R = SURFACE_RULES;
-  const b = (out.byBiome[t.biome] ||= { n: 0, plateaus: 0, ramps: 0, caches: 0, creatures: 0, props: 0 });
+  const b = (out.byBiome[t.biome] ||= { n: 0, plateaus: 0, ramps: 0, caches: 0, creatures: 0, props: 0, ponds: 0 });
   b.n++;
+  b.ponds += g.ponds.length;
   const open = standWith(z, "open");
   for (let i = 0; i < w * d; i++) if (z.kind[i] === KIND.WALL) open[i] = -1;
   const map = reachable(open, w, d, Math.floor(z.spawn.x), Math.floor(z.spawn.y), PLAYER_STEP_UP, PLAYER_DROP), deep = reach3d(z);
