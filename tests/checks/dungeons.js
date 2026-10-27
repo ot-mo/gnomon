@@ -507,7 +507,49 @@ export async function checkLegends({ seed = 7 } = {}) {
   stats.saint = `burnt away after ${(ticks / 10).toFixed(1)} s by a lit brazier; uid ${uidWhere(game, saint.uid)}; XP ${xp0} → ${game.player.xp} (owed ${xpOwed})`;
   if (z.creatures.includes(sc) || uidWhere(game, saint.uid) !== "dead") problems.push(`a Lampless Saint by a lit brazier: still there ${z.creatures.includes(sc)}, uid ${uidWhere(game, saint.uid)}`);
   if (!(game.player.xp > xp0 || game.player.level > 1)) problems.push(`a Lampless Saint burnt away gave no experience (${xp0} → ${game.player.xp})`);
-  stats.cases = 6;
+  // 7. Its mutations and looks: on once, not stacking over re-entries, and back on after a save and a load (none
+  //    of armour, venom, damage or colour is a saved creature field).
+  const { encodeZone, decodeZone } = await import("../../src/save/codec.js");
+  startRun(seed, TEST_WORLD);
+  const L7 = [...game.run.sites.values()].find((s) => s.id === lair.id).legend;
+  L7.mutations = ["heavyBlows", "venomous", "thickHide"];
+  go(deep);
+  const look = (c) => c && { bonus: c.bonus, venom: c.venom, armour: c.armour, color: JSON.stringify(c.color) };
+  const first = look(game.zone.creatures.find((o) => o.uid === L7.uid));
+  for (let k = 0; k < 3; k++) { go(top); go(deep); }
+  const again = look(game.zone.creatures.find((o) => o.uid === L7.uid));
+  const base = Math.floor((L7.level - 1) / 4);
+  if (!first || first.bonus !== base + 2 || first.venom !== 3 || first.armour < 2 || first.color !== "[235,90,235]") problems.push(`mutations on first entry: ${JSON.stringify(first)}`);
+  if (JSON.stringify(again) !== JSON.stringify(first)) problems.push(`mutations after three re-entries: ${JSON.stringify(again)} (first ${JSON.stringify(first)})`);
+  go(top);
+  game.zones.set(deep, await decodeZone(await encodeZone(game.zones.get(deep), { slot: null })));
+  go(deep);
+  const loaded = look(game.zone.creatures.find((o) => o.uid === L7.uid));
+  if (JSON.stringify(loaded) !== JSON.stringify(first)) problems.push(`mutations after a save and a load: ${JSON.stringify(loaded)} (before ${JSON.stringify(first)})`);
+  stats.mutations = `${JSON.stringify(first)}; the same after 3 re-entries and after a save and a load`;
+  // 8. A history relic lies in one zone: claimed where it was laid; one claimed elsewhere first isn't there too;
+  //    carried off and dropped in another zone, it stays where it was dropped.
+  startRun(seed, TEST_WORLD);
+  const hist = [...game.run.sites.values()].find((s) => s.kind === "historic" && s.historyRef.relicId);
+  if (hist) {
+    const rid = hist.historyRef.relicId, hDeep = `${hist.at.wx},${hist.at.wy},${hist.dungeon.levels}`, hTop = `${hist.at.wx},${hist.at.wy},${hist.dungeon.levels - 1}`;
+    const relicIn = (key) => (game.zones.get(key)?.items || []).filter((it) => it.histRelic === rid).length;
+    go(hDeep);
+    const laid = relicIn(hDeep), claimedBy = uidWhere(game, rid);
+    const it = game.zone.items.find((o) => o.histRelic === rid);
+    game.zone.items = game.zone.items.filter((o) => o !== it);   // picked up…
+    go(hTop);
+    game.zone.items.push({ ...it, x: game.player.x, y: game.player.y });   // …and dropped a level up
+    go(hDeep); go(hTop);
+    const dropped = relicIn(hTop);
+    startRun(seed, TEST_WORLD);
+    claimUid(game, rid, "elsewhere");
+    go(hDeep);
+    const twice = relicIn(hDeep);
+    stats.relic = `laid ${laid} (claimed by ${claimedBy}); dropped a level up: ${dropped} there; claimed elsewhere first: ${twice} in the reliquary`;
+    if (laid !== 1 || claimedBy !== hDeep || dropped !== 1 || twice !== 0) problems.push(`a history relic: ${stats.relic}`);
+  } else problems.push("no historic site with a relic");
+  stats.cases = 8;
   return { name: "legends", ok: problems.length === 0, problems, stats };
 }
 
