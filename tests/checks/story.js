@@ -255,6 +255,11 @@ export async function run(env) {
                    get: (x, y, zl) => (zl === FLOOR_Z - 1 && y === 5 && x >= 4 && x <= 7 ? B.MOSAIC_WHITE : 0) };
       const at = (x, y) => murals.muralsAt(zz, x, y).map((m) => m.text).join();
       if (at(5, 5) !== "a" || at(6, 5) !== "b" || at(4, 5) !== "a" || at(7, 5) !== "b" || at(5, 6) !== "") fail(`muralsAt: ${[at(5, 5), at(6, 5), at(4, 5), at(7, 5), at(5, 6)]}`);
+      // A 5-wide tablet (WS10's Hour-site paving, x 8-12 round a mural at 10): its edges read it; a gap or a third tile doesn't.
+      const zt = { murals: [{ x: 10, y: 3, z: FLOOR_Z - 1, view: "map", text: "c" }],
+                   get: (x, y, zl) => (zl === FLOOR_Z - 1 && y === 3 && x >= 8 && x <= 12 && x !== 14 ? B.MOSAIC_WHITE : y === 3 && x === 13 ? B.MOSAIC_GOLD : 0) };
+      const at5 = (x) => murals.muralsAt(zt, x, 3).map((m) => m.text).join();
+      if (at5(8) !== "c" || at5(12) !== "c" || at5(13) !== "" || at5(7) !== "") fail(`a 5-wide tablet: ${[at5(8), at5(12), at5(13), at5(7)]}`);
     }
     // Drawing and describing learn nothing; the describer shows the mosaic's text, and says what the relief needs.
     game.debug.draw();

@@ -4,8 +4,8 @@
 //                 Hour sites and murals gimmick, 7b's village mosaics): "map" a floor mosaic (the Flat Account),
 //                 "3d" a carved relief (the Deep Inscription), "dark" a rune (the Dark Gloss). secret: the id it
 //                 teaches; without one, the history account whose text it is (secrets.js muralSecret).
-//   muralsAt(zone, x, y) → [mural]      the murals a tile shows: its own, and a mosaic's tablet (the tiles either side
-//                                       of a "map" mural that are mosaic too: WS10 lays them three wide)
+//   muralsAt(zone, x, y) → [mural]      the murals a tile shows: its own; else the nearest "map" mural up to 2 tiles along
+//                                       the row through unbroken mosaic (a tablet: WS10 lays them 3 and 5 wide)
 //   readable(game, zone, m) → bool      a mosaic only on the map; a relief only in 3D, in light; a rune only in 3D, in
 //                                       the dark (your torch out)
 //   readMural(game, ev) → [id]          on `inspect` { zone, x, y, z, open } (WS8's look cursor sends open: true, a map
@@ -26,8 +26,12 @@ export function muralsAt(zone, x, y) {
   const all = zone?.murals || [];
   const own = all.filter((m) => m.x === x && m.y === y);
   if (own.length) return own;   // a mural on the tile itself wins over a neighbour's tablet
-  return all.filter((m) => m.view === "map" && m.y === y && Math.abs(m.x - x) === 1 && isMosaic(zone, x, y, m.z)).slice(0, 1);
+  // A tablet: an unbroken row of mosaic from this tile to the mural, at most TABLET tiles away (WS10 lays 3 and 5 wide).
+  const unbroken = (m) => { for (let k = Math.min(x, m.x); k <= Math.max(x, m.x); k++) if (!isMosaic(zone, k, y, m.z)) return false; return true; };
+  const near = all.filter((m) => m.view === "map" && m.y === y && Math.abs(m.x - x) <= TABLET && unbroken(m));
+  return near.sort((a, b) => Math.abs(a.x - x) - Math.abs(b.x - x)).slice(0, 1);
 }
+const TABLET = 2;
 
 export function readable(game, zone, m) {
   if (m.view === "map") return game.view === "map";
