@@ -108,7 +108,9 @@ export function checkCombat({ game, startRun, srcFiles }) {
   const p = game.player;
   const logged = [], log = game.log;
   game.log = (text) => logged.push(text);
-  const undoCombat = overrideRules("combat", "d20");
+  // d20 on the legacy stat set (its rows read STR 10, as written in 0C; since the flip, p2-flip, the attribute set is
+  // the default, and WS8's TTK tables hold d20 with it).
+  const undoCombat = overrideRules("combat", "d20"), undoStats = overrideRules("stats", "legacy");
   const undoDay = setDaylight(1);
   const attacks = [];
   const offAttack = on("attack", (g, { result }) => attacks.push(result));
@@ -518,7 +520,7 @@ export function checkCombat({ game, startRun, srcFiles }) {
       stats.bus = { bounty: !!quarry.killed, guardianWakes: wakes.length, kills: kills.map((k) => k.c.type), won: true };
     }
   } finally {
-    offAttack(); offKill(); undoCombat(); undoDay();
+    offAttack(); offKill(); undoCombat(); undoStats(); undoDay();
     game.combatRng = null;
     Object.assign(p.attrs, savedAttrs); invalidateStats(p);
     game.log = log;

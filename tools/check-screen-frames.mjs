@@ -10,4 +10,5 @@ const fixture = JSON.parse(fs.readFileSync(path.join(ROOT, "tests", "fixtures", 
 const env = await installNodeEnv({ cols: 180, rows: 56 });
 const { game, startRun, inputHandlers } = await env.load("game.js");
 const { addStatus } = await env.load("status.js");
-process.exit(report(checkScreenFrames(screenFrames({ game, startRun, inputHandlers, addStatus, frameHash: env.frameHash, seedRandom }), fixture)));
+const rules = await env.load("rules.js");
+process.exit(report(checkScreenFrames(screenFrames({ game, startRun, inputHandlers, addStatus, frameHash: env.frameHash, seedRandom, rules }), fixture)));

@@ -7,6 +7,7 @@
 // over today's modules (tests/golden/current-api.js). Pure: no file or DOM access.
 import { canon } from "../lib/hash.js";
 import { recordMechanics, recordFrames, recordDungeons, recordVaults, recordTemple } from "../golden/scenarios.js";
+import { overrideRules } from "../../src/rules.js";
 
 // Legacy level 1 differs on purpose since 0A1 (no sky well; stairs up to the temple), so the
 // dungeon comparison covers depths 2-20 and only reports what changed on depth 1.
@@ -25,7 +26,13 @@ function diffPaths(a, b, path = "", out = [], limit = 8) {
 const same = (a, b) => canon(a) === canon(b);
 const norm = (v) => JSON.parse(canon(v));
 
-export function checkGolden(api, fixtures, { only = null } = {}) {
+// The fixtures are the parent's game, so they replay under its rules: since the flip (p2-flip) the defaults are the
+// attribute set and d20, and golden (a) no longer holds the default game, only the legacy sets (TECH_DESIGN §8.5).
+export function checkGolden(api, fixtures, opts) {
+  const undo = [overrideRules("stats", "legacy"), overrideRules("combat", "legacy")];
+  try { return goldenParts(api, fixtures, opts); } finally { while (undo.length) undo.pop()(); }
+}
+function goldenParts(api, fixtures, { only = null } = {}) {
   const problems = [], notes = [], stats = {};
   const want = (part) => !only || only.includes(part);
   const t0 = Date.now();

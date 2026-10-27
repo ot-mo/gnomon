@@ -53,14 +53,21 @@ const { servicesFor } = await import("../src/talk.js");
 const ARROWS = { "1,0": "ArrowRight", "-1,0": "ArrowLeft", "0,1": "ArrowDown", "0,-1": "ArrowUp" };
 const tileOf = (p) => [Math.floor(p.x), Math.floor(p.y)];
 
-function settle() {   // let the "DEPTH n" beat (and any story page) pass
+function settle() {   // let the "DEPTH n" beat (and any story page) pass; a target screen confirmed, else let go
   for (let k = 0; k < 400 && game.mode !== "map" && game.mode !== "explore"; k++) {
     if (game.mode === "story") { game.pages = null; game.mode = game.view === "map" ? "map" : "explore"; break; }
+    if (game.mode === "target") { aimed(); continue; }
     game.debug.step(1 / 30);
   }
 }
 
 const monstersIn = (zone) => zone.creatures.filter((c) => !canTalk(c));
+// The target screen (the map's T under the d20 set, an aimed ability since the WS4b merge): Enter on what it starts
+// on (the nearest foe in reach), and Esc if that is refused (your own tile for a knife), as a player would.
+function aimed() {
+  inputHandlers.onKeyDown("Enter", false, "Enter");
+  if (game.mode === "target") inputHandlers.onKeyDown("Escape", false, "Escape");
+}
 
 function arrive() {   // a fresh zone: no fights, no dying
   game.zone.creatures = talkersIn(game.zone);
@@ -665,6 +672,7 @@ export async function runSession({ seed = 1234, zones: want = 10 } = {}) {
   const settled = () => {
     for (let k = 0; k < 600; k++) {
       if (game.mode === "levelup") press("Digit1");
+      else if (game.mode === "target") { aimed(); counts.keys++; }
       else if (game.mode === "transition") frame();
       else if (game.mode === "story") { game.pages = null; game.mode = game.view === "map" ? "map" : "explore"; }
       else if (game.mode === "pause") game.debug.lockChange(true);

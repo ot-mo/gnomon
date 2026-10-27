@@ -991,10 +991,13 @@ export function checkItems(m) {
     const E = m.effects;
     // Line for line: every potion drunk and scroll read gives what p0-done's switches gave (the same log, numbers,
     // statuses and random draws), and every thrown potion's splash from the table what throwing.js's switch gives.
-    const traced = consumableTrace(m);
+    // (Traced on the legacy sets, as p0-done's switches were: since the flip, p2-flip, they aren't the default.)
+    const undoSets = [m.rules.overrideRules("stats", "legacy"), m.rules.overrideRules("combat", "legacy")];
+    let traced, splashes;
+    try { traced = consumableTrace(m); splashes = splashTrace(m); } finally { while (undoSets.length) undoSets.pop()(); }
     const off = Object.keys(PARENT_CONSUMABLES).filter((k) => traced[k] !== PARENT_CONSUMABLES[k]);
     if (off.length || Object.keys(traced).length !== Object.keys(PARENT_CONSUMABLES).length) fail(`consumables that differ from p0-done's switches: ${off.join(", ") || "(a different set)"}`);
-    const splashes = splashTrace(m), drift = splashes.filter((r) => r.parent !== r.table).map((r) => r.effect);
+    const drift = splashes.filter((r) => r.parent !== r.table).map((r) => r.effect);
     if (drift.length) fail(`thrown potions whose splash from the table differs from throwing.js's switch: ${drift.join(", ")}`);
     stats.effectsTraced = `${Object.keys(traced).length - off.length} of ${Object.keys(PARENT_CONSUMABLES).length} drunk or read as at p0-done; ${splashes.length - drift.length} of ${splashes.length} splashes as throwing.js's switch`;
     const missing = [...Object.keys(I.POTIONS).filter((k) => !E.DRINK[k]), ...Object.keys(I.SCROLLS).filter((k) => !E.READ[k])];

@@ -21,7 +21,7 @@
 //   7. The parent's literal values, pinned: `$` in the old gold colour (255, 210, 70), a sale pays
 //      floor(price × 0.3) (36 for a mace +2); the HUD row shows formatFunds in that colour, in both views.
 //      capture: node-env's presented frame.
-import { RULES } from "../../src/rules.js";
+import { RULES, overrideRules } from "../../src/rules.js";
 import * as C from "../../src/currency.js";
 import * as I from "../../src/items.js";
 import * as St from "../../src/stats.js";
@@ -35,7 +35,13 @@ const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|
 const GOLD_OK = [/sfx\("gold"\)/, /case "gold":/, /sound: "gold"/, /FLOOR_ART\.gold/, /^\s*gold:\s*\{ w:/, /registerItemKind\("gold"/,
   /\["\$", \[255, 210, 70\], "gold"\]/, /"golden"/, /gold bands/];
 
-export function checkCurrency({ game, startRun, dialogue, npcs, creatures, srcFiles, capture }) {
+// The parent's economy (Pell's prices, the Haggler's fifth) on the legacy stat set, which isn't the default since the
+// flip (p2-flip); the attribute set's prices (EGO, reputation) are check-social's.
+export function checkCurrency(m) {
+  const undo = overrideRules("stats", "legacy");
+  try { return currencyParts(m); } finally { undo(); }
+}
+function currencyParts({ game, startRun, dialogue, npcs, creatures, srcFiles, capture }) {
   const problems = [], stats = {}, t0 = Date.now();
   const fail = (m) => problems.push(m);
   const { CURRENCY } = C;

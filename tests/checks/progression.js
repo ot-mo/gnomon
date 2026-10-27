@@ -581,7 +581,7 @@ export async function checkProgression(m) {
 
   // --- 6. The old game ---------------------------------------------------------------------------------------------
   function section6() {
-    if (rules.RULES.stats !== "legacy") { fail("the legacy set isn't the default"); return; }
+    if (rules.RULES.stats !== "legacy") { fail("section 6 runs without the legacy set"); return; }
     game.debug.startRun(31);
     for (let k = 0; k < 20 && game.mode === "story"; k++) press("Space");
     const p = game.player;
@@ -1340,7 +1340,9 @@ export async function checkProgression(m) {
   try {
     section1(); section2(); section3(); section4(); section5(); section7();
   } finally { undo(); }
-  section6();
+  // The old game under the legacy set, which is no longer the default since the flip (p2-flip): set here.
+  const undoLegacy = [rules.overrideRules("stats", "legacy"), rules.overrideRules("combat", "legacy")];
+  try { section6(); } finally { while (undoLegacy.length) undoLegacy.pop()(); }
   return { name: NAME, ok: problems.length === 0, problems: problems.slice(0, 60).concat(problems.length > 60 ? [`… and ${problems.length - 60} more`] : []), stats: out };
 }
 

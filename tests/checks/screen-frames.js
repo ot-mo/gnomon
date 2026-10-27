@@ -10,7 +10,13 @@
 //       page and the victory card.
 //   checkScreenFrames(frames, fixture) → { name, ok, problems, stats }
 //       fixture: { against, frames: [{ name, hash }] } (tools/record-screen-frames.mjs, from p0-0c)
-export function screenFrames({ game, startRun, inputHandlers, addStatus, frameHash, seedRandom }) {
+// rules: the tree's rules.js, to draw the old game under its own sets (since the flip, p2-flip, they aren't the
+// default); a tree before the flip has nothing to switch, so a runner may leave it out.
+export function screenFrames(m) {
+  const undo = m.rules?.overrideRules ? [m.rules.overrideRules("stats", "legacy"), m.rules.overrideRules("combat", "legacy")] : [];
+  try { return framesOf(m); } finally { while (undo.length) undo.pop()(); }
+}
+function framesOf({ game, startRun, inputHandlers, addStatus, frameHash, seedRandom }) {
   const out = [];
   const shot = (name) => {
     game.fps = 60; game.frameMs = 1.5;   // the fps segment: the same number in both trees
@@ -102,5 +108,5 @@ export async function run(env) {
   const { frameHash } = await env.screen({ cols: 180, rows: 56 });
   const { game, startRun, inputHandlers } = await env.src("game.js");
   const { addStatus } = await env.src("status.js");
-  return checkScreenFrames(screenFrames({ game, startRun, inputHandlers, addStatus, frameHash, seedRandom: env.seedRandom }), fixture);
+  return checkScreenFrames(screenFrames({ game, startRun, inputHandlers, addStatus, frameHash, seedRandom: env.seedRandom, rules: await env.src("rules.js") }), fixture);
 }

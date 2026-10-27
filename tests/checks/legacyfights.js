@@ -16,12 +16,19 @@
 // 600 frames of 1/60 s a level. Kills, XP, archers, elites, spiders, the guardians and the creatures'
 // blows on you all come through it.
 import { hashString } from "../lib/hash.js";
+import { overrideRules } from "../../src/rules.js";
 
 export const LEVELS = [1, 2, 3, 4, 5, 6, 9, 10, 12];
 const ARROWS = { "1,0": "ArrowRight", "-1,0": "ArrowLeft", "0,1": "ArrowDown", "0,-1": "ArrowUp" };
 const monstersOf = (z) => z.monsters || z.creatures.filter((c) => !c.talk);
 
-export function playLegacyFights({ game, startRun, inputHandlers, keys }, view) {
+// The fixture is the parent's fights, so they are played under its rules (§8.5: since the flip, p2-flip, the defaults
+// are the attribute set and d20).
+export function playLegacyFights(m, view) {
+  const undo = [overrideRules("combat", "legacy"), overrideRules("stats", "legacy")];
+  try { return playFights(m, view); } finally { while (undo.length) undo.pop()(); }
+}
+function playFights({ game, startRun, inputHandlers, keys }, view) {
   const settle = () => {
     for (let k = 0; k < 400 && game.mode !== "map" && game.mode !== "explore"; k++) {
       if (game.mode === "story") { game.pages = null; game.mode = game.view === "map" ? "map" : "explore"; break; }

@@ -195,7 +195,9 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles, capture }
       for (let k = 0; k < 360; k++) { game.time += STEP; tickEffects(game, STEP); }
       return hp0 - p.hp;
     };
-    const got = [bite([], 0), bite(["thickBlood"], 0), bite([], 4)];
+    const undoSet = [overrideRules("stats", "legacy"), overrideRules("combat", "legacy")];   // (the legacy set: not the default since the flip)
+    let got;
+    try { got = [bite([], 0), bite(["thickBlood"], 0), bite([], 4)]; } finally { while (undoSet.length) undoSet.pop()(); }
     stats.salamanderLegacy = { hpLost: got, parent: [3, 1, 4] };
     if (got.join() !== "3,1,4") fail(`legacy salamander bite: HP lost ${got} over 6 s (the parent: plain 3, Thick blood 1, venomous 4)`);
   }

@@ -28,6 +28,8 @@
 //      a tab, a row to select and again to buy, "Esc back", "Esc to leave"; M in the pack toggles nothing),
 //      levelup (1, or a click on a perk), the "DEPTH n" beat, and the death and victory cards (R, or a
 //      click on "Press R…").
+import { overrideRules } from "../../src/rules.js";
+
 export function checkShell({ game, startRun, inputHandlers, screens, keys, ui, input, S, capture, srcFiles, creatures, encounters, makeRng }) {
   const problems = [], stats = {};
   const fail = (m) => problems.push(m);
@@ -397,17 +399,21 @@ export function checkShell({ game, startRun, inputHandlers, screens, keys, ui, i
     click("Esc back"); expect("talk", "clicking \"Esc back\" in the pack");
     click("Esc to leave"); expect("map", "clicking \"Esc to leave\"");
 
-    // A level gained: 1-4 or a click.
-    p.pendingLevels = 1; game.debug.step(1 / 60); seen(byKey); seen(byMouse);   // (XP from a fight: keys or the mouse)
-    expect("levelup", "a level gained on the map");
-    press("Digit1", "1"); expect("map", "1 on the levelup screen");
-    p.pendingLevels = 1; game.debug.step(1 / 60);
-    frame();
-    let row = -1;   // the first choice: its number, two spaces, its name
-    for (let y = 0; y < capture.rows && row < 0; y++) if (/^\s*-*\s*1  \S/.test(capture.chars.slice(y * capture.cols, (y + 1) * capture.cols).join("").replace(/^\s+/, " "))) row = y;
-    if (row >= 0) { const line = capture.chars.slice(row * capture.cols, (row + 1) * capture.cols).join(""); inputHandlers.onMouseDown(0, line.indexOf("1  ") + 4, row); seen(byMouse); }
-    expect("map", "a click on the first perk");
-    if (game.mode === "levelup") game.debug.choosePerk(0);
+    // A level gained: 1-4 or a click. The parent's card, on the legacy stat set (since the flip, p2-flip, the attribute
+    // set's card is WS4's, held by check-progression and browser-ws4).
+    const undoCard = overrideRules("stats", "legacy");
+    try {
+      p.pendingLevels = 1; game.debug.step(1 / 60); seen(byKey); seen(byMouse);   // (XP from a fight: keys or the mouse)
+      expect("levelup", "a level gained on the map");
+      press("Digit1", "1"); expect("map", "1 on the levelup screen");
+      p.pendingLevels = 1; game.debug.step(1 / 60);
+      frame();
+      let row = -1;   // the first choice: its number, two spaces, its name
+      for (let y = 0; y < capture.rows && row < 0; y++) if (/^\s*-*\s*1  \S/.test(capture.chars.slice(y * capture.cols, (y + 1) * capture.cols).join("").replace(/^\s+/, " "))) row = y;
+      if (row >= 0) { const line = capture.chars.slice(row * capture.cols, (row + 1) * capture.cols).join(""); inputHandlers.onMouseDown(0, line.indexOf("1  ") + 4, row); seen(byMouse); }
+      expect("map", "a click on the first perk");
+      if (game.mode === "levelup") game.debug.choosePerk(0);
+    } finally { undoCard(); }
 
     // Stairs: the "DEPTH n" beat, then back to the map.
     game.debug.changeFloor("0,0,1", "down", "You descend the stairs..."); modes.add("transition"); byKey.add("transition"); byMouse.add("transition");

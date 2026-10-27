@@ -18,10 +18,11 @@ const deepFreeze = (v) => {
 };
 
 const CORE = {
-  // Which formula sets run. Phase 0 keeps the parent game's numbers ("legacy") so the golden traces
-  // prove the refactor changed nothing; the integrator flips both once WS4 and WS8 are in (§8.5).
-  stats: "legacy",      // "legacy" | "attributes"
-  combat: "legacy",     // "legacy" | "d20" (0C)
+  // Which formula sets run. Phase 0 kept the parent game's numbers ("legacy") so the golden traces proved the
+  // refactor changed nothing; with WS4 and WS8 in, the integrator flipped both (§8.5). The checks that replay the
+  // parent's fixtures (golden (a), the legacy fights) set "legacy" themselves (overrideRules).
+  stats: "attributes",  // "legacy" | "attributes" (the flip, at p2-flip: the user's call, 2026-10-27)
+  combat: "d20",        // "legacy" | "d20" (0C; flipped with stats)
 
   // The d20 set (DECISIONS; bible §10.6, §15.6; combat.js). To-hit: d20 + mods > DV; a natural 1 misses, a
   // natural ≥ critNat hits and crits (× crit); critNat = 20 − round(20 × (bonus(crit) + critPerAgi × AGI mod)),
