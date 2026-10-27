@@ -300,6 +300,14 @@ export async function run(env) {
     const p = game.player;
     const teller = creatures.spawnCreature(maren.type, Math.floor(p.x) + 1, Math.floor(p.y), p.z, {});
     teller.talk = { dialogue: "storyCheck", gossip: true };
+    // A talker of a faction that has an opinion of an Hour tells a rumour about that Hour (the fixture: the Kites
+    // favour Ishvalet, the Pleatwood hate Ammaruth).
+    for (const [faction, rulerId] of [["kites", "hour:ishvalet"], ["pleatwood", "hour:ammaruth"]]) {
+      const t2 = creatures.spawnCreature(maren.type, Math.floor(p.x) - 1, Math.floor(p.y), p.z, {});
+      t2.talk = { dialogue: "storyCheck", gossip: true }; t2.faction = faction;
+      const d = gossip.gossipDef(game, t2);
+      if (d?.ref?.rulerId !== rulerId) fail(`a talker of ${faction} told a rumour of ${d?.ref?.rulerId}, not ${rulerId}`);
+    }
     const text = gossip.gossipFor(game, teller);
     if (!text) fail("a talker that gossips has nothing to tell");
     const root = talk.talkTo(game, teller), opt = root.options.find((o) => /Heard anything/.test(o.label));

@@ -73,7 +73,7 @@ function rumours(run) {
   const faction = (id) => GRAMMAR.factions[id]?.name || id;
   const say = (rule, R, extra, about = null) => {
     const ctx = { ...forms(R), name: R.name, cog: R.epithet, teller: rng.pick(GRAMMAR.rules.teller), ...extra };
-    out.push({ id: `gossip:${out.length + 1}`, kind: "gossip", reading: null, tags: [R.id], value: 5, ref: { rulerId: R.id, about },
+    out.push({ id: `gossip:${out.length + 1}`, kind: "gossip", reading: null, tags: [R.id, ...(R.favoured || []), ...(R.hated || [])], value: 5, ref: { rulerId: R.id, about },
                text: cap(expand(GRAMMAR.rules, rule, rng, ctx)) });
   };
   for (const q of h.siteRequests) {
