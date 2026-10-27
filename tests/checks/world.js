@@ -12,6 +12,11 @@
 // 4. The run: buildRun → serializeRun → restoreRun deep-equal (and JSON-stable), with a spy on every
 //    build step and on buildRun proving that the load path builds nothing; a save for another world is
 //    refused; sites the same for the same seed and different for another; the placement rules hold.
+// 5. The world map's travel (WS1): on both worlds every span you can travel onto has the data a step needs
+//    (hours and a lost chance where it is "yes"; a line where it is "drop"), and every "yes" and "road" span is
+//    reached from the start by legal 8-way steps (overworld/state.js canStep: roads only along road and river
+//    edges, the bible's diagonal rule); "drop" spans end a journey (the Lattice's rim is reached, its inside
+//    walked); no span with travel "no" is reached.
 // Navigability of the zones is check-edges' and check-surface's (later in 0A2).
 import { compileWorld, validateWorld, levelOfTier, tierOfLevel, SIDES, SIDE_STEP, SITE_MARGIN } from "../../src/world/worldmodel.js";
 import { buildRun, serializeRun, restoreRun, zoneSeed, runRng, RUN_STEPS, RUN_STATS } from "../../src/world/run.js";
@@ -23,6 +28,7 @@ import { CURRENCY } from "../../src/content/currency.js";
 import { distance } from "../../src/rng.js";
 import { GEN_CALLS } from "../../src/world/genstats.js";
 import { SURFACE } from "../../src/world.js";
+import { canStep } from "../../src/overworld/state.js";   // WS1
 
 // Deep equality that understands Maps (by entries, in order) and plain data.
 export function deepEqual(a, b, path = "run", out = []) {
@@ -329,8 +335,46 @@ export function checkWorld({ seeds = [1, 7, 42, 1234, 31337], bibleText } = {}) 
   const bible = checkBible(problems, bibleText);
   const compiled = checkCompiled(problems);
   const run = checkRun(problems, seeds);
+  const travel = checkTravel(problems);   // WS1
   return { name: "world", ok: problems.length === 0, problems,
-           stats: { brokenWorldsRefused: refused, ...bible, ...compiled, seeds: seeds.length, ...run } };
+           stats: { brokenWorldsRefused: refused, ...bible, ...compiled, seeds: seeds.length, ...run, travel } };
+}
+
+// WS1: the world map's travel graph on both worlds (section 5 of the header).
+function checkTravel(problems) {
+  const out = {};
+  for (const [name, def] of [["test", TEST_WORLD], ["real", REAL_WORLD]]) {
+    const W = compileWorld(def), at = `${name} world travel`;
+    for (const t of W.tiles) {
+      const T = W.terrains[t.terrain];
+      if (t.travel === "yes" && !(t.travelHours > 0 && t.lostChance >= 0 && t.lostChance <= 1))
+        problems.push(`${at}: (${t.wx}, ${t.wy}) ${t.terrain} can be travelled onto with hours ${t.travelHours}, lost chance ${t.lostChance}`);
+      if (t.travel === "road" && !(t.travelHours > 0)) problems.push(`${at}: road span (${t.wx}, ${t.wy}) has no hours`);
+      if (t.travel === "drop" && !T?.edgeMessage) problems.push(`${at}: drop span (${t.wx}, ${t.wy}) says nothing when you walk onto it`);
+      if (!(t.encounterRate >= 0 && t.encounterRate <= 1)) problems.push(`${at}: (${t.wx}, ${t.wy}) encounter rate ${t.encounterRate}`);
+    }
+    const start = { wx: W.start.wx, wy: W.start.wy }, seen = new Set([`${start.wx},${start.wy}`]), q = [start];
+    while (q.length) {
+      const a = q.shift();
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          if (canStep(W, a, dx, dy)) continue;
+          const b = { wx: a.wx + dx, wy: a.wy + dy }, k = `${b.wx},${b.wy}`;
+          if (seen.has(k)) continue;
+          seen.add(k);
+          if (W.tileAt(b.wx, b.wy).travel !== "drop") q.push(b);   // a drop span ends the journey: you walk on from its zone
+        }
+    }
+    // Every "yes" and "road" span; a "drop" span only where it borders the rest (its inside is walked, bible §4.7).
+    const want = W.tiles.filter((t) => t.travel === "yes" || t.travel === "road"), missed = want.filter((t) => !seen.has(`${t.wx},${t.wy}`));
+    const drops = W.tiles.filter((t) => t.travel === "drop"), dropsReached = drops.filter((t) => seen.has(`${t.wx},${t.wy}`)).length;
+    if (drops.length && !dropsReached) problems.push(`${at}: no "drop" span can be reached from the start`);
+    const wrong = W.tiles.filter((t) => t.travel === "no" && seen.has(`${t.wx},${t.wy}`));
+    if (missed.length) problems.push(`${at}: ${missed.length} spans you could travel onto can't be reached from the start, the first (${missed[0].wx}, ${missed[0].wy}) ${missed[0].terrain}`);
+    if (wrong.length) problems.push(`${at}: ${wrong.length} travel "no" spans reached, the first (${wrong[0].wx}, ${wrong[0].wy})`);
+    out[name] = { reached: seen.size, travellable: want.length, drops: `${dropsReached} of ${drops.length}`, walkInOnly: W.tiles.filter((t) => t.travel === "no").length };
+  }
+  return out;
 }
 
 // tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
