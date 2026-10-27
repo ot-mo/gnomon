@@ -25,6 +25,21 @@ and moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## Next step
 
+**WIP (2026-10-27, the integrator stopped at a usage limit): the WS5 merge is half done on `integration`; `p2-ws5` is
+not tagged and `main` is still at `p2-ws4a`.** Done so far: `p1-ws5` merged (`791938e`; the sample lines of WS8 and
+WS5 both kept; `NOT_COMPARED` the union of WS3's 1 and WS5's 8 frames, 38 compared, 0 mismatched); findings fixed:
+the map legend moved from G to the comma (`f170d6d`, §4.3 gives G to WS5's pick-up; WS9 told), two Plumb backgrounds'
+implant ids matched to WS5's table (`4e36991`; WS4b told to copy it), WS8's look tests now expect WS5's examine
+(`c820d2e`, "WS5 examine from L" pinned); WS5's requests applied: 3 (`24432f0`), 5 (`9b616ac`), 6 (`fb3e737`, a
+`breath` bonus key), 7 (`0b95d2a`), 13 (`d73cdf5`), 14 (the commit after it). **Left:** WS5's request 15 (README and
+§8.4: `browser-ws5`, `screens/inventory.js`, check-items' row) and 18 (`browser-0d1`'s tour: examine and the Truing
+Cradle; `docs/ws5.md` has the block; put it after the `create` block); requests 8 and 9 (gyro wrists, juggler's arm,
+survey lens, grip soles) as the integrator's own follow-up; record the carried ones (4 to WS4b and WS9, 10 to WS4b,
+11 to WS6b, 12 to WS10, 16 with golden (b)'s retirement, 19 to WS4b with `light.js`, 20 to WS6a, 21 to C); then
+`run-all`, `check-perf` alone against `p0-done`, the browser checks (`browser-ws5` among them, serve on 8660),
+the integration log entry, the tag `p2-ws5` and `main`'s fast-forward.
+
+
 **The integrator:** wait for the coordinator's message; merge each `p1-*` tag as it lands, in §8.5's
 order (WS9, WS3, WS8, WS5, WS4, WS6a, WS6b, WS10, WS2, WS7, WS1). For each: read `docs/<ws>.md` and
 `docs/sessions/<ws>.md`; merge the tag; apply the requests aimed at P0's, unowned, the integrator's or merged
