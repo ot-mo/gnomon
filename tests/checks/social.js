@@ -417,6 +417,13 @@ export async function run(env) {
       if (!ids.includes("survey") || !ids.includes("assize") || ids.includes("pleatwood")) fail(`known in ${view}: ${ids.join(", ")}`);
       keys.dispatchKey(game, "ArrowDown");
       if (game.factionsView.sel !== 1) fail(`↓ moved the selection to ${game.factionsView.sel}`);
+      keys.dispatchKey(game, "KeyP", true);   // P held: its repeat doesn't close what P opened
+      if (game.mode !== "factions") fail(`P's key repeat closed the factions screen (${game.mode})`);
+      let musicKey = 0;
+      const unbind = keys.bind("*", "KeyQ", () => { musicKey++; });   // a "*" binding, as M and N are
+      keys.dispatchKey(game, "KeyQ");
+      unbind();
+      if (musicKey !== 1 || game.mode !== "factions") fail(`a "*" key (M, N) didn't get through the factions screen (${musicKey}, ${game.mode})`);
       keys.dispatchKey(game, view === "map" ? "KeyP" : "Escape");
       if (game.mode !== view) fail(`closing the factions screen left ${game.mode}, want ${view}`);
     }

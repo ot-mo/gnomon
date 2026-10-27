@@ -92,10 +92,10 @@ function close(game) { if (game.mode === MODE) popMode(game); game.factionsView 
 
 registerScreen(MODE, {
   draw: drawFactions,
-  key(game, code) {
-    if (code === "Escape" || code === "KeyP") { close(game); return true; }
-    listKey(game.factionsView, code, knownFactions(game).length);
-    return true;
+  // Its own keys only (held keys don't repeat a close): anything else goes on to the "*" bindings (M, N).
+  key(game, code, repeat) {
+    if (code === "Escape" || code === "KeyP") { if (!repeat) close(game); return true; }
+    return listKey(game.factionsView, code, knownFactions(game).length) !== null;
   },
   mouse(game, button, cell) {
     if (button === 2) { close(game); return; }
