@@ -1956,7 +1956,7 @@ workstream when both are merged.
 | `factions.js talk.js`, `social/index reputation builders`, `screens/factions`, `content/factions`, `check-social`, `tests/checks/social.js` | WS6a |
 | `dialogue.js`, `social/merchants ritual voices shrines backings liquids`, `screens/trade ritual`, `content/liquids items/containers` | WS6b (same agent as 6a) |
 | `story/*`, `screens/journal story`, `content/grammar quests villages creatures/villagers`, `check-story`, `tests/checks/story.js` | WS7 |
-| `combat.js ai.js creatures.js turns.js throwing.js missiles.js`, `screens/target.js`, `content/items/missiles`, `check-combat`, `tests/checks/combat.js` | WS8 |
+| `combat.js ai.js creatures.js turns.js throwing.js missiles.js`, `screens/target.js`, `content/items/missiles`, `check-combat`, `browser-ws8`, `tests/checks/combat.js` | WS8 |
 | `save/*`, `hud.js`, `config.js`, `screens/title log options dead pause`, `check-save`, `tests/checks/save.js` | WS9 |
 | `gen/dungeon.js vaults.js`, `guardians.js traps.js interact.js`, `world/sites.js`, `content/dungeons creatures/legends`, `test.html`, `check-dungeons/sites`, `tests/checks/dungeons.js` | WS10 |
 | `content/world/*`, `content/currency.js` (designed data) | C (content phase); the P0 fixtures stay for tests |
