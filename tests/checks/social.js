@@ -350,7 +350,7 @@ export async function run(env) {
       game.mode = "map"; game.modeStack = [];
     }
     fresh(1234, { genotype: "bent" });
-    const shown = Object.values(F.FACTIONS).filter((f) => !f.hidden);
+    const shown = Object.values(F.FACTIONS).filter((f) => !f.hidden), curtSeen = {};
     for (const role of builders.ROLES) for (const f of shown) for (const [bandId, [lo]] of Object.entries(EDGES)) {
       game.state.rep = { [f.id]: bandId === "hated" ? -800 : lo };
       const c = person("mira", role, f.id);
@@ -361,13 +361,24 @@ export async function run(env) {
       const root = talk.talkTo(game, c);
       if (root.text.length > 140) fail(`${role} of ${f.id} at ${bandId}: a ${root.text.length}-letter greeting`);
       if (bandId === "hated" && (root.options.length !== 1 || !root.options[0].bye)) fail(`${role} of ${f.id} at Dark: ${root.options.length} options`);
-      const refused = ["hostile", "wary"].includes(builders.standingOf(game, c).attitude) || bandId === "hated";
+      const st = builders.standingOf(game, c);
+      const refused = st.attitude === "hostile" || bandId === "hated", curt = !refused && (bandId === "disliked" || st.attitude === "wary");
+      if (curt) curtSeen[role] = (curtSeen[role] || 0) + 1;
       if (refused !== (root.options.length === 1 && root.options[0].bye === true)) fail(`${role} of ${f.id} at ${bandId}: refused ${refused}, options ${root.options.length}`);
       if (role === "merchant" && !refused) {
         const shop = root.options.find((o) => /what you have/.test(o.label))?.go();
-        const want = bandId === "disliked" ? "node" : "shop";
+        const want = curt ? "node" : "shop";
         if ((shop?.shop ? "shop" : "node") !== want) fail(`merchant of ${f.id} at ${bandId}: the pack gives ${JSON.stringify(shop?.shop ?? shop?.text)}`);
       }
+    }
+    // Cold is reached by a talker of one faction (every role, every temperament, the merchant's pack shut).
+    for (const role of builders.ROLES) if (!(curtSeen[role] > 0)) fail(`no ${role} of a single faction ever spoke curtly at Cold`);
+    for (const temper of TEMPERS) {
+      game.state.rep = { drovers: -400 };
+      const c = person("mira", "merchant", "drovers"); c.brain = { temperament: temper };
+      c.talk.state = { stock: [{ item: { kind: "potion", id: "heal" }, price: 10, count: 1 }] };
+      const root = talk.talkTo(game, c), pack = root.options.find((o) => /what you have/.test(o.label))?.go();
+      if (root.text !== builders.GREET.merchant.disliked || !pack || pack.shop) fail(`a ${temper} Drover merchant at Cold: "${root.text}", the pack ${JSON.stringify(pack?.shop ?? pack?.text)}`);
     }
     // A talker with no faction (the roles work for anyone).
     for (const role of builders.ROLES) {

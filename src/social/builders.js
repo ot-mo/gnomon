@@ -13,8 +13,9 @@
 //   walkDialogue(game, c, { depth = 4, max = 60 }) → { nodes, problems }   talkTo, then every option's go()
 //                               down to `depth`: each answer must be a node, null (the talk ends) or { shop: tab }
 //
-// What a talker says follows how it feels about you (factions.js attitude) and its faction's band: Dark (or out
-// for you, or wary) → a short refusal and goodbye; Cold → curt, and a merchant won't trade; Grey → plain;
+// What a talker says follows how it feels about you (factions.js attitude) and its faction's band: Dark, or a
+// fighter out for you → a short refusal and goodbye; Cold, or wary of you (a grudge, or a talker who can't fight
+// where a fighter would be hostile) → curt, and a merchant won't trade; Grey → plain;
 // Warm → glad of you; Bright → you are one of theirs. Every role can be asked who it is, about its faction (its
 // likes and hates, with the bible's reasons) and where you stand with them. Greetings are at most two lines
 // (bible §2.1), in the plain register.
@@ -32,7 +33,7 @@ export function standingOf(game, c) {
 }
 
 // --- What they say --------------------------------------------------------------------------------------------
-const GREET = {
+export const GREET = {
   villager: {
     disliked: "You again. Say it quickly.",
     indifferent: "Mind the salt on the step. It gets everywhere.",
@@ -121,7 +122,8 @@ export function buildDialogue(role) {
     const st = standingOf(game, c);
     const name = c.name || typeOf(c)?.name || "Nobody";
     const fname = st.def?.name ?? null;
-    if (st.band === "hated" || st.attitude === "hostile" || st.attitude === "wary") return node(REFUSE[role], [bye("Leave.")]);
+    if (st.band === "hated" || st.attitude === "hostile") return node(REFUSE[role], [bye("Leave.")]);
+    const curt = st.band === "disliked" || st.attitude === "wary";
     const back = { label: "Back.", go: () => talkTo(game, c) };
     const options = [
       { label: "Who are you?", go: () => node(WHO[role](name, fname), [back, bye()]) },
@@ -131,15 +133,15 @@ export function buildDialogue(role) {
       options.push({ label: `Tell me about ${st.def.name}.`, go: () => node(aboutFaction(st.def), [back, bye()]) });
       options.push({ label: "How do your people see me?", go: () => node(STANDING[st.band], [back, bye()]) });
     }
-    if (role === "merchant") options.unshift({ label: "Show me what you have.", go: () => shopOf(game, c, st, back) });
-    const greet = GREET[role][st.band] ?? GREET[role].indifferent;
+    if (role === "merchant") options.unshift({ label: "Show me what you have.", go: () => shopOf(game, c, curt, back) });
+    const greet = GREET[role][curt ? "disliked" : st.band] ?? GREET[role].indifferent;
     return node(first && st.band === "indifferent" ? `${greet} New face.` : greet, [...options, bye()]);
   };
 }
 
 // A merchant's pack: the parent's shop screen while its stock is in talk.state (WS6b's trade screen takes over).
-function shopOf(game, c, st, back) {
-  if (st.band === "disliked") return node("Not for you. Find someone who doesn't know your face.", [back, bye()]);
+function shopOf(game, c, curt, back) {
+  if (curt) return node("Not for you. Find someone who doesn't know your face.", [back, bye()]);
   return c.talk.state?.stock?.length ? { shop: "buy" } : node("The pack's empty. The road ate it.", [back, bye()]);
 }
 
