@@ -12,4 +12,5 @@ const { checkConfig } = await import("../tests/checks/config.js");
 const srcFiles = fs.readdirSync(SRC, { recursive: true }).filter((f) => f.endsWith(".js"))
   .map((f) => ({ file: f.split(path.sep).join("/"), text: fs.readFileSync(path.join(SRC, f), "utf8") }));
 const indexHtml = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
-process.exit(report(checkConfig({ config, audio, srcFiles, indexHtml })));
+const { GEN_VERSION: genVersion } = await import("../src/world/run.js");   // integrator (WS10 #2): VERSION.gen follows it
+process.exit(report(checkConfig({ config, audio, srcFiles, indexHtml, genVersion })));
