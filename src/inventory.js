@@ -146,9 +146,11 @@ export function inventoryClick(game, cell) {
   if (!h) return 0;
   if (h.key) return inventoryKey(game, h.key);
   if (h.tab !== undefined) { game.invTab = TABS[h.tab]; return 0; }
-  if (h.packIndex !== undefined) {
-    if (h.packIndex === game.invSel) return useSelected(game);
-    game.invSel = h.packIndex;
+  if (h.list && h.index !== undefined && (game.invTab || "pack") === "pack") {   // a row of the pack's list (ui.js list's hit rect)
+    const i = visible(game)[h.index];
+    if (i === undefined) return 0;
+    if (i === game.invSel) return useSelected(game);
+    game.invSel = i;
     return 0;
   }
   if (h.bodyRow !== undefined) {
@@ -364,7 +366,6 @@ function drawPack(game, { x0, w, top, listH, shown }) {
 
 function packRow(game, it, i, { x, y, w, sel }) {
   const p = game.player;
-  hit({ x, y, w, h: 1 }, { packIndex: i });
   const [glyph, color] = itemGlyph(game, it);
   if (sel) S.text(x, y, ">", 255, 230, 140);
   S.put(x + 2, y, glyph, ...color);
