@@ -2,7 +2,7 @@
 // landmark span of the test world, plus 200 random pairs of neighbouring spans, on 3 seeds; the apron
 // beside each seam; and arrival over each checked edge in both directions.
 //
-//   checkEdges({ seeds = [1, 42, 1234], pairs = 200, real = true }) → { name, ok, problems, stats, notes }
+//   checkEdges({ seeds = [1, 42, 1234], pairs = 200, real = true, realPairs = 100 }) → { name, ok, problems, stats, notes }
 //
 // An edge joins zone A (west or north) and B (east or south): A's last column (or row) and B's first are
 // neighbouring world columns. For every tile along it, with W the run's world functions:
@@ -23,7 +23,9 @@
 // The share of arrivals on the mirrored tile itself is reported, and the border tiles left out (not
 // reachable from A's anchor, or treetops). In 3D your exact point is kept: 2.5 blocks up in the air, and
 // half a tile past the far border along the edge (beside an open corner). With real = true, the real world's
-// landmark spans are checked too (seed 42, rules (a)-(d) and arrival; its plans are still placeholders).
+// landmark spans are checked too (seed 42, rules (a)-(d) and arrival; its plans are still placeholders), and
+// `realPairs` random pairs of its spans with all the rules (seed 1234; WS2a: the Rust Steps' stacked mesas and
+// the other terrains the test world lacks).
 import { buildRun } from "../../src/world/run.js";
 import { TEST_WORLD } from "../../src/content/world/test-world.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
@@ -44,12 +46,13 @@ function groundTop(zone, x, y) {
 // A plan's wall (or roof) stands on this column: its "ground" isn't the terrain's.
 const planWall = (zone, x, y) => !!zone.gen?.plan[x + y * zone.w] && !!zone.get(x, y, FLOOR_Z);
 
-export function checkEdges({ seeds = [1, 42, 1234], pairs = 200, real = true } = {}) {
+export function checkEdges({ seeds = [1, 42, 1234], pairs = 200, real = true, realPairs = 100 } = {}) {
   const problems = [], notes = [], stats = {};
   const tally = { edges: 0, tiles: 0, crossings: 0, mirrored: 0, shifted: 0, exact: 0, skipUnreachable: 0, skipScenery: 0, trees: 0, ports: 0, apronTiles: 0, zones: 0 };
   const t0 = performance.now();
   for (const seed of seeds) checkWorld(TEST_WORLD, seed, { pairs, landmarks: true, near: true }, problems, tally);
   if (real) checkWorld(REAL_WORLD, 42, { pairs: 0, landmarks: true, near: false }, problems, tally);
+  if (real && realPairs) checkWorld(REAL_WORLD, 1234, { pairs: realPairs, landmarks: false, near: true }, problems, tally);
   stats.edges = `${tally.edges} edges (${tally.tiles} seam tiles) over ${tally.zones} zones; ${tally.ports} ports, ${tally.trees} trees across an edge`;
   stats.apron = `${tally.apronTiles} apron tiles next to a seam compared`;
   stats.arrivals = `${tally.crossings} crossings, ${tally.shifted} shifted, ${(100 * tally.mirrored / Math.max(1, tally.crossings)).toFixed(1)}% on the mirrored tile; ${tally.exact} 3D points in the air or by a corner kept; border tiles left out: ${tally.skipUnreachable} the anchor can't reach, ${tally.skipScenery} treetops`;
@@ -249,5 +252,5 @@ function reachOf(zone) {
 export async function run(env) {
   const a = env.args;
   return checkEdges({ pairs: a.pairs !== undefined ? Number(a.pairs) : 200, seeds: a.seeds ? String(a.seeds).split(",").map(Number) : undefined,
-    real: a.real !== "false" });
+    real: a.real !== "false", realPairs: a.realPairs !== undefined ? Number(a.realPairs) : 100 });
 }
