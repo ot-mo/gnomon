@@ -328,11 +328,18 @@ function rollGimmicks(rng, table, levels) {
 // makes zone.entrance).
 const gridOf = (w, d, fn) => Array.from({ length: d }, (_, y) => Array.from({ length: w }, (_, x) => fn(x, y)).join(""));
 // Its walls and rubble are planned (ctx.plan): the surface's checks don't count their steps as rough ground.
+// Anything two blocks high or more is a wall on the map (zone.planWalls), as a landmark plan's walls are.
+const TALL = new Set(["#", "2", "3", "l", "C"]);
 function stampSite(ctx, site, plan, { wall, floor, wallHeight = 2, roof = "none", height = 4 }) {
   const { zone, rect, rng } = ctx;
   const vault = { id: `site:${site.kind}`, name: site.name, height, wall, floorBlock: floor, plan, links: [] };
   stampVault(zone, vault, rect.x, rect.y, rng, { roof, wallHeight });
-  plan.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== "." && ctx.plan) ctx.plan[rect.x + x + (rect.y + y) * zone.w] = 1; }));
+  zone.planWalls ||= new Uint8Array(zone.w * zone.d);
+  plan.forEach((row, y) => [...row].forEach((ch, x) => {
+    const i = rect.x + x + (rect.y + y) * zone.w;
+    if (ch !== "." && ctx.plan) ctx.plan[i] = 1;
+    if (TALL.has(ch) && (ch !== "#" || wallHeight >= 2)) zone.planWalls[i] = 1;
+  }));
 }
 function entrance(ctx, site, at = null) {
   if (!site.dungeon) return;
