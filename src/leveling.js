@@ -86,8 +86,9 @@ export function gainXp(game, amount, { source = "kill" } = {}) {
   }
 }
 
-// One level under the attribute set: what max HP gains, the Bent's crease, an attribute point every 4th level;
-// the power is chosen on the level-up card (screens/levelup.js), one for each pending level.
+// One level under the attribute set: what max HP gains and the Bent's crease. Its attribute point (every 4th level)
+// and its power come with its own level-up card (screens/levelup.js), one card for each pending level in order, so
+// levels gained together each bring their point to their own card.
 function levelUp(game, p) {
   const L = RULES.progression.level, before = maxHp(p);
   p.level++;
@@ -96,7 +97,6 @@ function levelUp(game, p) {
   const creases = GENOTYPES[p.genotype]?.creasesPerLevel || 0;
   if (creases) p.creases = (p.creases || 0) + creases;
   const point = p.level % L.attrPointEvery === 0;
-  if (point) p.attrPoints = (p.attrPoints || 0) + 1;
   p.pendingLevels++;
   sfx("levelup");
   const gains = [`+${hp} max HP`, creases && `+${creases} crease${creases > 1 ? "s" : ""}`, point && "an attribute point"].filter(Boolean);

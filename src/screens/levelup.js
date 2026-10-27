@@ -1,8 +1,9 @@
 // Gained a level (or someone taught you a trick): stop and choose (TECH_DESIGN §4.2 `levelup`; WS4 from Phase 1).
 // The game waits.
 //   The legacy set: the parent's card (hud.js drawLevelUp): one of three perks, four at a milestone; 1-4 or a click.
-//   The attribute set (bible §10.7): the card says what the level gave (max HP, a crease, an attribute point);
-//   with an attribute point to spend it first asks which attribute it raises (or keeps it for a later card), then
+//   The attribute set (bible §10.7): the card says what the level gave (max HP, a crease, an attribute point: the
+//   level's point is credited when its card opens); with a point to spend it first asks which attribute it raises
+//   (or keeps it for a later card), then
 //   offers the powers (leveling.js offerPowers: 3, or 4 at INT 18+, a major among them at levels 5, 10, 15…).
 //   ↑↓ (W S) choose, Enter (E, Space) take, a digit picks a row, a click takes it.
 //
@@ -53,6 +54,7 @@ function openCard(game, p) {
   if (gift) p.bonusPerks--; else p.pendingLevels--;
   const milestone = !gift && level % RULES.progression.level.milestoneEvery === 0;
   const draw = gift ? (p.giftDraws = (p.giftDraws || 0) + 1) : 0;
+  if (!gift && level % RULES.progression.level.attrPointEvery === 0) p.attrPoints = (p.attrPoints || 0) + 1;   // this level's point
   Object.assign(card, { level, gift, milestone, draw });
   offer(game);
   const G = GENOTYPES[p.genotype];

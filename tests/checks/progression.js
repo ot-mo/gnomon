@@ -257,6 +257,39 @@ export async function checkProgression(m) {
     if (a.join(" ") !== b.join(" ")) fail(`the same seed made other offers: ${a.find((x, k) => x !== b[k])} / ${b.find((x, k) => x !== a[k])}`);
     if (a.join(" ") === c.join(" ")) fail("seeds 77 and 78 made the same 19 offers");
     out.sameSeed = `seed 77 twice: ${a.length} offers the same; seed 78: ${a.filter((x, k) => x !== c[k]).length} of ${a.length} differ`;
+    // Levels 3 to 8 in one gain: six cards in order, each with its level, its milestone (5 only) and the major first there;
+    // a level's own point (4 and 8) comes with its card, and a point kept for later ("Keep it for a later level") is
+    // asked about again on the next card.
+    {
+      const p = begun(choicesFor("droversChild", C.suggestSpread("bent", "droversChild")), 41);
+      L.gainXp(game, L.xpToNext(1), { source: "quest" }); step(1 / 60); press("Digit1");   // level 2, out of the way
+      let xp = 0;
+      for (let l = 2; l < 8; l++) xp += L.xpToNext(l);
+      L.gainXp(game, xp - p.xp, { source: "quest" });
+      const seen = [];
+      let kept = 0;
+      if (p.level !== 8 || p.pendingLevels !== 6 || p.attrPoints !== 0) fail(`six levels at once: level ${p.level}, pending ${p.pendingLevels}, points ${p.attrPoints}`);
+      for (let k = 0; k < 6; k++) {
+        step(1 / 60);
+        const cd = LU.levelCard(game), first = POWERS[game.perkChoices[0]], own = cd.level % 4 === 0 ? 1 : 0;
+        seen.push(`${cd.level}${cd.step === "attr" ? `+${p.attrPoints}` : ""}${cd.milestone ? "!" : ""}`);
+        if (cd.level !== k + 3) fail(`six levels at once: card ${k + 1} is level ${cd.level}, want ${k + 3}`);
+        if (p.attrPoints !== kept + own || (cd.step === "attr") !== (kept + own > 0)) fail(`six levels at once: level ${cd.level}'s card holds ${p.attrPoints} points (want ${kept + own}) on ${cd.step}`);
+        if (cd.milestone !== (cd.level === 5) || (cd.level === 5 && !first?.major)) fail(`six levels at once: level ${cd.level} milestone ${cd.milestone}, first offer ${game.perkChoices[0]}`);
+        if (cd.step === "attr" && cd.level === 4) {
+          press("Digit7");
+          kept = 1;
+          if (p.attrPoints !== 1 || LU.levelCard(game).step !== "power") fail(`"Keep it for a later level": ${p.attrPoints} points kept, on ${LU.levelCard(game).step}`);
+        } else if (cd.step === "attr") {
+          for (let n = p.attrPoints; n > 0; n--) { const before = st.attr(p, "tou"); press("Digit3"); if (st.attr(p, "tou") !== before + 1) fail(`six levels at once: a point didn't raise TOU at level ${cd.level}`); }
+          kept = 0;
+        }
+        press("Digit1");
+        if (game.mode === "levelup") fail(`six levels at once: level ${cd.level}'s card stays open`);
+      }
+      if (p.attrPoints !== 0) fail(`six levels at once: ${p.attrPoints} points left`);
+      out.together = `levels 3-8 in one gain: cards ${seen.join(" ")}, a point kept for later`;
+    }
     // XP (bible §10.7, §15.6).
     const p = begun(choicesFor("reedcutter", C.suggestSpread("bent", "reedcutter")), 5);
     const kx = (c, opts) => L.killXp(game, c, opts);
