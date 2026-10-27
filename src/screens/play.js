@@ -26,7 +26,7 @@ import { playerMelee } from "../combat.js";
 import { updateCreatures } from "../ai.js";
 import { creatureAt, hostilesTo, canTalk } from "../creatures.js";
 import { pickUpItems } from "../items.js";
-import { render3d } from "../render3d.js";
+import { render3d, CLOCK_SEGMENT } from "../render3d.js";
 import { renderMap, tileAtCell, mapView, hoverInspect, toggleMapLegend, setLegendKeyHint } from "../renderMap.js";
 import { emit } from "../events.js";
 import { drawHud, layoutHud, registerHudSegment } from "../hud.js";
@@ -417,6 +417,7 @@ bind("explore", HOTBAR_KEYS, (game, code) => { useHotbar(game, HOTBAR_KEYS.index
 // The status line's ability cooldowns (§4.5, priority 70): each hotbar slot whose ability is cooling down,
 // "1 Fold Step 9s", each dropped on its own. A ready ability shows nothing, so the parent's status line is
 // unchanged until you use one (WS4's abilities screen, B, lists them all).
+registerHudSegment("clock", CLOCK_SEGMENT);   // WS3's (§4.5, priority 30), under the sky only (WS3 #3, at the WS9 merge)
 registerHudSegment("abilities", { priority: 70, split: true, parts: (game, p) => (p.hotbar || []).map((id, k) => {
   const left = id ? cooldownLeft(p, id) : 0;
   return left > 0 ? { text: `${k + 1} ${ABILITIES[id]?.name || id} ${Math.ceil(left)}s`, color: [190, 170, 255] } : null;

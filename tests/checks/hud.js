@@ -36,7 +36,8 @@ export function checkHud({ game, startRun, inputHandlers, hud, renderMap, events
 
   // --- 1. Segments ------------------------------------------------------------------------------------
   {
-    const want = { location: 100, hp: 100, statuses: 90, abilities: 70, funds: 60, level: 50, strength: 50, defence: 50, keys: 45, torch: 40, ready: 40, fps: 0 };
+    const want = { location: 100, hp: 100, statuses: 90, abilities: 70, funds: 60, level: 50, strength: 50, defence: 50, keys: 45, torch: 40, ready: 40,
+      clock: 30, fps: 0 };   // integrator (WS3 #3): WS3's clock
     const ids = hud.hudSegments();
     for (const [id, pr] of Object.entries(want)) {
       const seg = hud.segmentDef(id);
@@ -83,15 +84,27 @@ export function checkHud({ game, startRun, inputHandlers, hud, renderMap, events
         const L = hud.layoutHud(game);
         if (L.rows.length !== 2 || L.dropped.length) fail(`100×40, three statuses: ${L.rows.length} rows, dropped ${L.dropped}`);
       }
-      // The parent's single row, unchanged where it fits: the segments in its order, two cells apart.
+      // The parent's single row, unchanged where it fits: the segments in its order, two cells apart, fps at the right
+      // end. integrator (WS3 #3, at the WS9 merge): held in this state underground, where the parent's game is and WS3's
+      // clock isn't; under the sky the clock is required at its priority's place (after every segment of more, before
+      // fps), with one status fewer so that all of it fits (with the three, §4.5's dropping takes fps, the lowest).
       if (cols === 180) {
-        game.view = "3d"; game.mode = "explore";
-        const L = hud.layoutHud(game), row = L.rows[0];
-        const order = row.map((q) => q.id).filter((id, k, a) => a.indexOf(id) === k).join();
-        if (L.rows.length !== 1 || order !== "location,hp,level,strength,defence,funds,keys,torch,ready,statuses,fps") fail(`180×56: one row in the parent's order, got ${L.rows.length} rows: ${order}`);
-        for (let j = 1; j < row.length - 1; j++) if (row[j].x !== row[j - 1].x + row[j - 1].text.length + 2) fail(`180×56: "${row[j].text}" isn't two cells after "${row[j - 1].text}"`);
-        const fps = row[row.length - 1];
-        if (fps.id !== "fps" || fps.x + fps.text.length !== 179) fail(`180×56: fps isn't at the right end (${JSON.stringify(fps)})`);
+        const PARENT = "location,hp,level,strength,defence,funds,keys,torch,ready,statuses";   // integrator (WS3 #3)
+        const oneRow = (where, wantOrder) => {
+          game.view = "3d"; game.mode = "explore";
+          const L = hud.layoutHud(game), row = L.rows[0];
+          const order = row.map((q) => q.id).filter((id, k, a) => a.indexOf(id) === k).join();
+          if (L.rows.length !== 1 || order !== wantOrder) fail(`180×56 ${where}: one row ${wantOrder}, got ${L.rows.length} rows: ${order}`);
+          for (let j = 1; j < row.length - 1; j++) if (row[j].x !== row[j - 1].x + row[j - 1].text.length + 2) fail(`180×56 ${where}: "${row[j].text}" isn't two cells after "${row[j - 1].text}"`);
+          const fps = row[row.length - 1];
+          if (fps.id !== "fps" || fps.x + fps.text.length !== 179) fail(`180×56 ${where}: fps isn't at the right end (${JSON.stringify(fps)})`);
+        };
+        if (!game.zone.hasSky) fail("180×56: the start span isn't under the sky");
+        status.removeStatus(game, game.player, "poisoned");
+        oneRow("under the sky", `${PARENT},clock,fps`);
+        status.addStatus(game, game.player, "poisoned", { t: 30 });
+        game.debug.enterZone("0,0,3", "down");
+        oneRow("underground", `${PARENT},fps`);
       }
     }
     stats.layout = sizes;
