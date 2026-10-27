@@ -328,7 +328,7 @@ function bands(G, name, world, problems) {
         placeEncounter(game, key, { kind: "band", types, elite: [null, null, null, null], level: t.level });
         leaveWorldMap(game, { at: "edge" });
         const a = game.arrival;
-        if (spawned.length < types.length) short++;
+        if (spawned.length < types.length) { short++; problems.push(`${name} bands (${pass}) at (${t.wx}, ${t.wy}): ${spawned.length} of ${types.length} placed`); }
         for (const c of spawned) {
           const d = distance(Math.floor(c.x) - Math.floor(a.x), Math.floor(c.y) - Math.floor(a.y));
           dists[pass].push(d);
