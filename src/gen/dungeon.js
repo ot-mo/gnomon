@@ -12,24 +12,37 @@
 //   final   the last level: no way down, no holes, the bottom's hall (a boss's throne)
 //   hasUp   stairs up in the start room (level 1's lead to the surface entrance)
 //   theme   a DUNGEON_THEMES id: room materials, how many rooms are dark, how many monsters
-//   bottom  { kind: "guardian" | "boss", id }: the hall the last level gets (pickVault); a guardian's hall
-//           there has no stairs behind its gate (a site's dungeon that ends in a guardian, 0A2)
-//   not yet used (WS10): creatureTable, holesIn and bottom.uid (the named creature's claimUid).
-//           A value other than null/undefined throws (NOT_YET below), so nothing is silently dropped.
+//   bottom  the hall the last level gets (gen/vaults.js bottomHall):
+//             { kind: "guardian", id }       a guardian's hall; there it has no stairs behind its gate (0A2)
+//             { kind: "boss", id }           a boss's throne (the legacy stack's Lich)
+//             { kind: "legend", id, uid, hall, legend: LegendDef }   a lair hall with the named creature (uid:
+//                                            guardians.js claims it on arrival, so it lives in one zone only)
+//             { kind: "relic", id, relic: RelicDef | null, trueMarks: [n…] }   an Hour site's reliquary
+//   creatureTable  the monsters this level draws: type ids (each with its own depths and weight, as the legacy
+//           table), or [type, weight, lo, hi] rows (a region's table, §2.18); null: every legacy type
+//   holesIn  { x0, y0, x1, y1 } | null: random holes (pits, chasms, deep water, collapses) only in rooms inside
+//           it, so a fall always lands on the level below; a vault's own chasms are its puzzle and stay
+//   gimmicks  GIMMICKS ids, run after the loot in the order given
+//   cradle  true: a Truing Cradle (B.STATION, two blocks) stands against a wall of some room (WS5's station)
+//   murals  [{ text, map }]: what the murals gimmick carves (history's accounts: text in 3D, map on the floor)
 import { Zone, B, FLOOR_Z, ROOM_TOP, CORRIDOR_TOP, standWith } from "../world.js";
 import { makeRng, noise2, distance } from "../rng.js";
 import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../pathing.js";
 import { CREATURE_TYPES, spawnCreature, addCreature, pickCreatureType, rollElite, canTalk } from "../creatures.js";
 import { makeItem, randomPotion, randomScroll, randomEquipment, randomTreasure, randomJewel } from "../items.js";
-import { pickVault, stampVault, VAULTS } from "./vaults.js";
+import { pickVault, stampVault, VAULTS, BOTTOM_LOOT } from "./vaults.js";
+import { DUNGEONS } from "../content/dungeons.js";
 import { planEncounters, peddlerStock, bountyTarget } from "../content/legacy/encounters.js";
 import { layoutSpikes } from "../traps.js";
+
+export { BOTTOM_LOOT };
 
 // Room layout and corridor routing work on this fixed grid (the validated generator's home).
 export const DUNGEON_W = 48, DUNGEON_D = 48, DUNGEON_H = 10;
 const W = DUNGEON_W, D = DUNGEON_D;
 
-// Theme id → { rooms: [{ wall, floor }], darkRate(level), count(level) }. WS10 adds more.
+// Theme id → { rooms: [{ wall, floor }], darkRate(level), count(level) }. The legacy stack's is here; the
+// sites' come from content/dungeons.js.
 export const DUNGEON_THEMES = {
   legacy: {
     rooms: [
@@ -42,18 +55,17 @@ export const DUNGEON_THEMES = {
     count: (level) => Math.min(18, 3 + level * 2),              // how many monsters
   },
 };
-// Gimmick id → (zone, rng, rooms, p) => void, run after monsters and loot. Each must keep
-// validateDungeonLevel passing. WS10 registers flooded, lightless, flatland, haunted…
+for (const [id, t] of Object.entries(DUNGEONS.themes)) if (!DUNGEON_THEMES[id]) DUNGEON_THEMES[id] = t;
+// Gimmick id → (zone, rng, rooms, p) => void, run after monsters and loot (below, "Gimmicks"). Each keeps
+// validateDungeonLevel passing (a level that doesn't is made again, like any other).
 export const GIMMICKS = {};
 const MAX_ATTEMPTS = 40;
-// Parts of p the generator doesn't read yet. WS10 implements them and takes them off this list.
-const NOT_YET = { creatureTable: (p) => p.creatureTable, holesIn: (p) => p.holesIn, "bottom.uid": (p) => p.bottom?.uid };
 
 export function generateDungeonLevel(seed, p) {
   const theme = DUNGEON_THEMES[p.theme || "legacy"];
   if (!theme) throw new Error(`unknown dungeon theme "${p.theme}"`);
-  for (const [name, get] of Object.entries(NOT_YET))
-    if (get(p) != null) throw new Error(`generateDungeonLevel: p.${name} is not supported yet (WS10); it would be ignored`);
+  for (const id of p.gimmicks || []) if (!GIMMICKS[id]) throw new Error(`generateDungeonLevel: unknown gimmick "${id}"`);
+  if (p.bottom?.kind === "legend" && !p.bottom.legend) throw new Error("generateDungeonLevel: a legend bottom needs its LegendDef (p.bottom.legend)");
   let zone = null;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const mix = (Math.imul(seed, 7919) + Math.imul(p.z, 104729) + Math.imul(attempt, 2654435761)) >>> 0;
@@ -90,7 +102,7 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   for (let tries = 0; tries < 60 && !vaultRect; tries++) {
     const vx = rng.int(2, W - vault.w - 2), vy = rng.int(2, D - vault.d - 4);
     vaultRect = { x0: vx, y0: vy, x1: vx + vault.w - 1, y1: vy + vault.d - 1 };
-    entrance = stampVault(f, vault, vx, vy, rng, { cosmetic });
+    entrance = stampVault(f, vault, vx, vy, rng, final && p.bottom ? { cosmetic, bottom: p.bottom } : { cosmetic });
   }
   // A guardian's hall at the bottom of a dungeon (a site's last level, 0A2): its gate opens onto
   // the end of the dungeon, not onto stairs. (The legacy guardians are never on the last level.)
@@ -203,10 +215,11 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   // Cells next to doorways stay clear so rooms can't be sealed off by accident.
   // The last level has no holes at all (pits, chasms, deep water): there's nowhere lower to fall.
   const nearDoor = (r, x, y) => r.doors.some((d) => Math.abs(d.x - x) <= 2 && Math.abs(d.y - y) <= 2);
+  const holesOk = (r) => !p.holesIn || (r.x0 >= p.holesIn.x0 && r.x1 <= p.holesIn.x1 && r.y0 >= p.holesIn.y0 && r.y1 <= p.holesIn.y1);
   if (!simple) {
     for (const r of rooms) {
       if (r === start) continue;
-      if (r.hall && final) { addPillars(f, r, nearDoor); continue; }
+      if (r.hall && (final || !holesOk(r))) { addPillars(f, r, nearDoor); continue; }
       if (r.hall) {
         if (depth >= 2 && rng.chance(0.45)) addBigChasm(f, rng, r, nearDoor, depth);
         else addLake(f, rng, r, nearDoor, depth);
@@ -217,9 +230,9 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
       else if (roll < 0.34) addCrates(f, rng, r, nearDoor);
       else if (roll < 0.47) addPlatform(f, rng, r, nearDoor);
       else if (roll < 0.6) addLedge(f, rng, r, nearDoor);
-      else if (roll < 0.7) { if (!final) addPits(f, rng, r, nearDoor); }
+      else if (roll < 0.7) { if (!final && holesOk(r)) addPits(f, rng, r, nearDoor); }
       else if (roll < 0.84) addClimb(f, rng, r, nearDoor, depth);
-      else if (depth >= 2 && !final && roll < 0.92) addChasm(f, rng, r, nearDoor);
+      else if (depth >= 2 && !final && roll < 0.92) { if (holesOk(r)) addChasm(f, rng, r, nearDoor); }
       else if (depth >= 2 && roll >= 0.92 && roll < 0.98) addSpikeBand(f, rng, r, nearDoor);
     }
   }
@@ -297,7 +310,7 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
     if (!spots.length) continue;
     const [x, y] = rng.pick(spots);
     taken.add(x + y * W);
-    const type = pickCreatureType(rng, depth), state = rng.chance(0.5) ? "idle" : "wander";
+    const type = pickFrom(rng, depth, p.creatureTable), state = rng.chance(0.5) ? "idle" : "wander";
     addCreature(f, spawnCreature(type, x, y, f.stand[x + y * W], { rng: cosmetic, state, level: depth, elite: rollElite(rng, depth) }));
   }
   // Loot lying around: a few potions and scrolls, a piece of gear (sometimes two), usually a few
@@ -312,8 +325,14 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   if (rng.chance(0.75)) placeItem(f, rng, rng.pick(rooms), { kind: "bomb", count: rng.chance(0.3) ? 2 : 1 });
   for (let k = rng.int(1, 2); k > 0; k--) placeItem(f, rng, rng.pick(rooms), { kind: "cash", amount: rng.int(5, 10) + depth });
 
-  // --- 10½. The site's gimmicks (none on the legacy stack).
-  for (const id of p.gimmicks || []) GIMMICKS[id](f, rng, rooms, p);
+  // --- 10½. The site's gimmicks (none on the legacy stack), and a Truing Cradle where the site has one.
+  const ctx = { start, nearDoor, holesOk, depth, final, cosmetic };
+  for (const id of p.gimmicks || []) GIMMICKS[id](f, rng, rooms, p, ctx);
+  // A level-wide rule holds over whatever ran after it (a climb brings a lamp, spikeworks new spikes).
+  if (f.flags.lightless) GIMMICKS.lightless(f);
+  if (f.beat) GIMMICKS.oneBeat(f);
+  if (p.cradle) placeCradle(f, rng, rooms, ctx);
+  if ((p.gimmicks || []).length || p.cradle) f.refresh();
 
   // --- 11. The people of this level (the site plans who's where; for the legacy stack, content/legacy/encounters.js planEncounters).
   placeEncounters(f, rng, cosmetic, rooms, start, depth, p.encounters || []);
@@ -491,6 +510,190 @@ function addSpikeBand(f, rng, r, nearDoor) {
   if (cells.length < 4) return;
   layoutSpikes(f, cells, rng);
   r.spikes = true;
+}
+
+// ---------------------------------------------------------------------------
+// The monsters a level draws: the legacy table (null), a list of type ids (their own depths and weights), or a
+// region's rows [type, weight, lo, hi] (TECH_DESIGN §2.18), which fall back on the legacy table where none fits.
+function pickFrom(rng, level, table) {
+  if (!table) return pickCreatureType(rng, level);
+  if (typeof table[0] === "string") return pickCreatureType(rng, level, table);
+  const rows = table.filter(([type, w, lo, hi]) => CREATURE_TYPES[type] && w > 0 && level >= lo && level <= hi);
+  if (!rows.length) return pickCreatureType(rng, level);
+  let pick = rng() * rows.reduce((s, r) => s + r[1], 0);
+  for (const [type, w] of rows) if ((pick -= w) < 0) return type;
+  return rows[rows.length - 1][0];
+}
+
+// ---------------------------------------------------------------------------
+// Gimmicks (TECH_DESIGN §5.5; bible §8.7's floors by leaning). Each changes a finished level, and each gives
+// both views something to do:
+//   flooded     half the rooms stand in shallow water (brine where salt rules): the map shows where to wade,
+//               3D splashes you along slower
+//   lightless   no lamps at all: the map fills in only as your torch shows it, and the torch costs glim
+//   flatland    flat beings wander the level: they are fought on the map
+//   allDeep     nothing flat, and rooms climb: the treasure perches are 3D jumps
+//   haunted     plank bridges are ghost planks (seen in 3D only with your torch out; the map calls them chasm)
+//               and shades drift in the dark rooms (lamplight burns them)
+//   spikeworks  spike bands across rooms: read their beat on the map, or time them in 3D
+//   oneBeat     every spike field outside the vault rises on one shared beat (zone.beat; WS5's metronome heart
+//               shows it in 3D)
+//   collapsed   pits drop to the level below (never on the last level, and only inside p.holesIn)
+//   murals      the history's accounts: one carved on a wall (read in 3D, zone.murals view "3d"), one laid in
+//               the floor (read on the map, view "map")
+//   braziers    cold braziers in the dark rooms: light them with your torch and the room is lit for good
+// ctx = { start, nearDoor, holesOk, depth, final, cosmetic }.
+const nearTile = (s, x, y) => s && Math.abs(s.x - x) <= 1 && Math.abs(s.y - y) <= 1;
+const occupied = (f, x, y) => f.creatures.some((c) => c.tx === x && c.ty === y) ||
+  f.items.some((it) => Math.floor(it.x) === x && Math.floor(it.y) === y);
+const hasStairs = (f, r) => [f.stairs, f.upStairs].some((s) => s && s.x >= r.x0 - 1 && s.x <= r.x1 + 1 && s.y >= r.y0 - 1 && s.y <= r.y1 + 1);
+// Room r's plain floor: open at the datum, its own floor block, not beside the stairs or a doorway.
+function plainTiles(f, r, ctx) {
+  const out = [];
+  for (let y = r.y0; y <= r.y1; y++)
+    for (let x = r.x0; x <= r.x1; x++) {
+      if (f.stand[x + y * W] !== FLOOR_Z || f.get(x, y, FLOOR_Z - 1) !== r.theme.floor) continue;
+      if (nearTile(f.stairs, x, y) || nearTile(f.upStairs, x, y) || ctx.nearDoor(r, x, y)) continue;
+      out.push([x, y]);
+    }
+  return out;
+}
+// A room nothing else has changed: every tile of it open at the datum.
+const plainRoom = (f, r) => !r.hall && !r.climb && !r.stones && !r.spikes && !r.locked && !r.flooded &&
+  interior(r).every(([x, y]) => f.stand[x + y * W] === FLOOR_Z);
+const others = (rooms, ctx) => rooms.filter((r) => r !== ctx.start);
+
+GIMMICKS.flooded = (f, rng, rooms, p, ctx) => {
+  for (const r of others(rooms, ctx)) {
+    if (r.locked || !rng.chance(0.5)) continue;
+    for (const [x, y] of plainTiles(f, r, ctx)) f.set(x, y, FLOOR_Z - 1, B.WATER_SHALLOW);
+    r.flooded = true;
+  }
+  if (p.theme === "salt") f.liquid = "brine";
+};
+GIMMICKS.lightless = (f) => {
+  for (let z = 1; z < f.h; z++)
+    for (let y = 0; y < D; y++)
+      for (let x = 0; x < W; x++) if (f.get(x, y, z) === B.LAMP) f.set(x, y, z, f.get(x, y, z - 1) || B.ROCK);
+  f.flags.lightless = true;
+};
+// A few things of type `type` on free floor away from the start.
+function scatter(f, rng, rooms, ctx, type, n, state = "wander") {
+  for (let k = 0; k < n; k++) {
+    const r = rng.pick(others(rooms, ctx));
+    const spots = plainTiles(f, r, ctx).filter(([x, y]) => !occupied(f, x, y) && distance(x - ctx.start.cx, y - ctx.start.cy) > 8);
+    if (!spots.length) continue;
+    const [x, y] = rng.pick(spots);
+    addCreature(f, spawnCreature(type, x, y, FLOOR_Z, { rng: ctx.cosmetic, state, level: ctx.depth }));
+  }
+}
+GIMMICKS.flatland = (f, rng, rooms, p, ctx) => scatter(f, rng, rooms, ctx, "flatling", rng.int(2, 4));
+GIMMICKS.allDeep = (f, rng, rooms, p, ctx) => {
+  f.creatures = f.creatures.filter((c) => !c.vis?.flat || canTalk(c) || c.guardian || c.flags?.legend);
+  let made = 0;
+  for (const r of rng.shuffle(others(rooms, ctx))) {
+    if (made >= 2 || !plainRoom(f, r) || hasStairs(f, r) || interior(r).some(([x, y]) => occupied(f, x, y))) continue;   // (its steps would bury them)
+    addClimb(f, rng, r, ctx.nearDoor, ctx.depth);
+    if (r.climb) made++;
+  }
+  if (made) f.refresh();
+};
+GIMMICKS.haunted = (f, rng, rooms, p, ctx) => {
+  const v = f.vault;
+  for (let y = 0; y < D; y++)
+    for (let x = 0; x < W; x++)
+      if (f.get(x, y, FLOOR_Z - 1) === B.PLANK && !f.get(x, y, 0) && !(x >= v.x0 && x <= v.x1 && y >= v.y0 && y <= v.y1))
+        f.set(x, y, FLOOR_Z - 1, B.GHOST);
+  const dark = others(rooms, ctx).filter((r) => r.dark);
+  scatter(f, rng, dark.length ? dark : rooms, ctx, "shade", rng.int(1, 3));
+};
+GIMMICKS.spikeworks = (f, rng, rooms, p, ctx) => {
+  let made = 0;
+  for (const r of rng.shuffle(others(rooms, ctx))) {
+    if (made >= 2 || !plainRoom(f, r) || hasStairs(f, r)) continue;
+    addSpikeBand(f, rng, r, ctx.nearDoor);
+    if (r.spikes) made++;
+  }
+};
+GIMMICKS.oneBeat = (f) => {
+  const v = f.vault, period = 4;
+  for (const [i, s] of f.spikes) {
+    const x = i % W, y = (i - x) / W;
+    if (x >= v.x0 && x <= v.x1 && y >= v.y0 && y <= v.y1) continue;
+    f.spikes.set(i, { ...s, phase: 0, period, up: 1, pattern: "beat" });
+  }
+  f.beat = { period, phase: 0 };
+};
+GIMMICKS.collapsed = (f, rng, rooms, p, ctx) => {
+  if (ctx.final) return;
+  let made = 0;
+  for (const r of rng.shuffle(others(rooms, ctx))) {
+    if (made >= rng.int(1, 3) || !plainRoom(f, r) || hasStairs(f, r) || !ctx.holesOk(r)) continue;
+    addPits(f, rng, r, ctx.nearDoor);
+    made++;
+  }
+  if (!made) return;
+  const hole = (x, y) => !f.get(x, y, 0) && !f.get(x, y, FLOOR_Z - 1);
+  f.creatures = f.creatures.filter((c) => !hole(c.tx, c.ty));
+  f.items = f.items.filter((it) => !hole(Math.floor(it.x), Math.floor(it.y)));
+  f.refresh();
+};
+const MURAL_TEXTS = [{ text: "Faded figures climb a stair that never ends.", map: "A floor of tiles shows a stair seen from above: a spiral." }];
+GIMMICKS.murals = (f, rng, rooms, p, ctx) => {
+  const texts = p.murals?.length ? p.murals : MURAL_TEXTS;
+  f.murals ||= [];
+  let k = 0;
+  for (const r of rng.shuffle(others(rooms, ctx))) {
+    if (k >= Math.min(2, texts.length * 2)) break;
+    const t = texts[Math.floor(k / 2) % texts.length];
+    if (k % 2 === 0) {   // carved in a wall, at eye height
+      const walls = [];
+      for (let x = r.x0 + 1; x < r.x1; x++) walls.push([x, r.y0 - 1, x, r.y0], [x, r.y1 + 1, x, r.y1]);
+      const ok = walls.filter(([x, y, fx, fy]) => f.get(x, y, FLOOR_Z) === r.theme.wall && f.get(x, y, FLOOR_Z + 1) === r.theme.wall &&
+        !f.secretWalls.has(x + y * W) && !r.doors.some((d) => d.x === x && d.y === y) && f.stand[fx + fy * W] === FLOOR_Z);
+      if (!ok.length) continue;
+      const [x, y] = rng.pick(ok);
+      f.set(x, y, FLOOR_Z + 1, B.MURAL);
+      f.murals.push({ x, y, z: FLOOR_Z + 1, view: "3d", text: t.text });
+    } else {             // laid in the floor: a white-edged tablet of gold, read from above
+      const spots = plainTiles(f, r, ctx).filter(([x, y]) => [0, 1, 2].every((d) => f.get(x + d, y, FLOOR_Z - 1) === r.theme.floor &&
+        f.stand[x + d + y * W] === FLOOR_Z && !nearTile(f.stairs, x + d, y) && !nearTile(f.upStairs, x + d, y)));
+      if (!spots.length) continue;
+      const [x, y] = rng.pick(spots);
+      [B.MOSAIC_WHITE, B.MOSAIC_GOLD, B.MOSAIC_WHITE].forEach((b, d) => f.set(x + d, y, FLOOR_Z - 1, b));
+      f.murals.push({ x: x + 1, y, z: FLOOR_Z - 1, view: "map", text: t.map });
+    }
+    k++;
+  }
+};
+GIMMICKS.braziers = (f, rng, rooms, p, ctx) => {
+  const pool = others(rooms, ctx).filter((r) => !r.hall && !r.locked);
+  const dark = pool.filter((r) => r.dark);
+  let made = 0;
+  for (const r of rng.shuffle(dark.length >= 2 ? dark : pool)) {
+    if (made >= rng.int(2, 3)) break;
+    const corners = [[r.x0, r.y0], [r.x1, r.y0], [r.x0, r.y1], [r.x1, r.y1]];
+    const ok = corners.filter(([x, y]) => f.stand[x + y * W] === FLOOR_Z && f.get(x, y, FLOOR_Z - 1) === r.theme.floor && !occupied(f, x, y) &&
+      !ctx.nearDoor(r, x, y) && !nearTile(f.stairs, x, y) && !nearTile(f.upStairs, x, y));
+    if (!ok.length) continue;
+    const [x, y] = rng.pick(ok);
+    f.set(x, y, FLOOR_Z, B.BRAZIER);
+    made++;
+  }
+};
+
+// A Truing Cradle (WS5's station) in a corner of some ordinary room.
+function placeCradle(f, rng, rooms, ctx) {
+  for (const r of rng.shuffle(others(rooms, ctx).filter((o) => !o.hall && !o.locked))) {
+    const corners = [[r.x0, r.y0], [r.x1, r.y0], [r.x0, r.y1], [r.x1, r.y1]].filter(([x, y]) => f.stand[x + y * W] === FLOOR_Z &&
+      !occupied(f, x, y) && !ctx.nearDoor(r, x, y) && !nearTile(f.stairs, x, y) && !nearTile(f.upStairs, x, y) && !isStairs(f, x, y));
+    if (!corners.length) continue;
+    const [x, y] = rng.pick(corners);
+    f.set(x, y, FLOOR_Z, B.STATION);
+    f.set(x, y, FLOOR_Z + 1, B.STATION);
+    f.cradle = { x, y };
+    return;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -866,6 +1069,14 @@ export function validateDungeonLevel(f, p = {}) {
     if (bottom?.kind === "boss") {
       const boss = f.creatures.find((m) => CREATURE_TYPES[m.type].boss);
       if (!boss || !at(all, boss.x, boss.y)) problems.push("boss missing or unreachable");
+    }
+    if (bottom?.kind === "legend") {   // a lair: its owner stands where you can reach it
+      const owner = f.creatures.find((m) => m.uid === bottom.uid && m.flags?.legend);
+      if (!owner || !at(all, owner.x, owner.y)) problems.push("legend missing or unreachable");
+    }
+    if (bottom?.kind === "relic") {    // a reliquary: what lies on its altar can be reached
+      const altar = f.items.find((it) => f.get(Math.floor(it.x), Math.floor(it.y), FLOOR_Z) === B.ALTAR);
+      if (!altar || !at(all, altar.x, altar.y)) problems.push("the reliquary's altar missing or unreachable");
     }
     if (f.guardianHall) {   // a guardian at the bottom (a site's last level): it must be reachable
       const g = f.creatures.find((m) => m.guardian);

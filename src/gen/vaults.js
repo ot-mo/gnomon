@@ -28,8 +28,9 @@
 import { B, FLOOR_Z, ROOM_TOP } from "../world.js";
 import { makeRng } from "../rng.js";
 import { spawnCreature, addCreature, canTalk } from "../creatures.js";
-import { makeItem, randomPotion, randomScroll, randomEquipment, randomTreasure } from "../items.js";
+import { makeItem, randomPotion, randomScroll, randomEquipment, randomTreasure, ITEM_KINDS } from "../items.js";
 import { layoutSpikes } from "../traps.js";
+import { LEGENDS, legendLooks } from "../content/creatures/legends.js";
 
 export const VAULTS = [
   {
@@ -53,7 +54,7 @@ export const VAULTS = [
   {
     // On the map: an open room with treasure in the far corner. In 3D: it's a chasm,
     // and the only way across is a narrow winding path.
-    id: "flatLie", name: "The Flat Lie", height: 4, wall: B.MOSS, floorBlock: B.ROCK,
+    id: "flatLie", name: "The Flat Lie", height: 4, wall: B.MOSS, floorBlock: B.ROCK, holes: true,
     plan: [
       "############",
       "#~~~~~~~~.*#",
@@ -100,7 +101,7 @@ export const VAULTS = [
   {
     // A chasm with treasure on the far side, and a winding bridge of ghost planks that
     // only shows with your torch out. The map, of course, shows only the chasm.
-    id: "unseenPath", name: "The Unseen Path", height: 4, wall: B.STONE, floorBlock: B.ROCK,
+    id: "unseenPath", name: "The Unseen Path", height: 4, wall: B.STONE, floorBlock: B.ROCK, holes: true,
     build: unseenPathPlan,
     hint: "A chasm, and treasure on the far side. They say the old builders made bridges only the dark can see.",
   },
@@ -298,6 +299,75 @@ const LICH_THRONE = {
 };
 export const BOSS_HALLS = { lich: LICH_THRONE };
 
+// Lair halls (a lair's last level, p.bottom = { kind: "legend", id, uid, hall }): the legend in the middle of a
+// wide hall, its hoard behind it. By the hall its template asks for (content/creatures/legends.js):
+//   plain     the hall alone
+//   beat      a ring of spike fields around the legend, rising on one beat (traps.js): on the map you read the
+//             ring beat by beat to reach it; in 3D you time it or jump a row
+//   herd      spots for a herd of its own kind (H)
+//   braziers  cold braziers in the corners (f): light them with your torch and the dark-only owner burns in them
+// N is the legend (the "legend" handler: the creature the bottom names, with its uid), A the bottom's loot on a dais.
+function lairPlan(hall) {
+  const w = 19, d = 15, cx = 9, cy = 7;
+  return grid(w, d, (x, y) => {
+    if (y === d - 1) return x === cx ? "E" : "#";
+    if (y === 0 || x === 0 || x === w - 1) return (y === 4 || y === 10) && hall !== "braziers" ? "l" : "#";   // a dark-only owner's hall: no lamps
+    if (x === cx && y === cy) return "N";
+    if (x === cx && y === 1) return "A";
+    if ((x === cx - 2 || x === cx + 2) && y === 1) return "*$"[x < cx ? 0 : 1];
+    const ring = Math.max(Math.abs(x - cx), Math.abs(y - cy));
+    if (hall === "beat" && (ring === 3 || ring === 4) && y < d - 2 && y > 1) return "^";
+    if (hall === "herd" && ring === 2 && (x + y) % 2 === 0) return "H";
+    if (hall === "braziers" && (x === 2 || x === w - 3) && (y === 2 || y === d - 3)) return "f";
+    return ".";
+  });
+}
+export const LAIR_HALLS = Object.fromEntries(["plain", "beat", "herd", "braziers"].map((hall) => [hall, {
+  id: `lair:${hall}`, name: "The Lair", height: 4, wall: B.ROCK, floorBlock: B.DIRT, legendHall: hall,
+  plan: lairPlan(hall), spikes: hall === "beat" ? "ripple" : null, links: [], legend: { N: "legend", H: "herd", A: "bottomLoot" },
+  hint: hall === "beat" ? "Spikes rise in rings around the hall's owner, all on one beat. The map shows which ring comes next."
+    : hall === "braziers" ? "Cold braziers stand in the corners of a dark hall. Something in here hates fire."
+      : "Bones, a hoard, and something old that made this place its own.",
+}]));
+
+// The reliquary (an Hour site's last level, p.bottom = { kind: "relic", id: relicId, trueMarks: [n…] }): the
+// relic on an altar (A), a pile of true-marks per number (M), an artifact (O) beside it, and the Hour's likeness
+// laid into the floor in gold, read whole only from above (the map), while the altar's glow leads you in 3D.
+const RELIQUARY = {
+  id: "reliquary", name: "The Reliquary", height: 4, wall: B.STONE, floorBlock: B.TILE, links: [],
+  legend: { A: "bottomLoot", M: "trueMark", O: "bodyMod" },
+  hint: "A hushed hall, a likeness laid into the floor, and an altar at its head.",
+  plan: [
+    "#######l#######",
+    "#....M.A.M....#",
+    "#.....O.M.....#",
+    "#.............#",
+    "l.............l",
+    "#.............#",
+    "#.............#",
+    "#.............#",
+    "l.............l",
+    "#.............#",
+    "#######E#######",
+  ],
+  mosaics: [[7, 3, B.MOSAIC_GOLD], [6, 4, B.MOSAIC_GOLD], [8, 4, B.MOSAIC_GOLD], [5, 5, B.MOSAIC_GOLD], [9, 5, B.MOSAIC_GOLD],
+    [5, 6, B.MOSAIC_GOLD], [9, 6, B.MOSAIC_GOLD], [6, 7, B.MOSAIC_GOLD], [8, 7, B.MOSAIC_GOLD], [7, 8, B.MOSAIC_GOLD],
+    [7, 5, B.MOSAIC_WHITE], [7, 6, B.MOSAIC_WHITE]],
+};
+export const RELIC_HALLS = { reliquary: RELIQUARY };
+
+// What a site's bottom leaves (seams to the workstreams that own the item kinds). Each returns an item or null:
+//   trueMark(count)       a pile of true-marks (bible §10.4; WS5's item kind "credit"); null while that kind isn't
+//                         registered, so nothing unknown is ever laid on a floor
+//   bodyMod(rng, level)   an artifact, cell or implant (WS5's randomBodyMod); null until bodymods sets it
+//   relic(relicDef, rng)  a history relic (WS7's History.relics entry) as an item; the default builds its base
+//                         item (an amulet, a weapon…) and marks it with the relic's id and name
+export const BOTTOM_LOOT = {
+  trueMark: (count) => (ITEM_KINDS.credit ? { kind: "credit", count } : null),
+  bodyMod: null,
+  relic: (def) => ({ kind: def.base.kind, id: def.base.id, ench: 2, known: true, histRelic: def.id, relicName: def.name }),
+};
+
 // The guardians' halls (in the legacy stack on levels 5, 10 and 15; guardians.js): the guardian in the middle, and
 // the stairs down in an alcove behind a gate that opens when it dies.
 const hallTop = (w) => {
@@ -332,7 +402,18 @@ export const GUARDIAN_HALLS = {
 
 // Any vault or hall by its id.
 export function vaultById(id) {
-  return VAULTS.find((v) => v.id === id) || GUARDIAN_HALLS[id] || BOSS_HALLS[id] || null;
+  return VAULTS.find((v) => v.id === id) || GUARDIAN_HALLS[id] || BOSS_HALLS[id] || RELIC_HALLS[id]
+    || Object.values(LAIR_HALLS).find((v) => v.id === id) || null;
+}
+// The hall a dungeon's bottom asks for: a guardian's, a boss's, a legend's lair (by its template's hall) or the
+// reliquary of an Hour site.
+export function bottomHall(bottom) {
+  if (!bottom) return null;
+  if (bottom.kind === "guardian") return GUARDIAN_HALLS[bottom.id] || null;
+  if (bottom.kind === "boss") return BOSS_HALLS[bottom.id] || null;
+  if (bottom.kind === "legend") return LAIR_HALLS[bottom.hall || bottom.legend?.hall || "plain"] || LAIR_HALLS.plain;
+  if (bottom.kind === "relic") return RELIC_HALLS.reliquary;
+  return null;
 }
 
 // A vault ready to stamp: its plan built (the puzzle rooms roll theirs), with its size.
@@ -344,18 +425,19 @@ export function buildVault(v, rng) {
 
 // Which vault a dungeon level gets (p: the level's parameters, gen/dungeon.js):
 //   p.forcedVault        that one (the legacy stack's fixed sequence, a site's own hall)
-//   p.final + p.bottom   the bottom's hall: { kind: "guardian", id } or { kind: "boss", id }
+//   p.final + p.bottom   the bottom's hall (bottomHall): a guardian's, a boss's, a legend's lair, the reliquary
 //   otherwise            a pick from p.vaultPool (ids, or [id, weight]; default every puzzle vault),
-//                        keeping vaults whose `levels` range holds p.level. Equal weights draw
-//                        exactly as rng.pick does, so the legacy stack's random vaults don't move.
+//                        keeping vaults whose `levels` range holds p.level, and on a last level only vaults
+//                        without chasms (`holes`: there's nowhere to fall to). Equal weights draw exactly as
+//                        rng.pick does, so the legacy stack's random vaults don't move (its last level is a hall).
 export function pickVault(rng, p = {}) {
   let v = p.forcedVault ? vaultById(p.forcedVault) : null;
-  if (!v && p.final && p.bottom) v = (p.bottom.kind === "guardian" ? GUARDIAN_HALLS : BOSS_HALLS)[p.bottom.id] || null;
+  if (!v && p.final && p.bottom) v = bottomHall(p.bottom);
   if (!v) {
     const level = p.level ?? 1;
     const pool = (p.vaultPool || VAULTS.map((o) => o.id))
       .map((e) => (Array.isArray(e) ? { v: vaultById(e[0]), w: e[1] } : { v: vaultById(e), w: 1 }))
-      .filter(({ v: o }) => o && (!o.levels || (level >= o.levels[0] && level <= o.levels[1])));
+      .filter(({ v: o }) => o && (!o.levels || (level >= o.levels[0] && level <= o.levels[1])) && !(p.final && o.holes));
     if (!pool.length) throw new Error(`no vault fits level ${level}`);
     if (pool.every((e) => e.w === pool[0].w)) v = pool[Math.floor(rng() * pool.length)].v;
     else {
@@ -463,6 +545,66 @@ registerLegend("armour", lying((c) => randomEquipment(c.rng, c.zone.level + 1, 0
 registerLegend("treasure", lying((c) => randomTreasure(c.rng, c.zone.level)));
 for (const type of ["rat", "goblin", "skeleton", "flatling"])
   registerLegend(type, (c) => { floorCol(c); addCreature(c.zone, spawnCreature(type, c.x, c.y, c.z0, { rng: c.cosmetic, state: "wander", level: c.zone.level })); });
+
+// --- The bottoms' parts (lair halls and the reliquary; opts.bottom is the level's p.bottom) ---------------------
+// N: the legend itself. H: one of its herd (every other spot). A: the bottom's loot on a dais (an altar under a
+// relic). M: a pile of true-marks (the k-th M holds bottom.trueMarks[k]). O: an artifact. A Truing Cradle (a
+// "cradle" letter in a landmark's plan): two blocks of B.STATION, used by walking into it or with E (WS5).
+const bottomOf = (c) => c.opts.bottom || {};
+const note = (c) => (c.zone.bottomLoot ||= { trueMarks: [], relic: null, bodyMod: false, legend: null });
+registerLegend("legend", (c) => {
+  floorCol(c);
+  const def = bottomOf(c).legend;
+  if (!def) return;
+  spawnLegend(c.zone, def, c.x, c.y, c.z0, c.cosmetic);
+  note(c).legend = def.uid;
+});
+registerLegend("herd", (c) => {
+  floorCol(c);
+  const def = bottomOf(c).legend;
+  if (!def || !c.rng.chance(0.5)) return;
+  addCreature(c.zone, spawnCreature(def.species, c.x, c.y, c.z0, { rng: c.cosmetic, state: "idle", level: Math.max(1, def.level - 3) }));
+});
+registerLegend("bottomLoot", (c) => {
+  floorCol(c);
+  const b = bottomOf(c), level = c.zone.level, rdef = b.kind === "relic" ? b.relic : null;
+  let it = rdef ? BOTTOM_LOOT.relic(rdef, c.rng) : null;
+  if (it) { it.uid = rdef.id; it.relicSpawn = true; note(c).relic = rdef.id; }
+  if (!it && b.kind === "legend") { it = BOTTOM_LOOT.bodyMod?.(c.rng, level) || null; if (it) note(c).bodyMod = true; }
+  it ||= randomTreasure(c.rng, level + 2);
+  at(c, 0, B.ALTAR);
+  c.zone.items.push(makeItem(it, c.x + 0.5, c.y + 0.5, c.z0 + 1));
+});
+registerLegend("trueMark", (c) => {
+  floorCol(c);
+  const marks = bottomOf(c).trueMarks || [], k = c.cells.M.length - 1;   // (cells holds this tile already)
+  if (k >= marks.length) return;
+  note(c).trueMarks.push(marks[k]);
+  const it = BOTTOM_LOOT.trueMark(marks[k]);
+  if (it) c.zone.items.push(makeItem(it, c.x + 0.5, c.y + 0.5, c.z0));
+});
+registerLegend("bodyMod", (c) => {
+  floorCol(c);
+  const it = BOTTOM_LOOT.bodyMod?.(c.rng, c.zone.level) || null;
+  if (it) { note(c).bodyMod = true; c.zone.items.push(makeItem(it, c.x + 0.5, c.y + 0.5, c.z0)); }
+  else c.zone.items.push(makeItem(randomTreasure(c.rng, c.zone.level + 1), c.x + 0.5, c.y + 0.5, c.z0));
+});
+registerLegend("cradle", (c) => { floorCol(c); at(c, 0, B.STATION); at(c, 1, B.STATION); });
+
+// A legend (world/sites.js makeLegend: { uid, template, species, name, epithet, level, mutations, opinions, hook })
+// standing at (x, y): its species at its level, ×2 health and ×10 experience (bible §12.13), named, with its uid
+// (zones.js claimUid keeps it in one zone; guardians.js claims it when you arrive). Its looks and mutations are
+// legendLooks's (content/creatures/legends.js), which guardians.js runs again on every entry (they aren't saved).
+export function spawnLegend(zone, def, x, y, z, rng) {
+  const c = spawnCreature(def.species, x, y, z, { rng, state: "idle", level: def.level, uid: def.uid, name: `${def.name} ${def.epithet}` });
+  c.maxHp = c.hp = c.hp * LEGENDS.base.hpMul;
+  c.xp *= LEGENDS.base.xpMul;
+  c.named = true;
+  c.flags = { ...(c.flags || {}), legend: def.uid };
+  if (def.hook) c.brain = { ...(c.brain || {}), hook: `legend:${def.hook}` };
+  legendLooks(c, def);
+  return addCreature(zone, c);
+}
 
 export function stampVault(zone, vault, vx, vy, rng, opts = {}) {
   const o = { ...STAMP_DEFAULTS, ...opts };

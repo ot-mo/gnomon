@@ -12,11 +12,14 @@
 <pre id="out">Running…</pre>
 <script type="module">
 // Generates many dungeon levels and checks each can be finished (stairs, rooms, vault, keys
-// reachable), then sanity-checks the monster and item art. Open with ?seeds=50&depths=20 to change
-// the size. The levels are the legacy stack's (the fixture site under world tile 0, 0):
-// generateDungeonLevel(seed, legacyParams(depth, seed)). tools/check-dungeons.mjs does the same in Node, and
-// tools/check-content.mjs the art (test-world.html runs both in the browser).
+// reachable), then sanity-checks the monster and item art. Open with ?seeds=50&depths=20&random=1000 to
+// change the size. The levels are the legacy stack's (the fixture site under world tile 0, 0):
+// generateDungeonLevel(seed, legacyParams(depth, seed)), then 1,000 with random site parameters (every theme,
+// gimmick and bottom: tests/checks/dungeons.js randomParams, and what each gimmick promises). Node's
+// tools/check-dungeons.mjs makes the same levels and must print the same regenerations and signature;
+// tools/check-content.mjs checks the art (test-world.html runs both in the browser).
 import { generateDungeonLevel, validateDungeonLevel, legacyParams, LEGACY_GUARDIANS } from "./src/gen/dungeon.js";
+import { randomParams, siteLevelProblems, levelSig } from "./tests/checks/dungeons.js";
 import { templeFixture as buildTemple } from "./src/content/world/temple.js";
 import { CREATURE_TYPES, canTalk } from "./src/creatures.js";
 import { FLOOR_ART, WEAPONS, WEAPON_PALETTE, itemPalette, POTIONS, POTION_COLORS, RINGS, AMULETS, RELICS, makeRelic, itemName, itemInfo } from "./src/items.js";
@@ -69,6 +72,21 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   }
 }
 
+// Levels with random site parameters (the same 1,000 as Node's).
+const RANDOM = params.has("random") ? +params.get("random") : 1000;
+const random = { levels: 0, failures: [], retries: 0, slowest: 0, totalMs: 0, signature: 0x811c9dc5 };
+for (let i = 0; i < RANDOM; i++) {
+  const { seed, p } = randomParams(i);
+  const t0 = performance.now();
+  const f = generateDungeonLevel(seed, p);
+  const ms = performance.now() - t0;
+  random.levels++; random.totalMs += ms; random.slowest = Math.max(random.slowest, ms); random.retries += f.attempts - 1;
+  random.signature = levelSig(f, random.signature);
+  const problems = [...validateDungeonLevel(f, p), ...siteLevelProblems(f, p)];
+  if (problems.length) random.failures.push(`random level ${i}: ${problems.join(", ")}`);
+}
+random.signature = random.signature.toString(16);
+
 // Every piece of pixel art: rows the same width, every letter in its palette.
 const artProblems = [];
 const checkArt = (name, frames, palette) => {
@@ -113,10 +131,13 @@ lines.push(`people: ${features.npcs} · elites: ${features.elites} of ${features
   `(${((features.secretWalls || 0) / Math.max(1, features.secrets || 0)).toFixed(2)} ways in each)`);
 for (const [band, mix] of Object.entries(features.mix || {}))
   lines.push(`  depths ${band}: ` + Object.entries(mix).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${t} ${n}`).join(", "));
+if (RANDOM) lines.push(`<span class="${random.failures.length ? "bad" : "ok"}">${random.levels - random.failures.length}/${random.levels} random site levels pass</span>` +
+  ` · ${random.retries} regenerations · avg ${(random.totalMs / random.levels).toFixed(1)} ms, slowest ${random.slowest.toFixed(1)} ms · signature ${random.signature}`);
 lines.push(`<span class="${artProblems.length ? "bad" : "ok"}">art: ${artProblems.length ? artProblems.join("; ") : "ok"}</span>`);
-if (failures.length) lines.push("", ...failures.slice(0, 40));
+if (failures.length || random.failures.length) lines.push("", ...failures.slice(0, 40), ...random.failures.slice(0, 40));
 out.innerHTML = lines.join("\n");
-window.testResult = { floors, failures, retries, artProblems };
+window.testResult = { floors, failures, retries, artProblems,
+  random: { levels: random.levels, failures: random.failures, retries: random.retries, signature: random.signature } };
 </script>
 </body>
 </html>
