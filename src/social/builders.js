@@ -26,7 +26,7 @@ import { typeOf } from "../creatures.js";
 export const ROLES = ["villager", "priest", "guard", "wanderer", "merchant"];
 
 export function standingOf(game, c) {
-  const [main] = membershipsOf(c).sort((a, b) => b[1] - a[1]);
+  const [main] = [...membershipsOf(c)].sort((a, b) => b[1] - a[1]);   // (a copy: a type's list is shared)
   const id = main?.[0] ?? null, def = id ? FACTIONS[id] : null;
   const b = id ? band(repOf(game, id)) : "indifferent";
   return { faction: id, def, band: b, name: BAND_NAMES[b], attitude: attitude(game, c, game.player) };

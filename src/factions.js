@@ -17,7 +17,7 @@
 //                                  nothing); emits "rep" { faction, n, from, rep, reason } when it moved
 //   band(rep) → bandName           thresholds −600, −250, +250, +600
 //   bandName(rep) → "Dark" | …     the light word for the band
-//   membershipsOf(c) → [[id, w]]   c.faction ({ id: weight }) or the type's `factions` (a list, or { id: weight });
+//   membershipsOf(c) → [[id, w]]   read-only (a type's list is shared and frozen); c.faction ({ id: weight }) or the type's `factions` (a list, or { id: weight });
 //                                  only registered factions with a weight above 0
 //   relation(f, g) → −1 | 0 | 1    how faction f regards faction g: its own relation to g, else to the nearest of
 //                                  g's parent groups it names; failing that, f's parent's
@@ -96,7 +96,8 @@ export function membershipsOf(c) {
   const t = typeOf(c);
   if (!t?.factions) return NONE;
   let m = byType.get(t);
-  if (!m || m.size !== Object.keys(factions()).length) byType.set(t, (m = { list: entries(t.factions), size: Object.keys(factions()).length }));
+  const size = Object.keys(factions()).length;   // (worked out again when the table or the registry changes)
+  if (!m || m.of !== t.factions || m.size !== size) byType.set(t, (m = { list: Object.freeze(entries(t.factions)), of: t.factions, size }));
   return m.list;
 }
 

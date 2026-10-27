@@ -153,6 +153,28 @@ export async function run(env) {
       finally { delete F.FACTIONS["test:loopA"]; delete F.FACTIONS["test:loopB"]; }
       if (got !== 0) fail(`a cycle of parents: ${got}`);
     }
+    // A type's memberships are shared by its creatures: asking one talker where it stands mustn't reorder them,
+    // and the type's own temperament counts.
+    {
+      const T = creatures.CREATURE_TYPES.goblin, keep = { f: T.factions, t: T.temperament };
+      // No type temperament: the first faction's (Hollowmere, docile) decides, so at Cold it is wary.
+      T.factions = { hollowmere: 0.3, rustbacks: 0.7 }; delete T.temperament;
+      try {
+        game.state.rep = { hollowmere: -400, rustbacks: -400 };
+        const g1 = creatures.spawnCreature("goblin", 2, 2, 0, { rng: R, level: 2 }), g2 = creatures.spawnCreature("goblin", 3, 2, 0, { rng: R, level: 2 });
+        const before = F.attitude(game, g2, p());
+        let threw = null;
+        try { builders.standingOf(game, g1); } catch (err) { threw = err.message; }
+        const after = F.attitude(game, g2, p());
+        if (threw || before !== after || before !== "wary") fail(`a type's memberships: ${before} → ${after} after standingOf${threw ? ` (threw ${threw})` : ""} (want wary both times)`);
+        // The type's temperament over its factions': an aggressive type of Hollowmere at Grey is out for you.
+        T.factions = { hollowmere: 1 }; T.temperament = "aggressive"; game.state.rep = {};
+        const g3 = creatures.spawnCreature("goblin", 2, 3, 0, { rng: R, level: 2 });
+        if (F.attitude(game, g3, p()) !== "hostile") fail(`an aggressive type of Hollowmere at Grey: ${F.attitude(game, g3, p())}`);
+        T.temperament = "docile";   // the same table, a new temper: neutral (and the memberships read afresh)
+        if (F.attitude(game, g3, p()) !== "neutral") fail(`a docile type of Hollowmere at Grey: ${F.attitude(game, g3, p())}`);
+      } finally { T.factions = keep.f; T.temperament = keep.t; if (keep.f === undefined) delete T.factions; if (keep.t === undefined) delete T.temperament; }
+    }
     // Creature against creature.
     const hm = mob("hollowmere"), hm2 = mob("hollowmere"), az = mob("assize"), cl = mob("clatter"), sv = mob("survey"), rb = mob("rustbacks");
     // The Assize hates Hollowmere through the Bent (a parent group); Hollowmere hates the Rustbacks, not back.
