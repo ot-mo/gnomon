@@ -3,24 +3,24 @@
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
 **Updated:** 2026-10-27, the integrator (local session), on `integration`. **Phase 1 is running and Phase 2's
-integration has started: WS3, WS8, WS4, WS6 and WS7 (both halves each), WS5, WS10 and WS2a are merged (`p2-ws3`,
-`p2-ws8`, `p2-ws4a`, `p2-ws5`, `p2-ws6a`, `p2-ws4b`, `p2-ws6b`, `p2-ws10`, `p2-ws2a`, `p2-ws7a`, `p2-ws7b`), and the
-flip is in (`p2-flip`: the attribute set and d20 by default); the next `p1-*` tag merges as it lands (WS9 and WS2b
-aren't tagged yet; WS1 is queued).** From here on only the integrator edits this file and
+integration has started: WS3, WS8, WS4, WS6, WS7 and WS2 (both halves each), WS5 and WS10 are merged (`p2-ws3`,
+`p2-ws8`, `p2-ws4a`, `p2-ws5`, `p2-ws6a`, `p2-ws4b`, `p2-ws6b`, `p2-ws10`, `p2-ws2a`, `p2-ws7a`, `p2-ws7b`, `p2-ws2b`),
+and the flip is in (`p2-flip`: the attribute set and d20 by default); the next `p1-*` tag merges as it lands (WS9
+isn't tagged yet; WS1 is queued).** From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p2-ws7b` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
-  `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b`, `p1-ws10`, the flip, `p1-ws2a`, `p1-ws7a` and
-  `p1-ws7b`, with their integration requests; `p2-ws3` … `p2-ws7a` before it).
+- **Last tag:** `p2-ws2b` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+  `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b`, `p1-ws10`, the flip, `p1-ws2a`, `p1-ws7a`,
+  `p1-ws7b` and `p1-ws2b`, with their integration requests; `p2-ws3` … `p2-ws7b` before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
 - **Branch:** `integration`, in the worktree `C:\Users\Otto Mörner\Code\gnomon-wt\integration` (serves on port
   8660). Nothing is half finished.
-- **Done:** Phase 0 (0A1 … 0D2, notes in `docs/sessions/0A1.md` … `0D2.md`); WS3, WS8, WS4, WS5, WS6, WS10
-  and WS7, and WS2a (`docs/ws3.md`, `ws8.md`, `ws4.md`, `ws5.md`, `ws6.md`, `ws10.md`, `ws7.md`, `ws2.md`;
+- **Done:** Phase 0 (0A1 … 0D2, notes in `docs/sessions/0A1.md` … `0D2.md`); WS3, WS8, WS4, WS5, WS6, WS10,
+  WS7 and WS2 (`docs/ws3.md`, `ws8.md`, `ws4.md`, `ws5.md`, `ws6.md`, `ws10.md`, `ws7.md`, `ws2.md`;
   `docs/sessions/ws3.md`, `ws8.md`, `ws4.md` "Part 4a" and "Part 4b", `ws5.md`, `ws6.md` "Part 6a" and "Part 6b",
-  `ws10.md`, `ws7.md` "Part 7a" and "Part 7b", `ws2.md`), merged. The merges' own numbers are under "Integration log" below.
+  `ws10.md`, `ws7.md` "Part 7a" and "Part 7b", `ws2.md` "Part 2a" and "Part 2b"), merged. The merges' own numbers are under "Integration log" below.
 - **Checks:** `node tools/run-all.mjs`, 38 checks (WS10 added `check-sites`) (about 2 minutes on an idle machine, 4 with three workstreams
   running; the timed ones, `check-dungeons`, `check-status`, `check-stats` and `check-perf`, alone at the end; since
   WS3, `check-perf` runs the render check first). Browser (headless Playwright, audio silenced,
@@ -77,7 +77,7 @@ tags; WS1, which builds on the most, last):
 | 5 | WS4a → WS4b Character creation and progression | `ws4`, `ws/ws4` | WS4a tagged `p1-ws4a` (dc22850), **merged, `p2-ws4a`** (2026-10-27); WS4b tagged `p1-ws4b` (f8062f9), **merged, `p2-ws4b`** (2026-10-27) |
 | 6 | WS6a → WS6b Factions, dialogue builders → trade, the Kindling, backings | `ws6`, `ws/ws6` | WS6a tagged `p1-ws6a` (0697109), **merged, `p2-ws6a`**; WS6b tagged `p1-ws6b` (68ef866), **merged, `p2-ws6b`** (2026-10-27) |
 | 7 | WS10 Dungeon sites, lairs and legends | `ws10`, `ws/ws10` | tagged `p1-ws10` (1bbd302), **merged, `p2-ws10`** (2026-10-27) |
-| 8 | WS2a → WS2b Surface generation | `ws2`, `ws/ws2` | WS2a tagged `p1-ws2a` (386bd98), **merged, `p2-ws2a`** (2026-10-27); WS2b running |
+| 8 | WS2a → WS2b Surface generation | `ws2`, `ws/ws2` | WS2a tagged `p1-ws2a` (386bd98), **merged, `p2-ws2a`**; WS2b tagged `p1-ws2b` (2003f0a), **merged, `p2-ws2b`** (2026-10-27) |
 | 9 | WS7a → WS7b Knowledge: history, villages, quests | `ws7`, `ws/ws7` | WS7a tagged `p1-ws7a` (b503957), **merged, `p2-ws7a`**; WS7b tagged `p1-ws7b` (d7a0038), **merged, `p2-ws7b`** (2026-10-27) |
 | 10 | WS1 Overworld travel | `ws1`, `ws/ws1` | queued |
 
@@ -171,7 +171,9 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   secretId })` once discovery.js drops `STUB`; the visit quest also listens to `world:step` and reads `ev.to` as `{ wx,
   wy }`; the journal's Locations tab wants a key that opens the world map centred on a span; discovery XP is WS1's and skips
   village sites, whose first visit pays its own (`story/village-site.js`, `xpReward("village")`, source `"village"`;
-  WS7b #13), and WS7b's find quest listens to `world:step` too. A legend met on the road is a zone patch `{ op: "spawnCreature", uid: def.uid, type:
+  WS7b #13), and WS7b's find quest listens to `world:step` too. WS2b #11: an encounter table may read `BIOMES[biome].spawns`
+  (bible §15.2's spawn keys as registered types with weights) through `gen/biomes/common.js spawnPick(rng, spawns,
+  level)`. A legend met on the road is a zone patch `{ op: "spawnCreature", uid: def.uid, type:
   def.species, level: def.level }` with the def from `legendOf(run, uid)`; its lair is then empty of it (checked).
 - **WS9** addition (from WS10 #2): `config.js` `VERSION.gen` should follow `world/run.js GEN_VERSION`, now 4 (WS7a's history and secrets; WS7b's villages,
   their secrets and factions). From
@@ -231,10 +233,14 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   WS4 #12 and #13: WS9's title pushes `"create"` with `{ seed, mode }` (the wizard is registered on `integration`
   since `p2-ws4a`), and the wizard can read `save.js RUN_MODES` instead of its own copy; the wizard is for the
   attribute set, which is the default since `p2-flip`, so the title's New game pushes it. WS4 #4 with WS9 #2 (startRun's `{ mode, player }`): above, under WS4b.
-- **WS2b** (at its merge; WS2a did WS3 #5, the map looks of TRUNK, LEAVES (`♠`), SHALE, CRYSTAL, GLASS, REED (`¦`), and
-  WS3 #6's staged far bands): WS3 #10, the Gnomon's 14-block voxel foot at span (37, 3) (or C1's landmark plan;
-  render3d starts the needle on whatever stands at the span's middle), in WS2b's open items; GRASS (id 7, the
-  integrator's) stays `.` (§6.5's `"` is the amulet's, bible §15.7).
+- **C (content), from the WS2b merge** (WS2b #9, #10): a landmark plan (C1) may use WS2's legend letters (`legend: { ch:
+  id }`, with `props`, `creatures` and `rubble` on the plan; `gen/biomes/legend.js`); a plan replaces
+  `LANDMARK_BUILDERS`, and the Gnomon's must stand its own 14-block foot at the span's middle, (40, 24), where render3d
+  starts the needle; until then the real world's landmarks stand on stub footprints. Wildlife (C3 and the balance
+  phase): bible §12's behaviours, the species left out, d20 `dv` and attributes per species; `content/biomes.js`'s
+  wildlife counts and spawn weights are first numbers. GRASS (id 7) stays `.` (§6.5's `"` is the amulet's). **For
+  the coordinator:** naming props in the map legend (`,`) and the inspect describer needs a `props` describer, which
+  `tests/checks/hud.js:199` (P0's) freezes out; the props are drawn since `p2-ws2b`, unnamed.
 - **WS1, WS7, WS6b** (at their merges): WS4 #11, discoveries, quests, triangulations and Kindlings give XP through
   `gainXp(game, xpReward(kind, level), { source: kind })` (Pilgrim's ×2.2), and the powers waiting on them (Keen Eye,
   Pathfinder, Terrain lore, Homing sense: WS1; Hour script, Gossip, Triangulator, Vey's script: WS7) lose their `needs`
@@ -248,6 +254,39 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p2-ws2b`** (2026-10-27): `p1-ws2b` (2003f0a, above `p1-ws2a`) merged into `integration` (`cfb7272`), cleanly: since
+`p1-ws2a` WS2b changed only its own files (`gen/biomes/*`, `gen/surface.js`, `gen/terrain.js`, `gen/apron.js`,
+`content/biomes.js`, `content/creatures/wildlife.js`) and its checks (edges, landmarks, surface). `buildRun` is
+unchanged (16 of 16 serialized runs of seeds 1-8 on both worlds equal to `p2-ws7b`'s), so `GEN_VERSION` stays 4; zones
+are made differently (a saved zone keeps its blocks). Every wildlife species' factions are registered on `integration`
+(36 species: 23 out for a fresh player, 13 neutral).
+- Applied: #7 (`7314abe`): the dressing's props drawn, in 3D as sprites like an item's (0.14 of a tile a character of
+  their art) and on the map as their glyphs, inside the "items" overlay (check-hud, P0's, freezes the overlay list),
+  under items, creatures and you, never on a tile the map draws as wall. The render check's section 14: 6 of 6 seen
+  props shown on the test world's start span, a shrub three tiles ahead changes 174 cells in 3D; without the drawing
+  0 of 6 and 0 cells. Not done: naming props in the legend and inspect (a `props` describer, which
+  `tests/checks/hud.js:199` freezes out: for the coordinator). In the browser on the Brine Flats (2,15,0: 17 props),
+  the map shows reeds, glimseed, bones and salt blooms; in 3D the bones are hard to tell from the salt (their colour,
+  C3's).
+- Merge findings: the render check's Gnomon in its own span (`4232bcc`): WS3's case was written for a span with no
+  voxel foot; WS2b's 14-block column (WS3 #10) puts the needle's start above the screen from 15 tiles off at pitch 0.
+  The renderer is right (the needle's lowest row 14 / 27 / 40 against the foot top's 14.0 / 27.2 / 40.2 at pitch
+  0.5 / 0.7 / 0.9); the case now looks up at the foot and asks the needle to rise from its top (with the needle from
+  the ground: lowest row 55, 1668 cells beside the foot). check-social's "old game" (`7b81aeb`) took WS2b's wildlife
+  for the parent's monsters (40 pairs failed): it takes the types without factions (19, as at `p2-ws7b`), and every
+  type of `LEGACY_MONSTERS` must be among them.
+- Information, nothing to apply: #8 (`browser-gate` shows 8 prefetch frames; real-world zones hold wildlife). Carried:
+  #9 and #10 to C (C1's plans, C3's wildlife and the balance phase), #11 to WS1; 2a's #1 and #3 stay WS9's.
+- Checks: `run-all` at `7b81aeb` **38 of 38** (188.9 s). Timed alone (14% load, no training job): `check-surface
+  --budget` **PASS** (p50 16.2, p95 26.3, max 139.4 ms); `check-perf --against p2-ws7b --rounds 3 --no-render`
+  **PASS**, ×0.94-1.09 (the outdoor frame p50 15.72 against 15.81, surface generation p95 37.3 against 35.9 and max
+  125.8 against 123.6, dungeon generation p95 31.9 against 29.3, budget 40). Browser (0 console errors, audio
+  silenced): `browser-0d1 --against p0-done` (23 of 23 modes, the HUD at 100×30, golden (b) 27 of 27, per tick
+  underground +0.4% in 3D and +0.1% on the map, the surface −11.3% in 3D); `browser-0d2 --all` (boot with 179
+  modules, `test-world.html` 34 passed, 0 failed); `browser-gate` (1234, 7: 8 prefetch frames); `browser-silent`;
+  and on `tools/serve.mjs 8660`, `browser-0c` (1234, 7), `browser-shell`, `browser-ws4`, `browser-ws5`,
+  `browser-ws6`, `browser-ws7`, `browser-ws8`.
 
 **`p2-ws7b`** (2026-10-27): `p1-ws7b` (d7a0038) merged into `integration` (`574ac45`), cleanly: `story/index.js`
 registers `SITE_BUILDERS.village` and WS10's `world/sites.js` every other kind. No P0 check, fixture or frame changed in
@@ -689,8 +728,8 @@ its §8.4 files and two P0 checks).
   | 7 (20) | 6.94 s, 54.2% (troll 76%) | 2.92 s, 14.6% | 2.80 s, 9.3% | 4.49 s, 34.8% |
   | 8 (23) | 7.67 s, 60.0% (troll 83%) | 3.17 s, 16.6% (troll 23%) | 3.05 s, 10.6% | 4.92 s, 37.7% |
 
-- **WS3 (merged; what's left):** the edge-swap frame's step (the far apron bands built in the swap frame: carried to
-  WS2 above); the underground legend says "gold" while golden (b) holds (WS3 #9: change `renderMap.js`'s `$` row
+- **WS3 (merged; what's left):** the edge-swap frame's step (the far bands come from the staged prefetch since
+  `p2-ws2a`; a neighbour read from the save still builds them in the swap: WS9, above); the underground legend says "gold" while golden (b) holds (WS3 #9: change `renderMap.js`'s `$` row
   when it retires; the outdoor legend says glim). The outdoor frame, the horizon band and the clock's looks are done
   (`docs/sessions/ws3.md` §2: 16.1 ms at noon against `p0-done`'s 22.6 on a quiet machine).
 - **WS8 (merged; what's left):** `passTime` costs ×1.2-1.7 `p0-done`'s in WS8's alternating measure (p50 4-5 ms
@@ -711,12 +750,13 @@ its §8.4 files and two P0 checks).
   neither fight back nor flee, and a creature of a faction that hates a village's may now go for its people
   (`factions.js` no longer counts them unstrikable). A rune shrine reads at night two tiles from a lit commons lamp,
   as `light.js inDark` reads only the sky (P0's rule). The content above (C).
-- **WS2a (merged; what's left):** WS2b builds the biome builders, the ways up the cliffs and the 3D-only plateaus,
-  the legend handlers and wildlife; cliff tops (about 14 columns a zone) have no way up yet; the map can't show height
-  (ground 4 or more up is a wall glyph, so `tile.elev` is unread); every river is plain water until C1 gives the
-  Inkrun `liquid: "ink"` (compileWorld passes it on since `p2-ws2a`); when spans change terrain in a run (the
-  Lengthening, WS1 or C) call `gen/surface.js forgetWorld(run.world)` first. A recorded outdoor map frame with a tree
-  in it changes (`♠`); golden (b) and the underground frames don't.
+- **WS2 (merged; what's left):** the map can't show height: ground 4 or more up is a wall glyph, so cliff tops, ramps'
+  tops, caches and plateaus are 3D's alone (by design; `tile.elev` is unread); every river is plain water until C1
+  gives the Inkrun `liquid: "ink"` (compileWorld passes it on since `p2-ws2a`); when spans change terrain in a run
+  (the Lengthening, WS1 or C) call `gen/surface.js forgetWorld(run.world)` first. Props are drawn since `p2-ws2b`
+  (3D and the map), unnamed (above). The real world's surface zones hold wildlife (23 of 36 species hostile to a fresh
+  player), the test world's none. Surface generation's max in check-perf is one sample (130-290 ms at `p0-done`
+  itself on this machine); lamps cost about 1 ms each at every refresh.
 - **WS6b (merged; what's left):** credit isn't built (a sale a full flask can't hold is refused); prices move with EGO and
   rep only under the attribute set (the flip); the legacy Pell keeps his own shop and his one pack; the Snuffer's
   torch −1 (the integrator's backlog); the content above.
