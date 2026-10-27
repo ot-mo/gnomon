@@ -242,7 +242,7 @@ export async function checkProgression(m) {
       if (game.player.background !== bg || game.state.mode !== "pilgrim" || game.mode !== "map") fail(`${bg}: the run began as ${game.player.background}, mode ${game.state.mode}, in ${game.mode}`);
       // The background's change goes on top of the start by genotype, with Pilgrim's floor (factions.js baseRep,
       // WS6a; P0's stub started every faction at 0).
-      for (const [f, n] of Object.entries(B.rep || {})) {
+      for (const [f, n] of Object.entries({ ...(B.rep || {}), ...(B.villageRep ? { bentVillages: B.villageRep } : {}) })) {
         const want = Math.max(F.REP_MIN, Math.min(F.REP_MAX, F.baseRep(game, f) + n));
         if (F.repOf(game, f) !== want) fail(`${bg}: ${f} at ${F.repOf(game, f)}, want ${want} (the start ${F.baseRep(game, f)} and ${n})`);
       }
@@ -804,7 +804,7 @@ export async function checkProgression(m) {
         wingsUp: { muts: ["wings"], ok: (p) => STS.statusLeft(p, "flying") > 24 },
         // (a sturdy rat, so it lives to burn; its burning holds no copy of you, since a zone saves its creatures' statuses)
         bellows: { muts: ["bellowsThroat"], set: (p, at) => ({ r: rat(at.x + 2, at.y, at.z, { hp: 99, maxHp: 99 }) }),
-                   ok: (p, s) => s.r.hp < s.hp0 && STS.hasStatus(s.r, "burning") && JSON.stringify(s.r.status.burning).length < 80 },
+                   ok: (p, s) => s.r.hp < s.hp0 && STS.hasStatus(s.r, "burning") && JSON.stringify(s.r.status.burning).length < 80 && s.r.status.burning.src === "player" },
         flatwise: { muts: ["flatwise"], ok: (p) => STS.statusFlag(p, "flat") && game.mode === "map" },
         echo: { muts: ["echoThroat"], set: (p, at) => { p.torch = false; return { r: rat(at.x + 6, at.y, at.z) }; },
                 ok: (p, s) => game.zone.sightings.get(s.r.id)?.time === game.time },
@@ -1148,12 +1148,13 @@ export async function checkProgression(m) {
         const tc = (who) => st.bonus(who, "torchCost");
         const lamp = C.makeCharacter(choicesFor("lamplighterOfCassin", C.suggestSpread("plumb", "lamplighterOfCassin")));
         const sk = bentIn(["lampskin"]), plain = bentIn([]);
-        L.takePerk(game, "thriftyWick"); L.takePerk(game, "steadyHand");
-        const got = { cassin: tc(lamp), lampskin: tc(sk), thrifty: tc(game.player), steady: st.bonus(game.player, "missileAcc") };
+        const ex0 = st.bonus(game.player, "examine");
+        L.takePerk(game, "thriftyWick"); L.takePerk(game, "steadyHand"); L.takePerk(game, "keenFingers");
+        const got = { cassin: tc(lamp), lampskin: tc(sk), thrifty: tc(game.player), steady: st.bonus(game.player, "missileAcc"), keen: st.bonus(game.player, "examine") - ex0 };
         out.hooks = JSON.stringify(got);
-        if (got.cassin !== -0.5 || got.lampskin !== -1 || got.thrifty !== -0.5 || got.steady !== 2 || plain !== game.player)
-          fail(`the torch and missile hooks: ${out.hooks} (want Cassin -0.5, Lampskin -1, Thrifty wick -0.5, Steady hand 2)`);
-        const waiting = ["haggler", "steadyHand", "thriftyWick"].filter((id) => POWERS[id].needs);
+        if (got.cassin !== -0.5 || got.lampskin !== -1 || got.thrifty !== -0.5 || got.steady !== 2 || got.keen !== 3 || plain !== game.player)
+          fail(`the torch, missile and examine hooks: ${out.hooks} (want Cassin -0.5, Lampskin -1, Thrifty wick -0.5, Steady hand 2, Keen fingers 3)`);
+        const waiting = ["haggler", "steadyHand", "thriftyWick", "keenFingers"].filter((id) => POWERS[id].needs);
         if (waiting.length) fail(`still waiting (needs), so never offered: ${waiting.join(", ")}`);
       }
     }

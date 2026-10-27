@@ -117,7 +117,7 @@ registerAbility("bellows", {
       for (let k = 0; k < lvl; k++) dmg += 1 + Math.floor(rng() * 4);
       if (applyDamage(game, c, dmg, { src: e, color: [255, 150, 60] }) > 0) {
         hit++;
-        if (game.zone.creatures.includes(c)) addStatus(game, c, "burning", { t: 3 });   // (no src: a status is saved with its creature)
+        if (game.zone.creatures.includes(c)) addStatus(game, c, "burning", { t: 3, src: "player" });   // (yours: monsters.js makes its kill yours; "player", not you: a status is saved with its creature)
       }
     }
     let lit = 0;

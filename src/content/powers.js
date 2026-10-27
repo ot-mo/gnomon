@@ -84,7 +84,7 @@ export const POWERS = {
   brew:         { tree: "leechcraft", name: "Brew",         info: "Mix tonics at a village oven.", needs: "WS6b" },
   repair:       { tree: "artificing", name: "Repair",       info: "Mend your gear.", needs: "WS5" },
   recharge:     { tree: "artificing", name: "Recharge",     info: "Refill cells with glim.", needs: "WS5" },
-  keenFingers:  { tree: "artificing", name: "Keen fingers", info: "+3 to examine artifacts.", bonus: () => ({ examine: 3 }), needs: "WS5 (examining artifacts)" },
+  keenFingers:  { tree: "artificing", name: "Keen fingers", info: "+3 to examine artifacts.", bonus: () => ({ examine: 3 }) },
   mod:          { tree: "artificing", name: "Mod",          info: "Add one property to an item.", needs: "WS5" },
   pathfinder:   { tree: "pathcraft", name: "Pathfinder",    info: "You travel half again as far in an hour.", bonus: () => ({ travel: 0.5 }), needs: "WS1" },
   terrainLore:  { tree: "pathcraft", name: "Terrain lore",  info: "Three quarters less likely to get lost in one terrain (once for each terrain).", needs: "WS1" },

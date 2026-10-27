@@ -222,6 +222,8 @@ export function beginRun(game, choices, { seed } = {}) {
   try { startRun(seed ?? randomSeed()); } finally { nextRunPlayer(null); }
   game.state.mode = choices.mode;   // (WS9's title newGame does the same; docs/ws4.md, integration requests)
   for (const [faction, n] of Object.entries(BACKGROUNDS[choices.background].rep || {})) addRep(game, faction, n, "background");
+  const village = BACKGROUNDS[choices.background].villageRep;   // the Bent villages, one pool until WS7 gives each its faction
+  if (village) addRep(game, "bentVillages", village, "background");
   for (const id of Object.keys(game.player.mutations || {})) mutationRep(game, game.player, id);
   return game.player;
 }
