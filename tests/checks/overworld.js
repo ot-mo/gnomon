@@ -594,6 +594,14 @@ function lost(G, problems) {
   const opt = talker && talkTo(game, talker)?.options?.find((o) => o.label === "Which way am I?");
   if (!opt) problems.push("lost: no \"Which way am I?\" when talking");
   else { opt.go(); if (isLost(game)) problems.push("lost: asking the way didn't help"); }
+  // It runs out.
+  relost(game.zone.key);
+  const day = 24 * 60 * RULES.clock.secondsPerMinute;   // a world day
+  skipTime(game, day - 1, { interruptible: false });
+  if (!isLost(game)) problems.push("lost: over before a world day had passed");
+  skipTime(game, 2, { interruptible: false });
+  if (isLost(game)) problems.push("lost: still lost a world day later");
+  // (After everything that uses this run: fresh() starts a new one on the same game.)
   // Flying when you set out takes 10 points off the step's lost chance, though the flight is over when you arrive.
   {
     const g5 = fresh(G, 66, G.game.world), W5 = g5.run.world;
@@ -607,10 +615,6 @@ function lost(G, problems) {
     out.flying = { chance: r5.chance?.lost, want, stillFlying: hasStatus(g5.player, "flying") };
     if (!near(r5.chance?.lost ?? -1, want)) problems.push(`lost: flying when you set out: chance ${r5.chance?.lost}, want ${want}`);
   }
-  // It runs out.
-  relost(game.zone.key);
-  skipTime(game, OW().lostFor + 1, { interruptible: false });
-  if (isLost(game)) problems.push("lost: still lost a world day later");
   out.ways = ["road", "visited", "roll", "height", "asking", "expiry"];
   return out;
 }
