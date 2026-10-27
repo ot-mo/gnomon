@@ -278,6 +278,15 @@ export function checkItems(m) {
     const ab = m.abilities.abilitiesOf(p).find((a) => a.id === "planeShunt");
     if (ab?.source !== "implant" || ab.item !== shunt) fail(`the plane-shunt's ability: ${JSON.stringify(ab)}`);
     if (!m.abilities.activate(game, p, "planeShunt", null) || !m.status.hasStatus(p, "flat")) fail("the plane-shunt didn't make you Flat");
+    // The dial spine: once a world day (1,440 s of game time) at any WIL.
+    const spineAt = {};
+    for (const wil of [10, 24]) {
+      const q = fresh(); q.license = { grade: 12 }; q.attrs.wil = wil; St.invalidateStats(q);
+      IM.grantImplant(q, "dialSpine");
+      m.abilities.activate(game, q, "dialSpine", null);
+      spineAt[wil] = Math.round(m.abilities.cooldownLeft(q, "dialSpine"));
+    }
+    if (spineAt[10] !== 1440 || spineAt[24] !== 1440) fail(`the dial spine's cooldown: WIL 10 ${spineAt[10]} s, WIL 24 ${spineAt[24]} s (want 1440 at both)`);
     // The Truing Cradle block: walking into it on the map, E in 3D; the screen fits and takes out by keys.
     for (const view of ["map", "3d"]) {
       p = fresh({ view });

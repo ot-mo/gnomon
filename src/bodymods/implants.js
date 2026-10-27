@@ -33,7 +33,7 @@
 import { IMPLANTS, IMPLANT_VALUE } from "../content/items/implants.js";
 import { registerItemKind, takeOne } from "../items.js";
 import { addPart, removePart } from "../body.js";
-import { invalidateStats, clampHp } from "../stats.js";
+import { invalidateStats, clampHp, cooldownMul } from "../stats.js";
 import { registerAbility, registerAbilitySource } from "../abilities.js";
 import { registerStatus, addStatus } from "../status.js";
 import { pay, funds, formatPrice } from "../currency.js";
@@ -224,7 +224,8 @@ registerAbility("jumpBack", {
   },
 });
 registerAbility("dialSpine", {
-  name: "Dial spine", source: "implant", target: "self", cooldown: () => 24 * FITTING_TIME, mapTime: 0.5,
+  // Once a world day whatever your WIL (abilities.js scales every cooldown by cooldownMul: this one divides it out).
+  name: "Dial spine", source: "implant", target: "self", cooldown: (lvl, e) => (24 * FITTING_TIME) / cooldownMul(e), mapTime: 0.5,
   info: () => "Once a world day: everything but you stands still for 5 s.",
   use(game, e) {
     for (const c of game.zone.creatures) if (c !== e) addStatus(game, c, "stilled", { t: 5 });
