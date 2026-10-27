@@ -31,7 +31,7 @@
 // Time is game time in both views: real seconds in 3D, the seconds an action costs on the map. Every
 // effect is a function of elapsed time only, so a bulk catch-up gives what playing the time out gives.
 import { RULES } from "./rules.js";
-import { invalidateStats, setStatusBonus, dv } from "./stats.js";
+import { invalidateStats, setStatusBonus, dv, bonus } from "./stats.js";
 import { B } from "./world.js";
 import { hasKey } from "./keyset.js";
 
@@ -173,7 +173,7 @@ export function statusLine(game, e) {
   const out = [];
   if (e.status) for (const id in STATUS_DEFS) {   // in the order registered, whatever came first
     if (!e.status[id]) continue;
-    const def = STATUS_DEFS[id], text = def.hud?.(e.status[id], game);
+    const def = STATUS_DEFS[id], text = def.hud?.(e.status[id], game, e);
     if (text) out.push({ text, color: def.color });
   }
   return out;
@@ -212,19 +212,21 @@ registerStatus("chilled", { color: [140, 190, 255], t: 3, ends: ["burning"], hud
 registerStatus("blinded", { color: [120, 120, 140], t: 10, hud: (s) => `BLIND ${secs(s)}s`, ended: "You can see again." });
 
 // Drowning (new in 0B): a body that can't swim, floating in surface deep water. RULES.drown.air seconds
-// of breath, then 1 damage a second; you move at RULES.drown.speed. A toggle: it ends when your feet
-// leave deep water (updateDrowning), the same rule in both views.
+// of breath (× 1 + bonus "breath", stats.js: the bellows lung's 1 is twice as long), then 1 damage a second;
+// you move at RULES.drown.speed. A toggle: it ends when your feet leave deep water (updateDrowning), the same
+// rule in both views.
+export const airOf = (e) => RULES.drown.air * Math.max(0.1, 1 + bonus(e, "breath"));
 registerStatus("drowning", { color: [90, 150, 230], t: Infinity, cause: "drowning",
   speed: RULES.drown.speed,
   tick(game, e, s, dt) {
-    const air = RULES.drown.air, per = 1 / RULES.drown.dps, before = s.acc;
+    const air = airOf(e), per = 1 / RULES.drown.dps, before = s.acc;
     s.acc += dt;
     const n = Math.floor(Math.max(0, s.acc - air) / per + 1e-9) - Math.floor(Math.max(0, before - air) / per + 1e-9);
     for (let k = 0; k < n && alive(game, e); k++) harm(game, e, 1, "drowning");
   },
-  hud: (s) => (s.acc < RULES.drown.air ? `AIR ${Math.ceil(RULES.drown.air - s.acc)}s` : "DROWNING"),
+  hud: (s, game, e) => { const air = e ? airOf(e) : RULES.drown.air; return s.acc < air ? `AIR ${Math.ceil(air - s.acc)}s` : "DROWNING"; },
   onStart: (game, e) => log(game, e, "The water closes over your head. You can't swim: get out before your breath runs out!", [110, 170, 240]),
-  onEnd: (game, e, s) => { if (s.acc >= RULES.drown.air) log(game, e, "You drag yourself out of the water, coughing.", [110, 170, 240]); },
+  onEnd: (game, e, s) => { if (s.acc >= airOf(e)) log(game, e, "You drag yourself out of the water, coughing.", [110, 170, 240]); },
   killed: (e) => `The ${e.name} drowns.` });
 
 // Flat (bible §10.2, §15.6; DECISIONS): you exist only in the Plane. Phase 0 makes the status, forces the

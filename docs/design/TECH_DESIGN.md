@@ -2065,7 +2065,7 @@ darkRegen, str, maxHp, armour, speed, torch, sense, darkSight, stealth, firstBlo
 burnBonus, poisonHit, sunder, cutsFlat, foldGuard`. New: the six attributes `str agi tou int wil ego`, `av, dv, ma, pv,
 toHit, examine, navigation, travel, carry, price, cooldown, resistFire, resistFrost, resistShock, resistPoison, swim`; from WS8
 by integration request, `missileAcc` (to hit with a missile weapon); from WS4 by integration request, `torchCost` (the torch's
-glim: −0.5 half, −1 free; `torch.js`).
+glim: −0.5 half, −1 free; `torch.js`); from WS5, `breath` (fraction more breath under water; `status.js`).
 Every key is documented next to the registry in `stats.js`; `check-content` rejects unknown keys.
 
 ## Appendix B. The two-view rule for each new system

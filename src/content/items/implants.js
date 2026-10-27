@@ -31,7 +31,7 @@ export const IMPLANTS = {
     info: "A switch behind the ear that folds you down into the Plane: Flat for 4 s." },
   plateGraft: { name: "plate graft", parts: ["body", "back", "head"], grade: 3, bonus: { armour: 1 },
     info: "A plate of truesteel let into the flesh. +1 armour; up to three, one per part." },
-  bellowsLung: { name: "bellows lung", parts: ["body"], grade: 2, effect: "bellowsLung",
+  bellowsLung: { name: "bellows lung", parts: ["body"], grade: 2, effect: "bellowsLung", bonus: { breath: 1 },   // status.js airOf
     info: "A leather second lung. You hold your breath twice as long in deep water." },
   glimHeart: { name: "glim heart", parts: ["body"], grade: 4, bonus: { maxHp: -5, torchCost: -1 }, effect: "freeTorch", destroyOnRemove: true,   // torch.js torchCost
     info: "A heart that burns glim of its own. Your torch costs nothing; -5 max HP. Destroyed if removed." },

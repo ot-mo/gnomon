@@ -317,6 +317,24 @@ export function checkStatus({ game, startRun, inputHandlers, srcFiles, capture }
   if (onMap.damage !== in3d.damage) fail(`drowning damage in all: map ${onMap.damage}, 3D ${in3d.damage}`);
   stats.drowning = { firstHitWant: firstHit, map: { hits: mapHits, damage: onMap.damage, exitTile: onMap.exitTile },
                      "3d": { hits: hits3d, damage: in3d.damage, exitTile: in3d.exitTile } };
+  // More breath (the bonus "breath", stats.js; the bellows lung gives 1, WS5's request 6): twice as long before the
+  // first harm, and the HUD counts the longer breath down.
+  {
+    freshPlayer();
+    const p = game.player, def = St.STATUS_DEFS.drowning;
+    const firstHarm = (breath) => {
+      p.bonuses = breath ? { breath } : undefined; invalidateStats(p);
+      const s = { acc: 0 }, hp0 = p.hp = 1e6, hud0 = def.hud(s, game, p);
+      let at = null;
+      for (let k = 1; k <= 40 * 20 && at === null; k++) { def.tick(game, p, s, 1 / 20); if (p.hp < hp0) at = +(k / 20).toFixed(2); }
+      return { at, hud0 };
+    };
+    const plain = firstHarm(0), lung = firstHarm(1);
+    delete p.bonuses; invalidateStats(p);
+    if (plain.at !== firstHit || lung.at !== 2 * RULES.drown.air + 1 / RULES.drown.dps || lung.hud0 !== `AIR ${2 * RULES.drown.air}s`)
+      fail(`breath: the first harm at ${plain.at} s plain and ${lung.at} s with breath 1 (want ${firstHit} and ${2 * RULES.drown.air + 1 / RULES.drown.dps}), the HUD "${lung.hud0}"`);
+    stats.breath = { plain: plain.at, lung: lung.at, hud: lung.hud0 };
+  }
   // Inside deep water (drowning) every press on the map swims on: only the first step in asks.
   freshPlayer(); enter();
   Object.assign(game.player, { x: 29.5, y: 24.5, z: FLOOR_Z });
