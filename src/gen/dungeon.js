@@ -592,7 +592,7 @@ GIMMICKS.allDeep = (f, rng, rooms, p, ctx) => {
   f.creatures = f.creatures.filter((c) => !c.vis?.flat || canTalk(c) || c.guardian || c.flags?.legend);
   let made = 0;
   for (const r of rng.shuffle(others(rooms, ctx))) {
-    if (made >= 2 || !plainRoom(f, r) || hasStairs(f, r)) continue;
+    if (made >= 2 || !plainRoom(f, r) || hasStairs(f, r) || interior(r).some(([x, y]) => occupied(f, x, y))) continue;   // (its steps would bury them)
     addClimb(f, rng, r, ctx.nearDoor, ctx.depth);
     if (r.climb) made++;
   }

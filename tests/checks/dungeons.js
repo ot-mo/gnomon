@@ -242,6 +242,8 @@ export function siteLevelProblems(f, p) {
   }
   const flats = f.creatures.filter((c) => c.vis?.flat && !canTalk(c) && !c.guardian && !c.flags?.legend);
   if (g.includes("allDeep") && !(g.includes("flatland") && after("flatland", "allDeep")) && flats.length) out.push(`allDeep: ${flats.length} flat creature(s)`);
+  const buried = f.items.filter((it) => f.get(Math.floor(it.x), Math.floor(it.y), Math.floor(it.z)) !== B.AIR);
+  if (buried.length) out.push(`${buried.length} item(s) inside a block (${buried.map((it) => `${it.kind} at ${Math.floor(it.x)},${Math.floor(it.y)},${it.z}`).join("; ")})`);
   if (p.holesIn && holesOutside(f, p.holesIn)) out.push(`holesIn: ${holesOutside(f, p.holesIn)} hole column(s) outside it`);
   if (p.cradle && !(f.cradle && f.get(f.cradle.x, f.cradle.y, FLOOR_Z) === B.STATION && f.get(f.cradle.x, f.cradle.y, FLOOR_Z + 1) === B.STATION))
     out.push("cradle: no Truing Cradle");
