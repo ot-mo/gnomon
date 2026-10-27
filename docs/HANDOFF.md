@@ -34,6 +34,10 @@ verify sceptically, one commit per finding; tag `p2-<ws>` (annotated), push it, 
 `git merge-base --is-ancestor origin/main p2-<ws>` holds, `git push origin 'p2-<ws>^{commit}:refs/heads/main'` (an
 annotated tag's own name can't be pushed to a branch; `^{commit}` is the commit it tags).
 
+**On `integration`, not yet on `main`:** the root README for GNOMON as it stands at `p2-ws5` (`6645658`, from `wip/readme`;
+the user asked for it; an interim update before Phase 4's rewrite; the secret rooms' rules stay out of it, as
+DECISIONS asks). It reaches `main` with the next `p2-*` tag, not a tag of its own.
+
 **The workstreams** go on as the "Phase 1 plan" below says (the coordinating session starts the next one in the
 queue as a slot frees).
 
