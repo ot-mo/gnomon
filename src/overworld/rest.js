@@ -16,10 +16,9 @@
 import { skipTime } from "../time.js";
 import { secondsUntil } from "../clock.js";
 import { maxHp } from "../stats.js";
-import { zoneKey } from "../zones.js";
 import { OW, hourSeconds } from "./state.js";
 import { rollEncounter, placeEncounter } from "./encounters.js";
-import { leaveWorldMap } from "./travel.js";
+import { dropInto } from "./travel.js";
 
 const NAMED = ["dawn", "noon", "dusk", "midnight"];
 const healed = (game) => game.player.hp >= maxHp(game.player);
@@ -53,10 +52,8 @@ export function rest(game, { until = "healed", keepLit = false } = {}) {
       const enc = rollEncounter(game, where, { rest: true });
       if (!enc) continue;
       out.encounter = enc; out.why = "encounter"; out.interrupted = true;
-      if (trip) {
-        placeEncounter(game, zoneKey(where.wx, where.wy, 0), enc);
-        leaveWorldMap(game, { at: "edge" });
-      } else placeEncounter(game, game.zone.key, enc);
+      if (trip) dropInto(game, enc);
+      else placeEncounter(game, game.zone.key, enc);
       break;
     }
   } finally {

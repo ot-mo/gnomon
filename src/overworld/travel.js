@@ -26,6 +26,7 @@
 //   stepHours(game, from, to, edge) → world hours   the terrain's travelHours (3 along a road edge), +25% at
 //        night off roads, ÷ (1 + bonus(travel)) (Wings, Pathfinder)
 //   travelPath(game, from, to) → [{ wx, wy }] | null   (Dijkstra over hours by day; the path's spans, from excluded)
+//   dropInto(game, encounter)            down at the edge, then a band or legend 8-12 tiles from where you arrive
 //   answer(game, yes)                    the open prompt (a hidden site: "Stop and look?"; a span far above your tier)
 //   toggleTorch(game)                    F on the world map
 //
@@ -128,7 +129,7 @@ export function worldStep(game, dx, dy, { confirm = false, fast = false, drop = 
   } else if (res.encounter?.kind === "travellers") {
     meetTravellers(game, to);
   } else if (res.encounter) {
-    if (drop) { res.dropped = true; placeEncounter(game, zoneKey(to.wx, to.wy, 0), res.encounter); leaveWorldMap(game, { at: "edge" }); }
+    if (drop) { res.dropped = true; dropInto(game, res.encounter); }
   } else if (res.site) {
     trip.prompt = { kind: "site", siteId: res.site.id, line: siteLine(res.site) };
   }
@@ -256,6 +257,15 @@ export function leaveWorldMap(game, { at = "edge", siteId = null } = {}) {
   if (cached) return go(cached);
   if (ZONE_LOADER.has?.(game, key)) { trip.busy = true; return getZone(game, key).then(go); }
   return go(makeZone(game, key));
+}
+
+// Down at the edge, then the encounter: a band or a legend is placed into the zone you are then in, so it waits
+// 8-12 tiles from where you arrive, also when that is the zone you left (a patch for the zone you are in applies
+// at once, from where you stand: placed before going down, it measured from where you had stood).
+export function dropInto(game, enc) {
+  const place = (ok) => { if (ok === true && game.zone) placeEncounter(game, game.zone.key, enc); return ok; };
+  const r = leaveWorldMap(game, { at: "edge" });
+  return r && typeof r.then === "function" ? r.then(place) : place(r);
 }
 
 // --- F on the world map ------------------------------------------------------------------------------------------

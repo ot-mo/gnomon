@@ -303,6 +303,35 @@ function bands(G, name, world, problems) {
     }
   } finally { undo.forEach((u) => u()); }
 
+  // Back into the zone you left (the one you are still in on the map): the band measures from where you arrive,
+  // not from where you stood; a rest on the world map there too.
+  {
+    const g = fresh(G, 23, world), W2 = g.run.world;
+    const a = W2.tiles.find((u) => u.travel === "yes" && !u.landmark && !u.roadWidth && !u.riverWidth && W2.inBounds(u.wx + 1, u.wy)
+      && !canStep(W2, u, 1, 0) && !canStep(W2, { wx: u.wx + 1, wy: u.wy }, -1, 0));
+    goTo(g, a.wx, a.wy);
+    for (const how of ["step", "rest"]) {
+      const p = g.player;
+      p.x = Math.floor(g.zone.w / 2) + 0.5; p.y = Math.floor(g.zone.d / 2) + 0.5;
+      const z0 = g.zone.stand[Math.floor(p.x) + Math.floor(p.y) * g.zone.w];
+      if (z0 >= 0) p.z = z0;
+      const had = new Set(g.zone.creatures);
+      enterWorldMap(g);
+      worldStep(g, 1, 0, { confirm: true, drop: false });
+      if (g.trip.prompt) answer(g, false);
+      const undo = [swap(a, { encounterRate: 1, lostChance: 0 }), swap(ENCOUNTERS.kinds, { travellers: 0, legend: 0 })];
+      try {
+        if (how === "step") worldStep(g, -1, 0, { confirm: true });
+        else { worldStep(g, -1, 0, { confirm: true, drop: false }); if (g.trip?.prompt) answer(g, false); const u = overrideRules("overworld", { restEncounter: 1e9 }); try { g.player.hp = 1; rest(g, { until: "healed" }); } finally { u(); } }
+      } finally { undo.forEach((f) => f()); }
+      const arr = g.arrival, band = g.zone.creatures.filter((c) => !had.has(c));
+      if (g.zone.key !== zoneKey(a.wx, a.wy, 0) || g.trip || !band.length) { problems.push(`${name} bands back home (${how}): not down in ${a.wx},${a.wy} with a band (${g.zone.key}, ${band.length})`); continue; }
+      for (const c of band) {
+        const d = distance(Math.floor(c.x) - Math.floor(arr.x), Math.floor(c.y) - Math.floor(arr.y));
+        if (d < 8 || d > 12) problems.push(`${name} bands back home (${how}): a ${c.type} ${d.toFixed(1)} tiles from where you arrived`);
+      }
+    }
+  }
   // A legend on the road: claimed in that zone, then neither rolled again nor taken by its lair.
   const uid = `legend:test:${name}`, def = { uid, template: "plain", species: "goblin", name: "Ottar", epithet: "the Patient", level: t.level, siteId: null };
   game.run.legends = new Map([[uid, def]]);
