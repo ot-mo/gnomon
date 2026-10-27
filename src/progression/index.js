@@ -6,13 +6,21 @@
 //
 // Registered here: the "origin" bonus source (stats.js): a made character's background bonus (bible §10.9-§10.10:
 // +2 TOU and the like, after the point-buy's cap) and its Level's (Vey +3 examine, Orrum +1 natural armour). A quick
-// game's player has no background, so it adds nothing there.
+// game's player has no background, so it adds nothing there. The "mutations" bonus source: each mutation's bonus at
+// the level you bought (content/mutations.js; nothing for a body without mutations). Loaded with it: mutations.js
+// (its statuses, Cast's watch on the turns of the world) and abilities.js (the mutations' abilities).
 // WS4 also owns abilities.js (§2.8, built in P0 with Fold Step), player.js, leveling.js and the screens create,
 // charsheet, abilities and levelup (screens/index.js imports every screen; each registers its own mode).
 import { registerBonusSource } from "../stats.js";
 import { originBonuses } from "./chargen.js";
+import { MUTATIONS } from "../content/mutations.js";
+import "./abilities.js";
 
 registerBonusSource("origin", originBonuses);
+registerBonusSource("mutations", function* (e) {
+  if (!e.mutations) return;
+  for (const id in e.mutations) { const b = MUTATIONS[id]?.bonus?.(e.mutations[id], e); if (b) yield b; }
+});
 
 export { makeCharacter } from "./chargen.js";
 export { mutationOffers, gainMutation, raiseMutation } from "./mutations.js";

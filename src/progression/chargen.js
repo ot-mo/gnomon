@@ -3,8 +3,9 @@
 //
 //   makeCharacter(choices) → player    choices = { genotype: "bent" | "plumb" (DECISIONS §1), background (a
 //                                      BACKGROUNDS id of that genotype), attrs: { str, agi, tou, int, wil, ego } (the
-//                                      point-buy's scores, before the background's bonus), mutations: [id] (Bent;
-//                                      progression/mutations.js, 4b), implant: id (Plumb; WS5's bodymods), name,
+//                                      point-buy's scores, before the background's bonus), mutations: [id] (Bent:
+//                                      content/mutations.js, defects included; their creases at most the 12),
+//                                      implant: id (Plumb; WS5's bodymods), name,
 //                                      mode: "oneWick" | "commonsLamp" | "pilgrim" }. Throws on choices
 //                                      validateChoices refuses. The player keeps the bought scores as its base
 //                                      attributes and gets the background's bonus through the "origin" bonus source
@@ -22,10 +23,13 @@
 //   originBonuses(e)                   the "origin" bonus source: the background's attribute bonus and its Level's
 //   beginRun(game, choices, { seed })  a new run with the made character: game.js startRun on the seed (its
 //                                      start landmark, the intro), the run's mode in state.mode (as WS9's title
-//                                      newGame does) and the background's reputation changes (factions.js addRep)
+//                                      newGame does), the background's reputation changes (factions.js addRep) and
+//                                      its mutations' (bible §10.4)
 //
 // A made player has, besides makePlayer()'s fields: name, genotype, background, trees (open power trees),
-// attrPoints, origin: { level, implant, fitted }, and creases (Bent) or grade (Plumb).
+// attrPoints, mutations: { id: level }, origin: { level, implant, fitted }, and creases (Bent) or grade (Plumb).
+// It has no innate ability (the quick start's Fold Step is P0's): its hotbar holds its mutations' abilities, in the
+// order taken.
 import { makeAttrs, ATTRS, maxHp } from "../stats.js";
 import { makeBody } from "../body.js";
 import { ITEM_KINDS, addToInventory } from "../items.js";
@@ -38,7 +42,7 @@ import { BACKGROUNDS, LEVELS } from "../content/backgrounds.js";
 import { MUTATIONS } from "../content/mutations.js";
 import { IMPLANTS } from "../content/items/implants.js";
 import { TREES } from "../content/powers.js";
-import { gainMutation } from "./mutations.js";
+import { gainMutation, isDefect, creasesSpent, mutationRep } from "./mutations.js";
 import { canInstall, install } from "../bodymods/implants.js";
 
 export const RUN_MODES = ["oneWick", "commonsLamp", "pilgrim"];
@@ -99,9 +103,18 @@ export function validateChoices(c = {}) {
     const left = pointsLeft(c.genotype, attrs);
     if (left !== 0) out.push(left > 0 ? `${left} point${left > 1 ? "s" : ""} not spent` : `${-left} point${left < -1 ? "s" : ""} overspent`);
   }
-  const muts = c.mutations || [];
-  if (muts.length && G.track !== "mutations") out.push(`${G.plural} take no mutations`);
-  for (const id of muts) if (!MUTATIONS[id]) out.push(`no mutation ${id}`);
+  const muts = Array.isArray(c.mutations) ? c.mutations : c.mutations == null ? [] : null;
+  if (!muts) out.push(`mutations must be a list of ids, not ${JSON.stringify(c.mutations)}`);
+  else if (muts.length && G.track !== "mutations") out.push(`${G.plural} take no mutations`);
+  else {
+    for (const id of muts) if (!MUTATIONS[id]) out.push(`no mutation ${id}`);
+    const known = muts.filter((id) => MUTATIONS[id]);
+    if (new Set(known).size < known.length) out.push("a mutation taken twice");
+    for (const id of known) for (const other of known)
+      if (id < other && (MUTATIONS[id].excludes?.includes(other) || MUTATIONS[other].excludes?.includes(id))) out.push(`${MUTATIONS[id].name} and ${MUTATIONS[other].name} can't share a body`);
+    const spent = creasesSpent(known);
+    if (spent > G.creases) out.push(`the mutations cost ${spent} creases, more than the ${G.creases} you start with`);
+  }
   if (c.implant != null && G.track !== "implants") out.push(`${G.plural} take no implants`);
   else if (c.implant != null && bg && !freeImplants(c.background).includes(c.implant))
     out.push(`${JSON.stringify(c.implant)} isn't a free implant for ${bg.name} (${freeImplants(c.background).join(", ") || "none"})`);
@@ -147,6 +160,7 @@ export function makeCharacter(choices) {
     attrs: Object.fromEntries(ATTRS.map((k) => [k, choices.attrs[k]])),
     trees: [...bg.trees], attrPoints: 0, mutations: {},
     origin: { level: bg.level || null, implant: null, fitted: false },
+    innate: [], hotbar: [],   // abilities come from your mutations (and later implants and powers), none born with
   });
   if (G.track === "mutations") p.creases = G.creases; else p.grade = G.grade;
   // The kit (content/backgrounds.js): a new body, the pack, the purse and the glim.
@@ -157,8 +171,10 @@ export function makeCharacter(choices) {
   for (const it of bg.kit.pack || []) if (known(it)) addToInventory(p, copy(it));
   if (bg.purse) setPurse(p, bg.purse);
   p.funds = Math.min(bg.glim, purseCap(p));
-  // The second track: mutations (4b fills content/mutations.js and gainMutation), or the free implant (WS5).
-  for (const id of choices.mutations || []) gainMutation(null, p, id);
+  // The second track: mutations (the defects' refunds first, so the creases add up in any order), or the free
+  // implant (WS5).
+  const muts = choices.mutations || [];
+  for (const id of [...muts.filter(isDefect), ...muts.filter((id) => !isDefect(id))]) gainMutation(null, p, id);
   if (G.track === "implants") {
     const id = choices.implant ?? bg.implant ?? null;
     p.origin.implant = id;
@@ -206,6 +222,7 @@ export function beginRun(game, choices, { seed } = {}) {
   try { startRun(seed ?? randomSeed()); } finally { nextRunPlayer(null); }
   game.state.mode = choices.mode;   // (WS9's title newGame does the same; docs/ws4.md, integration requests)
   for (const [faction, n] of Object.entries(BACKGROUNDS[choices.background].rep || {})) addRep(game, faction, n, "background");
+  for (const id of Object.keys(game.player.mutations || {})) mutationRep(game, game.player, id);
   return game.player;
 }
 

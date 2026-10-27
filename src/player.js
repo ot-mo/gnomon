@@ -8,6 +8,7 @@ import { CURRENCY } from "./currency.js";
 import { hasStatus, statusFlag, statusSpeed } from "./status.js";
 import { torchGutters } from "./torch.js";
 import { hashFloat } from "./rng.js";
+import { MUTATIONS } from "./content/mutations.js";
 
 export const RADIUS = 0.3, HEIGHT = 1.6, EYE = 1.45;
 export const WALK = 4.2;           // blocks per second; also sets how long a step takes on the map
@@ -16,6 +17,14 @@ export const WADE_SLOWDOWN = 0.55; // speed multiplier in shallow water
 export const HASTE = RULES.haste;  // speed multiplier while hasted (and actions take 1/HASTE as long)
 const GRAVITY = 26, JUMP = 8.85;   // jump height = JUMP² / (2·GRAVITY) ≈ 1.5 blocks
 const JUMP_HIGH = 11.4;            // with the High jumper perk: ≈ 2.5 blocks
+// How fast a jump leaves the ground. The legacy set: the parent's two heights (any jump bonus of 1 or more: High
+// jumper, the climber's ring). The attribute set: 1.5 blocks + the jump bonus in blocks (Stilt Legs' halves count),
+// at most 4 more.
+export function jumpSpeed(p) {
+  const b = jumpBonus(p);
+  if (RULES.stats === "legacy") return b >= 1 ? JUMP_HIGH : JUMP;
+  return Math.sqrt(JUMP * JUMP + 2 * GRAVITY * Math.max(0, Math.min(4, b)));
+}
 const FLY_SPEED = 4;               // blocks per second up (Space) or down (C) while flying
 const EPS = 0.001;
 
@@ -41,8 +50,8 @@ export function quickPlayer() {
     inv: [{ kind: "potion", effect: "healing", count: 1 }, { kind: "knife", count: 4 }, { kind: "bomb", count: 1 }],
     ready: { kind: "knife" },   // what T / right-click throws (see throwing.js)
     status: {}, cooldowns: {},  // timed effects (flying, haste, poison…) and cooldowns: status.js
-    // Abilities (abilities.js): born with Fold Step (the P0 sample; WS4's character creation decides), and
-    // the hotbar, keys 1-9, holding ability ids only.
+    // Abilities (abilities.js): the quick start is born with Fold Step (the P0 sample; a made character has
+    // no innate grant: progression/chargen.js), and the hotbar, keys 1-9, holding ability ids only.
     innate: ["foldStep"], hotbar: ["foldStep"],
     attackCd: 0, throwCd: 0, swing: 0, swingTime: 0.35, hurt: 0, sprinting: false, impact: 0,
   };
@@ -74,11 +83,12 @@ export const weaponReach = (p) => WEAPONS[wielded(p).id].reach + bonus(p, "reach
 export { av as armourValue } from "./stats.js";
 
 // Your torch: how far it lights things up for the auto-map, and how bright it is. With it out
-// you see nothing by it, unless something lets you see in the dark a little (darkSight). With an empty
+// you see nothing by it, unless something lets you see in the dark a little (darkSight), or further with a
+// mutation that sees in the dark (content/mutations.js darkRange: Night Eyes). With an empty
 // purse it gutters (torch.js): a flicker RULES.torch.gutterRange tiles across, its strength jumping
 // about with time t (render3d passes game time).
 export function torchRange(p) {
-  if (!p.torch) return Math.min(4, bonus(p, "darkSight") * 1.5);
+  if (!p.torch) return Math.max(Math.min(4, bonus(p, "darkSight") * 1.5), darkRange(p));
   if (torchGutters(p)) return RULES.torch.gutterRange;
   return 6 * (1 + bonus(p, "torch")) * (hasStatus(p, "darkened") ? 0.4 : 1);
 }
@@ -89,6 +99,11 @@ export function torchPower(p, t = 0) {
 }
 export { speedMul };
 export const jumpBonus = (p) => bonus(p, "jump");
+function darkRange(p) {
+  let r = 0;
+  for (const id in p.mutations || {}) { const f = MUTATIONS[id]?.darkRange; if (f) r = Math.max(r, f(p.mutations[id])); }
+  return r;
+}
 export const hasFeatherFall = (p) => bonus(p, "featherFall") > 0;
 
 // Swimmers (bonus swim: the Swimmer perk) float on deep water instead of sinking: for them it's solid to stand on.
@@ -164,7 +179,7 @@ export function updatePlayer(p, zone, keys, dt) {
   if (flying) {
     // No gravity: hover, rise with Space, sink with C.
     p.vz = (keys.has("Space") ? FLY_SPEED : 0) - (keys.has("KeyC") || keys.has("ControlLeft") ? FLY_SPEED : 0);
-  } else if (keys.has("Space") && p.onGround) p.vz = jumpBonus(p) >= 1 ? JUMP_HIGH : JUMP;
+  } else if (keys.has("Space") && p.onGround) p.vz = jumpSpeed(p);
 
   const steps = Math.ceil(dt / 0.008);
   const h = dt / steps;

@@ -1,6 +1,7 @@
 // Character creation (TECH_DESIGN §4.2 `create`; bible §10.1; owner WS4): the wizard, genotype → background →
-// attributes (point-buy with live HP, DV, AV, MA) → mutations (offers from progression/mutations.js over
-// content/mutations.js) or the free implant (grade; WS5's bodymods) → name (ui.js textInput: "Ö" and "m" type; Tab
+// attributes (point-buy with live HP, DV, AV, MA) → mutations (3 seeded offers from progression/mutations.js over
+// content/mutations.js, one of them planar, drawn again with each one you take; the defects, each giving creases back;
+// a click on one you took gives it back) or the free implant (grade; WS5's bodymods) → name (ui.js textInput: "Ö" and "m" type; Tab
 // suggests one) → run mode (One Wick, Commons Lamp, Pilgrim) → begin. WS9's title pushes it with { seed, mode }
 // (its seed field and mode line); beginning starts the run with the made character (progression/chargen.js beginRun).
 //
@@ -14,6 +15,7 @@
 //   wizard() → the state as it stands: { step, steps, genotype, background, attrs, name, mode, seed, mutations,
 //              implant, msg }   (checks)
 //   wizardChoices() → the choices beginning would pass to beginRun
+//   trackRows(game) → the mutation step's rows (checks)
 import * as S from "../screen.js";
 import { registerScreen, setMode, popMode } from "../screens.js";
 import { UI, list, listKey, listAt, listWheel, keyHelp, wrap, hit, at, textInput, drawTextInput } from "../ui.js";
@@ -30,7 +32,7 @@ import { MUTATIONS } from "../content/mutations.js";
 import { IMPLANTS } from "../content/items/implants.js";
 import { TREES } from "../content/powers.js";
 import { FACTIONS } from "../factions.js";
-import { mutationOffers } from "../progression/mutations.js";
+import { mutationOffers, canGain, isDefect, creasesSpent, offerSeed } from "../progression/mutations.js";
 import { RUN_MODES, NAME_MAX, beginRun, validateChoices, suggestSpread, suggestName, baseAttrs, pointsLeft,
          canRaise, canLower, freeImplants } from "../progression/chargen.js";
 
@@ -82,7 +84,7 @@ export function openCreate(game, data = {}) { setMode(game, MODE, data, { pointe
 const stepId = () => STEPS[wiz.step];
 const bgs = () => backgroundsOf(wiz.genotype);
 const trackName = () => (wiz.genotype === "plumb" ? "Implant" : "Mutations");
-const creasesLeft = () => GENOTYPES.bent.creases - wiz.mutations.reduce((n, id) => n + (MUTATIONS[id]?.cost ?? 4), 0);
+const creasesLeft = () => GENOTYPES.bent.creases - creasesSpent(wiz.mutations);
 
 // A player made from the choices so far, for the live numbers (never the run's: nothing here is kept).
 function preview(game) {
@@ -90,23 +92,31 @@ function preview(game) {
   const p = { attrs: { ...(wiz.attrs || baseAttrs(wiz.genotype)) }, genotype: wiz.genotype, background: wiz.background, level: 1,
               maxHpGain: 0, perks: {}, status: {}, body: makeBody("humanoid"), trees: bg?.trees || [] };
   for (const [part, it] of Object.entries(bg?.kit.equip || {})) p.body.equip[part] = it;
-  if (G.track === "mutations") p.creases = creasesLeft();
+  if (G.track === "mutations") { p.creases = creasesLeft(); p.mutations = Object.fromEntries(wiz.mutations.map((id) => [id, 1])); }
   return p;
 }
 
+// The offers are seeded by the run's seed and how many mutations you've taken (defects don't count), as the sheet's
+// are (progression/mutations.js offerSeed): the same choices, the same offers; taking one draws three more, and
+// creases kept for later find the same three on the sheet.
 function offersFor(game) {
   if (wiz.genotype !== "bent") return [];
-  const rng = makeRng(seedFor(wiz.seed, "creation", "mutations", wiz.mutations.length));
+  const rng = makeRng(offerSeed(wiz.seed, wiz.mutations.filter((id) => !isDefect(id)).length));
   return (mutationOffers(game, preview(game), rng) || []).filter((id) => MUTATIONS[id] && !wiz.mutations.includes(id));
 }
+const defectsFor = () => Object.keys(MUTATIONS).filter((id) => isDefect(id) && !wiz.mutations.includes(id));
 const implantRows = () => freeImplants(wiz.background);   // the one your Level gives first
+
+// The mutation step's rows as they stand (checks): { taken: id }, an offer's id, { defect: id }, { done: true }.
+export const trackRows = (game) => (stepId() === "track" ? rowsOf(game) : []);
 
 function rowsOf(game) {
   switch (stepId()) {
     case "genotype": return Object.keys(GENOTYPES);
     case "background": return bgs();
     case "attributes": return ATTRS;
-    case "track": return wiz.genotype === "plumb" ? implantRows() : [...wiz.mutations.map((id) => ({ taken: id })), ...offersFor(game), { done: true }];
+    case "track": return wiz.genotype === "plumb" ? implantRows()
+      : [...wiz.mutations.map((id) => ({ taken: id })), ...offersFor(game), ...defectsFor().map((id) => ({ defect: id })), { done: true }];
     case "mode": return RUN_MODES;
     default: return [];
   }
@@ -162,18 +172,25 @@ function choose(game, i) {
   st.sel = i;
   if (stepId() === "track" && wiz.genotype === "plumb") wiz.implant = rows[i];
   if (stepId() === "track" && wiz.genotype === "bent" && !rows[i].done) {
-    pickTrack(rows[i]);
+    pickTrack(game, rows[i]);
     st.sel = Math.min(i, rowsOf(game).length - 1);
     return;
   }
   go(game, wiz.step + 1);
 }
 
-function pickTrack(row) {
-  if (row.taken) { wiz.mutations = wiz.mutations.filter((id) => id !== row.taken); return; }   // give it back
-  const cost = MUTATIONS[row]?.cost ?? 4;
-  if (cost > creasesLeft()) { wiz.msg = `That needs ${cost} creases; you have ${creasesLeft()}.`; return; }
-  wiz.mutations.push(row);
+function pickTrack(game, row) {
+  wiz.msg = "";
+  if (row.taken) {   // give it back (a defect only while what you took without it still fits)
+    const after = wiz.mutations.filter((id) => id !== row.taken);
+    const short = creasesSpent(after) - GENOTYPES.bent.creases;
+    if (short > 0) { wiz.msg = `Without ${MUTATIONS[row.taken].name} you'd be ${short} crease${short > 1 ? "s" : ""} short: give a mutation back first.`; return; }
+    wiz.mutations = after;
+    return;
+  }
+  const id = row.defect || row, why = canGain(null, preview(game), id);
+  if (why) { wiz.msg = `${why[0].toUpperCase()}${why.slice(1)}.`; return; }
+  wiz.mutations.push(id);
 }
 
 function begin(game) {
@@ -251,7 +268,7 @@ function drawGenotype(game, L, R) {
   y += say(R.x, y, R.w, G.info) + 1;
   y += say(R.x, y, R.w, `Attributes: ${G.base} each, ${G.points} points to spend (1 per +1 to ${G.steepAt}, then ${G.steepCost}; at most ${G.maxAtCreation} before your background).`, UI.dim);
   y += say(R.x, y, R.w, G.track === "mutations"
-    ? `Mutations: ${G.creases} creases to start, +${G.creasesPerLevel} a level. A new mutation costs 4.`
+    ? `Mutations: ${G.creases} creases to start, +${G.creasesPerLevel} a level. A new mutation costs 4, a level of one 1.`
     : `Implants: grade ${G.grade}, with one free implant costing at most ${G.freeImplantCost}. True-marks raise your grade.`, UI.dim);
 }
 
@@ -320,15 +337,19 @@ function drawTrack(game, L, R) {
   drawList(game, L.x, L.y, L.w, L.h, (row, i, r) => {
     if (r.sel) S.text(r.x, r.y, ">", ...UI.mark);
     if (row.done) { S.text(r.x + 2, r.y, `Go on (keep ${creasesLeft()} creases)`.slice(0, r.w - 2), ...(r.sel ? UI.sel : UI.dim)); return; }
-    const id = row.taken || row, m = MUTATIONS[id];
-    S.text(r.x + 2, r.y, `${row.taken ? "* " : ""}${m?.name || id}`.slice(0, r.w - 2), ...(r.sel ? UI.sel : row.taken ? UI.mark : UI.text));
+    const id = row.taken || row.defect || row, m = MUTATIONS[id];
+    const tag = isDefect(id) ? ` +${-m.cost}` : m?.planar ? " ◆" : "";
+    S.text(r.x + 2, r.y, `${row.taken ? "* " : ""}${m?.name || id}${tag}`.slice(0, r.w - 2), ...(r.sel ? UI.sel : row.taken ? UI.mark : row.defect ? UI.dim : UI.text));
   });
   let y = R.y;
   S.text(R.x, y++, `CREASES: ${creasesLeft()} of ${GENOTYPES.bent.creases}`, ...UI.title);
-  y += say(R.x, y, R.w, "A new mutation costs 4 creases; a defect gives some back. Creases you don't spend now are kept: you gain one a level.", UI.dim) + 1;
-  const row = rows[wiz.lists.track.sel], m = MUTATIONS[row?.taken || row];
-  if (m) say(R.x, y, R.w, typeof m.info === "function" ? m.info(1) : m.info || "", UI.text);
-  else if (rows.length === 1) say(R.x, y, R.w, "No mutations are known yet: your creases are kept for later.", UI.info);
+  y += say(R.x, y, R.w, "A new mutation costs 4 creases (◆: planar, it bends the Plane's rules); a defect (+2, +3) gives some back. Click one you took to give it back. Creases you keep buy mutations and levels later: one comes a level.", UI.dim) + 1;
+  const row = rows[wiz.lists.track.sel], id = row?.taken || row?.defect || row, m = MUTATIONS[id];
+  if (m) {
+    S.text(R.x, y++, `${m.name.toUpperCase()} (${isDefect(id) ? `defect, +${-m.cost} creases` : `${m.kind}, 4 creases`})`, ...UI.title);
+    y += say(R.x, y, R.w, m.info(1), UI.text);
+    if (m.bridge) say(R.x, y, R.w, `Both views: ${m.bridge}.`, UI.info);
+  } else if (rows.length === 1) say(R.x, y, R.w, "No mutations are known yet: your creases are kept for later.", UI.info);
 }
 
 function drawName(game, L, R) {
