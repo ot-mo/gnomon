@@ -204,3 +204,87 @@ offer).
 - **Browser, at the tag's tree:** `tools/browser-ws4.mjs` passes at 1280×720 and 600×330; `tools/browser-0d2.mjs
   --only progression,imports,abilities,shell,hud` passes (both boots, 156 modules in the page, the five checks in
   `test-world.html`). The server on 8644 was stopped and no browser left open.
+
+# Part 4b (in progress: paused before the verification and the tag)
+
+Local session, 2026-10-27, same machine and worktree, from `p1-ws4a` (with `95f8fcc`, the docs-only note on the
+Lamplighter's purse). WS9, WS5 and the integrator (merging `p1-ws4a` meanwhile) ran alongside. One commit per step,
+each pushed:
+
+| Commits | What |
+|---|---|
+| `47d30d8` | `content/mutations.js`, `progression/mutations.js`, `progression/abilities.js`, `progression/index.js`, `abilities.js`, `player.js`, `progression/chargen.js`: the mutations, their economy, Cast, their abilities; Fold Step as the Bent's mutation |
+| `83c4db4` | `screens/abilities.js` (B), `screens/charsheet.js` (K) |
+| `a7db9a5` | `screens/create.js`: the mutation step with real offers and the defects |
+| `beb5f72` | `tests/checks/progression.js` section 7 (4b's acceptance) |
+| `27ec9f1` | a picked tile on the map honoured by every ability that aims; `tools/browser-ws4.mjs` part 4b |
+| `fe46ed3` | `docs/ws4.md`: 4b's table, API, the mutations for the balance pass, integration requests 15-23 |
+| `1b60896` | the level-up card tells the Bent the creases to spend |
+| `a8adecb` | (self-review) Cast's wakes fade after a world hour, 60 s of game time |
+
+## 7. What was built
+
+(see `docs/ws4.md` "4b" for the file-by-file table and the mutations with their numbers)
+
+- **20 mutations** (`content/mutations.js`): 12 physical, 4 mental, 4 defects. 11 are planar (bible §13.5's ◆: every
+  offer of three holds one), 5 of those carry one view into the other (`bridge`): Flatwise (pressed flat from either
+  view: only the map holds you), Echo Throat (a shout in either view puts what's around you on the map), Fold Step (a
+  blink where you aim in 3D or toward what you pick on the map), Overlook (a 9 × 9 seen from above, drawn onto the map),
+  Shadowsense (flat beings and ghosts marked in 3D and on the map).
+- **The crease economy** (`progression/mutations.js`): 12 at creation and one a level (4a), 4 for a new mutation
+  from 3 seeded offers, 1 for a level, the cap floor(level / 2) + 1 and the mutation's own max (at most 10), defects
+  refunding 2-3 at creation only; spent in the wizard and, any time, on the sheet (K); the level-up card says what there
+  is to spend. A mental mutation works at its level + EGO's modifier (at least 1).
+- **Cast** (bible §10.3): the sum of the mental mutations' working levels; each turn of the world rolls a wake at
+  max(0, Cast − 10 − 2 × EGO mod) × 2% (at most 75%), seeded by the run's seed and the turn; wakes count per zone and
+  fade after a world hour; the third calls the pack ("The floor smooths itself out towards you.") and 10 s later emits
+  `"smoothers"` with its size, burnisher and Great Smoother (integration request 17 sends it).
+- **Abilities**: Fold Step (the P0 sample) is the Bent's mental mutation, 4 + level tiles; the quick start keeps P0's
+  innate Fold Step; a made character has no innate ability and its hotbar holds its mutations' abilities in the order
+  taken. Eight more abilities (`progression/abilities.js`), each in both views; the `"mutations"` and `"powers"`
+  ability sources; `abilityRange`.
+- **B and K** (`screens/abilities.js`, `screens/charsheet.js`): the list with cooldowns and hotbar assignment, and the
+  hint that keys 1-9 use the hotbar in both views (the hint `0D2.md` §7 asked for, on WS4's own screen); the sheet's four
+  tabs, with attribute points and creases spent there.
+- **Reputation** (bible §10.4): Wings, Shellback, Lampskin, Flatwise, Gills as the bible's table (Ink Glands, Horns,
+  Silk Glands aren't built); Crooked Manner −50 with every faction.
+
+## 8. Gate results (4b's acceptance)
+
+(Not written yet: 4b paused before the verification. See `docs/ws4.md` "Handoff".)
+
+## 9. Deviations from the design, with reasons
+
+16. **Every mutation costs 4 creases.** Bible §13.5 brackets a cost for each (Night Eyes 1, Fold Step 5…), but §10.3 and
+    §15.6 say "a new mutation costs 4" and DECISIONS puts §15 first (TECH_DESIGN §8.3 agrees). The bracketed figures are
+    left for the balance pass.
+17. **20 of the bible's 40 entries.** The rest wait for hooks other workstreams own or scope forbids (the file's
+    header names each reason): TECH_DESIGN §8.3 asks for at least 16 and 4 defects. Every built one works in both views
+    or is passive.
+18. **Fold Step on the map** keeps P0's targeting (toward the nearest hostile you see, a tile short, or the way you
+    face; a landing only where you could walk, never into a chasm) until WS8's target screen replaces the map's
+    `requestTarget` at the merge (integration request 1): then it steps onto the tile you pick (honoured already). The
+    bible's "if that tile is really a chasm, you fall" waits for that screen too.
+19. **The quick start keeps its innate Fold Step** (4 tiles, key 1): its hotbar and the HUD's cooldown line are in
+    check-abilities (P0) and the recorded frames. A made character has none, and the Bent who take Fold Step have the
+    mutation's 4 + level.
+20. **Wings is a timed flight** (20 + 5 × level s, cooldown 60 s) on the flying status, not a toggle: the status is the
+    potion's, and a toggle would need a way down that WS8's movement owns.
+21. **Mental levels are at least 1** with a low EGO (bible §10.6 says only that EGO adds its modifier).
+22. **Defects that come and go are statuses** (`shaken`, `mobbed`, `sunsick`) renewed each frame while their condition
+    holds (a second each), so they show on the HUD and the stat cache drops at once (a bonus reading the torch
+    directly would go stale until something invalidated it). Lightsick takes no account of a hood or veil (none exist:
+    integration request 19).
+23. **Shellback's armour** counts only with no body armour over it (clothes are none) instead of refusing the armour:
+    equipping is WS5's (integration request 19). **Lampskin** can't hide you by a stealth penalty (−0.25) rather than
+    the AI's light test, and its free light waits for the torch hook (request 20). **Stilt Legs** climbs 2 blocks on
+    the map from level 3 (turns.js's High-jumper threshold), not 5 (request 23); in 3D its jump grows by half a block
+    every 2 levels under the attribute set (player.js: 1.5 + the jump bonus; the legacy set's two heights unchanged).
+24. **Turns of the world** are watched (the view changing in one zone while you aren't flat) rather than announced by
+    `toggleMap` (P0's play.js): integration request 16 asks for a `"view:turn"` event and the Hand's exception.
+25. **Overlook's view stays on the map** (the auto-map keeps what you have seen) rather than lasting 5 s.
+
+## 10. Known issues
+
+- Integration requests 15-23 (`docs/ws4.md`): browser-0d1's tour reports `create`, `abilities` and `char` as never
+  reached until the integrator adds them; the Smoothers never come until creatures listen to `"smoothers"`.

@@ -271,60 +271,75 @@ changes when it lands. 1-3 are WS8's requests 1, 8 and 11 (`git show p1-ws8:docs
 
 ## Handoff
 
-**For the WS4b session** (same worktree `C:\Users\Otto Mörner\Code\gnomon-wt\ws4`, branch `ws/ws4`). State at the
-end of 4a: see the bottom of this section for the tag and the last commit.
+**For the next WS4b session** (same worktree `C:\Users\Otto Mörner\Code\gnomon-wt\ws4`, branch `ws/ws4`). **4b is
+paused at the user's request (usage limit), 2026-10-27: built and committed, not verified, not tagged.** Last tag
+`p1-ws4a`; the last commit is named at the bottom of this section.
 
-**What 4a built** (gate numbers in `docs/sessions/ws4.md` "Part 4a"): the genotypes, the 12 backgrounds and the Levels;
-`POWERS` (the parent's perks in the bible's trees, plus what waits); `makeCharacter`, the point-buy, names and
-`beginRun`; the attribute set's leveling (HP, creases, attribute points, seeded power offers, killXp, Pilgrim); the
-attribute set's level-up card; the creation wizard (keys and mouse, å ä ö); `check-progression` (Node and the
-browser's test page) and `tools/browser-ws4.mjs`.
+**Done (commits `47d30d8` … `420a6f5` after `p1-ws4a`, each pushed):**
+- Everything in "4b" above: `content/mutations.js` (20 mutations), `progression/mutations.js` (offers, the crease
+  economy, Cast and the Smoothers' event, the defects' statuses, reputation), `progression/abilities.js` (8 abilities),
+  `abilities.js` (Fold Step as the Bent's mutation, the `"mutations"` and `"powers"` sources, `abilityRange`, picked
+  tiles on the map), `player.js` (Night Eyes, jump height), `chargen.js` (made characters: `innate: []`, hotbar from
+  mutations, validation, reputation at `beginRun`), the wizard's mutation step, B and K, the level-up card's creases.
+- `check-progression` section 7 (4b's acceptance) passes; so does all of it (`node tools/check-progression.mjs`).
+- `tools/browser-ws4.mjs` part 4b passes at 1280×720 and 600×330 (served with `node tools/serve.mjs 8644`);
+  `tools/browser-0d2.mjs --only progression,imports,abilities,shell,hud,content,stats` passes (both boots, 6 checks in
+  the page, stats Node-only).
+- `run-all` after the main commits: 35 of 37, the two failures timed and generation-only (check-dungeons, check-perf's
+  dungeon generation p95) with three other sessions and the ML job running; check-dungeons alone passed (p95 37.2 ms at
+  68% CPU). Not rerun since `a8adecb` and `420a6f5`.
+- Self-review fix: Cast's wakes fade after a world hour, 60 s of game time (`a8adecb`).
+- The integrator's request of 2026-10-27: the Plumb implants by WS5's ids, `plumbEar` and `knuckles` (`420a6f5`).
+- `browser-0d1.mjs` (the integrator's): its shell tour passes; its mode list lacks `create`, `char` and `abilities`
+  (integration request 15: the tour is the integrator's file; 4a's `create` was already missing at `p1-ws4a`).
 
-**The exact next step for 4b:** fill `content/mutations.js` and `progression/mutations.js` (drop both `STUB`s):
-`mutationOffers(game, p, rng)` (3 seeded offers, one planar), `gainMutation(game, p, id)` (4 creases; `game` may be
-null at creation: `makeCharacter` calls `gainMutation(null, p, id)` for each of `choices.mutations`),
-`raiseMutation(game, p, id)` (1 crease, cap floor(level / 2) + 1, at most 10), defects refunding 2-3 (the wizard
-reads `MUTATIONS[id].cost`, 4 by default, so a defect with `cost: -2` gives two back: `screens/create.js`
-`creasesLeft` and `pickTrack`). Then a mutation bonus source (progression/index.js) and an ability
-source (`registerAbilitySource("mutations", …)` in abilities.js), Fold Step as the Bent's mutation (drop
-`innate: ["foldStep"]` from `player.js quickPlayer` only for made characters, or for all once the integrator
-agrees: the quick start's hotbar is in recorded frames only while it cools down), then B, K and the hotbar hint.
+**Half finished:**
+- **The independent verification**: two verifiers (gate and old game with mutants against `p1-ws4a`; spec and play in
+  Node and Chromium) were started at `27ec9f1` and stopped by the pause before they reported. The gate verifier's
+  partial run-all failed only timed checks under load (check-dungeons, check-perf's surface generation max, check-status'
+  8-hour skip). Their worktrees are removed; nothing of theirs is in this tree.
+- **`docs/sessions/ws4.md` "Part 4b"**: a draft (what was built, deviations 16-25, known issues); §8 (gate numbers),
+  the verification and the recheck are not written.
+- **Timed numbers**: one `check-perf --against p0-done` under 83% CPU failed frame.dungeon (×1.34), passTime (×1.79) and
+  mapStep (×1.25). passTime and the map step run no 4b code (no ability or update hook in `ai.js`, `turns.js` or
+  `time.js`); the frame runs two cheap update hooks (`"mutations:turns"`, `"mutations:defects"`). It must be shown alone,
+  against `p0-done` in alternation (and an A/B of `src/` if it leans).
 
-**Where to look:**
-- The wizard's mutation step already calls `mutationOffers` with a seeded rng (`seedFor(seed, "creation",
-  "mutations", n)`) and lists `taken` rows (a click gives one back) and a last "Go on" row; `check-progression` §4
-  drives it with an empty table. Add a 4b section that takes and gives back mutations through it.
-- `screens/levelup.js` shows "+1 crease" on the card; spending creases at level-up or on the sheet is 4b's (bible:
-  creases buy new mutations or levels at any time).
-- `p.attrPoints` kept "for later" today wait for the next card; K's sheet should spend them too.
-- Cast (bible §10.3) and the mutations' reputation changes (§10.4) are 4b's; `mentalLevel(e)` in `stats.js` is
-  `level + mod(ego)`.
+**The exact next step:** `git -C <worktree> fetch origin --tags`, confirm `ws/ws4` is at the last commit below, run
+`node tools/run-all.mjs` (rerun any timed failure alone). Then the independent, sceptical verification (two agents in
+detached worktrees made with `git worktree add --detach`, removed after; one for the gate and the old game under the
+legacy set byte for byte against `p1-ws4a` plus 20-40 mutants of 4b's code against check-progression, one for the spec
+(bible §10.3, §10.4, §10.6, §13.5, §15.6; TECH_DESIGN §2.8, §4.2-§4.4, §8.3) and play (every ability in both views and
+odd states, save/load with mutations, cooldowns and `game.state.cast`, `STATS_DEBUG.verify`, B and K at 100×30 and
+180×56, the wizard by real input in Chromium)). Fix each finding in its own commit with an assertion that fails without
+it; recheck; take the timed numbers alone; write Part 4b's §8 (the numbers `check-progression` prints are its section 7
+lines), the verification and the recheck; tag `p1-ws4b` and push it; turn this Handoff into the integrator's (the
+draft below).
 
-**Integration requests 1-3** (WS8's): 2 and 3 are the integrator's (settled, see above). 1 (the map's `requestTarget`
-through WS8's `screens/target.js`) touches WS4's `abilities.js` but needs WS8's screen, which this tree doesn't have and
-mustn't merge (`ws/ws8` stays out of `ws/ws4`): 4b keeps `abilities.js`'s seam as it is (`requestTarget(game, ability,
-done)`, callers continuing in `done`) so the integrator can swap the map's body at the WS4 merge; ask the coordinator
-before doing more.
+**From the integrator (2026-10-27), to keep the merge clean:**
+- Leave alone on `ws/ws4`: Steady hand's `needs`/bonus, `LEVELS.cassin.torchCost`, Thrifty wick's and the Haggler's
+  `needs`: the integrator switches them at the WS4 merge (`missileAcc` and `torchCost` exist on `integration`, with #5,
+  #6, #7 and #11 applied there). Lampskin's free light (`torchCost: -1`) likewise at the merge (request 20); don't add
+  the key on `ws/ws4` (check-content would refuse it).
+- `tests/checks/progression.js`'s Plumb-implant block: `integration` has its own version (it reads WS5's table, empty
+  here); take integration's at the merge and don't rewrite those lines further.
+- The map legend's key is the comma (G is WS5's pick-up); B and K are WS4's and free.
+
+**For the integrator (draft, to finish at the tag):** merge `p1-ws4b` (both halves); request 1 (the map's
+`requestTarget` through `screens/target.js`: every aimed ability already honours a picked tile, check-progression §7.4
+drives it), then the flip after the user's call on the tier 5-8 balance (the mutations' numbers are in "the mutations,
+with what they add" above; no WS4 commit changed a combat number), request 15 (browser-0d1's tour), the rest as each
+says. Worth knowing: Cast's turns are watched each frame (a test setting `game.view` by hand counts a turn for a player
+with mental mutations; request 16 would end that); the defects' 1-second statuses show on the HUD; `game.state.cast`,
+`p.mutations`, `p.creases` and the hotbar (nulls for empty keys) are saved; the quick start is unchanged (innate Fold
+Step on key 1, 4 tiles).
 
 **Surprising / worth knowing:**
-- `progression/chargen.js` imports `game.js` (for `startRun`), and `game.js` reaches `screens/create.js`, which imports
-  `chargen.js`: a cycle that is fine as long as `create.js` reads nothing of `chargen.js` while loading (its `wiz` state
-  takes the name's max in `reset()`). check-imports loads every module on its own and catches a slip.
-- Under the legacy set nothing of 4a shows (golden, screen frames and legacy fights hold); tests switch with
-  `overrideRules("stats", "attributes")` and must undo it.
-- This machine runs WS9, WS5, the integrator and an ML job: timed checks read slow under load; take timed numbers
-  alone, against `p0-done` in alternation (`node tools/check-perf.mjs --against p0-done`).
-- Port 8644 is WS4's (`node tools/serve.mjs 8644`); 8645 is WS5's.
-- What the verification changed that 4b builds on: a level's attribute point is credited when its card opens
-  (`screens/levelup.js openCard`), not in `gainXp`; the Plumb's implant goes through `freeImplants(background)` (WS5's
-  table costing ≤ 2, the background's own first) and `validateChoices` refuses anything else; a suggested name that
-  nobody touched is dropped when the genotype or background changes; `chargen.js NAME_PARTS` is what check-progression
-  holds to bible §15.11 (keep any new syllable or family in it).
-- Shell quoting on this machine: a Python heredoc through Git Bash turned `\n` and `\u0000` into raw characters in a
-  test file once; write such edits to a script file in the scratchpad (or use the Edit tool) instead.
-- Settled by the user (2026-10-27): the Lamplighter of Cassin keeps the 500 purse that holds its 250 glim
-  (`docs/sessions/ws4.md` deviation 2). Still the integrator's: the flip before WS9's title can push the wizard
-  (integration request 13).
+- Python heredocs through Git Bash turn `\n` into a real newline (it broke a test file once in 4b): write such edits to a
+  script file in the scratchpad, or use the Edit tool.
+- A wizard row is picked by one click and chosen by a click on the row already picked; after a give-back the row below
+  is the picked one, so one click takes it (check-progression §7.8's `take` helper allows for that).
+- Most of the bible's mutations are planar (11 of 16 here), so offers are often all planar.
 
-**State at the end of 4a:** tag `p1-ws4a` on `ws/ws4` (pushed), every 4a acceptance item with its numbers in
-`docs/sessions/ws4.md` "Part 4a"; nothing half finished; the server on 8644 stopped, no browser open.
+**State at the pause:** nothing running (the server on 8644 stopped, no browser open, both verifiers stopped and their
+worktrees removed); every commit pushed; last commit: see `git log -1 ws/ws4` (the WIP commit that wrote this section).
