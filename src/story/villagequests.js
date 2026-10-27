@@ -13,7 +13,8 @@
 //                        it"), once (zone.flags), never a uid that lives elsewhere or died (zones.js claimUid)
 //
 // Stages (each a bus event; talk options emit their own):
-//   recover, climb   fetch  ─ the thing in your pack ("clock:tick", "pickup") ─→ return ─ "quest:turnIn" ─→ done
+//   recover, climb   fetch  ─ the thing in your pack ("clock:tick", "pickup") ─→ return ─ "quest:turnIn" with it ─→ done
+//                    (return ─ the thing gone from your pack, on "clock:tick" ─→ fetch)
 //   carry            deliver ─ "quest:deliver" (talk to the other village's leader, choose the answer) ─→ return ─→ done
 //   readFloor        read ─ "secret" (the mosaic's Flat Account, read on the map) ─→ return ─→ done
 //   pray             pray ─ "inspect" of the shrine in its view (story/murals.js readable) ─→ return ─→ done
@@ -38,6 +39,7 @@ import { spawnCreature, addCreature, removeCreature, pickCreatureType } from "..
 import { makeItem, addToInventory, randomEquipment, randomJewel, randomPotion, itemName } from "../items.js";
 import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../pathing.js";
 import { standWith } from "../world.js";
+import { KIND } from "../blocks.js";
 import { claimUid, uidWhere, addZonePatch, zoneState } from "../zones.js";
 import { receive } from "../currency.js";
 import * as factions from "../factions.js";
@@ -87,14 +89,19 @@ const zoneKeyOf = (zone) => zone?.key;
 
 // --- The templates --------------------------------------------------------------------------------------------------
 const turnIn = { "quest:turnIn": (game, q, ev) => (ev.q === q ? "done" : null) };
+// A thing to bring back is turned in only in your pack; dropped or lost on the way, the quest goes back to fetching it.
+const bringBack = { on: {
+  "quest:turnIn": (game, q, ev) => (ev.q === q && carrying(game, q.vars.itemUid) ? "done" : null),
+  "clock:tick": (game, q) => (carrying(game, q.vars.itemUid) ? null : "fetch"),
+} };
 const fetch = { on: {
   "clock:tick": (game, q) => (carrying(game, q.vars.itemUid) ? "return" : null),
   pickup: (game, q, ev) => (ev.item?.uid === q.vars.itemUid ? "return" : null),
 } };
 const common = { reward: (game, q) => rewardOf(game, q), onComplete: (game, q) => giveReward(game, q) };
 
-registerQuest("recover", { ...common, start: "fetch", stages: { fetch, return: { on: turnIn } } });
-registerQuest("climb", { ...common, start: "fetch", stages: { fetch, return: { on: turnIn } } });
+registerQuest("recover", { ...common, start: "fetch", stages: { fetch, return: bringBack } });
+registerQuest("climb", { ...common, start: "fetch", stages: { fetch, return: bringBack } });
 registerQuest("carry", { ...common, start: "deliver", stages: {
   deliver: { on: { "quest:deliver": (game, q, ev) => (ev.q === q ? "return" : null) } }, return: { on: turnIn } } });
 registerQuest("readFloor", { ...common, start: "read", stages: {
@@ -112,9 +119,31 @@ registerQuest("rescue", { ...common, start: "find", stages: {
   find: { on: { "quest:found": (game, q, ev) => (ev.q === q ? "return" : null) } }, return: { on: turnIn } } });
 registerQuest("chart", { ...common, start: "chart", stages: {
   chart: { on: {
-    "clock:tick": (game, q) => (zoneKeyOf(game.zone) === q.vars.target.key && mapPercent(game.zone) >= q.vars.percent ? "return" : null),
-    "zone:leave": (game, q, ev) => (zoneKeyOf(ev.zone) === q.vars.target.key && mapPercent(ev.zone) >= q.vars.percent ? "return" : null),
+    "zone:enter": (game, q, ev) => { if (zoneKeyOf(ev.zone) === q.vars.target.key && q.vars.chartable == null) q.vars.chartable = chartable(game, ev.zone); return null; },
+    "clock:tick": (game, q) => (zoneKeyOf(game.zone) === q.vars.target.key && mapPercent(game.zone) >= chartGoal(q) ? "return" : null),
+    "zone:leave": (game, q, ev) => (zoneKeyOf(ev.zone) === q.vars.target.key && mapPercent(ev.zone) >= chartGoal(q) ? "return" : null),
   } }, return: { on: turnIn } } });
+
+// How much of a level can be charted at all: the share of its open tiles you can walk to from where you first came in,
+// or stand beside (some levels are mostly beyond chasms and gates). The quest asks for percent%, or 5 under that share.
+const chartGoal = (q) => Math.max(1, Math.min(q.vars.percent, (q.vars.chartable ?? 100) - 5));
+function chartable(game, zone) {
+  const stand = standWith(zone, "open"), p = game.player;
+  const d = reachable(stand, zone.w, zone.d, Math.floor(p.x), Math.floor(p.y), PLAYER_STEP_UP, PLAYER_DROP);
+  let open = 0, near = 0;
+  for (let i = 0; i < zone.w * zone.d; i++) {
+    if (zone.kind[i] === KIND.WALL) continue;
+    open++;
+    const x = i % zone.w, y = (i - x) / zone.w;
+    let ok = false;
+    for (let dy = -1; dy <= 1 && !ok; dy++) for (let dx = -1; dx <= 1 && !ok; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (nx >= 0 && ny >= 0 && nx < zone.w && ny < zone.d && d[nx + ny * zone.w] >= 0) ok = true;
+    }
+    if (ok) near++;
+  }
+  return Math.round((100 * near) / Math.max(1, open));
+}
 
 // Praying: the shrine looked at (inspect) in its own view, in its village.
 function prayed(game, q, ev) {
@@ -268,7 +297,7 @@ registerTalkOptions("villageQuests", (game, c) => {
         { label: "I'll do it.", go: () => { offerQuest(game, v); return node("Good. Come back when it's done.", [bye()]); } },
         bye("Not now."),
       ]) });
-    } else if (q && !q.done && !q.failed && q.stage === "return") {
+    } else if (q && !q.done && !q.failed && q.stage === "return" && (!q.vars.itemUid || carrying(game, q.vars.itemUid))) {
       out.push({ label: "It's done.", go: () => { emit(game, "quest:turnIn", { q, c }); return rewardNode(game, q, T[q.template].done); } });
     } else if (q?.done && q.vars.offerOpen) {
       out.push({ label: "About my reward...", go: () => rewardNode(game, q, "Take your pick.") });
