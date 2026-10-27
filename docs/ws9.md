@@ -25,7 +25,7 @@ graveyard({ store }) → [{ name, seed, mode, level, cause, where, time, unclean
 migrate(slot, zones, { to, migrations }) → { slot, zones } · MIGRATIONS = { [n]: { slot(rec), zone(rec) } }
 registerWorld(id, def | () => def) · requestSave(game, reason, { delay, checkpoint }) · modeOf(game) → mode
 canSave(game) · whenWritten(game) · saveStatus(game) → { slotId, committed, pending, failed, cp, live, unclean, dead, last }
-SAVE_RULES = { auto, afterChange: 0.5, every: 120, travelEvery: 10, oneWick: { unclean: "warn" | "death" }, graveyard: 50 }
+SAVE_RULES = { auto, afterChange: 0.5, every: 120, travelEvery: 10, oneWick: { unclean: "warn" | "death" }, graveyard: 50, retry: 10 }
 RUN_MODES = { oneWick, commonsLamp, pilgrim: { name, note, death: "end" | "checkpoint" } } · SESSION · SAVE_STATS
 // save/store.js
 STORES = { slots: "id", zones: ["slot","key"], checkpointZones: ["slot","key"], meta: "id" }

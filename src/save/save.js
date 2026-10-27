@@ -100,6 +100,7 @@ export const SAVE_RULES = {
   travelEvery: 10,     // real seconds of world-map travel
   oneWick: { unclean: "warn" },   // "warn" | "death": a One Wick slot loaded after a session that never saved cleanly
   graveyard: 50,       // grave records kept
+  retry: 10,           // real seconds after a failed write before the save is tried again
 };
 export const RUN_MODES = {
   oneWick: { name: "One Wick", note: "one life: death ends the run, and its save", death: "end" },
@@ -233,6 +234,16 @@ function landed(game, sv, job) {
   for (const r of job.rows) if (r.zone) { unpend(sv, r.zone); sv.committed.add(r.zone); SAVE_STATS.zoneWrites++; }
   trim(game, sv);
 }
+// A job that didn't land: its zones count as never written (they may not leave memory, and the next save writes them
+// afresh), its keeps as never made (the next write makes them), and a save is asked for again a little later.
+function unwrite(game, sv, job) {
+  for (const r of job.rows) if (r.zone) {
+    unpend(sv, r.zone);
+    sv.committed.delete(r.zone);
+    if (r.keep || r.copy) sv.kept?.delete(r.zone);
+  }
+  if (!sv.dead && game.saving === sv) requestSave(game, "retry", { delay: SAVE_RULES.retry });
+}
 function submit(game, sv, job) {
   job.absorbed = null;
   sv.jobs.push(job);
@@ -249,7 +260,7 @@ function submit(game, sv, job) {
     await sv.store.writeNow(ops);
   }).finally(() => { const k = sv.jobs.indexOf(job); if (k >= 0) sv.jobs.splice(k, 1); })
     .then(() => { landed(game, sv, job); job.after?.(null); },
-          (e) => { for (const r of job.rows) if (r.zone) unpend(sv, r.zone); job.after?.(e); throw e; });
+          (e) => { unwrite(game, sv, job); job.after?.(e); throw e; });
   sv.queue = done.catch(() => {});
   return done;
 }
@@ -366,7 +377,10 @@ function autoFor(game) {
 const autoOn = (game) => SAVE_RULES.auto && !!(game.run && game.state && game.player) && !game.saving?.dead && !game.saving?.quitting && !!(game.saving || currentStore());
 export function requestSave(game, reason, { delay = 0, checkpoint: cp = false } = {}) {
   const a = autoFor(game), at = (game.uiTime || 0) + delay;
-  a.want = { reason: a.want ? `${a.want.reason}+${reason}` : reason, at: a.want ? Math.max(a.want.at, at) : at, checkpoint: !!(a.want?.checkpoint || cp) };
+  // (Several asked for become one, at the latest of their times: a change's half second holds off a periodic one. A
+  // retry's wait doesn't hold off a new one.)
+  const later = a.want && a.want.reason !== "retry" ? Math.max(a.want.at, at) : at;
+  a.want = { reason: a.want ? `${a.want.reason}+${reason}` : reason, at: later, checkpoint: !!(a.want?.checkpoint || cp) };
 }
 // A settlement: a surface span whose site (a landmark or a village) is a checkpoint (world/sites.js).
 function settlement(game, key) {

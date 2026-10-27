@@ -728,7 +728,7 @@ async function ws9Sections(ctx) {
   const { game, startRun, inputHandlers, runSession, fresh, screen, child, fail, stats, notes, compare, walk, idsAbove, problems } = ctx;
   const save = await import("../../src/save/save.js");
   const { SAVE_RULES: RULES, SAVE_STATS, SESSION, listenPage, unloadSave, pageShown, wakeAtCheckpoint, exportSlot, importSlot, moveSlot,
-          graveyard, migrate } = save;
+          graveyard, migrate, checkpoint } = save;
   const { SCREENS, registerScreen } = await import("../../src/screens.js");
   const { prefetchNeighbours } = await import("../../src/zones.js");
   const { startCooldown, addStatus: addStatusTo } = await import("../../src/status.js");
@@ -1317,5 +1317,64 @@ async function ws9Sections(ctx) {
         stats.debugFlag = `?debug=1 registers the "debug" segment ("${d.text}"); without it none`;
       } catch (e) { fail(`?debug=1's child: ${String(e.message || e).slice(0, 200)}`); }
     }
+  }
+
+  // --- 19. Failed writes -------------------------------------------------------------------------------------
+  // A store whose writes fail while `armed(ops)` says so. A zone whose newest write failed may not leave memory and
+  // is written by the next save; a copy on write that failed is made by the next write.
+  {
+    const failing = (armed) => {
+      const a = memoryAdapter(), real = a.writeNow;
+      a.fails = 0;
+      a.writeNow = (ops) => { if (armed(ops)) { a.fails++; return Promise.reject(new Error("the store refused it (check)")); } return real(ops); };
+      return a;
+    };
+    const quiet = console.error;
+    console.error = () => {};
+    const out = [];
+    try {
+      // A zone's newest write fails (written once before): it stays in memory until a save writes it.
+      RULES.auto = false;
+      let armed = false;
+      const fs1 = failing((ops) => armed && ops.some((o) => o.op === "put" && o.store === "zones" && o.value.key === "0,0,1"));
+      freshRun(1234, { store: null });
+      game.debug.enterZone("0,0,1", "down"); playing(game, "map");
+      await saveGame(game, { store: fs1 });
+      game.debug.enterZone("0,0,2", "down"); playing(game, "map"); await whenWritten(game);   // 0,0,1 written behind
+      game.debug.enterZone("0,0,1", "up"); playing(game, "map");
+      game.zone.items.push({ kind: "bomb", count: 8, x: game.player.x, y: game.player.y, z: game.player.z });
+      armed = true;
+      game.debug.enterZone("0,0,2", "down"); playing(game, "map"); await whenWritten(game);   // its write-behind fails
+      armed = false;
+      const evicted = evictDormant(game, 0).includes("0,0,1"), inMemory = !!cachedZone(game, "0,0,1"), had = bombs(cachedZone(game, "0,0,1")?.items);
+      await saveGame(game, {});
+      const back = bombs((await fs1.get("zones", [game.saving.slotId, "0,0,1"]))?.items);
+      if (fs1.fails !== 1 || evicted || !inMemory || back !== had) fail(`a failed write-behind: ${fs1.fails} failed, evicted ${evicted}, in memory ${inMemory}, the next save stored ${back} bombs (the zone has ${had})`);
+      out.push(`a zone whose newest write failed stayed in memory (evictDormant(0) passed it over) and the next save wrote it (${back} bombs)`);
+      // The copy on write of a zone written before the checkpoint fails; the zone's next write keeps it after all.
+      RULES.auto = true;
+      armed = false;
+      const fs2 = failing((ops) => armed && ops.some((o) => o.op === "keep" && o.key[1] === "0,0,2"));
+      const go = async (key, how) => { game.zone.creatures = game.zone.creatures.filter((c) => c.talk); game.debug.enterZone(key, how); playing(game, "map"); await settle(); };
+      freshRun(1234, { store: fs2, mode: "commonsLamp" });
+      await settle();
+      await go("0,0,1", "down"); await go("0,0,2", "down"); await go("0,0,3", "down");
+      await checkpoint(game); await whenWritten(game);
+      const atCp = await digestGame(game, ["0,0,2"]);
+      armed = true;
+      await go("0,0,2", "up");   // the save that writes 0,0,2 first (its keep) fails
+      armed = false;
+      game.zone.items.push({ kind: "bomb", count: 5, x: game.player.x, y: game.player.y, z: game.player.z });
+      await go("0,0,3", "down");
+      const copies = await rowsOf(fs2, game.saving.slotId, "checkpointZones");
+      game.hurtPlayer(99999, "a test");
+      await game.saving.restoring;
+      await wakeAtCheckpoint(game);
+      const n0 = problems.length;
+      compare("a failed copy on write, made by the next write: woken", { ...atCp, state: "", player: "", run: "", ids: "" }, { ...(await digestGame(game, ["0,0,2"])), state: "", player: "", run: "", ids: "" });
+      if (!fs2.fails || !copies.includes("0,0,2")) fail(`a failed copy on write: ${fs2.fails} failed, copies ${copies.join(" ")}`);
+      out.push(`a failed copy on write (${fs2.fails} failed write) made by 0,0,2's next write: woken with 0,0,2 ${problems.length === n0 ? "as at the checkpoint" : "CHANGED"}`);
+    } finally { console.error = quiet; RULES.auto = false; }
+    stats.failedWrites = out.join("; ");
   }
 }
