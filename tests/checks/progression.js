@@ -1069,6 +1069,18 @@ export async function checkProgression(m) {
       edge("K effects");
       press("Escape");
       if (game.mode !== "map") fail(`K: Esc left ${game.mode}`);
+      // The wake chance shows whole on both tabs at 100 columns (Cast 20: 20%).
+      {
+        const c = bentIn(["foldStep", "overlook", "shadowsense", "kindle"], { view: "map" });
+        c.mutations.kindle = 17; st.invalidateStats(c);
+        const want = `${Math.round(PM.wakeChance(c) * 100)}%`;
+        press("KeyK");
+        const a = text().join("\n");
+        press("Tab");
+        const b = text().join("\n");
+        press("Escape");
+        if (PM.castOf(c) !== 20 || !a.includes(`Cast 20: ${want}`) || !b.includes(want)) fail(`K at Cast ${PM.castOf(c)}: the wake chance ${want} on the attributes tab ${a.includes(want)}, on the mutations tab ${b.includes(want)}`);
+      }
       // The quick start's sheet and list (no genotype) draw too.
       const undo2 = rules.overrideRules("stats", "legacy");
       try {

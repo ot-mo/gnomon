@@ -156,7 +156,7 @@ function drawAttributes(game, p, L, R) {
   ry++;
   if (track(p) === "mutations") {
     line(`Creases ${p.creases || 0}: a new mutation 4, a level 1`, UI.title);
-    line(`Cast ${castOf(p)}: a turn of the world leaves a wake ${Math.round(wakeChance(p) * 100)}% of the time`, UI.dim);
+    line(`Cast ${castOf(p)}: ${Math.round(wakeChance(p) * 100)}% a turn of the world leaves a wake`, UI.dim);
   } else if (track(p) === "implants") line(`Grade ${p.grade ?? 0}: true-marks raise it`, UI.title);
   else line("The quick start: no second track. Make a character for one.", UI.dim);
   if (p.trees?.length) line(`Open trees: ${p.trees.map((t) => TREES[t]?.name || t).join(", ")}`, UI.dim);
@@ -193,7 +193,7 @@ function drawTrack(game, p, L, R) {
   let ry = R.y;
   S.text(R.x, ry++, `CREASES: ${p.creases || 0}`, ...UI.title);
   ry += say(R.x, ry, R.w, "A new mutation costs 4 (the offers stand until you take one; ◆ planar), a level 1. A level can't pass half your own, plus one.", UI.dim);
-  S.text(R.x, ry++, `Cast ${castOf(p)} (mental levels, EGO's included): wakes ${Math.round(wakeChance(p) * 100)}% a turn.`.slice(0, R.w), ...UI.dim);
+  ry += say(R.x, ry, R.w, `Cast ${castOf(p)} (mental levels, EGO's included): a turn of the world leaves a wake ${Math.round(wakeChance(p) * 100)}% of the time.`, UI.dim);
   ry++;
   const r = rows[st.sel], id = r?.had || r?.offer, m = MUTATIONS[id];
   if (!m) return;
