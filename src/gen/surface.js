@@ -404,7 +404,7 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
         const x = rng.int(Math.max(r.ox, R.edgeKeep + 1), Math.min(r.ox + r.w, ZW - R.edgeKeep - 1) - 1);
         const y = rng.int(Math.max(r.oy, R.edgeKeep + 1), Math.min(r.oy + r.d, ZD - R.edgeKeep - 1) - 1);
         const i = x + y * ZW;
-        if (plan[i] || reserved[i] || road[i] || water[i] || scenery[i] || base.cliff[i] || zone.get(x, y, FLOOR_Z - 1 + H[i] + 1)) continue;
+        if (plan[i] || reserved[i] || road[i] || water[i] || scenery[i] || base.cliff[i] || busy[i] || zone.get(x, y, FLOOR_Z - 1 + H[i] + 1)) continue;   // (busy: the dressing's, its props)
         const e = zone.entrance || hub;
         if (distance(x - e.x, y - e.y) < 5 || NEXT4.some(([dx, dy]) => water[x + dx + (y + dy) * ZW])) continue;
         if (below && !below(x - r.ox, y - r.oy)) continue;

@@ -363,7 +363,7 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
 // [seed, wx, wy, what was wrong there] (docs/sessions/ws2.md, Part 2b §4).
 const REGRESSIONS = [
   [42, 20, 9, "a ramp up a cliff a site's skirt had pulled down to 3"],
-  [1, 14, 10, "a shrub buried in a barrow"], [1, 34, 6, "a Stacks floor plan's stone outline on stone, marked local"], [1, 20, 15, "bones inside a crag"], [42, 10, 9, "a cache's scrap by the edge"],
+  [1, 14, 10, "a shrub buried in a barrow"], [42, 31, 6, "a sinkhole under a prop"], [1, 34, 6, "a Stacks floor plan's stone outline on stone, marked local"], [1, 20, 15, "bones inside a crag"], [42, 10, 9, "a cache's scrap by the edge"],
 ];
 
 // --- 10. Dressing, zone by zone ---------------------------------------------------------------------------
