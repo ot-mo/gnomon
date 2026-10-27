@@ -1032,25 +1032,31 @@ export async function run(env) {
     const k = named("mira", "merchant", "drovers", { near: [1, 0], name: "Dov", level: 5 });
     k.teaches = ["swimmer", "tough"];
     ritual.performRite(game, k, "tracing");
-    game.state.journal = { secrets: {
-      "loc:a": { learned: 0, kind: "location", reading: "deep", text: "Where the reeds bend." },
-      "gossip:1": { learned: 0, kind: "gossip", text: "The ford moved." },
-      "loc:b": { learned: 0, kind: "location", reading: "dark", text: "A rune under the mill." } } };
+    // The run's own secrets, learned as a player would (WS7's journal since the WS7a merge: its entries say only when
+    // and how you learned each; kind, reading and text are the run's): deep readings of three events, a dark one of a
+    // fourth (no event triangulated), a rumour.
+    const SEC = await m("story/secrets.js"), defs = [...SEC.secretsOf(game.run).values()], evs = new Set();
+    const pick = (reading) => { const d = defs.find((x) => x.kind === "history" && x.reading === reading && !evs.has(x.ref.eventId)); evs.add(d.ref.eventId); return d; };
+    const A = pick("deep"), Cd = pick("deep"), Dd = pick("deep"), Bd = pick("dark"), G = defs.find((x) => x.kind === "gossip");
+    delete game.state.journal;
+    for (const d of [A, G, Bd]) SEC.learnSecret(game, d.id, "talk", { quiet: true });
     const rows = () => ritual.ritualRows(game, k);
     const ids = rows().map((r) => r.id);
-    for (const w of ["give:loc:a", "give:gossip:1", "power:swimmer", "power:tough", "recruit", "best"]) if (!ids.includes(w)) fail(`the flame-kin menu lacks ${w}: ${ids.join(", ")}`);
-    if (ids.includes("give:loc:b")) fail("the Drovers (deep) want a dark reading");
+    for (const w of [`give:${A.id}`, `give:${G.id}`, "power:swimmer", "power:tough", "recruit", "best"]) if (!ids.includes(w)) fail(`the flame-kin menu lacks ${w}: ${ids.join(", ")}`);
+    if (ids.includes(`give:${Bd.id}`)) fail("the Drovers (deep) want a dark reading");
+    const label = rows().find((r) => r.id === `give:${A.id}`)?.label || "";
+    if (!label.includes(SEC.secretText(game.run, A))) fail(`a reading's row doesn't tell its account: "${label}"`);
     const rep0 = F.repOf(game, "drovers");
     const doRow = (id, c = k) => ritual.ritualRow(game, c, ritual.ritualRows(game, c).find((r) => r.id === id));
-    doRow("give:gossip:1"); doRow("give:loc:a");
+    doRow(`give:${G.id}`); doRow(`give:${A.id}`);
     const kk = ritual.kin(game, k);
     if (F.repOf(game, "drovers") - rep0 !== 95 || kk.net !== 95) fail(`rumour + reading: +${F.repOf(game, "drovers") - rep0}, net ${kk.net}, want 95`);
-    if (!game.state.journal.secrets["gossip:1"].sold || rows().some((r) => r.id === "give:gossip:1")) fail("a sold reading is offered again");
-    game.state.journal.secrets["loc:c"] = { learned: 0, kind: "location", text: "Another." };
-    doRow("give:loc:c");
+    if (!game.state.journal.secrets[G.id].sold || rows().some((r) => r.id === `give:${G.id}`)) fail("a sold reading is offered again");
+    SEC.learnSecret(game, Cd.id, "talk", { quiet: true });
+    doRow(`give:${Cd.id}`);
     if (kk.net !== 120) fail(`the cap: net ${kk.net} after 95 + 35, want 120`);
-    game.state.journal.secrets["loc:d"] = { learned: 0, kind: "location", text: "One more." };
-    if (doRow("give:loc:d").ok) fail("a gain past the +120 cap went through");
+    SEC.learnSecret(game, Dd.id, "talk", { quiet: true });
+    if (doRow(`give:${Dd.id}`).ok) fail("a gain past the +120 cap went through");
     const repB = F.repOf(game, "drovers");
     doRow("power:tough");
     if (F.repOf(game, "drovers") !== repB - 50 || leveling.perkRank(p(), "tough") !== 1) fail(`a rank-1 power: rep ${repB} → ${F.repOf(game, "drovers")}, rank ${leveling.perkRank(p(), "tough")}`);

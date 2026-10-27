@@ -265,11 +265,10 @@ export const recruitCost = (game, c) => -Math.max(KINDLING.menu.recruit.min,
   KINDLING.menu.recruit.base + KINDLING.menu.recruit.perLevel * ((c.level || 1) - (game.player.level || 1)));
 const bestCost = (it) => -Math.max(KINDLING.menu.best.min, Math.round(itemPrice(it) / KINDLING.menu.best.div));
 
-function journalSecrets(game) {
-  const js = game.state?.journal?.secrets || {};
-  return Object.entries(js).map(([id, s]) => ({ id, ...s }));
-}
-const secretText = (s) => (typeof s.text === "string" ? s.text : s.title || s.id);
+// What you know, as WS7's journal tells it (story/secrets.js readings: { id, kind, reading, text, sold }; the journal's
+// own entries hold only when and how you learned each).
+const journalSecrets = (game) => secrets.readings(game);
+const secretText = (s) => s.text || s.id;
 function wants(f, s) {
   const def = FACTIONS[f];
   if (def.buys) return (!def.buys.readings || def.buys.readings.includes(s.reading)) && (!def.buys.topics || def.buys.topics.includes(s.kind));
@@ -286,7 +285,7 @@ export function ritualRows(game, c) {
   for (const s of journalSecrets(game)) if (!s.sold && wants(f, s)) {
     const n = isRumour(s) ? M.rumour : M.reading;
     rows.push({ id: `give:${s.id}`, label: `Give ${isRumour(s) ? "the rumour" : "the reading"}: ${secretText(s)}`, n, run: () => {
-      game.state.journal.secrets[s.id].sold = true;
+      secrets.markSold(game, s.id);
       return `${c.name} takes it in, and turns it over.`;
     } });
   }
