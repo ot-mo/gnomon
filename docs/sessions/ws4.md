@@ -199,8 +199,8 @@ offer).
   | Outdoor frame p50 | 27 (24.2-34.0) | 29 (24.0-34.4) |
   | Refresh p95 | 13.8 | 14.4 |
 
-  No regression; one tree's runs spread about 30% on this machine while the other sessions work. The tag's run-all
-  is the one below.
+  No regression; one tree's runs spread about 30% on this machine while the other sessions work. The tag's run-all is
+  the "run-all" item above.
 - **Browser, at the tag's tree:** `tools/browser-ws4.mjs` passes at 1280×720 and 600×330; `tools/browser-0d2.mjs
   --only progression,imports,abilities,shell,hud` passes (both boots, 156 modules in the page, the five checks in
   `test-world.html`). The server on 8644 was stopped and no browser left open.
