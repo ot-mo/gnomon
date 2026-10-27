@@ -380,7 +380,6 @@ registerItemKind("artifact", {
     return lines;
   },
   price: (it) => (it.broken ? 2 : it.known === true ? ARTIFACTS[it.id]?.value || 0 : Math.round((ARTIFACTS[it.id]?.value || 0) / 2)),
-  aura: (game, it) => (it.known === true ? "good" : null),
   use: (game, e, it) => useArtifact(game, e, it),
   art: { w: 0.34, h: 0.34, art: [" ddd ", "dvVvd", "dVwVd", "dvVvd", " ddd "] },
   palette: (game, it) => (it.broken ? { d: [[70, 66, 76], 0], v: [[90, 86, 100], 0], V: [[110, 104, 120], 0], w: [[130, 124, 140], 0] }

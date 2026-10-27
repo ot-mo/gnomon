@@ -15,6 +15,7 @@ import { UI, wrap, hitLabel } from "../ui.js";
 import { on } from "../events.js";
 import { itemName, itemGlyph, itemDetails, itemBonuses, itemPrice, itemWeight, isGear, ITEM_KINDS, ARMOURS } from "../items.js";
 import { slotsFor, wornOn, defaultPart } from "../body.js";
+import { partLabel } from "../inventory.js";
 import { CREATURE_TYPES, ELITES, canTalk } from "../creatures.js";
 import { attitude } from "../factions.js";
 import { resistText, avOf, dvOf } from "../combat.js";
@@ -108,7 +109,10 @@ export function examineLines(game, subject) {
       else if (mine) {
         const theirs = bonusWords(itemBonuses(mine)), avMine = ITEM_KINDS[mine.kind]?.av?.(mine);
         add(`You wear ${itemName(game, mine)} there${avMine ? ` (armour ${avMine})` : ""}${theirs.length ? `: ${theirs.join(", ")}` : ""}.`, UI.dim);
-      } else if (!parts.some((id) => wornOn(p, id) === it)) add(`Your ${defaultPart(p, it)?.replace("_", " ") || "body"} is free for it.`, UI.dim);
+      } else if (!parts.some((id) => wornOn(p, id) === it)) {
+        const part = p.body.parts.find((q) => q.id === defaultPart(p, it));
+        add(`Your ${part ? partLabel(part).toLowerCase() : "body"} is free for it.`, UI.dim);
+      }
     }
     const price = itemPrice(it), weight = itemWeight(it);
     add(`${price ? `Worth about ${formatPrice(price)}` : "Not for sale"}${weight ? ` · weight ${weight}` : ""}.`, UI.help);
