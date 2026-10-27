@@ -431,6 +431,25 @@ function resting(G, problems) {
   try { r = rest(game, { until: 2 * H }); } finally { undo(); }
   out.r10 = { poisonGone: !hasStatus(q, "poisoned"), hpLost: hp0 - q.hp, cooldown: cooldownLeft(q, "secondWind") };
   if (hasStatus(q, "poisoned") || !(hp0 - q.hp > 0) || !near(cooldownLeft(q, "secondWind"), 300 - 2 * H)) problems.push(`rest: statuses and cooldowns didn't catch up (${JSON.stringify(out.r10)})`);
+  // Dying on the road ends the journey: the next run's Z is an ordinary rest in a zone (a hunter 2 tiles off stops it).
+  game = fresh(G, 57, G.game.world);
+  goTo(game, 3, 3); enterWorldMap(game);
+  addStatus(game, game.player, "poisoned", { t: 1e5 });
+  game.player.hp = 2;
+  for (let k = 0; k < 6 && game.mode !== "dead"; k++) { worldStep(game, k % 2 ? -1 : 1, 0, { confirm: true, drop: false }); if (game.trip?.prompt) answer(game, false); }
+  out.deadOnRoad = { mode: game.mode, trip: !!game.trip };
+  if (game.mode !== "dead" || game.trip) problems.push(`rest: death on the road (${JSON.stringify(out.deadOnRoad)}) left the journey behind`);
+  game = fresh(G, 58, G.game.world);
+  if (game.trip) problems.push("rest: a new run still has the old run's journey");
+  goTo(game, 3, 3);
+  {
+    const me2 = game.player, c2 = spawnCreature("goblin", Math.floor(me2.x) + 2, Math.floor(me2.y), FLOOR_Z, { rng: makeRng(2), state: "chase" });
+    c2.z = me2.z; addCreature(game.zone, c2);
+    game.trip = { wx: 9, wy: 9, came: null, moved: true, viewOnly: false };   // as the old run's would have been left
+    const t1 = game.time, rr = rest(game, { until: 2 * H });
+    if (rr.why !== "hostile" || game.time !== t1 || game.zone.key !== "3,3,0") problems.push(`rest: a journey left over made Z a world-map rest (${rr.why}, in ${game.zone.key})`);
+    game.trip = null;
+  }
   // A hostile awake near you: no rest at all.
   game = fresh(G, 55, G.game.world);
   goTo(game, 3, 3);

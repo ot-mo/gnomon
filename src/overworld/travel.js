@@ -34,7 +34,7 @@
 // creatures' statuses), and no zone is made until you go down into one (R10: every hour is skipTime's).
 import { skipTime } from "../time.js";
 import { isNight } from "../clock.js";
-import { emit } from "../events.js";
+import { emit, on } from "../events.js";
 import { pushMode, popMode, setMode } from "../screens.js";
 import { changeZone, cachedZone, makeZone, getZone, arrivalPoint, zoneKey, ZONE_LOADER } from "../zones.js";
 import { hostilesTo } from "../creatures.js";
@@ -69,6 +69,10 @@ export function enterWorldMap(game, { viewOnly = false, center = null } = {}) {
   pushMode(game, "world");
   return { ok: true };
 }
+
+// A journey ends when you go down (leaveWorldMap clears it first), so any other zone entry finds a stale one: a new
+// run or a load (both enter a zone) after you died on the road. Clear it, so nothing reads the old run's span.
+on("zone:enter", (game) => { game.trip = null; game.bearingsLook = null; }, { priority: 50 });
 
 // --- One step ------------------------------------------------------------------------------------------------------
 export function stepHours(game, from, to, edge = edgeBetween(game.run.world, from, to)) {
@@ -106,6 +110,7 @@ export function worldStep(game, dx, dy, { confirm = false, fast = false, drop = 
   trip.wx = to.wx; trip.wy = to.wy; trip.came = { dx, dy }; trip.moved = true; trip.cursor = null;
   if (game.mode === "dead") {
     res.dead = true;
+    game.trip = null;
     emit(game, "world:step", { from, to, seconds: res.seconds, lost: false, encounter: null });
     return res;
   }

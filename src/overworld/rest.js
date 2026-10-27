@@ -15,6 +15,7 @@
 //   waitChoices(game) → [{ id, label, until }]   what the Z menu offers
 import { skipTime } from "../time.js";
 import { secondsUntil } from "../clock.js";
+import { inStack } from "../screens.js";
 import { maxHp } from "../stats.js";
 import { OW, hourSeconds } from "./state.js";
 import { rollEncounter, placeEncounter } from "./encounters.js";
@@ -32,7 +33,8 @@ export function waitChoices(game) {
 }
 
 export function rest(game, { until = "healed", keepLit = false } = {}) {
-  const p = game.player, trip = game.trip && !game.trip.viewOnly ? game.trip : null, H = hourSeconds();
+  const p = game.player, H = hourSeconds();
+  const trip = game.trip && !game.trip.viewOnly && inStack(game, "world") ? game.trip : null;   // on the world map
   let total, stop = null;
   if (until === "healed") { total = OW().restMax * H; stop = healed; }
   else if (NAMED.includes(until)) total = secondsUntil(game, until);
@@ -47,7 +49,7 @@ export function rest(game, { until = "healed", keepLit = false } = {}) {
     while (out.elapsed < total - 1e-9) {
       const sk = skipTime(game, Math.min(H, total - out.elapsed), { interruptible: !trip, reason: "rest", until: stop || undefined });
       out.elapsed += sk.elapsed;
-      if (sk.why) { out.why = sk.why; out.interrupted = sk.interrupted; break; }
+      if (sk.why) { out.why = sk.why; out.interrupted = sk.interrupted; if (sk.why === "dead") game.trip = null; break; }
       if (sk.elapsed < H - 1e-9) break;   // the last, partial hour
       const enc = rollEncounter(game, where, { rest: true });
       if (!enc) continue;
