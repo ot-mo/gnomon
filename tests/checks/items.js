@@ -502,6 +502,27 @@ export function checkItems(m) {
       m.talk.serviceDef("removeImplant").run(game, surgeon, out.target);
       if (p.body.implants.feet || !p.inv.includes(leg)) fail("the surgeon didn't take the tendons out");
     }
+    // The same surgeon as a talker who trades (WS6b's trade screen, merged at p2-ws6b; the dependency table's "WS5
+    // implant surgery"): the services tab lists the fitting, Enter on it pays the fee and fits it, an hour passes.
+    {
+      p = fresh();
+      const doc = m.creatures.addCreature(game.zone, m.creatures.spawnCreature("mira", Math.floor(p.x) + 1, Math.floor(p.y), p.z, { talk: { dialogue: "merchant", state: {} } }));
+      Object.assign(doc, { name: "Detail C", merchant: { services: m.stations.SERVICES } });
+      const tendons = { kind: "implant", id: "springTendons" };
+      p.inv.push(tendons);
+      const f0 = p.funds, t0 = game.time;
+      m.merchants.openTrade(game, doc, "services");
+      const list = m.merchants.tradeRows(game, doc, "services"), k = list.findIndex((r) => r.service === m.talk.serviceDef("fitImplant") && r.target.item === tendons);
+      if (game.mode !== "trade" || k < 0) fail(`the trade screen's services: mode ${game.mode}, rows ${list.map((r) => r.label).join("; ") || "none"} (want the tendons' fitting)`);
+      else {
+        game.trade.sel = k;
+        m.keys.dispatchKey(game, "Enter", false, "Enter");
+        const got = { fitted: p.body.implants.feet === tendons, paid: f0 - p.funds, hour: +(game.time - t0).toFixed(1), mode: game.mode, label: list[k].label };
+        stats.surgeryByTrade = JSON.stringify(got);
+        if (!got.fitted || got.paid !== list[k].price || got.paid !== 50 || got.hour < 59) fail(`the surgeon's fitting through the trade screen: ${stats.surgeryByTrade} (want fitted, 50 glim, an hour)`);
+        m.keys.dispatchKey(game, "Escape");
+      }
+    }
     // A save round trip.
     p = fresh(); p.license = { grade: 8 }; p.credits = 3;
     const r1 = { kind: "implant", id: "foldingRack" }, r2 = { kind: "implant", id: "levelEye" };
@@ -1022,7 +1043,7 @@ export async function run(env) {
     load("events", "events.js"), load("renderMap", "renderMap.js"), load("interact", "interact.js"), load("talk", "talk.js"),
     load("currency", "currency.js"), load("creatures", "creatures.js"), load("world", "world.js"), load("rules", "rules.js"),
     load("status", "status.js"), load("abilities", "abilities.js"), load("codec", "save/codec.js"), load("rng", "rng.js"),
-    load("time", "time.js"), load("effects", "effects.js"), load("player", "player.js"), load("throwing", "throwing.js"), load("ui", "ui.js"), load("combat", "combat.js"), load("torch", "torch.js"),
+    load("time", "time.js"), load("effects", "effects.js"), load("player", "player.js"), load("merchants", "social/merchants.js"), load("throwing", "throwing.js"), load("ui", "ui.js"), load("combat", "combat.js"), load("torch", "torch.js"),
   ]);
   m.implantTable = (await env.src("content/items/implants.js")).IMPLANTS;
   m.artifactTable = (await env.src("content/items/artifacts.js")).ARTIFACTS;
