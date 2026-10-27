@@ -34,16 +34,21 @@ followsPlayer(c), bandToward(game, c)
 attitude(game, a, b) → "hostile" | "wary" | "neutral" | "friendly" | "unaware"
 ```
 
-`attitude`, in order: a === b friendly · you: friendly to your followers, hostile to whatever is hostile to you,
-else neutral · a follower: friendly to its leader and its leader's other followers, hostile on its own grudge, else
-its leader's attitude (yours: hostile to what is hostile to you) · **house rule** (neither is you): flat against deep
-→ unaware; a ghost against a non-ghost → unaware unless both see in the dark (`darkSight` on the creature or its
-type; ghosts do) · grudge (`brain.grudges[id]`, yours is `"player"`) → hostile · **WS8 #2**: hostile to you →
+`attitude`, in order: a === b friendly · (more than 6 leaders deep, a cycle only a bug makes: neutral) · you:
+friendly to your followers, hostile to whatever is hostile to you, else neutral · a follower: friendly to its leader
+and its leader's other followers · **house rule** (neither is you; followers too): flat against deep → unaware; a
+ghost against a non-ghost → unaware unless both see in the dark (`darkSight` on the creature or its type; ghosts do)
+· a follower: hostile on its own grudge, else its leader's attitude (yours: hostile to what is hostile to you) ·
+grudge (`brain.grudges[id]`, yours is `"player"`) → hostile · **WS8 #2**: hostile to you →
 hostile to your followers · toward you: no membership → the parent's rule (people neutral, monsters hostile); else
 §2.11's table on the band (a hated membership of weight ≥ 0.25 wins, else the weighted mean) × temperament
 (`brain.temperament`, else the type's, else the first faction's) · creature against creature: a shared faction →
 friendly; any −1 → hostile; any +1 → friendly; else neutral. A talker that can't be struck (no `hp`) is **wary**
-where a fighter would be hostile, and nothing is hostile to such a talker (creatures can't touch it either).
+where a fighter would be hostile, and a creature's faction hatred of such a talker reads neutral (creatures can't
+touch it either; a grudge or WS8 #2 can still make it hostile). Legacy creatures have no membership, so the parent's
+attitudes hold everywhere but one place: a ghost and a dark-sighted creature (the Gloom Warden, the Lich King,
+Brann) were "unaware" of each other in P0 and are "neutral" now; only `witnessesOf` tells the two apart.
+Grudges don't expire (a villager you struck stays out for you); `addRep` rounds halves away from zero.
 
 ### `social/reputation.js` (subscribed on load)
 
@@ -75,8 +80,9 @@ standingOf(game, c) → { faction, def, band, name, attitude }      // its heavi
 checkNode(node, path) → [problem]   walkDialogue(game, c, { depth = 4, max = 60 }) → { nodes, problems }
 ```
 
-What a role says follows its attitude and its main faction's band: refused (only "Leave.") at Dark or when it is out
-for you or wary; curt at Cold (a merchant won't open the pack); plain at Grey; glad at Warm; kin at Bright. Options:
+What a role says follows its attitude and its main faction's band: refused (only "Leave.") at Dark or when it is a
+fighter out for you; curt at Cold or when wary of you (a talker who can't fight, at Cold, or one bearing a grudge;
+a merchant won't open the pack); plain at Grey; glad at Warm; kin at Bright. Options:
 "Who are you?", a role question (rumours for a wanderer, the road for a guard, …), "Tell me about <faction>." (the
 bible's lore with its likes and hates and their reasons), "How do your people see me?" (the band's light word), and
 for a merchant "Show me what you have." → `{ shop: "buy" }` while `talk.state.stock` has anything (WS6b replaces it
@@ -104,15 +110,24 @@ their reasons.
    by creatures) when it has `hp > 0`; legacy people (no `hp`) stay untouchable. `factions.js` already treats a
    talker with `hp > 0` as one that can fight (hostile, not wary). The map's bump on such a talker should talk while
    it isn't hostile and strike with Shift (WS8's "attack anyway").
-2. **`monsters.js` (the integrator): kills without a source.** `setStatusHarm`'s kill (`monsters.js:36`) defaults to
-   `byPlayer = true`, `src = game.player`, so a faction member dying of poison, burning or bleeding counts as your
-   kill whoever caused it (§2.11: `byPlayer` defaulting to true "becomes an explicit source"). Pass the status's
-   source (`status.src`, set where the status is given) and `byPlayer = src === game.player`. Also the "kill"
+2. **Harm without a source counts as yours (WS8 `combat.js`, WS10 `traps.js`, the integrator's `monsters.js`),
+   major for the rep system.** §2.11: `byPlayer` defaulting to true "becomes an explicit source". Today it doesn't:
+   - `combat.js applyDamage` defaults `src = game.player`, and `traps.js:69` calls `damageMonster` (spikes) with no
+     source, so spikes hurting a faction member emit "hurt" with you as `src`: the victim and its watching fellows
+     get a grudge against you and the faction pays `attackPenalty` (the review's probe: a Clatter member on spikes
+     turned hostile with `grudges {"player": 1}`). `applyDamage`'s default should be `src = null` (every caller of
+     yours passes `game.player`: bombs, scrolls, thrown things), and spikes pass nothing.
+   - `setStatusHarm`'s kill (`monsters.js:36`) defaults to `byPlayer = true`, `src = game.player`, so a faction
+     member dying of poison, burning or bleeding counts as your kill (the probe: Clatter 50 → 45, Saltbeasts −400 →
+     −398). Pass the status's source (`status.src`, set where the status is given) and `byPlayer = src ===
+     game.player`.
+   `reputation.js` can't tell these from your own blows: the payload says `src` is you. Also the "kill"
    payload's `factions: m.factions || []` is always `[]` (creatures carry `faction`, a weight table, or the type's
    `factions`): `membershipsOf(m).map(([id]) => id)` from `factions.js`.
 3. **The dependency table "WS6a witnesses" (the integrator, at the merge):** `reputation.js` switches to WS8's
    `creatures.witnessesOf` by itself once both are in; rerun `node tools/check-social.mjs` (its bot places the
-   witnesses in line of sight 2-6 tiles off, so WS8's sight rules should agree).
+   witnesses in line of sight 2-6 tiles off, a fellow behind a wall, and on the span 1,0,0 fellows in sight 11 and 13
+   tiles off; WS8's sight rules should agree).
 4. **`progression/chargen.js` (WS4):** `beginRun` should also apply `villageRep`:
    `if (bg.villageRep) addRep(game, "bentVillages", bg.villageRep, "background")` (the Aspirant's −50). The start by
    genotype and Pilgrim's floor need nothing from `beginRun`: `repOf` reads them from `game.player.genotype` and
