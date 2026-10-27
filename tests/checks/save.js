@@ -778,6 +778,11 @@ async function checkSections({ game, startRun, inputHandlers, runSession, fresh,
 //      a failed checkpoint is given up; the player is told once.
 //  20. The pause card in screen-frames.js's four "3d pause card" states at 180×56 (not compared there any more): outside
 //      it the view as without it; inside, its lines centred in their colours; at 100×30 every key named.
+//  21. What Phase 1 added, through a save and a load (at the WS9 merge): a made Plumb (its attributes, its Level's
+//      free implant fitted) and a made Bent (two mutations), each in Pilgrim, with reputation changed, three secrets
+//      learned, XP gained, a village's quest under way, a mortal villager struck and a goblin following: saved,
+//      loaded into another run, and the state, player, run, ids and every visited zone the same, and each of those
+//      named things the same.
 async function ws9Sections(ctx) {
   const { game, startRun, inputHandlers, runSession, fresh, screen, child, seedRandom, fail, stats, notes, compare, walk, idsAbove, problems } = ctx;
   const save = await import("../../src/save/save.js");
@@ -1703,5 +1708,66 @@ async function ws9Sections(ctx) {
     const unbound = named.filter(([m, c]) => !bound(m, c));
     if (unbound.length) fail(`the pause card names keys nothing binds: ${unbound.map(([m, c]) => `${c} in ${m}`).join(", ")}`);
     stats.pauseCard = `${out.join("; ")}; at 100×30 every key named; ${named.length - unbound.length} of ${named.length} named keys bound`;
+  }
+
+  // --- 21. What Phase 1 added, through a save and a load -------------------------------------------------------------
+  {
+    const CG = await import("../../src/progression/chargen.js"), { BACKGROUNDS } = await import("../../src/content/backgrounds.js");
+    const { MUTATIONS } = await import("../../src/content/mutations.js"), F = await import("../../src/factions.js");
+    const SEC = await import("../../src/story/secrets.js"), talk = await import("../../src/talk.js"), C = await import("../../src/creatures.js");
+    const leveling = await import("../../src/leveling.js"), ai = await import("../../src/ai.js");
+    const named = (g) => ({
+      mode: g.state.mode, genotype: g.player.genotype, attrs: canonicalJson(g.player.attrs), implants: canonicalJson(g.player.body?.implants || {}),
+      mutations: canonicalJson(g.player.mutations || {}), level: g.player.level, xp: g.player.xp, rep: canonicalJson(g.state.rep || {}),
+      quests: canonicalJson(g.quests.map((q) => [q.id, q.stage, q.done])), secrets: Object.keys(g.state.journal?.secrets || {}).length,
+      followers: g.zone.creatures.filter((c) => ai.leaderOf ? ai.leaderOf(g, c) === g.player : c.brain?.leader).length,
+      struck: g.zone.creatures.filter((c) => c.talk && c.maxHp > 0 && c.hp < c.maxHp).map((c) => `${c.uid} ${c.hp}/${c.maxHp}`).join(", "),
+    });
+    const out = [];
+    for (const genotype of ["plumb", "bent"]) {
+      const bg = Object.keys(BACKGROUNDS).find((id) => BACKGROUNDS[id].genotype === genotype);
+      const choices = { genotype, background: bg, attrs: CG.suggestSpread(genotype, bg), mutations: [], implant: BACKGROUNDS[bg].implant ?? null,
+                        name: genotype === "plumb" ? "Tess Lintel-Vey" : "Marro Reed", mode: "pilgrim" };
+      if (genotype === "bent") {   // the first two mutations creation takes together
+        const ids = Object.keys(MUTATIONS).filter((id) => MUTATIONS[id].kind !== "defect");
+        pairs: for (const x of ids) for (const y of ids) if (x < y && !CG.validateChoices({ ...choices, mutations: [x, y] })?.length) { choices.mutations = [x, y]; break pairs; }
+      }
+      useStore(memoryAdapter());
+      CG.beginRun(game, choices, { seed: 3 });   // (seed 3: the test world has village quests; check-story)
+      game.pages = null; game.pendingPages = null; game.story.cube = true;
+      playing(game, "map");
+      F.addRep(game, "hollowmere", -40, "check"); F.addRep(game, "clatter", 60, "check");
+      for (const d of [...SEC.secretsOf(game.run).values()].slice(0, 3)) SEC.learnSecret(game, d.id, "talk", { quiet: true });
+      leveling.gainXp(game, 50, { source: "check" });
+      const v = [...game.run.villages.values()].find((x) => x.quest && !x.abandoned);
+      if (!v) { fail(`${genotype}: no village with a quest on seed 3`); continue; }
+      const site = game.run.sites.get(v.siteId);
+      game.debug.enterZone(`${site.at.wx},${site.at.wy},0`, "edge");
+      playing(game, "map");
+      const giver = game.zone.creatures.find((c) => c.uid === v.quest.params.giver);
+      const ask = giver && talk.talkTo(game, giver).options.find((o) => /anything I can do/.test(o.label));
+      ask?.go().options.find((o) => /do it/.test(o.label))?.go();
+      playing(game, "map");
+      const struck = game.zone.creatures.find((c) => c.talk && c.maxHp > 0 && c.uid !== v.quest.params.giver);
+      if (struck) struck.hp = Math.max(1, struck.hp - 5);
+      const p = game.player;
+      ai.recruit(game, C.addCreature(game.zone, C.spawnCreature("goblin", Math.floor(p.x) + 1, Math.floor(p.y), p.z, { rng: () => 0.5, level: 2 })));
+      const n0 = named(game);
+      if (n0.mode !== "pilgrim" || (genotype === "plumb" ? !n0.implants.includes(choices.implant) : n0.mutations === "{}") || !n0.quests.includes(":quest") || !n0.struck || !n0.followers)
+        fail(`${genotype}: the state to save isn't what it should be: ${JSON.stringify(n0).slice(0, 300)}`);
+      const keys = [...game.zones.keys()].filter((k) => k === game.zone.key || game.state.zoneLeft[k] !== undefined).sort();
+      const before = await digestGame(game, keys), slot = await saveGame(game, {});
+      await whenWritten(game);
+      const st = currentStore();
+      startRun(99); game.pages = null;
+      await loadGame(slot.id, { store: st });
+      const after = await digestGame(game, keys), n1 = named(game);
+      for (const k of ["state", "player", "run", "ids"]) if (before[k] !== after[k]) fail(`${genotype}: ${k} differs after the load`);
+      for (const k of keys) if (before.zones[k] !== after.zones[k]) fail(`${genotype}: zone ${k} differs after the load`);
+      for (const k of Object.keys(n0)) if (n0[k] !== n1[k]) fail(`${genotype}: ${k} ${n0[k]} → ${n1[k]} after the load`);
+      out.push(`${genotype} (${genotype === "plumb" ? choices.implant : choices.mutations.join(" + ")}; ${keys.length} zones): the same`);
+    }
+    useStore(null);
+    stats.phase1RoundTrip = out.join("; ");
   }
 }
