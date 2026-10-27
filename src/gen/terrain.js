@@ -25,7 +25,9 @@
 //   cliffs  a separate mask raises small areas by 5 (≥ 4, so even across the relief the step at a cliff's
 //           foot is 4 or more and the map draws it as a wall). No cliff within 10 tiles of a port or a
 //           landmark's flattened ground. Where the biome stacks them (content/biomes.js cliffTiers 2: the Rust
-//           Steps' mesas) the mask's cores rise 5 more, a mesa on a mesa (`tier` 2). The map draws all ground
+//           Steps' mesas) the mask's cores rise 5 more, a mesa on a mesa (`tier` 2): only inside such a span
+//           (not blended into its neighbours) and only where all four neighbours are cliff too, so a stacked
+//           mesa always stands on a ledge, never straight out of the plain. The map draws all ground
 //           4 or more blocks up as wall (world.js computeKinds), so a cliff top is ground only in 3D, and only
 //           once a builder makes a way up (a ramp, a climb); the map's navigability leaves it out
 //           (gen/surface.js validateSurface).
@@ -139,6 +141,15 @@ function makeWorldFns(world, seed) {
     return out;
   }
 
+  // Whether the cliff mask raises (gx, gy) at all (columnAt's first tier, alone).
+  function cliffAt(gx, gy) {
+    const wx = floorDiv(gx, ZW), wy = floorDiv(gy, ZD);
+    for (const p of portsOf(wx, wy)) if (rectDist(channel(wx, wy, p), gx, gy) < R.cliffClear) return false;
+    for (const f of flattenNear(wx, wy)) if (rectDist(f, gx, gy) < R.cliffClear) return false;
+    const c = blend(cliffs, gx, gy);
+    return c > 0 && seededNoise(sCliff, gx / R.cliffWave, gy / R.cliffWave) > 1 - R.cliffArea * c;
+  }
+
   function columnAt(gx, gy) {
     const wx = floorDiv(gx, ZW), wy = floorDiv(gy, ZD);
     let raw = R.maxRelief * blend(relief, gx, gy) * fbm(sRelief, gx / R.reliefWave, gy / R.reliefWave, 2);
@@ -159,8 +170,8 @@ function makeWorldFns(world, seed) {
         const m = seededNoise(sCliff, gx / R.cliffWave, gy / R.cliffWave);
         if (m > 1 - R.cliffArea * c) {
           tier = 1;
-          const c2 = blend(stacked, gx, gy);
-          if (c2 > 0 && m > 1 - R.cliffArea2 * c2) tier = 2;
+          const c2 = stacked[spanIndex(wx, wy)];   // the span's own: mesas stack only on the Steps
+          if (c2 > 0 && m > 1 - R.cliffArea2 * c2 && cliffAt(gx + 1, gy) && cliffAt(gx - 1, gy) && cliffAt(gx, gy + 1) && cliffAt(gx, gy - 1)) tier = 2;
           cliff = tier * R.cliffRise;
         }
       }

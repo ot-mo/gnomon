@@ -7,7 +7,8 @@
 //    run it alone for that, as check-perf holds gen.surface in run-all.
 // 2. The world function itself: 10⁵ random columns a seed, no 4-neighbour step over 1 without a cliff or water
 //    (the slope rule), no ground over 12 blocks up (DECISIONS), a cliff's foot 4 or more below it (a map wall), and
-//    the Rust Steps' mesas stacked (tier 2 somewhere); no tree's top leaf above the zone's 16 blocks.
+//    the Rust Steps' mesas stacked (tier 2 somewhere, only in their spans, never beside unraised ground); no tree's
+//    top leaf above the zone's 16 blocks.
 // 3. The apron: on `pairs` random neighbour pairs a seed (50; straight sides and corners), the band of span A
 //    toward B built from the world functions equals a copy of B's generated blocks in every voxel of every column
 //    B's own features left alone (zone.gen.local: its roads, river bends, banks, footprint, plan, sinkholes and
@@ -47,7 +48,7 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
   const t0 = performance.now();
   const times = [], navs = [];
   let zones = 0, retried = 0, ground3d = 0, twice = 0;
-  const slope = { columns: 0, steps: 0, over: 0, high: 0, feet: 0, tier2: 0, maxH: 0, trees: 0, tallTrees: 0 };
+  const slope = { columns: 0, steps: 0, over: 0, high: 0, feet: 0, tier2: 0, strayTier2: 0, sheer: 0, maxH: 0, trees: 0, tallTrees: 0 };
   const apron = { pairs: 0, columns: 0, left: 0, leftDiffer: 0, voxels: 0, corners: 0, decoys: 0, told: 0 };
   const liquids = { zones: 0, rivers: 0, byLiquid: {} };
   const swap = { cold: [], warm: [], same: 0 };
@@ -99,7 +100,11 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
       const a = W.columnAt(gx, gy);
       slope.columns++;
       if (a.height > SURFACE_RULES.maxStand) slope.high++;
-      if (a.tier === 2) slope.tier2++;
+      if (a.tier === 2) {
+        slope.tier2++;
+        const span = world.tileAt(Math.floor(gx / ZW), Math.floor(gy / ZD));
+        if (biomeFor(world, span).cliffTiers < 2) { slope.strayTier2++; fail(`seed ${seed} world (${gx}, ${gy}): a stacked mesa in ${span.terrain}`); }
+      }
       if (a.height > slope.maxH) slope.maxH = a.height;
       for (const b of [W.columnAt(gx + 1, gy), W.columnAt(gx, gy + 1)]) {
         slope.steps++;
@@ -110,6 +115,8 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
         }
         // A cliff's foot: from ground that isn't a cliff to a cliff, the rise is a map wall's (4 or more).
         if (a.cliff !== b.cliff && !a.water && !b.water && step < 4) { slope.feet++; fail(`seed ${seed} world (${gx}, ${gy}): a cliff's foot only ${step} high`); }
+        // A stacked mesa stands on a ledge: never next to ground no cliff raises.
+        if ((a.tier === 2 && !b.cliff && !b.water) || (b.tier === 2 && !a.cliff && !a.water)) { slope.sheer++; fail(`seed ${seed} world (${gx}, ${gy}): a stacked mesa straight out of the plain`); }
       }
       if (k % 10 === 0) {
         const t = W.treeAt(Math.floor(gx / SURFACE_RULES.treeCell), Math.floor(gy / SURFACE_RULES.treeCell));
@@ -278,7 +285,7 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
   stats.spans = `${zones} zones (${spans} a seed × ${seeds.length} seeds, the real world), ${retried} needed a retry, ${twice} made twice the same`;
   stats.navigability = `map: min ${(100 * navs[0]).toFixed(1)}%, p5 ${(100 * q(navs, 0.05)).toFixed(1)}%, mean ${(100 * navs.reduce((a, b) => a + b, 0) / navs.length).toFixed(1)}%; ground the map draws as wall (cliff tops, no way up yet) ${(ground3d / zones).toFixed(0)} columns a zone`;
   stats.ms = `generateSurface p50 ${ms(q(times, 0.5))}, p95 ${ms(p95)}, max ${ms(max)}${budget ? " (budget held)" : " (budget: --budget, alone)"}`;
-  stats.slope = `${slope.columns} columns, ${slope.steps} steps: ${slope.over} over 1 without a cliff, ${slope.feet} cliff feet under 4, ${slope.high} over 12; highest ${slope.maxH}; ${slope.tier2} on stacked mesas; ${slope.trees} trees, ${slope.tallTrees} too tall`;
+  stats.slope = `${slope.columns} columns, ${slope.steps} steps: ${slope.over} over 1 without a cliff, ${slope.feet} cliff feet under 4, ${slope.high} over 12; highest ${slope.maxH}; ${slope.tier2} on stacked mesas (${slope.strayTier2} outside a stacking biome, ${slope.sheer} beside the plain); ${slope.trees} trees, ${slope.tallTrees} too tall`;
   stats.apron = `${apron.pairs} pairs (${apron.corners} corners): ${apron.columns} band columns, ${apron.voxels} voxels equal; ${apron.left} (${(100 * apron.left / Math.max(1, apron.columns)).toFixed(2)}%) the neighbour's own features left out, ${apron.leftDiffer} of them different; ${apron.told} of ${apron.decoys} decoys (another seed's neighbour) told apart`;
   stats.liquids = `${liquids.zones} zones (${liquids.rivers} with a river): ${Object.entries(liquids.byLiquid).map(([k, v]) => `${k} ${v}`).join(", ")}; ${liquids.mixedEdges} river edges agree with liquids on some spans only`;
   swap.cold.sort((a, b) => a - b); swap.warm.sort((a, b) => a - b);
