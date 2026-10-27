@@ -15,7 +15,7 @@
 //    the trees that gave way to them); the share of columns left out is reported.
 // 4. Liquids: every zone's liquid is its span's (its river's where one runs, else its biome's, content/biomes.js),
 //    the same on both sides of every river edge sampled; the ports agree on a river's liquid from both sides, also
-//    with a liquid set on one span only.
+//    with a liquid set on one span only; and no span of the real world is where rivers of two liquids meet.
 // 5. The edge-swap frame (WS3 #6): after a zone's staged make (surfaceSteps) its world-function bands are kept,
 //    so building them again takes no time and gives the same band; cold and warm times reported.
 // 6. Ports: edgePorts is portsOf in §1.4's shape. forgetWorld drops what is kept (world functions, ports, bands).
@@ -223,6 +223,19 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
         if (!other || other.liquid !== p.liquid || other.along !== p.along) fail(`river edge ${p.edgeId}: ${p.liquid} from one side, ${other?.liquid} from the other`);
       }
     liquids.mixedEdges = edges;
+  }
+  // 4c. One liquid per span holds only if rivers of two liquids never meet in a span: the span would hold one of
+  // them (liquidOf), and the other river would change liquid at that span's edge. The world's data must keep them
+  // apart (today every river is plain water; integration request 2 gives the Inkrun its ink). A span with two river
+  // ports of different liquids fails here, on every seed's ports.
+  {
+    const run = buildRun(1, REAL_WORLD), world = run.world;
+    let meet = 0;
+    for (const t of world.tiles) {
+      const kinds = new Set(portsOf(world, run.seed, t.wx, t.wy).filter((p) => p.kind === "river").map((p) => p.liquid));
+      if (kinds.size > 1) { meet++; fail(`real world (${t.wx}, ${t.wy}): rivers of ${[...kinds].join(" and ")} meet in one span`); }
+    }
+    liquids.meetings = meet;
   }
 
   // 7. Mutants of a valid zone: validateSurface must catch each.

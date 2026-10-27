@@ -126,6 +126,8 @@ screenshots of three biomes in the browser (`?silent=1`, port 8652).
    `tile.riverLiquid`** (`link(W.rivers, …)`: `t.riverLiquid = p.liquid ?? null` for every span of the path). The ports
    read it already (`gen/ports.js riverLiquid`, both sides agreeing). Then C1 gives the Inkrun `liquid: "ink"` in
    `content/world/worldmap.js` (bible §15.2: "Slake …; Inkrun [22,22,32]"); until both, every river is plain water.
+   One rule for that data: rivers of two liquids must never meet in a span (one liquid per span: the span would hold
+   one and the other river would change liquid at its edge); `check-surface` fails such a span.
 3. **`zones.js` (the integrator, WS3 #6 with WS9's "prefetch through the loader")**: 3D prefetch through
    `surfaceSteps` now builds a zone's far bands ahead (nothing to change for that). Two paths still build them in the
    swap: a neighbour **read from the save** (`readAhead`: no `surfaceSteps` runs) and one **made on the map**
