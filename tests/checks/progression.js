@@ -437,13 +437,30 @@ export async function checkProgression(m) {
       click("[ Suggest ]");
       const suggested = W.wizard().name;
       if (!/-Orrum$/.test(suggested)) fail(`wizard: a Forgehand of Orrum's name is "${suggested}"`);
+      // Back to the backgrounds for a Lamplighter of Cassin: the untouched suggestion goes with the old background, and the
+      // name step suggests a Cassin name; a typed name would stay (below).
+      for (let k = 0; k < 3; k++) click("[ Back ]");
+      expect("background", "[ Back ] three times");
+      click("Lamplighter of Cassin"); click("Lamplighter of Cassin");
+      for (let k = 0; k < 2; k++) click("[ Next ]");
+      expect("name", "on to the name again (attributes, implant)");
+      if (!/-Cassin$/.test(W.wizard().name)) fail(`wizard: after a new background the name is "${W.wizard().name}", want a Cassin name`);
+      typeText("Ylva");
+      for (let k = 0; k < 3; k++) click("[ Back ]");
+      click("Forgehand of Orrum"); click("Forgehand of Orrum");
+      for (let k = 0; k < 2; k++) click("[ Next ]");
+      if (W.wizard().name !== "Ylva") fail(`wizard: a typed name became "${W.wizard().name}" after a new background`);
+      click("[ Suggest ]");
+      const again = W.wizard().name;
+      if (!/-Orrum$/.test(again)) fail(`wizard: [ Suggest ] for a Forgehand gave "${again}"`);
+      const suggested2 = again;
       click("[ Next ]"); expect("mode", "[ Next ] on the name");
       click("Commons Lamp"); click("Commons Lamp"); expect("begin", "two clicks on Commons Lamp");
       click("Attributes", { row: "Genotype" }); expect("attributes", "a click on the step at the top");
       click("[ Next ]"); click("[ Next ]"); click("[ Next ]"); click("[ Next ]"); expect("begin", "four clicks on [ Next ]");
       click("[ Begin ]");
       const p = game.player;
-      if (p.background !== "forgehandOfOrrum" || p.name !== suggested || game.state.mode !== "commonsLamp" || p.attrs.tou !== after.tou)
+      if (p.background !== "forgehandOfOrrum" || p.name !== suggested2 || game.state.mode !== "commonsLamp" || p.attrs.tou !== C.suggestSpread("plumb", "forgehandOfOrrum").tou)   // (a new background resets the spread)
         fail(`wizard: the mouse began ${p.background}, "${p.name}", ${game.state.mode}, TOU ${p.attrs.tou}`);
       steps.push("plumb by mouse");
     }

@@ -130,12 +130,12 @@ function leave(game) {
   switch (stepId()) {
     case "genotype": {
       const g = rows[sel];
-      if (g !== wiz.genotype || !wiz.background) { wiz.genotype = g; wiz.background = null; wiz.attrs = null; wiz.mutations = []; wiz.implant = null; wiz.reached = 0; }
+      if (g !== wiz.genotype || !wiz.background) { wiz.genotype = g; wiz.background = null; wiz.attrs = null; wiz.mutations = []; wiz.implant = null; wiz.reached = 0; forgetSuggestion(); }
       return true;
     }
     case "background": {
       const b = rows[sel];
-      if (b !== wiz.background) { wiz.background = b; wiz.attrs = suggestSpread(wiz.genotype, b); wiz.implant = null; wiz.lists.track.sel = 0; wiz.reached = 1; }
+      if (b !== wiz.background) { wiz.background = b; wiz.attrs = suggestSpread(wiz.genotype, b); wiz.implant = null; wiz.lists.track.sel = 0; wiz.reached = 1; forgetSuggestion(); }
       return true;
     }
     case "attributes": {
@@ -189,6 +189,9 @@ function suggest() {
   wiz.name.cursor = [...wiz.name.text].length;
   wiz.name.fresh = true;
 }
+// A new genotype or background: a suggestion nobody touched belongs to the old one (its culture, its Level), so the name
+// step suggests again; a name you typed stays.
+function forgetSuggestion() { if (wiz.name.fresh) Object.assign(wiz.name, { text: "", cursor: 0, fresh: false }); }
 const printable = (k) => typeof k === "string" && [...k].length === 1 && !/[\p{Cc}\p{Cf}]/u.test(k);
 // A browser sends its own keydown for Shift (and AltGr, a dead key's first press…) before the letter: those leave a
 // suggested name standing, so "Anna" typed with Shift replaces it like "anna" does.
