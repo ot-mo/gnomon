@@ -123,8 +123,8 @@ examineLines(game, subject) · examineSubjects(data) · bonusWords(bonuses)
    branch**, one line each marked `// WS5`, with samples of the four new kinds (`implant`, `credit`, `artifact`,
    `cell`); both checks fail on a registered kind without one (0D2.md §6). The same as WS8's request 6: keep both
    lines at the merge (they sit next to WS8's).
-2. **`tests/checks/screen-frames.js` (P0's): applied on this branch, with the coordinator's leave** (2026-10-27,
-   the third exception in its queue notes; TECH_DESIGN §2 has WS5 rewrite `inventory.js`). The rebuilt inventory
+2. **`tests/checks/screen-frames.js` (P0's): applied on this branch with the coordinator's approval** (2026-10-27,
+   option A with conditions; TECH_DESIGN §2 has WS5 rewrite `inventory.js`; commits `4ab2702`, `e2aea20`). The rebuilt inventory
    changes the 8 recorded "… inventory" frames (seeds 99 and 31, depths 3 and 11, map and 3D): they are listed by
    exact name in a `NOT_COMPARED` map in WS3's shape (`p1-ws3` has the same map with its "victory card"), still
    drawn, lines marked `// WS5`; the fixture is untouched and the other 39 frames still match p0-0c (39 compared, 0
@@ -175,6 +175,52 @@ examineLines(game, subject) · examineSubjects(data) · bonusWords(bonuses)
     (`screens/play.js`: `bind("map", "KeyG", toggleMapLegend)`); "map" bindings run before "play" ones, so on the map G
     would show the legend and in 3D pick up. Either give the legend another key (§4.3 keeps `/` and `,` for
     integration) or move pick-up; picking up also happens by walking over things, so nothing is lost meanwhile.
+18. **`tools/browser-0d1.mjs` (P0's, the integrator): two new modes to reach.** Its mode tour fails on this branch
+    with "modes never reached: truing, examine" (the same as WS8's target screen at its merge). The block below goes
+    right after the target block that `integration` added (before `const all = await page.evaluate(…SCREENS…)`), and
+    one more sentence in the header ("and since WS5's merge examine (I, L; Esc, a right click) and the Truing Cradle
+    (a Cradle block walked into; Esc, a right click)"). Tested on a copy of this branch with `--skip frametime`:
+    "PASS modes: 16 of 16 registered reached by keys and clicks" (without it: "modes never reached: truing, examine").
+    ```js
+    // Examine and the Truing Cradle (WS5's, merged at p2-ws5): on the map, I then L opens examine on the pack's first
+    // thing (Esc, or a right click, back to the pack); a Cradle block put beside you (as a Plumb) and walked into opens
+    // the Cradle (Esc, or a right click, back to the map).
+    for (let k = 0; k < 12 && (await mode()) === "story"; k++) { await page.keyboard.press("Space"); await frames(page, 2); }
+    if ((await mode()) === "explore") await page.keyboard.press("Tab");
+    await page.waitForFunction(() => window.game.mode === "map", null, { timeout: 10000 }).catch(() => {});
+    const rightClick = async () => { const c = await page.evaluate(() => { const r = document.getElementById("screen").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await page.mouse.click(c.x, c.y, { button: "right" }); };
+    if ((await mode()) !== "map") problems.push(`examine: the new run never reached the map (in ${await mode()})`);
+    else for (const how of ["keys", "mouse"]) {
+      await page.keyboard.press("KeyI"); await frames(page, 2);
+      await page.keyboard.press("KeyL"); await frames(page, 2);
+      const opened = await mode();
+      if (opened !== "examine") { problems.push(`examine by ${how}: I, L led to ${opened}, not examine`); break; }
+      reached.add("examine");
+      if (how === "keys") await page.keyboard.press("Escape"); else await rightClick();
+      await frames(page, 2);
+      if ((await mode()) !== "inventory") problems.push(`examine by ${how}: ${how === "keys" ? "Esc" : "a right click"} led to ${await mode()}, not back to the inventory`);
+      await page.keyboard.press("Escape"); await frames(page, 2);
+      const dir = await page.evaluate(async () => {
+        const W = await import("/src/world.js"), g = window.game, p = g.player, z = g.zone, tx = Math.floor(p.x), ty = Math.floor(p.y);
+        for (const [dx, dy, key] of [[1, 0, "ArrowRight"], [-1, 0, "ArrowLeft"], [0, 1, "ArrowDown"], [0, -1, "ArrowUp"]]) {
+          const x = tx + dx, y = ty + dy;
+          if (z.solid(x, y, p.z) || z.stand[x + y * z.w] !== p.z || z.creatures.some((c) => c.tx === x && c.ty === y)) continue;
+          z.set(x, y, p.z, W.B.STATION); z.set(x, y, p.z + 1, W.B.STATION); z.refresh();
+          p.genotype = "plumb";
+          return key;
+        }
+        return null;
+      });
+      if (!dir) { problems.push("truing: no floor beside you for a Cradle"); break; }
+      await page.keyboard.press(dir); await frames(page, 2);
+      const cradle = await mode();
+      if (cradle !== "truing") { problems.push(`truing by ${how}: walking into the Cradle led to ${cradle}, not truing`); break; }
+      reached.add("truing");
+      if (how === "keys") await page.keyboard.press("Escape"); else await rightClick();
+      await frames(page, 2);
+      if ((await mode()) !== "map") problems.push(`truing by ${how}: ${how === "keys" ? "Esc" : "a right click"} led to ${await mode()}, not back to the map`);
+    }
+    ```
 
 ## Handoff
 
