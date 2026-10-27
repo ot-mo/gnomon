@@ -7,8 +7,8 @@
 //
 //   recapOf(game) → { cause, messages, hurt: [[source, damage]], mode, ending: "gone" | "checkpoint" | "unsaved" }
 //   RECAP_AFTER = 1 (real seconds)
-// The damage is counted in game.state.recap.hurt (saved with the run) by a wrapper around game.hurtPlayer, put on
-// at the first zone:enter: game.js's hurtPlayer has no event of its own yet (docs/ws9.md, integration requests).
+// The damage is counted in game.state.recap.hurt (saved with the run) from game.js's "player:hurt" { dmg, source }
+// (what each blow took, before death; WS9 #3, at the WS9 merge: until then a wrapper around game.hurtPlayer).
 import * as S from "../screen.js";
 import { registerScreen, setMode } from "../screens.js";
 import { at, hitLabel, modal, box, UI, wrap } from "../ui.js";
@@ -27,16 +27,7 @@ function tally(game, source, dmg) {
   const k = String(source || "something");
   hurt[k] = (hurt[k] || 0) + dmg;
 }
-on("zone:enter", (game) => {
-  if (typeof game.hurtPlayer !== "function" || game.hurtPlayer.tallied) return;
-  const base = game.hurtPlayer;
-  const wrapped = function (dmg, source, quiet) {
-    if (this.mode !== "dead") tally(this, source, Math.min(dmg, Math.max(0, this.player?.hp ?? dmg)));
-    return base.call(this, dmg, source, quiet);
-  };
-  wrapped.tallied = true;
-  game.hurtPlayer = wrapped;
-}, { priority: 100 });
+on("player:hurt", (game, { dmg, source }) => tally(game, source, dmg));
 
 export function recapOf(game) {
   const hurt = Object.entries(game.state?.recap?.hurt || {}).sort((a, b) => b[1] - a[1]);

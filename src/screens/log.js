@@ -1,9 +1,9 @@
 // The message log (TECH_DESIGN §4.2 `log`, §4.3 H): this run's message history, the last LOG_LINES of it, newest at
 // the bottom, with the time of day each was said. H opens it in both views and closes it (so does Esc); ↑ ↓,
 // PgUp PgDn, Home End and the wheel scroll. The game is paused under it.
-// game.js keeps only the last 40 messages (game.messages: the HUD shows 5), so the history is collected from them
-// every frame (a registered update in every mode): a message pushed and shifted out within one frame, more than 40
-// at once, would be missed. It is runtime only, like game.messages (a load starts it afresh).
+// game.js keeps only the last 40 messages (game.messages: the HUD shows 5), so the history is kept from game.log's
+// "log" { msg } event (WS9 #4, at the WS9 merge: until then collected from game.messages every frame, which missed
+// more than 40 in one frame). It is runtime only, like game.messages (a new run or a load starts it afresh).
 //
 //   openLog(game) · MODE = "log" · LOG_LINES = 500
 //   logHistory(game) → [{ text, color, time }]   (oldest first)
@@ -11,22 +11,20 @@ import * as S from "../screen.js";
 import { registerScreen, pushMode, popMode } from "../screens.js";
 import { UI, modal, box, keyHelp, wrap } from "../ui.js";
 import { bind } from "../keys.js";
-import { registerUpdate } from "../events.js";
+import { on } from "../events.js";
 import { minutesAt } from "../clock.js";
 
 export const MODE = "log";
 export const LOG_LINES = 500;
-const hist = { run: null, lines: [], last: null, scroll: 0 };
+const hist = { run: null, lines: [], scroll: 0 };
 
-function collect(game) {
-  if (hist.run !== game.run) { hist.run = game.run; hist.lines = []; hist.last = null; }
-  const msgs = game.messages || [];
-  let k = hist.last ? msgs.lastIndexOf(hist.last) + 1 : 0;   // (not there any more: all 40 are new)
-  for (; k < msgs.length; k++) hist.lines.push(msgs[k]);
-  if (msgs.length) hist.last = msgs[msgs.length - 1];
+// (A new run, or a load: the history starts afresh.)
+function collect(game) { if (hist.run !== game.run) { hist.run = game.run; hist.lines = []; } }
+on("log", (game, { msg }) => {
+  collect(game);
+  hist.lines.push(msg);
   if (hist.lines.length > LOG_LINES) hist.lines.splice(0, hist.lines.length - LOG_LINES);
-}
-registerUpdate("log:history", (game) => collect(game), { modes: ["*"] });
+});
 
 export function logHistory(game) { collect(game); return hist.lines; }
 

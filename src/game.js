@@ -27,7 +27,7 @@
 // game.view says which picture is showing ("3d" or "map"); it survives descending and dying.
 import * as S from "./screen.js";
 import { changeZone, cachedZone, makeZone, zoneKey } from "./zones.js";
-import { runUpdates } from "./events.js";
+import { runUpdates, emit } from "./events.js";
 import "./clock.js";   // the clock's events, every frame (time of day from state.time)
 import "./world/zonegen.js";   // the zone generators: surfaces, site dungeons, the legacy stack
 import { buildRun } from "./world/run.js";
@@ -96,8 +96,10 @@ export const game = {
   },
 
   log(text, color = [220, 220, 220]) {
-    this.messages.push({ text, color, time: this.time });
+    const msg = { text, color, time: this.time };
+    this.messages.push(msg);
     if (this.messages.length > 40) this.messages.shift();
+    emit(this, "log", { msg });   // (screens/log.js keeps the run's history from it: WS9 #4)
   },
 
   // A line for TOAST_TIME seconds of real time under the status line (hud.js): a zone's name over an edge,
@@ -110,6 +112,7 @@ export const game = {
   hurtPlayer(dmg, source, quiet = false) {
     if (this.mode === "dead") return;
     const p = this.player;
+    emit(this, "player:hurt", { dmg: Math.min(dmg, Math.max(0, p.hp)), source, quiet });   // what it takes, before death (WS9 #3)
     p.hp -= dmg;
     // Second wind: a killing blow leaves you on 1 HP, then not again for RULES.cooldown.secondWind
     // seconds of game time (it was once per floor; TECH_DESIGN §2.4).

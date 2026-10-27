@@ -1475,6 +1475,14 @@ async function ws9Sections(ctx) {
     if (!shows || !top || closed !== "map" || game.mode !== "explore" || !in3d || log.logHistory(game).length < 60)
       fail(`the log: newest ${shows}, scrolled to the first ${top}, closed to ${closed}, in 3D ${in3d} (then ${game.mode}), ${log.logHistory(game).length} lines kept`);
     out.push("the log on H: 60 lines kept (game.messages keeps 40), the newest shown, Home scrolls to the first; H and Esc close; in both views");
+    // More than game.messages keeps said within one frame: all in the history (game.log's "log" event, WS9 #4 at the
+    // WS9 merge; collected from game.messages every frame, the history kept only the last 40 of them).
+    const h0 = log.logHistory(game).length;
+    for (let k = 1; k <= 60; k++) game.log(`Burst line ${k}.`);
+    game.debug.step(1 / 60);
+    const burst = log.logHistory(game).slice(h0).filter((m) => /^Burst line/.test(m.text)).length;
+    if (burst !== 60) fail(`60 lines said within one frame: ${burst} in the log's history`);
+    out.push(`60 lines within one frame: ${burst} in the history`);
     // The recap; R keeps the mode; C wakes a Commons Lamp life.
     RULES.auto = true;
     freshRun(1234, { store: st, mode: "commonsLamp" });
