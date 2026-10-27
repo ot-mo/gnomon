@@ -2063,7 +2063,8 @@ Playtest loops with the user (pacing matters to them: rewards meaningful to the 
 Kept from today (`items.js:126-134`, content-survey §1.3): `crit, swing, reach, maxDmg, leech, crush, thorns, ward, regen,
 darkRegen, str, maxHp, armour, speed, torch, sense, darkSight, stealth, firstBlock, jump, featherFall, killHeal, undeadHeal,
 burnBonus, poisonHit, sunder, cutsFlat, foldGuard`. New: the six attributes `str agi tou int wil ego`, `av, dv, ma, pv,
-toHit, examine, navigation, travel, carry, price, cooldown, resistFire, resistFrost, resistShock, resistPoison, swim`.
+toHit, examine, navigation, travel, carry, price, cooldown, resistFire, resistFrost, resistShock, resistPoison, swim`; from WS8
+by integration request, `missileAcc` (to hit with a missile weapon).
 Every key is documented next to the registry in `stats.js`; `check-content` rejects unknown keys.
 
 ## Appendix B. The two-view rule for each new system

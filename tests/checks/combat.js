@@ -63,7 +63,7 @@ import { snapshotZone } from "../../src/save/codec.js";
 import { memoryAdapter } from "../../src/save/store.js";
 import { saveGame, whenWritten } from "../../src/save/save.js";
 import { throwReady, throwAt, updateProjectiles, THROW_TIME, landOutside } from "../../src/throwing.js";
-import { fire, fireAt, readyLauncher } from "../../src/missiles.js";
+import { fire, fireAt, readyLauncher, missileSpec } from "../../src/missiles.js";
 import { requestTarget, cursorTarget, lineOfFire, targetText } from "../../src/screens/target.js";
 import { mapView } from "../../src/renderMap.js";
 import { MISSILES } from "../../src/content/items/missiles.js";
@@ -729,6 +729,12 @@ export function checkTargeting(ctx) {
       const before = readyLauncher(p);
       useItem(game, p, bow);
       expect(before === sling && readyLauncher(p) === bow, `E on the bolt-bow behind a sling: ready ${before?.id} → ${readyLauncher(p)?.id} (want sling → boltBow)`);
+      // stats.js missileAcc (request 8; WS4's Steady hand, bible §10.8): to hit with a missile weapon, and only with one.
+      const accBefore = missileSpec(p, bow).acc, bladeBefore = weaponSpec(p).acc;
+      p.bonuses = { missileAcc: 2 }; invalidateStats(p);
+      const accAfter = missileSpec(p, bow).acc, bladeAfter = weaponSpec(p).acc;
+      delete p.bonuses; invalidateStats(p);
+      expect(accAfter === accBefore + 2 && bladeAfter === bladeBefore, `missileAcc 2: the bolt-bow's accuracy ${accBefore} → ${accAfter} (want +2), the blade's ${bladeBefore} → ${bladeAfter} (want the same)`);
       stats.missiles = { reload: MISSILES.boltBow.reload, pinned: true, boltsOnTheFloor: dropped, readiedByE: true };
       game.combatRng = null;
     }

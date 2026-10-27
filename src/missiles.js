@@ -8,7 +8,8 @@
 //   ammoFor(p, launcher) → the ammo stack it shoots, null when you have none; a launcher with free shots
 //       (the sling: stones lie everywhere) needs none and gets true
 //   missileSpec(p, launcher) → { kind: "missile", dmg, acc, ench, material, noun, onHit }: a shot's spec;
-//       d20 damage is the range + material + enchantment (no STR: the string throws it)
+//       d20 damage is the range + material + enchantment (no STR: the string throws it); acc is the weapon's
+//       + bonus(p, "missileAcc") (stats.js; Steady hand, bible §10.8)
 //   fire(game) → bool        V in 3D: a shot along your view (pitch included, a little lift for the drop),
 //                            once the launcher has reloaded (cooldown "missile", in game seconds)
 //   aimFire(game) → false    V on the map: the target screen at the launcher's range; its confirm fires
@@ -24,6 +25,7 @@ import { takeOne } from "./items.js";
 import { EYE } from "./player.js";
 import { sfx } from "./sfx.js";
 import { combatRng } from "./combat.js";
+import { bonus } from "./stats.js";
 import { addStatus, registerStatus, statusFlag, cooldownLeft, startCooldown } from "./status.js";
 import { bind } from "./keys.js";
 import { registerHudSegment } from "./hud.js";
@@ -44,7 +46,7 @@ export function ammoFor(p, launcher) {
 export function missileSpec(p, launcher) {
   const m = MISSILES[launcher.id], hit = m.onHit;
   return {
-    kind: "missile", weapon: launcher, dmg: [...m.dmg], acc: m.acc, ench: launcher.ench || 0, material: launcher.material || 0,
+    kind: "missile", weapon: launcher, dmg: [...m.dmg], acc: m.acc + bonus(p, "missileAcc"), ench: launcher.ench || 0, material: launcher.material || 0,
     element: null, noun: m.noun,
     onHit: hit ? (game, tgt) => {
       if (combatRng(game)() >= hit.chance) return;
