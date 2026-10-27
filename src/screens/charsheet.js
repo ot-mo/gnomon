@@ -99,7 +99,7 @@ function act(game, row) {
     if (why) { sheet.msg = `${why[0].toUpperCase()}${why.slice(1)}.`; return; }
     gainMutation(game, p, row.offer);
     const ab = MUTATIONS[row.offer].ability, k = ab ? (p.hotbar || []).indexOf(ab) : -1;
-    sheet.msg = `You gain ${MUTATIONS[row.offer].name}.${k >= 0 ? ` ${ABILITIES[ab].name} is on key ${k + 1}.` : ""}`;
+    sheet.msg = `You gain ${MUTATIONS[row.offer].name}.${k >= 0 ? ` ${ABILITIES[ab].name} is on key ${k + 1}.` : ab ? ` Every key holds something: B puts ${ABILITIES[ab].name} on one.` : ""}`;
   }
 }
 

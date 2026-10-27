@@ -771,6 +771,13 @@ export async function checkProgression(m) {
       PM.gainMutation(game, g, "gills");
       if (rep("clatter") !== 150) fail(`Gills gained in play: clatter ${rep("clatter")}, want 150 (50 + 100)`);
       if (g.hotbar.includes("gills")) fail("a mutation without an ability went on the hotbar");
+      // Every hotbar key taken: the new ability goes on none, and the log and the sheet say B puts it on one.
+      {
+        const f = bentIn(["foldStep"], { view: "map" });
+        f.hotbar = ["foldStep", ...Array(8).fill("foldStep").map((x, i) => `test${i}`)];
+        PM.gainMutation(game, f, "wings");
+        if (f.hotbar.includes("wingsUp") || f.hotbar.length !== 9 || !said(/Every hotbar key holds something: B puts it on one/)) fail(`Wings with a full hotbar: ${JSON.stringify(f.hotbar)}, said ${game.messages.slice(-1).map((x) => x.text)}`);
+      }
       // The level-up card tells the Bent the creases there are to spend, and where.
       const lv = bentIn([], { view: "map" });
       lv.creases = 3;

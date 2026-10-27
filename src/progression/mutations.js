@@ -125,13 +125,15 @@ export function gainMutation(game, p, id) {
   if (why) throw new Error(`gainMutation: ${why}`);
   const def = MUTATIONS[id];
   reshape(p, () => { p.creases = (p.creases || 0) - costOf(id); (p.mutations ||= {})[id] = 1; });
+  let keyless = false;   // every hotbar key taken: the ability waits for B to put it on one
   if (def.ability && !(p.hotbar ||= []).includes(def.ability)) {
     const k = [...Array(HOTBAR).keys()].find((i) => !p.hotbar[i]);
-    if (k !== undefined) p.hotbar[k] = def.ability;
+    if (k !== undefined) p.hotbar[k] = def.ability; else keyless = true;
   }
   if (game) {
     mutationRep(game, p, id);
     game.log(def.kind === "defect" ? `You carry a defect: ${def.name}.` : `You gain a mutation: ${def.name}. ${def.info(1)}`, [200, 150, 255]);
+    if (keyless) game.log("Every hotbar key holds something: B puts it on one.", [200, 150, 255]);
     emit(game, "mutate", { e: p, id, level: 1, how: "gain" });
   }
   return p.mutations[id];
