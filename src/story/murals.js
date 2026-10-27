@@ -23,12 +23,10 @@ import { knows } from "./journal.js";
 const isMosaic = (zone, x, y, z) => !!BLOCKS[zone.get?.(x, y, z)]?.mosaic;
 
 export function muralsAt(zone, x, y) {
-  const out = [];
-  for (const m of zone?.murals || []) {
-    if (m.x === x && m.y === y) out.push(m);
-    else if (m.view === "map" && m.y === y && Math.abs(m.x - x) === 1 && isMosaic(zone, x, y, m.z)) out.push(m);
-  }
-  return out;
+  const all = zone?.murals || [];
+  const own = all.filter((m) => m.x === x && m.y === y);
+  if (own.length) return own;   // a mural on the tile itself wins over a neighbour's tablet
+  return all.filter((m) => m.view === "map" && m.y === y && Math.abs(m.x - x) === 1 && isMosaic(zone, x, y, m.z)).slice(0, 1);
 }
 
 export function readable(game, zone, m) {

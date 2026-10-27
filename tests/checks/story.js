@@ -220,6 +220,13 @@ export async function run(env) {
       { x: kx, y: ky, z: FLOOR_Z - 1, view: "map", text: ev[1].text.gospel },
     ];
     const id0 = `hist:${ev[0].id}:flat`, idR = `hist:${ev[0].id}:deep`, id1 = `hist:${ev[1].id}:flat`;
+    // Tiles: a mural's own tile reads it alone, even beside another mosaic's mural; a tablet's edge reads its mural.
+    {
+      const zz = { murals: [{ x: 5, y: 5, z: FLOOR_Z - 1, view: "map", text: "a" }, { x: 6, y: 5, z: FLOOR_Z - 1, view: "map", text: "b" }],
+                   get: (x, y, zl) => (zl === FLOOR_Z - 1 && y === 5 && x >= 4 && x <= 7 ? B.MOSAIC_WHITE : 0) };
+      const at = (x, y) => murals.muralsAt(zz, x, y).map((m) => m.text).join();
+      if (at(5, 5) !== "a" || at(6, 5) !== "b" || at(4, 5) !== "a" || at(7, 5) !== "b" || at(5, 6) !== "") fail(`muralsAt: ${[at(5, 5), at(6, 5), at(4, 5), at(7, 5), at(5, 6)]}`);
+    }
     // Drawing and describing learn nothing; the describer shows the mosaic's text, and says what the relief needs.
     game.debug.draw();
     for (let y = 0; y < z.d; y++) for (let x = 0; x < z.w; x++) renderMap.describeTile(game, { x, y });
