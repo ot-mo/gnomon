@@ -40,7 +40,7 @@ import { talkTo } from "../../src/talk.js";
 import { runUpdates } from "../../src/events.js";
 import { skipTime } from "../../src/time.js";
 import { xpToNext } from "../../src/leveling.js";
-import { maxHp } from "../../src/stats.js";
+import { maxHp, invalidateStats } from "../../src/stats.js";
 import { levelOfTier } from "../../src/world/worldmodel.js";
 import { FLOOR_Z } from "../../src/world.js";
 import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../../src/pathing.js";
@@ -51,7 +51,7 @@ import { rest } from "../../src/overworld/rest.js";
 import { reveal, isKnown, pin, pinsAt, knownSites, discoveryXp, sight } from "../../src/overworld/discovery.js";
 import { encounterChance, rollEncounter, placeEncounter, legendsFor, hiddenSiteRoll } from "../../src/overworld/encounters.js";
 import { atlas, canStep, edgeBetween, spanKey, OW } from "../../src/overworld/state.js";
-import { isLost } from "../../src/overworld/lost.js";
+import { isLost, lostChance } from "../../src/overworld/lost.js";
 import { worldView } from "../../src/overworld/renderWorld.js";
 
 const DIRS = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]];
@@ -614,6 +614,37 @@ function lost(G, problems) {
     const want = Math.max(0, u.lostChance * (isNight(g5) ? OW().nightLost : 1) - OW().flyingLost);
     out.flying = { chance: r5.chance?.lost, want, stillFlying: hasStatus(g5.player, "flying") };
     if (!near(r5.chance?.lost ?? -1, want)) problems.push(`lost: flying when you set out: chance ${r5.chance?.lost}, want ${want}`);
+  }
+  // INT, Terrain lore and Homing sense (bible §4.9, §15.6; TECH_DESIGN §5.2's −0.02 a point of INT modifier).
+  {
+    const g9 = fresh(G, 67, G.game.world), W9 = g9.run.world, q = g9.player;
+    const forest = W9.tiles.find((v) => v.terrain === "forest" && !v.roadWidth && !v.riverWidth && !v.landmark);
+    const marsh = W9.tiles.find((v) => v.terrain === "marsh" && !v.roadWidth && !v.riverWidth && !v.landmark);
+    const base = lostChance(g9, forest, {});   // by day: the data, 0.1
+    q.attrs = { ...(q.attrs || {}), int: 20 }; invalidateStats(q);   // INT 20: modifier +2
+    const smart = lostChance(g9, forest, {});
+    q.attrs.int = 16; invalidateStats(q);
+    q.perkRank = { ...(q.perkRank || {}), terrainLore: 1 };
+    const asked = lostChance(g9, forest, {});                          // the panel asks: learns nothing
+    const learnt = lostChance(g9, forest, {}, { learn: true });        // a step taken: the forest is learnt
+    const other = lostChance(g9, marsh, {}, { learn: true });          // rank 1: one terrain only
+    out.mitigation = { base, smart, asked, learnt, other, lore: Object.keys(atlas(g9).lore) };
+    if (!near(base, forest.lostChance) || !near(smart, forest.lostChance - 0.04)) problems.push(`lost: INT 20 (modifier +2) gives ${smart}, not ${forest.lostChance} − 0.04`);
+    if (!near(asked, forest.lostChance) || !near(learnt, forest.lostChance * 0.25) || !near(other, marsh.lostChance)) problems.push(`lost: Terrain lore (${JSON.stringify(out.mitigation)})`);
+    // Homing sense: the new-zone roll at 50% (the plain one forced to 0 here, the Homing one to 1).
+    delete q.perkRank.terrainLore;
+    const row = W9.tiles.find((u) => [0, 1, 2].every((k) => { const v = W9.tileAt(u.wx + k, u.wy); return v && v.travel === "yes" && !v.roadWidth && !v.riverWidth && !v.landmark; }) && u.wx > 2);
+    goTo(g9, row.wx, row.wy);
+    addStatus(g9, q, "lost", { t: OW().lostFor }); atlas(g9).lost = { in: g9.zone.key, since: g9.time, tried: {}, height: {}, gnomon: {} };
+    const u0 = overrideRules("overworld", { recover: 0, recoverHoming: 1 });
+    try {
+      goTo(g9, row.wx + 1, row.wy);
+      const plainStill = isLost(g9);
+      q.perkRank.homingSense = 1;
+      goTo(g9, row.wx + 2, row.wy);
+      out.homing = { plainStill, found: !isLost(g9) };
+      if (!plainStill || isLost(g9)) problems.push(`lost: Homing sense (${JSON.stringify(out.homing)})`);
+    } finally { u0(); delete q.perkRank.homingSense; }
   }
   out.ways = ["road", "visited", "roll", "height", "asking", "expiry"];
   return out;
