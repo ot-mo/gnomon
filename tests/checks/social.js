@@ -427,6 +427,32 @@ export async function run(env) {
       const k = rep.killed(game, P3, talker);
       if (k.flatfolk !== rep.REP_RULES.namedKillPenalty) fail(`killing a talker of the Flatfolk: ${JSON.stringify(k)}, want ${rep.REP_RULES.namedKillPenalty}`);
     }
+    // Through combat.resolveAttack: the victim holds a blow against you (WS8's turnOnYou) only after "hurt" and
+    // "attack" have gone out, so your first blow, landed under either set or missed under d20, costs rep once with
+    // a fellow watching and both turn on you (merge finding: the grudge came first, offend saw a hostile victim).
+    {
+      const { overrideRules } = await m("rules.js");
+      const got = [];
+      for (const [set, how] of [["legacy", "hit"], ["d20", "hit"], ["d20", "miss"]]) {
+        fresh(1234, { genotype: "bent" });
+        const undo = overrideRules("combat", set);
+        try {
+          const P4 = p(), v = mob("pleatwood", "docile"), w = mob("pleatwood", "docile");
+          Object.assign(v, { x: P4.x + 0.8, y: P4.y, z: P4.z, hp: 500, maxHp: 500 }); Object.assign(w, { x: P4.x + 0.8, y: P4.y + 0.5, z: P4.z });
+          creatures.addCreature(game.zone, v); creatures.addCreature(game.zone, w);
+          const r0 = F.repOf(game, "pleatwood");
+          const r = combat.resolveAttack(game, P4, v, combat.weaponSpec(P4), { view: "map", rng: how === "miss" ? () => 0 : () => 0.6 });
+          const r1 = F.repOf(game, "pleatwood");
+          combat.resolveAttack(game, P4, v, combat.weaponSpec(P4), { view: "map", rng: () => 0.6 });
+          const line = `${set} ${how}: ${r0} → ${r1} → ${F.repOf(game, "pleatwood")}, ${F.attitude(game, v, P4)}, ${F.attitude(game, w, P4)}`;
+          got.push(line);
+          if (r.hit !== (how === "hit") || r1 !== r0 + rep.REP_RULES.attackPenalty || F.repOf(game, "pleatwood") !== r1 ||
+              F.attitude(game, v, P4) !== "hostile" || F.attitude(game, w, P4) !== "hostile")
+            fail(`your first blow through resolveAttack (${line}${r.hit !== (how === "hit") ? `, hit ${r.hit}` : ""}): want ${r0} → ${r0 + rep.REP_RULES.attackPenalty} once, both hostile`);
+        } finally { undo(); }
+      }
+      stats.throughCombat = got.join("; ");
+    }
     stats.offend = `follower's blow ${rep.REP_RULES.attackPenalty}, at the hostile 0, unseen 0`;
   }
 

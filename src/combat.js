@@ -174,12 +174,16 @@ function hurtCreature(game, m, dmg, label, color, src) {
     const brain = (m.brain ||= {});
     brain.hurtBy = src.id;
     (brain.grudges ||= {})[src.id] = 1;
-  } else if (src) turnOnYou(game, m, state, lost);
+  }
+  // "hurt" goes out before it holds the blow against you: social/reputation.js asks whether it was out for you
+  // already (a first blow costs rep and tells the witnesses; one on a creature already hostile doesn't).
   emit(game, "hurt", { tgt: m, src: src || null, dmg });
+  if (src && isPlayer(game, src)) turnOnYou(game, m, state, lost);
 }
 
 // A blow that missed or was soaked to nothing still tells (d20): the target turns on whoever swung, as
-// hurtCreature does (you: it hunts you; a creature: it bears that one a grudge).
+// hurtCreature does (you: it hunts you; a creature: it bears that one a grudge). resolveAttack calls it after
+// the "attack" event, for the same reason as hurtCreature's order.
 function noticeBlow(game, m, src) {
   if (isPlayer(game, m)) return;
   if (isPlayer(game, src)) { const state = m.state, lost = m.lost; m.state = "chase"; m.lost = 0; turnOnYou(game, m, state, lost); return; }
@@ -280,9 +284,11 @@ export function resolveAttack(game, att, tgt, spec, ctx = {}) {
     emit(game, "attack", { att, tgt, result });
     return result;
   }
+  let noticed = false;
   if (legacy()) legacyBlow(game, att, tgt, spec, ctx, result);
-  else d20Blow(game, att, tgt, spec, ctx, result);
+  else noticed = d20Blow(game, att, tgt, spec, ctx, result) === "noticed";
   emit(game, "attack", { att, tgt, result });
+  if (noticed) noticeBlow(game, tgt, att);
   return result;
 }
 
@@ -397,10 +403,9 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
   Object.assign(result, rollToHit(game, att, tgt, spec, ctx, rng));
   if (!result.hit) {
     float(game, tgt, "miss", [170, 170, 180]);
-    noticeBlow(game, tgt, att);
     tell(game, result, spec, ctx, [170, 170, 180]);
     if (onYou) sfx("block", { at: att });
-    return;
+    return "noticed";   // (resolveAttack: noticeBlow after the "attack" event)
   }
   const crit = result.crit;
   // 3 Damage: the range, + material, + STR over the requirement, + enchantment (your blade; a missile
@@ -435,10 +440,9 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
   if (dmg <= 0) {
     result.dmg = 0;
     float(game, tgt, "0", [170, 180, 200]);
-    noticeBlow(game, tgt, att);
     tell(game, result, spec, ctx, [170, 180, 200]);
     sfx("block", { at: tgt });
-    return;
+    return "noticed";
   }
   // 5 Apply and tell.
   const line = (killed) => combatLine(game, { ...result, killed }, spec, ctx);
