@@ -534,6 +534,13 @@ function resting(G, problems) {
     if (rr.why !== "hostile" || game.time !== t1 || game.zone.key !== "3,3,0") problems.push(`rest: a journey left over made Z a world-map rest (${rr.why}, in ${game.zone.key})`);
     game.trip = null;
   }
+  // Whatever left a journey behind, the next zone entry ends it (stairs down here, as a load or a new run would).
+  {
+    game = fresh(G, 62, G.game.world);
+    game.trip = { wx: 9, wy: 9, came: null, moved: true, viewOnly: false };
+    changeZone(game, zoneKey(0, 0, 1), { how: "down" });
+    if (game.trip) problems.push("rest: a journey left behind outlived a zone entry (down the temple's stairs)");
+  }
   // A hostile awake near you: no rest at all.
   game = fresh(G, 55, G.game.world);
   goTo(game, 3, 3);
