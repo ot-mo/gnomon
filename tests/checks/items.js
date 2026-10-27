@@ -33,6 +33,112 @@
 //   7. The consumable effects table: every parent potion, scroll and splash is an entry; registerEffect.
 //   8. The inventory in check-screen-frames' 8 states (no longer compared there): the pack, header, tabs and I close.
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const fnv = (s) => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, "0"); };
+
+// --- The consumable effects, traced (§7) ------------------------------------------------------------------------------
+// consumableTrace(m) → { "drink:<effect>" | "read:<effect>": hash }: each potion drunk and each scroll read from the same
+// seeded state (seed 7's start, legacy depth 3, on the map, HP 10, a cursed ring in the pack), and a hash of everything it
+// changed: the log (text and colour), HP, max HP, STR, statuses, place and zone, the creatures (type, HP, state,
+// statuses), the weapon, the map's seen and pit cells, gas clouds, and the next random number (so every draw counts). It
+// needs only m.game, m.stats, m.body and m.seedRandom, so it runs on any tree since p0-done: PARENT_CONSUMABLES below
+// are its hashes from p0-done's effects.js switches (recorded once, docs/sessions/ws5.md §7).
+export function consumableTrace(m) {
+  const { game, startRun } = m.game, out = {};
+  const setup = (seed) => {
+    m.seedRandom(seed);
+    startRun(7);
+    game.pages = null; game.pendingPages = null; game.story.cube = true; game.modeStack = [];
+    const s = game.run.world.start;
+    game.debug.enterZone(`${s.wx},${s.wy},3`, "down");
+    game.view = "map"; game.mode = "map"; game.paused = false;
+    const p = game.player;
+    p.hp = 10;
+    p.inv.push({ kind: "ring", id: "strength", ench: -1, known: false });
+    game.messages = [];
+    return p;
+  };
+  const sum = (a) => a.reduce((s, v) => s + v, 0);
+  const digest = () => {
+    const p = game.player, z = game.zone, w = m.body.wielded(p);
+    return JSON.stringify({
+      msgs: game.messages.map((x) => [x.text, x.color]), hp: p.hp, max: m.stats.maxHp(p), str: m.stats.attr(p, "str"),
+      st: Object.entries(p.status || {}).map(([k, s]) => [k, +s.t.toFixed(3)]).sort(), pos: [p.x, p.y, p.z].map((v) => +v.toFixed(3)), zone: z.key,
+      cr: z.creatures.filter((c) => !c.talk).map((c) => [c.type, c.hp, c.state, Object.keys(c.status || {}).sort()]),
+      w: w && [w.id, w.ench, w.element || null, !!w.known], ring: p.inv.find((x) => x.kind === "ring")?.ench,
+      seen: sum(z.seen), holes: sum(z.holeSeen), clouds: z.clouds.length, next: Math.random(),
+    });
+  };
+  const POTIONS = ["healing", "strength", "flying", "haste", "seeing", "shadows", "descent", "poison", "paralysis", "darkness"];
+  const SCROLLS = ["uncurse", "fire", "frost", "shock", "holy", "blessing", "teleport", "summon", "malice"];
+  POTIONS.forEach((e, k) => { setup(700 + k); m.effects.drinkPotion(game, e); out[`drink:${e}`] = fnv(digest()); });
+  SCROLLS.forEach((e, k) => { setup(800 + k); m.effects.readScroll(game, e); out[`read:${e}`] = fnv(digest()); });
+  return out;
+}
+// Recorded from p0-done (9f8bea5) with consumableTrace against its own modules.
+const PARENT_CONSUMABLES = {
+  "drink:healing": "21f466b5", "drink:strength": "c744e00b", "drink:flying": "0d21ca66", "drink:haste": "cb52b67f",
+  "drink:seeing": "4d8dc488", "drink:shadows": "c7c3eb23", "drink:descent": "c35ae757", "drink:poison": "371f1083",
+  "drink:paralysis": "6b57528b", "drink:darkness": "9f580897", "read:uncurse": "1de47280", "read:fire": "4708abe1",
+  "read:frost": "072005ec", "read:shock": "33719e06", "read:holy": "e4a150aa", "read:blessing": "607d1fc7",
+  "read:teleport": "c3be6d4d", "read:summon": "2df32921", "read:malice": "e0eabfe0",
+};
+
+// splashTrace(m) → [{ effect, parent, table }]: a potion thrown on the map at a goblin beside you (throwing.js
+// throwAtNearest lands it at once), through throwing.js's own switch (the parent's, still the one the game calls until
+// WS8 applies docs/ws5.md request 3), and from the same state through effects.js splash() with the context throwing.js
+// works out: the two digests must be equal.
+export function splashTrace(m) {
+  const { game, startRun } = m.game, out = [];
+  const setup = (effect) => {
+    m.seedRandom(900);
+    startRun(7);
+    game.pages = null; game.pendingPages = null; game.story.cube = true; game.modeStack = [];
+    const s = game.run.world.start;
+    game.debug.enterZone(`${s.wx},${s.wy},4`, "down");
+    game.view = "map"; game.mode = "map";
+    const p = game.player, z = game.zone;
+    z.creatures = z.creatures.filter((c) => c.talk);
+    let at = null;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const x = Math.floor(p.x) + dx, y = Math.floor(p.y) + dy;
+      if (z.stand[x + y * z.w] === p.z && !z.solid(x, y, p.z + 1)) { at = [x, y]; break; }
+    }
+    const g = m.creatures.addCreature(z, m.creatures.spawnCreature("goblin", at[0], at[1], p.z, { rng: () => 0.5, state: "idle", level: 3 }));
+    z.sightings.set(g.id, { x: g.x, y: g.y, glyph: g.glyph, color: g.color, name: g.name, time: game.time });
+    p.hp = 10;
+    const stack = { kind: "potion", effect, count: 1 };
+    p.inv.push(stack);
+    game.messages = []; game.effects = [];
+    return { p, g, stack };
+  };
+  const digest = () => {
+    const p = game.player, z = game.zone;
+    return JSON.stringify({ msgs: game.messages.map((x) => [x.text, x.color]), hp: p.hp, st: Object.keys(p.status || {}).sort(),
+      cr: z.creatures.filter((c) => !c.talk).map((c) => [c.hp, c.state, Object.entries(c.status || {}).map(([k, v]) => [k, v.t]).sort()]),
+      clouds: z.clouds.map((c) => [c.r, c.time, c.kind]), holes: z.holeSeen.reduce((a, v) => a + v, 0), ready: p.ready, yaw: +p.yaw.toFixed(4),
+      bursts: game.effects.filter((e) => e.kind === "burst").length });
+  };
+  for (const effect of Object.keys(m.items.POTIONS)) {
+    const { stack } = setup(effect);
+    m.throwing.throwAtNearest(game, stack);
+    const parent = digest();
+    const { p, g, stack: s2 } = setup(effect);
+    // What throwAtNearest and shatter do before the switch (throwing.js), then the table.
+    p.ready = { kind: s2.kind, effect: s2.effect };
+    m.items.takeOne(p, s2);
+    p.yaw = Math.atan2(g.y - p.y, g.x - p.x);
+    const x = g.x, y = g.y, z = g.z + g.h * 0.6, color = m.items.POTION_COLORS[game.potionColor[effect]];
+    const known = game.knownPotions.has(effect);
+    game.knownPotions.add(effect);
+    game.log(known ? `The potion of ${m.items.POTIONS[effect].name} shatters!` : `The ${color.name} potion shatters. It was a potion of ${m.items.POTIONS[effect].name}!`, color.rgb);
+    game.effects.push({ kind: "burst", x, y, z, color: color.rgb, time: game.time });
+    const near = m.creatures.hostilesTo(game, p).filter((c) => m.creatures.touchable(game, c) && Math.hypot(c.x - x, c.y - y) <= 1.8 && Math.abs(c.z - z) < 2.5);
+    const youToo = Math.hypot(p.x - x, p.y - y) <= 1.8 && Math.abs(p.z + 1 - z) < 2.5;
+    m.effects.splash(game, effect, { x, y, z, r: 1.8, near, youToo, names: () => near.map((c) => c.name).join(", ") });
+    out.push({ effect, parent: fnv(parent), table: fnv(digest()) });
+  }
+  return out;
+}
 
 export function checkItems(m) {
   const problems = [], stats = {};
@@ -722,6 +828,14 @@ export function checkItems(m) {
   // --- 7. The consumable effects table ---------------------------------------------------------------------------
   section("effects table", () => {
     const E = m.effects;
+    // Line for line: every potion drunk and scroll read gives what p0-done's switches gave (the same log, numbers,
+    // statuses and random draws), and every thrown potion's splash from the table what throwing.js's switch gives.
+    const traced = consumableTrace(m);
+    const off = Object.keys(PARENT_CONSUMABLES).filter((k) => traced[k] !== PARENT_CONSUMABLES[k]);
+    if (off.length || Object.keys(traced).length !== Object.keys(PARENT_CONSUMABLES).length) fail(`consumables that differ from p0-done's switches: ${off.join(", ") || "(a different set)"}`);
+    const splashes = splashTrace(m), drift = splashes.filter((r) => r.parent !== r.table).map((r) => r.effect);
+    if (drift.length) fail(`thrown potions whose splash from the table differs from throwing.js's switch: ${drift.join(", ")}`);
+    stats.effectsTraced = `${Object.keys(traced).length - off.length} of ${Object.keys(PARENT_CONSUMABLES).length} drunk or read as at p0-done; ${splashes.length - drift.length} of ${splashes.length} splashes as throwing.js's switch`;
     const missing = [...Object.keys(I.POTIONS).filter((k) => !E.DRINK[k]), ...Object.keys(I.SCROLLS).filter((k) => !E.READ[k])];
     for (const k of ["poison", "paralysis", "darkness", "shadows", "descent", "healing", "haste"]) if (!E.SPLASH[k]) missing.push(`splash ${k}`);
     if (missing.length) fail(`effects with no entry: ${missing.join(", ")}`);
@@ -789,7 +903,7 @@ export async function run(env) {
     load("events", "events.js"), load("renderMap", "renderMap.js"), load("interact", "interact.js"), load("talk", "talk.js"),
     load("currency", "currency.js"), load("creatures", "creatures.js"), load("world", "world.js"), load("rules", "rules.js"),
     load("status", "status.js"), load("abilities", "abilities.js"), load("codec", "save/codec.js"), load("rng", "rng.js"),
-    load("time", "time.js"), load("effects", "effects.js"), load("player", "player.js"),
+    load("time", "time.js"), load("effects", "effects.js"), load("player", "player.js"), load("throwing", "throwing.js"),
   ]);
   m.implantTable = (await env.src("content/items/implants.js")).IMPLANTS;
   m.artifactTable = (await env.src("content/items/artifacts.js")).ARTIFACTS;
