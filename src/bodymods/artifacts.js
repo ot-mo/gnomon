@@ -359,20 +359,17 @@ export function makeArtifact(id, rand = Math.random) {
   }
   return it;
 }
-// Something for an Hour site's or a ruin's treasure: an artifact (harder ones deeper), a cell, an implant (rare),
-// or a true-mark.
+// Something for an Hour site's or a ruin's treasure: an artifact (harder ones deeper), a cell, or an implant (rare).
+// Never a true-mark: bible §10.4 names their only sources (site bottoms, floor plans, the vow), about 30 a run.
 export function randomBodyMod(rand, level) {
   const roll = rand();
   if (roll < 0.5) {
     const ids = Object.keys(ARTIFACTS).filter((id) => ARTIFACTS[id].complexity <= 1 + Math.floor(level / 3));
     return makeArtifact(ids[Math.floor(rand() * ids.length)], rand);
   }
-  if (roll < 0.8) { const ids = Object.keys(CELLS).filter((id) => id !== "heart" || level >= 15); return makeCell(ids[Math.floor(rand() * ids.length)], rand); }
-  if (roll < 0.95) {
-    const ids = Object.keys(IMPLANTS).filter((id) => IMPLANTS[id].grade <= 1 + Math.floor(level / 4));
-    return { kind: "implant", id: ids[Math.floor(rand() * ids.length)] };
-  }
-  return { kind: "credit", count: 1 };
+  if (roll < 0.85) { const ids = Object.keys(CELLS).filter((id) => id !== "heart" || level >= 15); return makeCell(ids[Math.floor(rand() * ids.length)], rand); }
+  const ids = Object.keys(IMPLANTS).filter((id) => IMPLANTS[id].grade <= 1 + Math.floor(level / 4));
+  return { kind: "implant", id: ids[Math.floor(rand() * ids.length)] };
 }
 
 // --- The item kinds ---------------------------------------------------------------------------------------

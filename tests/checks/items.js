@@ -622,6 +622,14 @@ export function checkItems(m) {
     const one = recharge(1, 600, false, false), split = recharge(10, 60, false, false);
     if (!same(one, split) || one[1] !== 500 || one[0] !== 0) fail(`a dark cell over 600 s underground with the torch out: one step ${one}, ten steps ${split} (want [0, 500])`);
     stats.cells = { darkOver600s: one[1], glimFill: paid };
+    // Loot for sites: artifacts, cells and implants, never a true-mark (bible §10.4 budgets those to site bottoms,
+    // floor plans and the vow).
+    {
+      const rng = m.rng.makeRng(5), kinds = {};
+      for (let k = 0; k < 10000; k++) { const it = AR.randomBodyMod(rng, 1 + (k % 24)); kinds[it.kind] = (kinds[it.kind] || 0) + 1; }
+      if (kinds.credit || !kinds.artifact || !kinds.cell || !kinds.implant) fail(`randomBodyMod over 10,000 draws: ${JSON.stringify(kinds)}`);
+      stats.loot = kinds;
+    }
   });
 
   // --- 6. The pack screen -------------------------------------------------------------------------------------------
