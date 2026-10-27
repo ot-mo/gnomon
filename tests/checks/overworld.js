@@ -1,7 +1,7 @@
 // WS1's check (TECH_DESIGN §8.3 "WS1" acceptance; owner WS1): world-map travel, on the test world and the real one.
 //
 //   run(env) → [{ name, ok, problems, stats }]   (tests/checks/index.js's contract; tools/check-overworld.mjs)
-//     args: --steps n (the random walk's, default 10000 a world)
+//     args: --steps n (the random walk's, default 10000 a world), --walkSeed k (another walk: its directions' stream + k)
 //
 //   1. walk        a random walk of 10⁴ steps a world (drop: false, so it stays on the map): no crash; every step
 //                  legal, never onto a travel "no" span; hours as the data and the night rule give them; the lost
@@ -82,7 +82,7 @@ function swap(obj, values) {
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
 
 // --- 1. The random walk --------------------------------------------------------------------------------------------
-function walk(G, name, world, steps, problems) {
+function walk(G, name, world, steps, problems, walkSeed = 0) {
   const game = fresh(G, 4242, world), W = game.run.world, O = OW();
   const left = game.zone, zonesBefore = game.zones.size;
   const before = left.creatures.map((c) => `${c.id}:${c.x},${c.y},${c.hp}`).join("|");
@@ -90,7 +90,7 @@ function walk(G, name, world, steps, problems) {
   const offEnter = on("zone:enter", () => { enters++; });
   const madeBefore = game.zones.size;
   if (!enterWorldMap(game).ok) { problems.push(`${name} walk: the world map didn't open at the start`); offEnter(); return {}; }
-  const rng = makeRng(name === "test" ? 77 : 78);
+  const rng = makeRng((name === "test" ? 77 : 78) + walkSeed);
   const per = {}, kinds = {};
   let seconds = 0, refused = 0, badHours = 0, badChance = 0, onNo = 0, prompts = 0, travellers = 0, t0 = game.time, hours = 0;
   for (let k = 0; k < steps; k++) {
@@ -663,7 +663,7 @@ function screen(G, scr, problems) {
 export async function run(env) {
   const scr = await env.screen({ cols: 180, rows: 56 });
   const G = await env.src("game.js");
-  const steps = Number(env.args?.steps) || 10000;
+  const steps = Number(env.args?.steps) || 10000, walkSeed = Number(env.args?.walkSeed) || 0;
   const results = [];
   const section = (name, fn) => {
     const problems = [];
@@ -671,7 +671,7 @@ export async function run(env) {
     try { stats = fn(problems) || {}; } catch (e) { problems.push(`threw: ${e?.stack || e}`); }
     results.push({ name: `overworld: ${name}`, ok: problems.length === 0, problems, stats });
   };
-  section("random walk", (pr) => Object.fromEntries(WORLDS(G.game).map(([n, w]) => [n, walk(G, n, w, steps, pr)])));
+  section("random walk", (pr) => Object.fromEntries(WORLDS(G.game).map(([n, w]) => [n, walk(G, n, w, steps, pr, walkSeed)])));
   section("fast travel", (pr) => Object.fromEntries(WORLDS(G.game).map(([n, w]) => [n, fast(G, n, w, pr)])));
   section("arrival edges", (pr) => ({ test: arrival(G, "test", G.game.world, { wx: 5, wy: 5 }, pr), real: arrival(G, "real", REAL_WORLD, { wx: 8, wy: 17 }, pr) }));
   section("encounter bands", (pr) => Object.fromEntries(WORLDS(G.game).map(([n, w]) => [n, bands(G, n, w, pr)])));
