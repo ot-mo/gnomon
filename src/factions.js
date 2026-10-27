@@ -82,9 +82,20 @@ const TOWARD_PLAYER = {
   loved:       { docile: "friendly", neutral: "friendly", aggressive: "friendly" },
 };
 
-const normal = (f) => (Array.isArray(f) ? Object.fromEntries(f.map((id) => [id, 1])) : f || {});
-export const membershipsOf = (c) => Object.entries(c.faction || normal(typeOf(c)?.factions))
+// attitude() runs for every pair of creatures the AI looks at, so a creature with no faction (every legacy one)
+// costs one lookup and no allocation; a type's memberships are worked out once.
+const NONE = Object.freeze([]);
+const byType = new WeakMap();
+const entries = (f) => Object.entries(Array.isArray(f) ? Object.fromEntries(f.map((id) => [id, 1])) : f)
   .filter(([id, w]) => w > 0 && factions()[id]);
+export function membershipsOf(c) {
+  if (c.faction) return entries(c.faction);
+  const t = typeOf(c);
+  if (!t?.factions) return NONE;
+  let m = byType.get(t);
+  if (!m || m.size !== Object.keys(factions()).length) byType.set(t, (m = { list: entries(t.factions), size: Object.keys(factions()).length }));
+  return m.list;
+}
 
 export function relation(f, g) {
   const F = factions()[f];
@@ -145,7 +156,9 @@ export function attitude(game, a, b) {
     return said === "hostile" && unstrikable(a) ? "wary" : said;   // people who can't fight keep away instead
   }
   // Creature against creature: a shared faction is friendly; otherwise the relations decide.
+  if (!mine.length) return "neutral";
   const theirs = membershipsOf(b);
+  if (!theirs.length) return "neutral";
   if (mine.some(([id]) => theirs.some(([o]) => o === id))) return "friendly";
   const rels = mine.flatMap(([id]) => theirs.map(([o]) => relation(id, o)));
   if (rels.includes(-1)) return unstrikable(b) || unstrikable(a) ? "neutral" : "hostile";
