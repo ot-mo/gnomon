@@ -19,6 +19,7 @@ import { stampVault, buildVault, pickVault, registerLegend, vaultById, VAULTS, G
 import { Zone, B, FLOOR_Z } from "../../src/world.js";
 import { makeRng, seedFor } from "../../src/rng.js";
 import { canTalk } from "../../src/creatures.js";
+import { ITEM_KINDS } from "../../src/items.js";
 import { makeLegend, dungeonParams, SITE_KINDS, SITE_BUILDERS } from "../../src/world/sites.js";
 import { buildRun, zoneSeed } from "../../src/world/run.js";
 import { compileWorld, tierOfLevel } from "../../src/world/worldmodel.js";
@@ -392,7 +393,17 @@ export function checkSites({ seeds = SEEDS } = {}) {
 
 // --- History's site requests (the P0 fixture: two Hours, two requests, one relic) ---------------------------
 export function checkHistoric({ seeds = SEEDS } = {}) {
-  const problems = [], stats = { built: 0, floors: 0, named: 0, relics: 0, trueMarks: 0, murals: 0 };
+  const problems = [], stats = { built: 0, floors: 0, named: 0, relics: 0, trueMarks: 0, trueMarkItems: 0, murals: 0 };
+  // While WS5's "credit" kind isn't registered here, a stand-in for one level shows the piles are laid when it is.
+  if (!ITEM_KINDS.credit) {
+    ITEM_KINDS.credit = { name: () => "true-mark", glyph: () => ["¶", [255, 255, 255]] };
+    try {
+      const f = generateDungeonLevel(5, { ...legacyParams(4, 5), final: true, forcedVault: null, bottom: { kind: "relic", id: null, relic: null, trueMarks: [3, 3, 2] } });
+      const piles = f.items.filter((o) => o.kind === "credit").map((o) => o.count);
+      stats.standIn = `piles ${JSON.stringify(piles)} with a credit kind registered`;
+      if (JSON.stringify(piles) !== "[3,3,2]") problems.push(`with a credit kind, the reliquary's true-mark piles are ${JSON.stringify(piles)}, want [3,3,2]`);
+    } finally { delete ITEM_KINDS.credit; }
+  }
   for (const [name, def] of WORLDS) {
     const W = compileWorld(def);
     for (const seed of seeds) {
@@ -426,6 +437,10 @@ export function checkHistoric({ seeds = SEEDS } = {}) {
             const marks = DUNGEONS.trueMarks[t.tier];
             if (f.vault.name !== "The Reliquary" || JSON.stringify(loot.trueMarks) !== JSON.stringify(marks)) problems.push(`${at}: the bottom isn't a reliquary with ${JSON.stringify(marks)} true-marks`);
             else stats.trueMarks += marks.reduce((a, b) => a + b, 0);
+            // The true-marks themselves lie there once WS5's "credit" kind is registered (BOTTOM_LOOT.trueMark).
+            const piles = f.items.filter((o) => o.kind === "credit").map((o) => o.count);
+            if (ITEM_KINDS.credit ? JSON.stringify(piles) !== JSON.stringify(marks) : piles.length) problems.push(`${at}: true-mark piles ${JSON.stringify(piles)}, want ${ITEM_KINDS.credit ? JSON.stringify(marks) : "none (no credit kind)"}`);
+            stats.trueMarkItems += piles.reduce((a, b) => a + b, 0);
             if (req.relicId) {
               const relic = run.history.relics.find((r) => r.id === req.relicId), it = f.items.find((o) => o.histRelic === req.relicId);
               if (!it || it.relicName !== relic.name || it.kind !== relic.base.kind) problems.push(`${at}: the relic ${req.relicId} isn't on the altar`);
