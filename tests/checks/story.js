@@ -96,6 +96,7 @@ export async function run(env) {
       "a tier without a span": (h) => { h.siteRequests[2].tier = 9; },
       "tier 8 (its one usable span sits beside the Gnomon)": (h) => { h.siteRequests[0].tier = 8; },
       "a gospel of four sentences": (h) => { h.rulers[3].events[2].text.gospel = "One. Two. Three. Four."; },
+      "two events with one gloss": (h) => { h.rulers[1].events[5].text.hostile = h.rulers[3].events[4].text.hostile; },
       "two favoured factions": (h) => { h.rulers[4].favoured = h.rulers[4].favoured.slice(0, 2); },
       "a relic placed twice": (h) => { const r = h.relics.find((x) => x.id); h.siteRequests[0].relicId = r.id; h.siteRequests[1].relicId = r.id; },
       "four Hours": (h) => { h.rulers.pop(); },
@@ -156,6 +157,15 @@ export async function run(env) {
         for (const d of a.values()) if (!SEC.secretText(r1, d)) fail(`seed ${seed} ${W.id}: ${d.id} has no text`);
       }
     }
+    // A mural names its event by its text alone (WS10 lays text): every account of 20 real runs resolves to itself.
+    let resolved = 0, wrong = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      const r = RUN.buildRun(seed, real);
+      for (const R of r.history.rulers) for (const e of R.events) for (const rd of SEC.READINGS) {
+        if (SEC.muralSecret(r, e.text[SEC.ACCOUNT[rd]]) === `hist:${e.id}:${rd}`) resolved++;
+        else if (++wrong <= 3) fail(`seed ${seed}: the ${rd} account of ${e.id} reads as ${SEC.muralSecret(r, e.text[SEC.ACCOUNT[rd]])}`);
+      }
+    }
     // Learning, in the test world.
     startRun(7);
     game.mode = "map"; game.view = "map"; game.story.cube = true; game.modeStack = []; game.pages = null;
@@ -203,7 +213,7 @@ export async function run(env) {
     offPass();
     game.run = keep.run; game.state.journal = keep.state;
     off();
-    stats.secrets = `ids stable over two builds and a save on ${stable} seed × world pairs (${total} secrets); a visit quest completed by entering the span ` +
+    stats.secrets = `${resolved} accounts of 20 runs each resolve to their own secret by text; ids stable over two builds and a save on ${stable} seed × world pairs (${total} secrets); a visit quest completed by entering the span ` +
       `and at once for a place visited; triangulation +${want} XP and a note; a cult pass at five triangulated events`;
   }
 

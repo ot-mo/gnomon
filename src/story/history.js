@@ -138,6 +138,7 @@ function makeHistory(seed, world) {
   const rng = makeRng(seedFor(seed, "run", "history"));
   const tiers = usableTiers(world);
   const taken = new Set();   // every name handed out, so no two places, regions or Hours share one
+  const accounts = { gospel: new Set(), inscription: new Set(), hostile: new Set() };   // every account written
   const fresh = (make) => { for (let k = 0; k < 60; k++) { const n = make(); if (!taken.has(n)) { taken.add(n); return n; } } throw new Error("history: ran out of fresh names"); };
   const history = { rulers: [], siteRequests: [], relics: [] };
 
@@ -157,7 +158,7 @@ function makeHistory(seed, world) {
   };
 
   for (let k = 0; k < 5; k++) {
-    const H = makeHour(rng, k, eras[k], fresh, when);
+    const H = makeHour(rng, k, eras[k], fresh, when, accounts);
     history.rulers.push(H.ruler);
     history.relics.push(...H.relics);
     history.siteRequests.push(...siteRequestsOf(rng, H, tiers, fresh));
@@ -165,7 +166,7 @@ function makeHistory(seed, world) {
   return history;
 }
 
-function makeHour(rng, k, era, fresh, when) {
+function makeHour(rng, k, era, fresh, when, accounts) {
   const G = GRAMMAR, period = G.periods[k];
   const name = fresh(() => hourName(rng)), short = name.toLowerCase();
   const pron = rng.pick(PRONOUNS);
@@ -180,7 +181,7 @@ function makeHour(rng, k, era, fresh, when) {
   const H = {
     k, name, short, pron, id: `hour:${short}`, domains: [d0], favoured: [], hated: [], cognomens: [G.domains[d0].cognomens[0]],
     colour: G.domains[d0].colour, profession: G.domains[d0].profession, regions, region: regions[0], crowned: false,
-    born: era.born, died: era.end, falseDeath: false, relics: [], events: [], renames: {}, fresh,
+    born: era.born, died: era.end, falseDeath: false, relics: [], events: [], renames: {}, fresh, accounts,
   };
   const deathAge = H.died - H.born;
 
@@ -441,10 +442,23 @@ function happen(rng, H, plan, when) {
   if (ev.falseDeath && type === "contest") gospel += " " + expand(G.rules, "returned", rng, ctx);
   if (type !== "origin" && type !== "death" && (plan.age < 16 || plan.age > 70))
     gospel += ` ${cap(H.pron.they)} ${H.pron.was} ${numberWords(plan.age)}.`;
+  // No two events of a run share an account: a mural names its event by its text alone (secrets.js muralSecret). A
+  // repeat is drawn again, then told apart by its place, then by its year.
+  const unique = (kind, make, tails) => {
+    const seen = H.accounts[kind];
+    let s = make();
+    for (let k = 0; k < 6 && seen.has(s); k++) s = make();
+    for (const tail of tails) if (seen.has(s)) s = tail(s);
+    seen.add(s);
+    return s;
+  };
+  const stop = (s) => s.replace(/[.!?]$/, "");
   ev.text = {
-    gospel: cap(gospel),
-    inscription: expand(G.rules, `${type}/${variant}/deep`, rng, ctx).toUpperCase(),
-    hostile: expand(G.rules, `${type}/${variant}/dark`, rng, ctx).toLowerCase(),
+    gospel: unique("gospel", () => cap(gospel), [(s) => `${s} It was at ${place}.`, (s) => `${s} (${year})`]),
+    inscription: unique("inscription", () => expand(G.rules, `${type}/${variant}/deep`, rng, ctx).toUpperCase(),
+      [(s) => `${stop(s)}, AT ${place.toUpperCase()}.`, (s) => `${stop(s)}, IN THE YEAR ${year}.`]),
+    hostile: unique("hostile", () => expand(G.rules, `${type}/${variant}/dark`, rng, ctx).toLowerCase(),
+      [(s) => `${s} / at ${place.toLowerCase()}`, (s) => `${s} / in ${year}`]),
   };
   if (c.relic && ev._relic === c.relic && !c.relic.text) relicText(rng, H, c.relic, place);
   H.events.push(ev);
@@ -547,6 +561,10 @@ export function validateHistory(h, { strict = true, world = null } = {}) {
       if (mine.length < 2 || mine.length > 4) out.push(`${at}: ${mine.length} relics, not 2-4`);
       if (mine.filter((r) => r.mask).length !== 1) out.push(`${at}: not one mask`);
     }
+  }
+  if (strict) for (const k of ["gospel", "inscription", "hostile"]) {
+    const all = h.rulers.flatMap((R) => R.events.map((e) => e.text?.[k]));
+    if (new Set(all).size !== all.length) out.push(`two events share a ${k}`);
   }
   const tiersOk = usableTiers(world);
   const names = new Set(), relicsPlaced = new Set();
