@@ -501,9 +501,17 @@ export function checkItems(m) {
       use(known("lancet"));
       r.lancetWall = g5.hp === h5;   // a wall between: the beam stops at it
       p = fresh({ view, depth: 4 }); lineEast(p);
+      hostileAhead(p, 6);   // (something to aim at, beyond the knife's 4 tiles: on the map, abilities.js's P0 stub aims at it)
       const x0 = p.x, knife = known("foldKnife");
       use(knife);
       r.foldKnife = { moved: +(p.x - x0).toFixed(2), charge: knife.cell.charge };
+      // Nothing in sight on the map: an aimed artifact is lowered, nothing paid (in 3D the crosshair always gives a point).
+      if (view === "map") {
+        p = fresh({ view, depth: 4 }); lineEast(p);
+        const f0 = p.funds, gun = known("glimgun", null), lc = known("lancet");
+        use(gun); use(lc);
+        r.noTarget = p.funds === f0 && lc.cell.charge === 2500;
+      } else r.noTarget = true;
       p = fresh({ view, depth: 4 }); lineEast(p);
       const bead = known("recallBead"), home = [p.x, p.y];
       use(bead);
@@ -532,7 +540,7 @@ export function checkItems(m) {
         w("plumb-bob", r.plumbBob), w("quicksilver level", r.quicksilver), w("echo-bell", r.echoBell.revealed > 0 && r.echoBell.charge === 400),
         w("glimgun", r.glimgun.hurt > 0 && r.glimgun.paid === 1), w("lancet", r.lancet.hit === 2 && r.lancet.charge === 2250), w("lancet (stopped by a wall)", r.lancetWall),
         w("fold-knife", r.foldKnife.moved > 2 && r.foldKnife.moved <= 4.6 && r.foldKnife.charge === 2200), w("recall bead", r.recallBead.back && r.recallBead.charge === 1500),
-        w("still-dial", r.stillDial), w("lantern-mote", r.lanternMote.lit === 0.4 && r.lanternMote.after300s === 50 && r.lanternMote.outWhenEmpty),
+        w("still-dial", r.stillDial), w("no target: nothing paid", r.noTarget), w("lantern-mote", r.lanternMote.lit === 0.4 && r.lanternMote.after300s === 50 && r.lanternMote.outWhenEmpty),
       ].filter(Boolean);
       if (bad.length) fail(`${view}: ${bad.join(", ")} didn't do what it says: ${JSON.stringify(r)}`);
     }

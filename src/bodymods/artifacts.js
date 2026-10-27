@@ -203,6 +203,8 @@ function toggle(game, p, it) {
 const AIM_RANGE = { foldKnife: 4, glimgun: 10, lancet: 8 };
 export function aimArtifact(game, p, it) {
   requestTarget(game, { range: AIM_RANGE[it.id] || 10, target: ARTIFACTS[it.id].target }, (target) => {
+    // No target (cancelled, or on the map nothing in sight to aim at): nothing happens, nothing is paid.
+    if (!target) { game.log(`You lower the ${ARTIFACTS[it.id].name}: nothing to aim it at.`, [170, 170, 170]); return; }
     const t = fireArtifact(game, p, it, target);
     if (t && game.mode === "map") mapUseTime(game, t);
   });
