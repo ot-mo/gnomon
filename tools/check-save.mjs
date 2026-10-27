@@ -134,7 +134,17 @@ if (args.browser) {
       if (k < 0) { fail(`the title has no "${id}" line`); return; }
       await press(page, "Home", ...Array(k).fill("ArrowDown"));
     };
-    const pastStory = async (page) => { for (let k = 0; k < 30 && (await G(page, () => game.mode)) === "story"; k++) await press(page, "Space"); };
+    // WS4's wizard first, which the title's first item opens once it is registered (since p2-ws4a; at the WS9 merge),
+    // by its keys alone (End on the mutations' list, Tab on the name, Enter on each step); then the intro's pages.
+    const pastWizard = async (page) => {
+      for (let k = 0; k < 20; k++) {
+        const step = await G(page, async () => (window.game.mode === "create" ? (await import("/src/screens/create.js")).wizard().step : null));
+        if (!step) return;
+        if (step === "track") await press(page, "End"); else if (step === "name") await press(page, "Tab");
+        await press(page, "Enter");
+      }
+    };
+    const pastStory = async (page) => { await pastWizard(page); for (let k = 0; k < 30 && (await G(page, () => game.mode)) === "story"; k++) await press(page, "Space"); };
     const where = (page) => G(page, () => ({ key: game.zone?.key, x: game.player?.x, y: game.player?.y, mode: game.mode, slot: game.saving?.slotId, cp: game.saving?.cp,
                                               unclean: game.saving?.unclean, reason: game.saving?.last?.reason }));
 
