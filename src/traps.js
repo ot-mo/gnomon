@@ -12,8 +12,8 @@
 import { B, FLOOR_Z } from "./world.js";
 import { distance } from "./rng.js";
 import { damageMonster } from "./combat.js";
-import { CREATURE_TYPES, canTalk } from "./creatures.js";
-import { statusFlag } from "./status.js";
+import * as creatures from "./creatures.js";
+import { statusFlag, hasStatus } from "./status.js";
 
 export const TICK = 0.5;
 
@@ -46,7 +46,9 @@ export function layoutSpikes(zone, cells, rng, pattern = rng.pick(["wave-x", "wa
 }
 
 // Anything standing on a tile when its spikes come up gets hurt, once per beat.
-// (Flying, a jump in 3D, or a flat being's plane: the spikes miss.)
+// (Flying, a jump in 3D, or a flat being's plane: the spikes miss. That goes for you too while you're flat
+// (bible §10.2: spikes rise harmlessly through you): WS8's touchesYou(game, null) says so where it exists,
+// else the flat status does.)
 export function updateSpikes(game) {
   const { zone, player: p } = game;
   if (!zone.spikes.size) return;
@@ -58,13 +60,14 @@ export function updateSpikes(game) {
     const i = Math.floor(x) + Math.floor(y) * zone.w;
     return last !== beat && spikeState(zone, i, game.time) === "up" && z < FLOOR_Z + 0.35 && zone.stand[i] === FLOOR_Z;
   };
-  if (!statusFlag(p, "flying") && p.onGround !== false && hits(p.x, p.y, p.z, p.spikeBeat)) {
+  const flatYou = creatures.touchesYou ? !creatures.touchesYou(game, null) : hasStatus(p, "flat");
+  if (!statusFlag(p, "flying") && !flatYou && p.onGround !== false && hits(p.x, p.y, p.z, p.spikeBeat)) {
     p.spikeBeat = beat;
     game.hurtPlayer(2 + Math.floor(zone.level / 3) + Math.floor(Math.random() * 3), "the spikes");
   }
   for (const m of [...zone.creatures]) {
-    const t = CREATURE_TYPES[m.type];
-    if (canTalk(m) || m.vis.statue || t.hover || t.flat || t.boss || !hits(m.x, m.y, m.z, m.spikeBeat)) continue;
+    const t = creatures.CREATURE_TYPES[m.type];
+    if (creatures.canTalk(m) || m.vis.statue || t.hover || t.flat || t.boss || !hits(m.x, m.y, m.z, m.spikeBeat)) continue;
     m.spikeBeat = beat;
     damageMonster(game, m, 3 + Math.floor(Math.random() * 3), [200, 200, 210], `The ${m.name} is skewered by the spikes.`);
   }
@@ -84,12 +87,22 @@ export function nearSpikes(game, r = 7) {
   return false;
 }
 
+// The beat in 3D (bible §8.2's Gears power, WS5's metronome heart `beatSight`): BEAT_SIGHT.has(game) says
+// whether you see it; then the spikes about to rise glow faintly at your feet as well. A seam: false until the
+// implant's owner sets it (at WS5's merge: (game) => implantEffect(game.player, "beatSight")).
+export const BEAT_SIGHT = { has: (game) => false };
+const WARN_ART = ["  w   w  ", " wW  wW  "];
+const WARN_PALETTE = { w: [[255, 170, 60], 0.6], W: [[255, 120, 40], 0.4] };
+
 export function spikeSprites(game) {
   const { zone, player: p } = game, out = [];
+  const sight = BEAT_SIGHT.has(game);
   for (const i of zone.spikes.keys()) {
     const x = i % zone.w, y = (i - x) / zone.w;
-    if (Math.abs(x + 0.5 - p.x) > 16 || Math.abs(y + 0.5 - p.y) > 16 || spikeState(zone, i, game.time) !== "up") continue;
-    out.push({ x: x + 0.5, y: y + 0.5, z: FLOOR_Z, w: 0.9, h: 0.55, art: SPIKE_ART, palette: SPIKE_PALETTE });
+    if (Math.abs(x + 0.5 - p.x) > 16 || Math.abs(y + 0.5 - p.y) > 16) continue;
+    const state = spikeState(zone, i, game.time);
+    if (state === "up") out.push({ x: x + 0.5, y: y + 0.5, z: FLOOR_Z, w: 0.9, h: 0.55, art: SPIKE_ART, palette: SPIKE_PALETTE });
+    else if (sight && state === "warn") out.push({ x: x + 0.5, y: y + 0.5, z: FLOOR_Z, w: 0.9, h: 0.2, art: WARN_ART, palette: WARN_PALETTE });
   }
   return out;
 }

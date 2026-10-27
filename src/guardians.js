@@ -15,9 +15,20 @@
 //
 // Each is an AI hook (ai.js AI_HOOKS "guardian:flatqueen", "guardian:warden", "guardian:colossus"), run
 // every update before the usual AI: it shrugs off blindness and long stuns, then guardianThink(game, m,
-// dt, occ); returning true would skip the rest of that AI for this update.
+// dt, occ); returning true would skip the rest of that AI for this update. A site's dungeon can end in any
+// of the three halls by id (p.bottom = { kind: "guardian", id }); there the gate opens onto the end.
+//
+// Legends (bible §12.13; world/sites.js makeLegend, gen/vaults.js spawnLegend) borrow the guardians' rules:
+//   "legend:twicePressed"   the Flat Queen's: flat (fought on the map) for 6 s, then deep (fought in 3D) for 6 s
+//   "legend:lamplessSaint"  the Gloom Warden's: there only in the dark; it snuffs the braziers near it, and
+//                           standing in their light (or a lamp's) burns it
+// and on every arrival in a zone (zone:prepare) each legend and history relic there claims its uid (zones.js
+// claimUid): one that lives elsewhere, or died, is taken away, so a legend lives in exactly one zone and a
+// killed one never comes back; the legend's looks and mutations are put back on (legendLooks).
 import { resolveAttack, naturalSpec } from "./combat.js";
-import { emit } from "./events.js";
+import { emit, on } from "./events.js";
+import { claimUid, uidWhere, zoneState } from "./zones.js";
+import { legendLooks } from "./content/creatures/legends.js";
 import { registerAIHook } from "./ai.js";
 import { spawnCreature, addCreature, removeCreature } from "./creatures.js";
 import { B, FLOOR_Z } from "./world.js";
@@ -212,3 +223,61 @@ export function slamState(zone, i, time) {
   if (zone.slamDone && time - zone.slamDone.time < 0.4 && zone.slamDone.cells.has(i)) return "up";
   return null;
 }
+
+// --- Legends ------------------------------------------------------------------------------------------------
+const TWICE_PRESSED = 6, SAINT_SNUFF = 12;
+// A legend's def: the run's legends (run.legends), else the lair site that made it.
+export function legendDef(game, uid) {
+  const run = game.run;
+  if (!run || !uid) return null;
+  const own = run.legends?.get?.(uid);
+  if (own) return own;
+  for (const s of run.sites?.values() || []) if (s.legend?.uid === uid) return s.legend;
+  return null;
+}
+
+registerAIHook("legend:twicePressed", (game, m, dt) => {
+  if (m.state !== "chase") return false;
+  m.g ||= { t: 0 };
+  if ((m.g.t += dt) < TWICE_PRESSED) return false;
+  m.g.t = 0;
+  m.risen = !m.risen;
+  game.log(m.risen ? `${m.name} stands up out of the floor, suddenly deep. (Strike it in 3D.)`
+    : `${m.name} lies back down into the plane. (Strike it on the map.)`, m.color);
+  sfx("rotate", { up: m.risen, at: m });
+  return false;
+});
+
+registerAIHook("legend:lamplessSaint", (game, m, dt) => {
+  const zone = game.zone;
+  if (fearLight(game, m, dt)) return true;
+  if (m.state !== "chase") return false;
+  m.g ||= { snuff: SAINT_SNUFF };
+  if ((m.g.snuff -= dt) > 0) return false;
+  m.g.snuff = SAINT_SNUFF;
+  for (let y = Math.max(0, m.ty - 8); y <= Math.min(zone.d - 1, m.ty + 8); y++)
+    for (let x = Math.max(0, m.tx - 8); x <= Math.min(zone.w - 1, m.tx + 8); x++)
+      if (zone.get(x, y, FLOOR_Z) === B.BRAZIER_LIT) {
+        zone.set(x, y, FLOOR_Z, B.BRAZIER);
+        zone.refresh();
+        game.log(`${m.name} breathes, and a brazier goes out.`, [170, 190, 255]);
+        return false;
+      }
+  return false;
+});
+
+// A legend that follows you (WS8's followers, brain.leader "player") moves its home with you. A history relic
+// is claimed once, where generation laid it (relicSpawn): after that it is an ordinary thing you can carry off.
+on("zone:prepare", (game, { zone }) => {
+  for (const c of [...zone.creatures]) {
+    if (!c.flags?.legend) continue;
+    const where = uidWhere(game, c.uid);
+    if (where !== "dead" && where !== zone.key && c.brain?.leader === "player") zoneState(game).uids[c.uid] = zone.key;
+    else if (!claimUid(game, c.uid, zone.key)) { removeCreature(zone, c); continue; }
+    const def = legendDef(game, c.uid);
+    if (def) legendLooks(c, def);
+  }
+  if (!zone.items.some((it) => it.relicSpawn)) return;
+  zone.items = zone.items.filter((it) => !it.relicSpawn || claimUid(game, it.uid, zone.key));
+  for (const it of zone.items) delete it.relicSpawn;
+});
