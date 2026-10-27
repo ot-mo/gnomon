@@ -2,8 +2,8 @@
 // go in, used through interact.js's registerUse (§1.4), and the services a surgeon or a tinker sells through
 // talk.js registerService (their trade screen is WS6b's; P0's shop already lists services).
 //
-//   CRADLE                         the block id: blocks.js's reserved STATION ("cradle"; its name and map look are
-//                                  the integrator's to set: docs/ws5.md)
+//   CRADLE                         the block id: blocks.js's reserved STATION ("Truing Cradle", ¤ on the map outdoors;
+//                                  set by the integrator at the WS5 merge)
 //   useCradle(game, x, y, z)       E on it in 3D, walking into it on the map: the Truing Cradle screen
 //                                  (screens/equipment.js) for the Plumb; anyone else is told it isn't for them
 //   SERVICES                       fitImplant · removeImplant (a surgeon: the same rules, fee and hour as a Cradle),

@@ -73,7 +73,7 @@ export const BLOCKS = [
   { key: "BONE",      name: "bone",        color: [225, 215, 190], reserved: true },
   { key: "CRYSTAL",   name: "crystal",     color: [180, 220, 240], reserved: true },
   { key: "FUNGUS",    name: "fungus",      color: [170, 110, 180], reserved: true },
-  { key: "STATION",   name: "cradle",      color: [140, 170, 190], reserved: true },
+  { key: "STATION",   name: "Truing Cradle", color: [140, 170, 190], reserved: true, map: { glyph: "¤", color: [170, 200, 220] } },   // WS5's request 13 (¤: no bible §15.7 glyph)
   { key: "STILL",     name: "still",       color: [150, 120, 80],  reserved: true },
   { key: "SIGN",      name: "signpost",    color: [150, 110, 70],  reserved: true },
   { key: "SPARE_1",   name: "stone",       color: [140, 140, 150], reserved: true },
