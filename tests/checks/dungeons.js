@@ -470,6 +470,9 @@ export async function checkLegends({ seed = 7 } = {}) {
   const L = lair.legend, deep = `${lair.at.wx},${lair.at.wy},${lair.dungeon.levels}`, top = `${lair.at.wx},${lair.at.wy},${lair.dungeon.levels - 1}`;
   const surface = `${lair.at.wx},${lair.at.wy},0`;
   stats.legend = `${L.name} ${L.epithet} (${L.template}, ${L.species}, level ${L.level}) in ${lair.name}`;
+  // The run knows every lair's owner by uid (world/run.js's legends step, since the WS10 merge).
+  const owners = [...game.run.sites.values()].filter((s) => s.legend);
+  if (owners.some((s) => game.run.legends.get(s.legend.uid) !== s.legend) || game.run.legends.size !== owners.length) problems.push(`run.legends: ${game.run.legends.size} of ${owners.length} lairs' owners`);
   // 1. In its lair: there, once, claimed by the lair, in its looks.
   go(deep);
   const c = game.zone.creatures.find((o) => o.uid === L.uid);
