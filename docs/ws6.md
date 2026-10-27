@@ -172,12 +172,137 @@ their reasons.
     `node tools/serve.mjs 8646`; the factions screen in both views, a villager struck with witnesses, a builder's
     priest").
 
+## Public API (6b)
+
+DECISIONS applied throughout: glim is a counter (no liquid backing, no container backs money); liquids are the
+factions' sacraments and the base of tonics; the bonding rite is the Kindling, one rite per view. Everything new is
+plain JSON under `game.state` (`kindling`, `snuffer`, `donations`) or on the creature (`talk.state.stock`,
+`stockedAt`).
+
+### `social/merchants.js` (trade; `RULES.trade`)
+
+```js
+openTrade(game, c, tab = "theirs", { onPop })   // the trade screen: theirs / yours / services (registerService rows)
+priceOf(game, it, trader, side)   // "buy": worth × priceLevel(trader.level) × stats.priceMul(buy, the trader's step)
+                                  //   × 1.2 for the Snuffer; "sell": worth × priceMul(sell); a filled vial sells as glass
+repStepOf(game, c)                // bible §3.1: Warm +0.1, Bright +0.2, Cold −0.1 (main faction, standingOf); none: 0
+priceNote(game, c) → { ego, step, buy, sell, text }   // "EGO +2 · Warm −0.1 · buy ×1.20 · sell ×0.45" on the screen
+tradeRows(game, c, tab) · tradeRow(game, c, tab, row) → { ok, line, offer? }   // offer "theirs": a full flask refused a sale
+registerStock(id, (game, c, rng) → [{ item, count, price, best? }])   // c.merchant.stock names it; default "general"
+ensureStock(game, c) · restock(game, c) · bestStock(game, c) · isMerchant(c) · snuffed(game) · restockSeconds()
+```
+
+- **Prices** follow bible §3.1 only under the attribute set: `RULES.stats = "legacy"` (today's default) keeps the
+  parent's prices, as `stats.js priceMul` always did, so EGO and rep show in the multiplier line but move nothing until
+  the flip.
+- **Stock**: a builder's merchant (`talk.dialogue = "merchant"`) or any talker with `merchant` is stocked on its first
+  look, seeded by (run seed, the merchant, the world day): potions, knives, bombs, empty vials, its faction's sacrament
+  in vials, gear, an unknown potion and scroll, and a back-shelf piece four levels up shown only at Bright.
+- **Restock** on `zone:enter` (not a load) after `away` ≥ 2 world days (2 × 1,440 s); **the legacy Pell is never
+  restocked** (the parent rolled his pack once) and keeps his own `shop` screen (his services list `registerService`
+  rows there; `openTrade(game, pell, "services")` shows the same six).
+- A sale the flask can't hold is **refused whole** and the screen turns to the trader's goods (bible §3.1).
+
+### `social/ritual.js` (the Kindling; `RULES.kindling`)
+
+```js
+openRitual(game, c, { onPop })     // the flame-kin menu (screens/ritual.js)
+RITES = { tracing, lighting, snuffing }   readingsOf(factionId) → { set: Set<"flat"|"deep"|"dark">, only }
+canKindle(game, c) → null | why    riteReady(game, c, rite) → null | why    performRite(game, c, rite) → { ok, text, changes }
+opinionsOf(game, c) → [[factionId, "loves"|"likes"|"dislikes"|"hates", why]]   // c.opinions, else made (see the file)
+kin(game, c) · kinKey(game, c) · ritualRows(game, c) · ritualRow(game, c, row) · recruitCost(game, c)
+```
+
+- **Each rite is ready only in its view**: the Tracing on the map beside them (1 ink from a vial, or 1 glim); the
+  Lighting in 3D, torch lit, within 2 tiles and facing them (1 glim); the Snuffing in 3D with the torch out, in the
+  dark, within 2 tiles (an hour: 60 s of game time through `skipTime`, broken by a threat). All three need you on one
+  level and in sight of each other. Talk offers "Will you kindle with me?" to a **named** talker of a faction (c.named,
+  its type's `named`, a legend or a boss), not hostile, rep > −250; the answer lists only the rites ready where you
+  stand. "X only" factions take only that rite; "none" (the Askew) can't be kindled.
+- **The bond** (bible §3.3): opinions ±40 / ±80, own reading +40, its sacrament poured +20, gains × (1 + 0.1 × EGO
+  mod), XP `kindling` (WS4's `xpReward` when merged, else 0.08 × lvlXP). Later rites: +20 with Warm Hands (perk key
+  `warmHands`) within the cap.
+- **The menu**: readings and rumours from `game.state.journal.secrets` (+35 / +60, each sold once; a faction wants its
+  own reading kinds unless its def has `buys: { readings, topics }`), asking for one of `c.readings` (−40, through
+  WS7's `learnSecret` once it isn't a stub), powers in `c.teaches` (leveling.js `takePerk`, −50/−100/−150 by rank),
+  recruiting (WS8's `ai.recruit` when present; 2 Kindled followers, 3 at EGO 20), the best item (merchants; once per
+  pack). +120 net per creature; no cost below −250.
+- **Oathbreaking**: a "kill" of a flame-kin with you as the source and not `splash` → −120 with every faction, the
+  Moths to −600, `game.state.snuffer = { at, until: +7 world days }` (prices +20%, nobody kindles).
+
+### The rest
+
+```js
+voiceFor(c) → voice | typeId | null      // social/voices.js: c.voice, else the main faction's { pitch, wave, thin, ghost,
+                                         //   stone, flags } (a Hz range gives each speaker its own pitch), else the
+                                         //   legacy person's type id (sfx.js's own voice), else the type's `voice`
+liquidAt(zone, x, y)                     // social/liquids.js: zone.liquids[x + y × zone.w], else zone.liquid, else "water"
+liquidDef(id) · sameLiquid(a, b) · liquidName(id) · sacramentOf(factionId) · isSacrament(factionId, liquidId)
+drinkLiquid(game, e, id) → line          // bible §13.7 with the statuses the game has (new status "nightEyes")
+LIQUIDS (content/liquids.js)             // 13 liquids + "water" (= fresh water); every faction's sacrament
+CONTAINERS = { vial }  ·  item kind "vial" { effect: liquidId | "" }   // fill beside water (feet to knees), drink, pour
+makeShrine(c, { cost, faction }) · donate(game, c, glim) · DONATIONS   // social/shrines.js: the legacy shrine as a
+                                         //   component; the Vigil +10 per 50 (to +200), the Lampless +1 per 2 in the dark
+registerCoinage(id, def) · COINAGES · coinsOf(e, id) · coinRoom(e, id)   // social/backings.js: the "item" backing and
+                                         //   the item kind "coinage" (used only if content/currency.js asks for it)
+```
+
+`dialogue.js`: talk answers may be `{ trade: tab }` or `{ ritual: true }`; closing either screen starts the talk over;
+each letter is spoken in `voiceFor(c) ?? c.type`. `builders.js`'s merchant answers `{ trade: "theirs" }`.
+
+## Integration requests (6b)
+
+1. **`tests/checks/body.js` (P0's; asked of the coordinator):** its own item-kind sample list needs WS6b's two kinds,
+   one line like WS5's: `out.push({ kind: "vial", effect: "brine", count: 1 }, { kind: "coinage", effect: "glim", count: 3 });   // WS6b`.
+   Until then `check-body` fails "registered kind vial / coinage has no sample in the check".
+2. **`combat.js` (WS8), oathbreaking:** thorns (`killMonster(…, "dies on your thorns")`) and the lightning arc
+   (`"is struck down"`) kill with you as the source; bible §3.3 says splash doesn't count. Have `killMonster` pass
+   `splash: true` in the "kill" payload for those two (ritual.js already skips such a kill).
+3. **The renderer (WS3's `render3d.js` / `light.js`), the Snuffer's mark:** while `game.state.snuffer.until >
+   game.time`, no shadow under you in 3D; and for the rest of the run (`game.state.snuffer` set at all) the torch's
+   radius −1.
+4. **`sfx.js`:** nothing to do; WS3's `voiceOf` (on `main`) takes `voiceFor`'s objects. On this branch (P0's sfx.js)
+   faction voices fall back to Maren's until the merge.
+5. **WS7 (secrets, villages):** journal entries the Kindling reads: `{ kind: "location"|"history"|"village"|"gossip"|
+   "recipe", reading: "flat"|"deep"|"dark", text, sold }`; a creature's own readings in `c.readings` (secret ids);
+   village leaders `named: true`; generated opinions may be given as `c.opinions`. A faction's `buys: { readings,
+   topics }` (content/factions.js, C) narrows what it wants.
+6. **WS4 (powers):** teachers list power ids in `c.teaches`; Warm Hands is the key `warmHands`; WS4 #11's Kindling XP
+   is applied (`xpReward("kindling", level)` with `{ source: "kindling" }`).
+7. **Content (C1-C4), not built here:** the faction variants of the rites (the Pouring, the Oiling, the Ascent's 8
+   blocks up, the Mirroring's order, the Moths' Moon-Wick and the Saltbeasts' Herdmothers only); the village dish; the
+   faction specials (the Spore Moot's limb, the Pressing, the Snuff); the commons lamp; the Chandler banks; clear glim's
+   and turnwater's full effects (WS4b, WS5, WS3).
+8. **`tools/README.md` (the integrator):** the check-social row adds "WS6b: prices, the item backing, Pell's services
+   through the trade screen, the Kindling's three rites, restock, voices, liquids, shrines"; the browser-ws6 row adds
+   "the trade screen, the Kindling on the map, in lit 3D and in the dark, Pell's services".
+
 ## Handoff
 
-**Updated:** 2026-10-27, local session, on `ws/ws6`. **WS6a is done: tag `p1-ws6a` on `ws/ws6` (pushed).** Nothing is
-half finished. Gate numbers, deviations and the verification: `docs/sessions/ws6.md` "Part 6a".
+**Updated:** 2026-10-27, local session, on `ws/ws6`. **WS6b is done: tag `p1-ws6b` on `ws/ws6` (pushed); WS6a's tag
+`p1-ws6a` is below it.** Nothing is half finished. Gate numbers, deviations and the verification:
+`docs/sessions/ws6.md` "Part 6a" and "Part 6b".
 
-### For the integrator (merging `p1-ws6a`)
+### For the integrator (merging `p1-ws6b`)
+
+- Requests (6b) 1-8 above. For play: **2** (thorns and the lightning arc as splash in combat.js's "kill", or a flame-kin
+  caught by an arc makes you the Snuffer) and **3** (the Snuffer's look in 3D). Request 1 (check-body's sample line)
+  is in this branch if the coordinator allowed it (see "Part 6b" §6), else it is yours at the merge.
+- Files outside §8.4's WS6b list: `tests/checks/content.js` (one `ITEM_SAMPLES` line, `// WS6b`, `599ad65`),
+  `content/factions.js` (WS6a's: the Flatfolk's and the Plan's voice ranges), `social/builders.js` (WS6a's: the
+  merchant opens the trade screen; walkDialogue accepts `{ trade }` and `{ ritual }`), `tools/browser-ws6.mjs` (WS6's).
+  No fixture or recorded frame changed.
+- At the merge: `sfx.js` on `main` already takes `voiceFor`'s objects (WS3's `voiceOf`); WS8's `ai.recruit` and WS4's
+  `xpReward`/`gainXp(…, { source })` are picked up by namespace import (nothing to edit); WS7's `learnSecret` turns on
+  "ask for a reading" once it isn't a stub. Rerun `node tools/check-social.mjs` and `browser-ws6` (port of your
+  choice) after the merge: the Kindling's numbers depend on content/factions.js's relations and on `stats.js priceMul`
+  (the attribute set's prices; WS4a's Haggler term is on `main`).
+- Prices move with EGO and rep only under `RULES.stats = "attributes"`; today's legacy set keeps the parent's prices,
+  so in play the multiplier line reads ×1.00 / ×0.30 until the flip.
+- Timing: nothing WS6b adds runs per frame or per tick (talk options, "kill" and "zone:enter" handlers only);
+  `check-perf --against p0-done --rounds 2` alone: PASS twice.
+
+### For the integrator (merging `p1-ws6a`, if not yet merged)
 
 - Requests 1-11 above. The ones that matter most for play: **1** (people with health, so a talking villager can be
   struck: without it the witness system fires only on faction members that don't talk), **2** (harm without a source
@@ -194,37 +319,6 @@ half finished. Gate numbers, deviations and the verification: `docs/sessions/ws6
   call); passTime alone against `p0-done` ×1.05. In a full run-all with other sessions busy, check-perf reads the
   machine (`docs/sessions/ws6.md` §3, §6).
 
-### Next: WS6b in this worktree (TECH_DESIGN §8.3 "WS6b")
-
-WS6b's files: `dialogue.js`, `social/merchants.js`, `social/ritual.js`, `social/voices.js`, `social/shrines.js`,
-`social/backings.js`, `social/liquids.js`, `screens/trade.js`, `screens/ritual.js`, `content/liquids.js`,
-`content/items/containers.js`, and its cases added to `tests/checks/social.js` (after Part 6a's, keeping
-`run(env)`). DECISIONS: glim is a counter with **no liquid backing and no containers** (so `backings.js` builds the
-item backing only and `content/items/containers.js` stays an empty table, or holds nothing that backs money); liquids
-are the factions' sacraments for the Kindling and the base of tonics; the bonding rite is **the Kindling** (the
-Tracing on the map, the Lighting in lit 3D, the Snuffing in the dark; numbers in bible §15.6 and §3.3).
-
-The exact first steps:
-
-1. **Trade** (`social/merchants.js openTrade`, `screens/trade.js` MODE "trade"): replace `builders.js`'s merchant
-   option `{ shop: "buy" }` with `openTrade(game, c)` (keep `{ shop: … }` for the legacy Pell until his services are
-   proved through the new screen). Prices through `currency.js buyPrice/sellPrice` (EGO and rep: `stats.js priceMul`
-   reads rep? check it; bible §3.5 "Warm: the shop discount", "Bright: the best stock"). Use `standingOf(game, c)` for
-   the band, and keep the Cold rule (curt → the pack shut).
-2. **The Kindling** (`social/ritual.js openRitual`, `screens/ritual.js` MODE "ritual"): rep `±40 / ±80` with
-   `addRep(game, id, n, "kindling")` (bible §3.5), readings bought and sold once, a power learned, recruiting through
-   WS8's `ai.recruit` (the follower rules in `factions.js` already hold); add it as a talk option with
-   `registerTalkOptions` for talkers whose faction's `rite` allows the current view (map / lit 3D / dark).
-3. **Voices** (`social/voices.js voiceFor(c)`): from `FACTIONS[id].voice` (`{ hz, wave, flags }`, bible §15.4) of the
-   main faction (`standingOf` or `membershipsOf`), else the species; `sfx.js speakLetter` takes it (`dialogue.js`
-   passes `t.npc.type` today).
-4. **Shrines** (`social/shrines.js`): the legacy shrine as a component any statue creature can carry.
-5. **Backings** (`social/backings.js`): the "item" backing only, `registerBacking("item", { funds, pay, receive })`.
-6. **Restock** on `zone:enter` after `away` ≥ two game days; the acceptance: price multipliers against EGO, pay and
-   receive with overflow for the item backing, Pell's legacy services all reachable through `registerService` (they
-   are, since 0C: keep `check-talk` green), the trade and ritual screens in the browser (extend
-   `tools/browser-ws6.mjs`).
-
 ### Surprising / worth knowing
 
 - **Talkers can't be struck** in P0 (and WS8): `touchable` refuses any talker. Until request 1 lands, a builder's
@@ -237,3 +331,10 @@ The exact first steps:
   happened in this worktree, and a parallel `browser-0d2` run read its mutant. Run verifiers' mutants in a copy.
 - **Timing on this machine**: with WS9, WS4b and the integrator busy, a full run-all reads the timed checks 2-4×
   slow; take timed numbers alone, alternating with `p0-done` (`check-perf --against p0-done`).
+- **(6b) The old game's Pell keeps his own shop and his one pack**; only WS6b's merchants (any talker with
+  `talk.dialogue = "merchant"` or a `merchant` component) use the trade screen and restock.
+- **(6b) A load is a zone:enter with `away` = the time since you last left that zone**, not since the save: a handler
+  that means "after being away" must skip `how === "load"` (merchants.js does).
+- **(6b) Money leaks hide in liquids and rep**: anything a pool gives for nothing must not sell for more than its
+  container costs (a filled vial sells as glass); the Kindling's best item turns rep into goods, so it is once per pack.
+- **(6b) Talk text types out**: a browser or Node check that reads a talk node presses Space (or sets `shown`) first.
