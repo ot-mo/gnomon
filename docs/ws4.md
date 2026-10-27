@@ -303,8 +303,9 @@ part 4b. The tables above ("4b", the public API, "the mutations, with what they 
 **After the merge:** `node tools/run-all.mjs`; `NODE_PATH="$(npm root -g)" node tools/browser-0d2.mjs --only
 progression,imports,abilities,shell,hud,content`; `browser-ws4.mjs` on the integration port; browser-0d1 once request
 15 is in. **The timed gates:** at the tag `check-dungeons` and `check-perf` were red only with the user's `train.py`
-holding the CPU at 91-96%, level with `p0-done` in alternation (`docs/sessions/ws4.md` §12); rerun them on an idle
-machine.
+holding the CPU at 91-96%, level with `p0-done` in alternation (`docs/sessions/ws4.md` §12); their absolute budgets are
+unconfirmed for this tree until an idle-machine run: rerun `check-perf` and `check-dungeons` on an idle machine before
+`main` moves to `p2-ws4b`. (The flip waits for the user's look at the TTK tables anyway.)
 
 **Surprising / worth knowing:**
 - Cast's turns of the world are watched each frame (update id `"mutations:turns"`): a test that sets `game.view` by

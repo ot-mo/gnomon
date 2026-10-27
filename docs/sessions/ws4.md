@@ -381,3 +381,9 @@ card's click); the paths that wait for WS8's target screen and WS1's world map (
   return) and nothing to generation. `check-dungeons` alternating with `p0-done`'s own: p95 112 / 117 / 101 ms against
   103 / 104 / 107 (both far over 40 at that load); alone at 68% CPU earlier it passed (37.2 ms).
 - **run-all:** 35 of 37 at the tag's tree, twice (515.5 s and 353.7 s, 11 at a time): every check but `check-dungeons` and `check-perf`, which failed with the user's `train.py` job holding the CPU at 91-96% (eight worker processes), their own reference trees as far over budget in the same runs (`p0-0d1`'s outdoor frame 57 ms against 17, its dungeon generation p95 143 ms against 40), and level with `p0-done` in alternation (above). Rerun alone at 94-96% CPU, `check-dungeons` read p95 104.3 ms (budget 40); at 68% earlier it passed. check-progression passes in run-all (68.1 s) and alone (section 8).
+  In alternation with `p0-done` (above): check-perf's 5 + 5 runs pooled ×0.92-1.13 on every measure but surface
+  generation's single max, which the A/B of `src/` puts at ×0.92; that A/B's quiet rounds ×0.90-1.05; check-dungeons
+  p95 112 / 117 / 101 ms against 103 / 104 / 107. **The absolute budgets (§6.7: frames 17 ms, generation 40 and 60 ms,
+  passTime 12 ms…) are unconfirmed for this tree until a run on an idle machine.** Tagged on the coordinator's word
+  (2026-10-27), as `p0-done` and WS6a were: the only reds are timed checks under the training job, with no regression
+  against `p0-done` in alternation.
