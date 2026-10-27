@@ -438,6 +438,37 @@ function resting(G, problems) {
   out.hourly = { hours: r.elapsed / H, rolls };
   if (!near(r.elapsed, 3 * H + 30) || rolls !== 3) problems.push(`rest: ${rolls} rolls in ${r.elapsed / H} hours, not one a whole hour`);
   void orig;
+  // The rate: 1,500 one-hour rests on a span of rate 0.4 (its bands placing nothing): half the travel rate (× 1.5 at
+  // night), within ±2 points; never travellers (nobody calls on a sleeper).
+  {
+    game = fresh(G, 59, G.game.world);
+    goTo(game, 3, 3);
+    const t = game.run.world.tileAt(3, 3), kinds = {};
+    let hits = 0, want = 0;
+    const undo = [swap(t, { encounterRate: 0.4 }), swap(PATCH_OPS, { band: () => {} })];
+    try {
+      for (let k = 0; k < 1500; k++) {
+        const rr = rest(game, { until: H });
+        want += 0.4 * (isNight(game) ? OW().nightEncounter : 1) * OW().restEncounter;
+        if (rr.encounter) { hits++; kinds[rr.encounter.kind] = (kinds[rr.encounter.kind] || 0) + 1; }
+      }
+    } finally { undo.forEach((u) => u()); }
+    out.restRate = { hours: 1500, rate: +(hits / 1500).toFixed(4), want: +(want / 1500).toFixed(4), kinds };
+    if (Math.abs(hits - want) / 1500 > 0.02) problems.push(`rest: encounters ${(hits / 1500).toFixed(4)} an hour at a span rate of 0.4, want ${(want / 1500).toFixed(4)}`);
+    if (kinds.travellers) problems.push(`rest: ${kinds.travellers} travellers called on a sleeper`);
+  }
+  // On the world map you are in no zone: a hunter by where you stood doesn't stop a rest there.
+  {
+    game = fresh(G, 60, G.game.world);
+    goTo(game, 3, 3); enterWorldMap(game);
+    const me3 = game.player, c3 = spawnCreature("goblin", Math.floor(me3.x) + 2, Math.floor(me3.y), FLOOR_Z, { rng: makeRng(3), state: "chase" });
+    c3.z = me3.z; addCreature(game.zone, c3);
+    const u = overrideRules("overworld", { restEncounter: 0 });
+    let rr;
+    try { rr = rest(game, { until: 2 * H }); } finally { u(); }
+    out.worldRest = rr.why;
+    if (rr.why === "hostile" || !near(rr.elapsed, 2 * H)) problems.push(`rest on the world map: stopped by a hunter in the zone you left (${rr.why}, ${rr.elapsed} s)`);
+  }
   // R10: poison does its full, finite damage; a cooldown counts down exactly.
   game = fresh(G, 54, G.game.world);
   goTo(game, 3, 3);
