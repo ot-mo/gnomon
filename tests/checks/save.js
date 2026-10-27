@@ -1592,8 +1592,8 @@ async function ws9Sections(ctx) {
     const want = [
       ["THE ROTATION CUBE", [255, 230, 120]], ["", null], ["Click to play", [255, 255, 255]], ["", null],
       ["WASD move · Shift sprint · Space jump", [170, 170, 170]], ["Mouse look · Left click attack · Wheel zoom", [170, 170, 170]],
-      ["E use / talk · I inventory · J journal · L look · T / right-click throw · V fire · Q quick-heal · R swap weapons · F torch · M music · N sounds", [170, 170, 170]],
-      ["1-9 the abilities on your hotbar (1 Fold Step)", [170, 170, 170]],
+      ["E use / talk · I inventory · J journal · T / right-click throw · Q quick-heal · R swap weapons · F torch · M music · N sounds", [170, 170, 170]],
+      ["L look · V fire · 1-9 the abilities on your hotbar (1 Fold Step)", [170, 170, 170]],
       ["Tab: rotate to the view from above (the map: turn-based; G its legend)", [170, 170, 170]], ["", null],
       ["From inside you see height, depth, light and dark.", [130, 130, 130]],
       ["From above you see the whole floor, the floor's pictures, and the flat things.", [130, 130, 130]],
