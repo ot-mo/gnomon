@@ -3,16 +3,17 @@
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
 **Updated:** 2026-10-27, the integrator (local session), on `integration`. **Phase 1 is running and Phase 2's
-integration has started: WS3, WS8, WS4 and WS6 (both halves each), WS5 and WS10 are merged (`p2-ws3`, `p2-ws8`,
-`p2-ws4a`, `p2-ws5`, `p2-ws6a`, `p2-ws4b`, `p2-ws6b`, `p2-ws10`), and the flip is in (`p2-flip`: the attribute set and
-d20 by default); the next `p1-*` tag merges as it lands (WS9 is paused before its tag).** From here on only the integrator edits this file and
+integration has started: WS3, WS8, WS4 and WS6 (both halves each), WS5, WS10 and WS2a are merged (`p2-ws3`,
+`p2-ws8`, `p2-ws4a`, `p2-ws5`, `p2-ws6a`, `p2-ws4b`, `p2-ws6b`, `p2-ws10`, `p2-ws2a`), and the flip is in (`p2-flip`:
+the attribute set and d20 by default); the next `p1-*` tag merges as it lands (WS7a next; WS9 is paused before its
+tag; WS2b and WS7b go on in their worktrees).** From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p2-flip` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
-  `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b` and `p1-ws10` with their integration requests, then the
-  flip; `p2-ws3` … `p2-ws10` before it).
+- **Last tag:** `p2-ws2a` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+  `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b`, `p1-ws10`, the flip and `p1-ws2a`, with their integration
+  requests; `p2-ws3` … `p2-flip` before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
 - **Branch:** `integration`, in the worktree `C:\Users\Otto Mörner\Code\gnomon-wt\integration` (serves on port
   8660). Nothing is half finished.
@@ -75,7 +76,7 @@ tags; WS1, which builds on the most, last):
 | 5 | WS4a → WS4b Character creation and progression | `ws4`, `ws/ws4` | WS4a tagged `p1-ws4a` (dc22850), **merged, `p2-ws4a`** (2026-10-27); WS4b tagged `p1-ws4b` (f8062f9), **merged, `p2-ws4b`** (2026-10-27) |
 | 6 | WS6a → WS6b Factions, dialogue builders → trade, the Kindling, backings | `ws6`, `ws/ws6` | WS6a tagged `p1-ws6a` (0697109), **merged, `p2-ws6a`**; WS6b tagged `p1-ws6b` (68ef866), **merged, `p2-ws6b`** (2026-10-27) |
 | 7 | WS10 Dungeon sites, lairs and legends | `ws10`, `ws/ws10` | tagged `p1-ws10` (1bbd302), **merged, `p2-ws10`** (2026-10-27) |
-| 8 | WS2a → WS2b Surface generation | `ws2`, `ws/ws2` | queued |
+| 8 | WS2a → WS2b Surface generation | `ws2`, `ws/ws2` | WS2a tagged `p1-ws2a` (386bd98), **merged, `p2-ws2a`** (2026-10-27); WS2b running |
 | 9 | WS7a → WS7b Knowledge: history, villages, quests | `ws7`, `ws/ws7` | queued |
 | 10 | WS1 Overworld travel | `ws1`, `ws/ws1` | queued |
 
@@ -171,7 +172,11 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   Hour's cult (bible §8.7, −500) and an Hourbound leader at the reliquary need factions (`site.historyRef.rulerId`).
 - **WS1** (at its merge; WS10 #7): a legend met on the road is a zone patch `{ op: "spawnCreature", uid: def.uid, type:
   def.species, level: def.level }` with the def from `legendOf(run, uid)`; its lair is then empty of it (checked).
-- **WS9** addition (from WS10 #2): `config.js` `VERSION.gen` should follow `world/run.js GEN_VERSION`, now 2.
+- **WS9** addition (from WS10 #2): `config.js` `VERSION.gen` should follow `world/run.js GEN_VERSION`, now 2. From
+  WS2a: #1, `save/codec.js` saves `zone.liquid` (in `AFTER`; one string a zone: without it a surface zone read back
+  holds plain water, the Brine Flats' brine and the rest lost); #3 (WS3 #6's other half, with WS9's "prefetch through
+  the loader"): a neighbour read from the save (`zones.js readAhead`) builds its far bands in the swap; step
+  `apronBandSteps(game.run, wx, wy)` a band a frame once the read lands, as a job beside `game.prefetchJob`.
 - **C4 / WS5** (WS6a #5's wearables, bible §3.5): the feather cloak, an Hour mask, the Assize writ, ink stains give
   `addRep(game, f, n, "worn")` when worn and take it back when unworn. **Content (C)**, WS6a #9: the Lantern Moths'
   "like you while your torch is lit" (text only today); the Smoothers with no membership (the parent rule makes them
@@ -226,14 +231,10 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   WS4 #12 and #13: WS9's title pushes `"create"` with `{ seed, mode }` (the wizard is registered on `integration`
   since `p2-ws4a`), and the wizard can read `save.js RUN_MODES` instead of its own copy; the wizard is for the
   attribute set, which is the default since `p2-flip`, so the title's New game pushes it. WS4 #4 with WS9 #2 (startRun's `{ mode, player }`): above, under WS4b.
-- **WS2** (at its merge): WS3 #5, `map` looks for the reserved TRUNK, SHALE, LEAVES, REED (blocks.js); note bible
-  §15.7 reserves `♣` (speaking trees) and `^` (spikes), as blocks.js's comments say. WS3 #5 for GRASS (id 7, the
-  integrator's): **not applied**: §6.5's grass `"` is the amulet's reserved glyph (bible §15.7 outranks TECH_DESIGN),
-  and GRASS already shows as `.` in its own colour. WS3 #6, the edge-swap frame's step: the new zone's far apron
-  bands are built from the world functions in the swap frame (`zones.js fillApron` → WS2's `buildApronBand`); build
-  them during prefetch or a band a frame. Deferred to WS2's merge (it rewrites `buildApronBand`) together with WS9's
-  "prefetch through the loader" (both touch `zones.js`'s prefetch). WS3 #10, the Gnomon's 14-block voxel foot at
-  span (37, 3) (or C1's landmark plan): render3d starts the needle on whatever stands at the span's middle.
+- **WS2b** (at its merge; WS2a did WS3 #5, the map looks of TRUNK, LEAVES (`♠`), SHALE, CRYSTAL, GLASS, REED (`¦`), and
+  WS3 #6's staged far bands): WS3 #10, the Gnomon's 14-block voxel foot at span (37, 3) (or C1's landmark plan;
+  render3d starts the needle on whatever stands at the span's middle), in WS2b's open items; GRASS (id 7, the
+  integrator's) stays `.` (§6.5's `"` is the amulet's, bible §15.7).
 - **WS1, WS7, WS6b** (at their merges): WS4 #11, discoveries, quests, triangulations and Kindlings give XP through
   `gainXp(game, xpReward(kind, level), { source: kind })` (Pilgrim's ×2.2), and the powers waiting on them (Keen Eye,
   Pathfinder, Terrain lore, Homing sense: WS1; Hour script, Gossip, Triangulator, Vey's script: WS7) lose their `needs`
@@ -246,6 +247,25 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p2-ws2a`** (2026-10-27): `p1-ws2a` (386bd98) merged into `integration` (`031ea42`), no conflicts (`blocks.js` merged
+on its own: WS2a's map looks beside the Truing Cradle's); WS2a changed only its own checks (`tests/checks/edges.js`,
+`surface.js`). It brought WS3 #5 (TRUNK and LEAVES `♠`, SHALE, CRYSTAL, GLASS `.` in their colours, REED `¦`) and WS3
+#6's staged far bands (3D prefetch builds a zone's world-function bands ahead).
+- Applied, with an assertion that fails without it: #2 (`9c4f791`: `compileWorld` gives a river's `liquid` to every span
+  of its path as `tile.riverLiquid`; check-surface's real world with its first river inked: 21 of 21 spans, 20 of 20
+  edges with ink ports; without it "0 of 21"). Carried: #1 (the codec's `zone.liquid`) and #3 (a neighbour read from
+  the save steps its bands) to WS9's merge; WS3 #10 to WS2b; #4-#6 information (above, "WS2a").
+- Checks: `run-all` at `9c4f791` **38 of 38** (165 s). Timed alone against `p2-flip`, the CPU at 100% with other
+  sessions: `check-perf --rounds 3 --no-render` **PASS** (surface generation p95 39.2 ms against 206.9 in that run, max
+  172 against 422, both over 150 as the machine's; dungeon generation p95 39.1; passTime 10.5, ×1.01; mapStep ×0.99;
+  the swap 26.6 against 40.1); the per-span surface A/B (the same 40 spans, three alternating rounds): p50 20.1 / 24.8 /
+  22.5 ms against 24.1 / 22.6 / 21.8, p95 55-62 against 51-63, the slowest spans the same two landmarks. Browser
+  (`tools/serve.mjs 8660`, `?silent=1`, 0 console errors): `browser-0d1 --against p0-done` 23 of 23 modes, the HUD at
+  100×30, golden (b) 27 of 27, per tick underground +0.4% (3D) and +0.9% (map), surface 3D −11.2%, surface map +1.2%;
+  `browser-gate` (1234, 7: the swap frame 34.3 / 27.6 ms on SwiftShader against a 16.5 median, prefetched in 7 staged
+  frames of 13-23 ms, black 0.005 → 0.007); `browser-0c` (1234, 7); `browser-0d2 --all` (boot with 158 modules,
+  `test-world.html` 34 passed, 0 failed); `browser-silent`.
 
 **`p2-flip`** (2026-10-27): the formula flip (TECH_DESIGN §8.5; WS8 #9, WS4 #13), on its own tag after `p2-ws10`, at the
 user's call (above): `RULES.stats = "attributes"` and `RULES.combat = "d20"` by default (`0e79899`, `rules.js`). Nothing
@@ -622,6 +642,12 @@ its §8.4 files and two P0 checks).
 - **WS10 (merged; what's left):** six of bible §12.13's legendary templates need systems that aren't in (WS10 #8,
   content); history's sites are placed after P0's kinds (deviation 2); a spike kill's harm is nobody's, its experience
   yours (the integrator's call); the legends' opinions (the integrator's backlog).
+- **WS2a (merged; what's left):** WS2b builds the biome builders, the ways up the cliffs and the 3D-only plateaus,
+  the legend handlers and wildlife; cliff tops (about 14 columns a zone) have no way up yet; the map can't show height
+  (ground 4 or more up is a wall glyph, so `tile.elev` is unread); every river is plain water until C1 gives the
+  Inkrun `liquid: "ink"` (compileWorld passes it on since `p2-ws2a`); when spans change terrain in a run (the
+  Lengthening, WS1 or C) call `gen/surface.js forgetWorld(run.world)` first. A recorded outdoor map frame with a tree
+  in it changes (`♠`); golden (b) and the underground frames don't.
 - **WS6b (merged; what's left):** credit isn't built (a sale a full flask can't hold is refused); prices move with EGO and
   rep only under the attribute set (the flip); the legacy Pell keeps his own shop and his one pack; the Snuffer's
   torch −1 (the integrator's backlog); the content above.
