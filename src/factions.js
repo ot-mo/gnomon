@@ -13,7 +13,8 @@
 //   baseRep(game, factionId) → n   the start: the faction's startRep for the player's genotype (bible §15.4; a
 //                                  player without one, the quick game's, reads as Bent), raised to 0 in a
 //                                  Pilgrim run unless the faction says pilgrimFloor: false (bible §3.5, §10.1)
-//   addRep(game, factionId, n, reason) → rep   emits "rep" { faction, n, from, rep, reason } when it moved
+//   addRep(game, factionId, n, reason) → rep   n rounded to a whole, halves away from zero (a non-number moves
+//                                  nothing); emits "rep" { faction, n, from, rep, reason } when it moved
 //   band(rep) → bandName           thresholds −600, −250, +250, +600
 //   bandName(rep) → "Dark" | …     the light word for the band
 //   membershipsOf(c) → [[id, w]]   c.faction ({ id: weight }) or the type's `factions` (a list, or { id: weight });
@@ -68,7 +69,9 @@ export function addRep(game, factionId, n, reason = null) {
   if (!game.state) return 0;
   const rep = (game.state.rep ||= {});
   const from = repOf(game, factionId);
-  rep[factionId] = Math.max(REP_MIN, Math.min(REP_MAX, Math.round(from + n)));
+  if (!Number.isFinite(n)) return from;   // (bad content: a repOnKill that isn't a number)
+  const step = Math.sign(n) * Math.round(Math.abs(n));   // halves away from zero, the same both ways (−2.5 → −3, +2.5 → +3)
+  rep[factionId] = Math.max(REP_MIN, Math.min(REP_MAX, from + step));
   if (rep[factionId] !== from) emit(game, "rep", { faction: factionId, n: rep[factionId] - from, from, rep: rep[factionId], reason });
   return rep[factionId];
 }

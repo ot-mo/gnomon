@@ -18,7 +18,7 @@
 //   4. bot        a real run (seed 1234): you hit a Hollowmere villager by walking into it on the map, and again
 //                 with the 3D swing: the villager and the fellows that see it turn hostile, one out of range and one
 //                 of another faction don't, Hollowmere's rep drops by attackPenalty, the kill costs killPenalty and
-//                 the Assize and the Rustbacks gain half; the witnesses then hunt you (ai.js); a follower's blow
+//                 the Assize (who hate the Bent) gain half, the Rustbacks nothing; the witnesses then hunt you (ai.js); a follower's blow
 //                 counts; a blow at someone already out for you costs nothing
 //   5. builders   every legacy person's dialogue and every role (villager, priest, guard, wanderer, merchant) of
 //                 every faction at every band gives valid nodes, walked to depth 4 (each answer a node, null or a
@@ -203,6 +203,11 @@ export async function run(env) {
       const before = seen.length;
       F.addRep(game, "moths", 50);   // already at the top: nothing moved
       if (seen.length !== before) fail("addRep emitted a change that didn't happen");
+      // Halves round away from zero both ways, and a non-number moves nothing.
+      const h0 = F.repOf(game, "kites");
+      const down = F.addRep(game, "kites", -2.5) - h0, up = F.addRep(game, "kites", 2.5) - (h0 + down);
+      if (down !== -3 || up !== 3) fail(`addRep ±2.5 moved ${down} and ${up}, want -3 and 3`);
+      if (F.addRep(game, "kites", NaN) !== h0 || !Number.isFinite(F.repOf(game, "kites"))) fail(`addRep(NaN) left kites at ${F.repOf(game, "kites")}`);
       const e = seen.find((x) => x.faction === "assize");
       if (!e || e.n !== 300 || e.from !== -100 || e.rep !== 200 || e.reason !== "background") fail(`the rep event: ${JSON.stringify(e)}`);
     } finally { off(); }
@@ -214,9 +219,9 @@ export async function run(env) {
     // The Assize hates the Bent (Hollowmere's parent group); nobody else hates Hollowmere.
     const ok1 = r1.hollowmere === 95 && r1.assize === -698 && Object.keys(r1).length === 2;
     const ok2 = r2.hollowmere === 45 && r2.assize === -673 && Object.keys(r2).length === 2;
-    // Half weights: −2.5 rounds to the nearer whole (97.5 → 98 style), and the haters' half of 2.5 is 1 (the
+    // Half weights: −2.5 rounds away from zero to −3, and the haters' half of 2.5 is 1 (the
     // Saltbeasts hate the Clatter, the Assize the Bent).
-    const ok3 = r3.hollowmere === 43 && r3.clatter === 48 && r3.saltbeasts === -399 && r3.assize === -672 && Object.keys(r3).length === 4;
+    const ok3 = r3.hollowmere === 42 && r3.clatter === 47 && r3.saltbeasts === -399 && r3.assize === -672 && Object.keys(r3).length === 4;
     if (!ok1) fail(`a common Hollowmere kill: ${JSON.stringify(r1)}`);
     if (!ok2) fail(`a named Hollowmere kill: ${JSON.stringify(r2)}`);
     if (!ok3) fail(`a half-Hollowmere, half-Clatter kill: ${JSON.stringify(r3)}`);
