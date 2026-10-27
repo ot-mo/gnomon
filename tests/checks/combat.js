@@ -49,7 +49,7 @@ import { pushPlayerOut, killMonster } from "../../src/monsters.js";
 import { killXp } from "../../src/leveling.js";
 import { mapStep, passTime, refreshView, startTravel, travelStep } from "../../src/turns.js";
 import { overrideRules, RULES } from "../../src/rules.js";
-import { invalidateStats, mod, maxHp, av as armourValue, bonusTable } from "../../src/stats.js";
+import { invalidateStats, mod, maxHp, av as armourValue, bonusTable, bonus } from "../../src/stats.js";
 import { makeBody } from "../../src/body.js";
 import { makeRng, distance } from "../../src/rng.js";
 import { WEAPONS, ARMOURS, useItem } from "../../src/items.js";
@@ -1543,6 +1543,14 @@ export function checkArena(ctx, { runs = 100 } = {}) {
 // and the share of your health one kill costs (its damage per second × your time to kill). Means are weighted by
 // how often each creature turns up. Melee only (archers' arrows, venom, regeneration and elites left out).
 // The same table under the legacy sets (the parent game: every blow lands, STR 10) is the balance reference.
+// Two builds beside it (since the WS4b merge, for the tier 5-8 balance call before the flip), the same fighter and
+// the same rolls: "powers" takes a combat power at each level from 2 (POWER_ORDER, ranks as they allow; a milestone's
+// major at 5, 10, 15, 20 adds nothing here), so Mighty's STR, Tough's HP, Iron skin's armour, Quick strikes' swing,
+// Keen eye's crits and the Executioner count; "mutations" is a Bent with those powers and Spare Heart (+2 TOU),
+// Thistlehide (2 back for every blow that lands on you) and Regeneration at level / 2 (1 HP every 12 / (1.2 × l) s).
+// Thorns shorten your time to kill (its blows on you hurt it too), regeneration slows its time to kill you and
+// lowers a kill's cost.
+const POWER_ORDER = ["quick", "keenEye", "mighty", "quick", "keenEye", "mighty", "ironSkin", "ironSkin", "tough", "tough", "tough", "executioner", "regen", "regen", "longReach"];
 const BANDS = [1, 2, 3, 4, 5, 6, 7, 8].map((tier) => ({ tier, level: 3 * tier - 1 }));
 const GEAR = { 1: ["mace", "leather"], 2: ["longsword", "chain"], 3: ["waraxe", "scale"], 4: ["greatsword", "plate"] };
 export function ttkTables(ctx, { blows = 1500 } = {}) {
@@ -1554,18 +1562,24 @@ export function ttkTables(ctx, { blows = 1500 } = {}) {
   const z = arena("ws8-ttk", { w: 16, d: 10 });
   enterZone(game, z, { how: "start" }); onMap(game);
   Object.assign(p, { x: 4.5, y: 5.5, z: FLOOR_Z });
-  const saved = { attrs: { ...p.attrs }, level: p.level, body: p.body, perks: p.perks };
+  const saved = { attrs: { ...p.attrs }, level: p.level, body: p.body, perks: p.perks, perkRank: p.perkRank, maxHpGain: p.maxHpGain, mutations: p.mutations };
   const table = {};
-  const sets = [["d20", "attributes"], ["legacy", "legacy"]];
+  const sets = [["d20", "attributes"], ["legacy", "legacy"], ["d20", "attributes", "powers"], ["d20", "attributes", "mutations"]];
   seedRandom?.(97);   // (the legacy set draws Math.random)
   try {
-    for (const [combat, statsSet] of sets) {
+    for (const [combat, statsSet, build] of sets) {
       const undo = [overrideRules("combat", combat), overrideRules("stats", statsSet)];
       const rows = [];
       for (const { tier, level } of BANDS) {
         const k = Math.floor(level / 4);
-        p.level = level; p.perks = {};
+        p.level = level; p.perks = {}; p.perkRank = {}; p.maxHpGain = 0; p.mutations = {};
         p.attrs = { ...saved.attrs, str: 18 + Math.ceil(k / 2), agi: 17 + Math.floor(k / 2), tou: 16 };
+        if (build) {
+          for (const id of POWER_ORDER.slice(0, level - 1 - Math.floor(level / 5))) { p.perks[id] = true; p.perkRank[id] = (p.perkRank[id] || 0) + 1; }
+          p.attrs.str += 2 * (p.perkRank.mighty || 0);
+          p.maxHpGain = 8 * (p.perkRank.tough || 0);
+        }
+        if (build === "mutations") p.mutations = { spareHeart: 1, thistlehide: 1, regeneration: Math.max(1, Math.floor(level / 2)) };
         const gt = level >= 12 ? 4 : level >= 8 ? 3 : level >= 4 ? 2 : 1;
         p.body = makeBody("humanoid");
         p.body.equip.hand_r = { kind: "weapon", id: GEAR[gt][0], ench: Math.floor(level / 6), known: true };
@@ -1582,19 +1596,24 @@ export function ttkTables(ctx, { blows = 1500 } = {}) {
           const itsHp = c.maxHp, T = CREATURE_TYPES[type];
           c.hp = c.maxHp = 1e12; c.cd = Infinity;
           const yours = [], theirs = [];
+          let thorns = 0;
           for (let b = 0; b < blows; b++) {
             yours.push(resolveAttack(game, p, c, weaponSpec(p), { view: "map" }).dmg);
             p.hp = 1e9;
+            const before = c.hp;
             theirs.push(resolveAttack(game, c, p, naturalSpec(c)).dmg);
+            thorns += before - c.hp;
             if ((b & 255) === 0) { game.effects.length = 0; run.logged.length = 0; }
           }
           z.creatures.splice(z.creatures.indexOf(c), 1);
           // Blows to bring hp down, drawing blows in turn from the sampled ones (a fixed walk through them).
           const toKill = (dmgs, hp) => { let sum = 0, nb = 0, total = 0, fights = 0; for (const d of dmgs) { sum += d; nb++; if (sum >= hp) { total += nb; fights++; sum = 0; nb = 0; } } return fights ? total / fights : Infinity; };
           const yourBlows = toKill(yours, itsHp), itsBlows = toKill(theirs, hpMax);
-          const yourTtk = yourBlows * swing, itsTtk = itsBlows * T.cooldown;
           const itsDps = theirs.reduce((a, d) => a + d, 0) / theirs.length / T.cooldown;
-          per.push({ type, w: n / 2000, yourTtk, itsTtk, cost: (itsDps * yourTtk) / hpMax });
+          const thornsDps = thorns / blows / T.cooldown, regenHps = bonus(p, "regen") / 12;
+          const yourTtk = thornsDps > 0 ? 1 / (1 / (yourBlows * swing) + thornsDps / itsHp) : yourBlows * swing;
+          const itsTtk = regenHps > 0 ? (itsDps > regenHps ? hpMax / (hpMax / (itsBlows * T.cooldown) - regenHps) : Infinity) : itsBlows * T.cooldown;
+          per.push({ type, w: n / 2000, yourTtk, itsTtk, cost: (Math.max(0, itsDps - regenHps) * yourTtk) / hpMax });
         }
         const wmean = (f) => per.reduce((a, r) => a + r.w * f(r), 0);
         const worst = per.reduce((a, r) => (r.cost > a.cost ? r : a), per[0]);
@@ -1604,7 +1623,7 @@ export function ttkTables(ctx, { blows = 1500 } = {}) {
                     types: per.length });
       }
       while (undo.length) undo.pop()();
-      table[combat] = rows;
+      table[build || combat] = rows;
     }
     // Bounds that hold the formulas, not a verdict on the balance (that is the table itself): you win a fight
     // with a creature of your level at every band; the first four tiers stay near the parent game's numbers.
@@ -1614,11 +1633,19 @@ export function ttkTables(ctx, { blows = 1500 } = {}) {
       expect(r.itKills >= 1.5 * r.youKill && r.costPct <= 75, `d20 tier ${r.tier}: it kills you in ${r.itKills} s, you it in ${r.youKill} s, a kill costs ${r.costPct}% (want it 1.5× slower and at most 75%)`);
       if (r.tier <= 4) expect(r.costPct <= 1.5 * L.costPct + 3 && r.youKill <= 1.5 * L.youKill + 0.5, `d20 tier ${r.tier}: a kill costs ${r.costPct}% in ${r.youKill} s against the legacy set's ${L.costPct}% in ${L.youKill} s (want within 1.5×)`);
     });
+    // The builds only help: never slower to kill, never dearer (within the rolls' noise).
+    for (const b of ["powers", "mutations"]) table[b].forEach((r, k) => {
+      const base = table.d20[k];
+      expect(r.youKill <= base.youKill * 1.05 + 0.02 && r.costPct <= base.costPct * 1.05 + 0.2, `${b} tier ${r.tier}: you kill in ${r.youKill} s at ${r.costPct}%, the plain fighter in ${base.youKill} s at ${base.costPct}%`);
+    });
+    const line = (r) => `tier ${r.tier} L${r.level} (HP ${r.hp}, DV ${r.dv}, AV ${r.av}): you kill in ${r.youKill} s, it kills you in ${r.itKills} s, a kill costs ${r.costPct}% (worst ${r.worst})`;
+    stats.powers = table.powers.map(line);
+    stats.mutations = table.mutations.map(line);
     stats.d20 = table.d20.map((r) => `tier ${r.tier} L${r.level} (${r.weapon}, HP ${r.hp}, DV ${r.dv}, AV ${r.av}): you kill in ${r.youKill} s, it kills you in ${r.itKills} s, a kill costs ${r.costPct}% (worst ${r.worst}; ${r.types} kinds)`);
     stats.legacy = table.legacy.map((r) => `tier ${r.tier} L${r.level}: you kill in ${r.youKill} s, it kills you in ${r.itKills} s, a kill costs ${r.costPct}%`);
     stats.table = table;
   } finally {
-    Object.assign(p, { attrs: saved.attrs, level: saved.level, body: saved.body, perks: saved.perks });
+    Object.assign(p, saved);
     invalidateStats(p);
     restoreRandom?.();
     run.restore();
