@@ -895,6 +895,135 @@ export async function checkProgression(m) {
       out.abilities = `${Object.keys(fired).length} abilities fired in both views (${Object.entries(fired).filter(([, n]) => n === 2).length} in each); ready again after ${JSON.stringify(parity)}`;
     }
 
+    // 7.9 The numbers, written out (verification: 24 of 62 mutants of 4b's code survived sections 7.1-7.8, which held
+    // each ability to its own def and fired it at level 1 well inside its reach). Combat rolls are fixed here.
+    {
+      const pins = [];
+      const pin = (what, got, want) => { pins.push(what); if (JSON.stringify(got) !== JSON.stringify(want)) fail(`${what}: ${JSON.stringify(got)}, want ${JSON.stringify(want)}`); };
+      // The defs: cooldown seconds (WIL 16: × 1) at levels 1, 5 and 12, the map's action time, the reach.
+      const p = bentIn(["foldStep", "kindle"], { view: "map" });
+      const want = { fling: [10, 10, 10, 0.5], wingsUp: [60, 60, 60, 0.5], bellows: [15, 15, 15, 1], flatwise: [30, 30, 30, 0.5], echo: [20, 20, 20, 0.5],
+                     overlook: [30, 22, 10, 1], shadowsense: [60, 60, 60, 0.5], kindle: [5, 5, 5, 0.5], foldStep: [12, 12, 12, 0.5] };
+      for (const [id, w] of Object.entries(want)) pin(`${id}'s cooldowns at 1, 5, 12 and map time`, [1, 5, 12].map((l) => A.abilityCooldown(p, id, l)).concat(A.ABILITIES[id].mapTime), w);
+      pin("Fold Step's reach at levels 1, 3, 10 (the mutation)", [1, 3, 10].map((l) => A.abilityRange(p, "foldStep", l)), [5, 7, 14]);
+      pin("Kindle's reach at levels 1, 4", [1, 4].map((l) => A.abilityRange(p, "kindle", l)), [6, 9]);
+      pin("Overlook's reach and Bellows' cone", [A.abilityRange(p, "overlook", 3), A.abilityRange(p, "bellows", 3)], [20, 3]);
+      // Level terms, fired at a level above 1 with the rolls fixed at their lowest (0) and highest (0.999).
+      const roll = (v, f) => { const old = game.combatRng; game.combatRng = () => v; try { return f(); } finally { game.combatRng = old; } };
+      const at3 = (muts, lvls, opts) => { const q = bentIn(muts, opts); q.level = 20; Object.assign(q.mutations, lvls); st.invalidateStats(q); return q; };
+      {
+        const q = at3(["thistlehide"], { thistlehide: 6 }, { view: "map" }), at = runEast(game.zone, 9);
+        place(q, at, 0);
+        const r = rat(at.x + 1, at.y, at.z, { hp: 99, maxHp: 99, speedMul: 0 });
+        roll(0, () => A.activate(game, q, "fling"));
+        pin("Fling at level 6, the lowest roll (1 + floor(6 / 2))", 99 - r.hp, 4);
+      }
+      for (const [v, dmg] of [[0, 3], [0.999, 12]]) {   // (in 3D, where no time passes in the use: the burning hasn't ticked yet)
+        const q = at3(["bellowsThroat"], { bellowsThroat: 3 }, { view: "3d" }), at = runEast(game.zone, 9);
+        place(q, at, 0);
+        const r = rat(at.x + 2, at.y, at.z, { hp: 99, maxHp: 99, speedMul: 0 });
+        roll(v, () => A.useAbility(game, q, "bellows"));
+        pin(`Bellows at level 3, every d4 rolling ${v ? 4 : 1}`, 99 - r.hp, dmg);
+      }
+      {
+        const q = at3(["flatwise", "wings", "shadowsense"], { flatwise: 3, wings: 3, shadowsense: 3 }, { view: "map" });
+        A.activate(game, q, "wingsUp"); A.activate(game, q, "shadowsense"); A.activate(game, q, "flatwise");
+        pin("Flatwise, Wings and Shadowsense at level 3 (3 + floor(3 / 2), 20 + 5 × 3, 8 + 2 × 3 s)", ["flat", "flying", "shadowsense"].map((s) => STS.statusLeft(q, s)), [4, 35, 14]);
+      }
+      {
+        const q = at3(["echoThroat"], { echoThroat: 3 }, { view: "3d" }), at = runEast(game.zone, 11);   // (in 3D only a sighting's own work shows them)
+        place(q, at, 0);
+        const near = rat(at.x + 9, at.y, at.z, { speedMul: 0 }), far = rat(at.x + 10, at.y, at.z, { speedMul: 0 });
+        game.zone.sightings.clear();
+        A.activate(game, q, "echo");
+        pin("Echo at level 3: a creature 9 tiles off on the map, one 10 off not", [game.zone.sightings.has(near.id), game.zone.sightings.has(far.id)], [true, false]);
+      }
+      {
+        // (in 3D: on the map the view's own sight would mark tiles around you as well)
+        const q = at3(["overlook"], {}, { view: "3d" }), at = runEast(game.zone, 9), zone = game.zone;
+        place(q, at, Math.PI);
+        zone.seen.fill(0);
+        const c = { x: Math.min(zone.w - 6, at.x + 14), y: Math.max(5, Math.min(zone.d - 6, at.y)) };
+        A.activate(game, q, "overlook", { creature: null, tile: c, point: { x: c.x + 0.5, y: c.y + 0.5, z: at.z }, dir: [1, 0, 0] });
+        const seen = (dx, dy) => !!zone.seen[c.x + dx + (c.y + dy) * zone.w];
+        pin("Overlook's 9 × 9: the corners in, a step past each edge out", [seen(4, 4), seen(-4, -4), seen(5, 0), seen(-5, 0), seen(0, 5), seen(0, -5)], [true, true, false, false, false, false]);
+      }
+      {
+        const q = at3(["kindle"], { kindle: 4 }, { view: "map" }), at = runEast(game.zone, 11), zone = game.zone;
+        place(q, at, 0);
+        zone.set(at.x + 10, at.y, WD.FLOOR_Z, WD.B.BRAZIER); zone.refresh(); zone.seen.fill(1);
+        const tooFar = A.activate(game, q, "kindle");
+        zone.set(at.x + 9, at.y, WD.FLOOR_Z, WD.B.BRAZIER); zone.refresh();
+        const lit = A.activate(game, q, "kindle") && zone.get(at.x + 9, at.y, WD.FLOOR_Z) === WD.B.BRAZIER_LIT;
+        pin("Kindle at level 4: a brazier 10 tiles off out of reach, one 9 off lit", [tooFar, lit], [false, true]);
+      }
+      // Night Eyes' sight with the torch out (3 + level / 2) and the attribute set's jump (1.5 blocks + the jump bonus).
+      {
+        const q = at3(["nightEyes", "stiltLegs"], { nightEyes: 1, stiltLegs: 1 }, { view: "map" });
+        q.torch = false;
+        const sight = [1, 4, 10].map((l) => { q.mutations.nightEyes = l; return m.playerMod.torchRange(q); });
+        pin("Night Eyes' sight at levels 1, 4, 10", sight, [3.5, 5, 8]);
+        const height = (l) => { q.mutations.stiltLegs = l; st.invalidateStats(q); return +(m.playerMod.jumpSpeed(q) ** 2 / 52).toFixed(2); };
+        pin("the jump at Stilt Legs 1, 3, 6 (1.5 + 0.5 × ceil(level / 2) blocks)", [1, 3, 6].map(height), [2.01, 2.51, 3.01]);
+        const legacy = rules.overrideRules("stats", "legacy");
+        try { pin("the legacy set's jumps (the parent's two)", [height(1), height(3)], [+(8.85 ** 2 / 52).toFixed(2), +(11.4 ** 2 / 52).toFixed(2)]); } finally { legacy(); }
+      }
+      // Spare Heart gained in play brings the HP it adds.
+      {
+        const q = bentIn([], { view: "map" });
+        const max0 = st.maxHp(q);
+        q.hp = max0;
+        PM.gainMutation(game, q, "spareHeart");
+        pin("Spare Heart in play: max HP and HP", [st.maxHp(q) - max0 > 0, q.hp === st.maxHp(q)], [true, true]);
+      }
+      // makeCharacter takes the defects' creases first, whatever the order chosen.
+      pin("defects listed last: four mutations and Dark-fear and Lightsick", C.makeCharacter(choicesFor("reedcutter", C.suggestSpread("bent", "reedcutter"), { mutations: ["wings", "gills", "foldStep", "kindle", "darkFear", "lightsick"] })).creases, 1);
+      // The offers' one seed path: (seed, "mutations", mutations gained), defects not counted.
+      {
+        const q = bentIn([], { view: "map" });
+        const o0 = PM.mutationOffers(game, q);
+        pin("the sheet's first offers by offerSeed(seed, 0)", o0, PM.mutationOffers(game, q, R.makeRng(PM.offerSeed(game.seed, 0))));
+        q.mutations.lightsick = 1;
+        pin("a defect doesn't redraw the offers", PM.mutationOffers(game, q), o0);
+        PM.gainMutation(game, q, o0[0]);
+        pin("after one gained, offerSeed(seed, 1)", PM.mutationOffers(game, q), PM.mutationOffers(game, q, R.makeRng(PM.offerSeed(game.seed, 1))));
+      }
+      // Cast: the third wake (not the second) calls the pack, 10 s of game time later; a pack for a zone you've left
+      // doesn't come (the Smoothers are that floor's); turns before you have the cube aren't counted.
+      {
+        const q = bentIn(["foldStep", "overlook", "shadowsense", "kindle"], { view: "map" });
+        q.mutations.kindle = 57; st.invalidateStats(q);   // Cast 60: 75%
+        const key = game.zone.key, wake = () => { for (let k = 0; k < 60; k++) if (PM.turnWorld(game)) return; };
+        game.state.cast = { turns: 300, wakes: { [key]: [game.time - 1] }, pack: null };
+        wake();
+        pin("two wakes in a zone call no pack", !!game.state.cast.pack, false);
+        wake();
+        pin("the third calls it, 10 s on", game.state.cast.pack && +(game.state.cast.pack.at - game.time).toFixed(6), 10);
+        const sent = [], off = m.events.on("smoothers", (g, e) => sent.push(e));
+        try {
+          game.state.cast.pack.zone = "elsewhere"; game.state.cast.pack.at = game.time;
+          step(1 / 60);
+          pin("a pack for a zone you've left", [sent.length, game.state.cast.pack], [0, null]);
+          game.story.cube = false; step(1 / 60); game.state.cast = null;   // (the watch reads the cube as it stood a frame ago)
+          for (let k = 0; k < 6; k++) { game.view = game.view === "map" ? "3d" : "map"; game.mode = game.view === "map" ? "map" : "explore"; step(1 / 60); }
+          pin("turns before you have the cube", game.state.cast?.turns ?? 0, 0);
+          game.story.cube = true;
+        } finally { off(); }
+      }
+      // K shows [+4] only when an offer can be bought.
+      {
+        const q = bentIn(["foldStep"], { view: "map" });
+        q.creases = 3;
+        press("KeyK"); press("Tab");
+        const none = find("[+4]");
+        q.creases = 4;
+        const some = find("[+4]");
+        press("Escape");
+        pin("K's [+4] with 3 creases and with 4", [!!none, !!some], [false, true]);
+      }
+      out.pinned = `${pins.length} numbers written out (cooldowns, map times, reaches, level terms at 3-10, Cast's 3 wakes and 10 s, the offers' seed, the jump, Night Eyes, Spare Heart)`;
+    }
+
     // 7.5 Cast and the Smoothers.
     {
       const p = bentIn(["foldStep", "overlook", "shadowsense", "kindle"], { ego: 16 });

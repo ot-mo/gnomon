@@ -20,7 +20,7 @@ const JUMP_HIGH = 11.4;            // with the High jumper perk: ≈ 2.5 blocks
 // How fast a jump leaves the ground. The legacy set: the parent's two heights (any jump bonus of 1 or more: High
 // jumper, the climber's ring). The attribute set: 1.5 blocks + the jump bonus in blocks (Stilt Legs' halves count),
 // at most 4 more.
-function jumpSpeed(p) {
+export function jumpSpeed(p) {
   const b = jumpBonus(p);
   if (RULES.stats === "legacy") return b >= 1 ? JUMP_HIGH : JUMP;
   return Math.sqrt(JUMP * JUMP + 2 * GRAVITY * Math.max(0, Math.min(4, b)));
