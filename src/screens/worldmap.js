@@ -117,9 +117,11 @@ registerScreen(MODE, {
   mouse(game, button, cell) {
     const h = at(cell), trip = game.trip;
     if (!trip || trip.busy) return;
-    if (h?.key) { dispatchKey(game, h.key, false, ""); return; }
+    // Under a prompt only its own Y / N answer, under the menu only its rows: the footer stays drawn below them,
+    // and its "Enter: go down" would otherwise say yes.
+    if (trip.prompt) { if (h?.key === "KeyY" || h?.key === "KeyN") dispatchKey(game, h.key, false, ""); return; }
     if (trip.menu) { if (h && h.menu !== undefined) chooseMenu(game, h.menu); else if (button === 2) trip.menu = null; return; }
-    if (trip.prompt) return;
+    if (h?.key) { dispatchKey(game, h.key, false, ""); return; }
     clickSpan(game, button, spanAtCell(cell));
   },
   hover(game, cell) { if (game.trip) game.trip.hover = spanAtCell(cell); },

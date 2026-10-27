@@ -579,7 +579,7 @@ async function stored(G, problems) {
 }
 
 // --- 7. Discovery ------------------------------------------------------------------------------------------------
-function discovery(G, problems) {
+function discovery(G, scr, problems) {
   const out = {};
   const game = fresh(G, 71, G.game.world), W = game.run.world, A = atlas(game), p = game.player;
   if (!isKnown(game, 0, 0)) problems.push("discovery: the start span isn't known");
@@ -661,7 +661,15 @@ function discovery(G, problems) {
     goTo(g3, from.wx, from.wy); enterWorldMap(g3);
     const t0 = g3.time, r = worldStep(g3, far.wx - from.wx, far.wy - from.wy);
     if (r.confirm !== "tier" || g3.time !== t0 || g3.trip.wx !== from.wx) problems.push("discovery: no tier warning before a tier-3 span at level 1");
-    const r2 = answer(g3, true);
+    // Under the prompt a click on the footer's "Enter: go down" doesn't answer it; a click on "Y: yes" does.
+    G.draw();
+    const lines = scr.frameText().split("\n"), find = (label) => { for (let y = lines.length - 1; y >= 0; y--) { const x = lines[y].indexOf(label); if (x >= 0) return { x, y }; } return null; };
+    const footer = find("Enter: go down");
+    SCREENS.get("world").mouse(g3, 0, footer);
+    if (!g3.trip?.prompt || g3.trip.wx !== from.wx) problems.push("discovery: a click on the footer's \"Enter: go down\" answered the tier warning");
+    const yes = find("Y: yes");
+    if (yes) { SCREENS.get("world").mouse(g3, 0, yes); if (g3.trip?.prompt) problems.push("discovery: a click on \"Y: yes\" didn't answer"); else out.promptClicks = true; }
+    const r2 = g3.trip?.prompt ? answer(g3, true) : { ok: g3.trip?.wx === far.wx, dropped: !g3.trip };
     if (!r2?.ok || g3.trip?.wx !== far.wx && !r2?.dropped) problems.push("discovery: yes to the tier warning didn't take the step");
     out.tierWarning = true;
   }
@@ -753,7 +761,7 @@ export async function run(env) {
   section("lost", (pr) => lost(G, pr));
   { const problems = []; let stats = {}; try { stats = await stored(G, problems); } catch (e) { problems.push(`threw: ${e?.stack || e}`); }
     results.push({ name: "overworld: a zone from the save", ok: !problems.length, problems, stats }); }
-  section("discovery", (pr) => discovery(G, pr));
+  section("discovery", (pr) => discovery(G, scr, pr));
   section("screen", (pr) => screen(G, scr, pr));
   return results;
 }
