@@ -203,8 +203,11 @@ agrees: the quick start's hotbar is in recorded frames only while it cools down)
 - Cast (bible §10.3) and the mutations' reputation changes (§10.4) are 4b's; `mentalLevel(e)` in `stats.js` is
   `level + mod(ego)`.
 
-**Integration requests 1-3** (WS8's) are WS4's or the integrator's: 1 is 4b's once `ws/ws8` is merged into the
-integration branch (its target screen isn't in this tree; don't merge it here).
+**Integration requests 1-3** (WS8's): 2 and 3 are the integrator's (settled, see above). 1 (the map's `requestTarget`
+through WS8's `screens/target.js`) touches WS4's `abilities.js` but needs WS8's screen, which this tree doesn't have and
+mustn't merge (`ws/ws8` stays out of `ws/ws4`): 4b keeps `abilities.js`'s seam as it is (`requestTarget(game, ability,
+done)`, callers continuing in `done`) so the integrator can swap the map's body at the WS4 merge; ask the coordinator
+before doing more.
 
 **Surprising / worth knowing:**
 - `progression/chargen.js` imports `game.js` (for `startRun`), and `game.js` reaches `screens/create.js`, which imports
@@ -215,3 +218,15 @@ integration branch (its target screen isn't in this tree; don't merge it here).
 - This machine runs WS9, WS5, the integrator and an ML job: timed checks read slow under load; take timed numbers
   alone, against `p0-done` in alternation (`node tools/check-perf.mjs --against p0-done`).
 - Port 8644 is WS4's (`node tools/serve.mjs 8644`); 8645 is WS5's.
+- What the verification changed that 4b builds on: a level's attribute point is credited when its card opens
+  (`screens/levelup.js openCard`), not in `gainXp`; the Plumb's implant goes through `freeImplants(background)` (WS5's
+  table costing ≤ 2, the background's own first) and `validateChoices` refuses anything else; a suggested name that
+  nobody touched is dropped when the genotype or background changes; `chargen.js NAME_PARTS` is what check-progression
+  holds to bible §15.11 (keep any new syllable or family in it).
+- Shell quoting on this machine: a Python heredoc through Git Bash turned `\n` and `\u0000` into raw characters in a
+  test file once; write such edits to a script file in the scratchpad (or use the Edit tool) instead.
+- Open for the user, not 4b: the Lamplighter of Cassin's 500 purse (`docs/sessions/ws4.md` deviation 2); the flip
+  before WS9's title can push the wizard (integration request 13).
+
+**State at the end of 4a:** tag `p1-ws4a` on `ws/ws4` (pushed), every 4a acceptance item with its numbers in
+`docs/sessions/ws4.md` "Part 4a"; nothing half finished; the server on 8644 stopped, no browser open.
