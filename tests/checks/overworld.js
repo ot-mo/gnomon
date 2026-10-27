@@ -48,7 +48,7 @@ import { REAL_WORLD } from "../../src/content/world/worldmap.js";
 import { ENCOUNTERS } from "../../src/content/encounters.js";
 import { enterWorldMap, worldStep, fastTravel, leaveWorldMap, travelPath, answer } from "../../src/overworld/travel.js";
 import { rest } from "../../src/overworld/rest.js";
-import { reveal, isKnown, pin, pinsAt, knownSites, discoveryXp } from "../../src/overworld/discovery.js";
+import { reveal, isKnown, pin, pinsAt, knownSites, discoveryXp, sight } from "../../src/overworld/discovery.js";
 import { encounterChance, rollEncounter, placeEncounter, legendsFor } from "../../src/overworld/encounters.js";
 import { atlas, canStep, edgeBetween, spanKey, OW } from "../../src/overworld/state.js";
 import { isLost } from "../../src/overworld/lost.js";
@@ -637,6 +637,21 @@ function discovery(G, scr, problems) {
       if (A.found[hidden.id] !== "road" || game.zone.key !== zoneKey(hidden.at.wx, hidden.at.wy, 0)) problems.push(`discovery: looking at a hidden site (${JSON.stringify(out.hidden)})`);
       else if (rect && (q.x < rect.x - 6 || q.x > rect.x + rect.w + 6 || q.y < rect.y - 6 || q.y > rect.y + rect.d + 6)) problems.push(`discovery: looking at ${hidden.id} put you at (${q.x.toFixed(1)}, ${q.y.toFixed(1)}), far from it`);
     } finally { undo.forEach((u) => u()); }
+  }
+  // A landmark of several spans is seen from any of them (Halfnight, (24..26, 11) on the real world), and from
+  // visibleFrom spans of its nearest.
+  {
+    const gr = fresh(G, 74, REAL_WORLD), L = gr.run.world.landmarks.get("halfnight");
+    if (L && L.spans.length > 1) {
+      const [x, y] = L.spans[L.spans.length - 1];
+      sight(gr, x, y);
+      if (!isKnown(gr, L.wx, L.wy)) problems.push(`discovery: standing on Halfnight's span (${x}, ${y}) didn't make it known`);
+      const g4 = fresh(G, 75, REAL_WORLD), L4 = g4.run.world.landmarks.get("halfnight");
+      const undo = swap(L4, { visibleFrom: 2 });
+      try { sight(g4, x + 2, y); } finally { undo(); }
+      if (!isKnown(g4, L4.wx, L4.wy)) problems.push("discovery: Halfnight with visibleFrom 2 not seen from 2 spans east of its east end");
+      out.sight = true;
+    }
   }
   // Travellers: a rumour of a site near by, pinned.
   {

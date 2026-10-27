@@ -112,7 +112,7 @@ export function sight(game, wx, wy) {
   if (!world) return;
   for (const L of world.landmarks.values()) {
     if (isKnown(game, L.wx, L.wy)) continue;
-    const r = L.wx === wx && L.wy === wy ? 0 : Math.max(...L.spans.map(([x, y]) => Math.max(Math.abs(x - wx), Math.abs(y - wy))));
+    const r = Math.min(...L.spans.map(([x, y]) => Math.max(Math.abs(x - wx), Math.abs(y - wy))));   // to its nearest span
     if (r <= (L.visibleFrom || 0)) for (const [x, y] of L.spans) reveal(game, x, y, 0);
   }
 }
