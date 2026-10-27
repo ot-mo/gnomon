@@ -174,28 +174,66 @@ their reasons.
 
 ## Handoff
 
-**Updated:** 2026-10-27, local session, on `ws/ws6`. **WS6a is implemented but NOT tagged** (the session hit its
-usage limit). Nothing is uncommitted.
+**Updated:** 2026-10-27, local session, on `ws/ws6`. **WS6a is done: tag `p1-ws6a` on `ws/ws6` (pushed).** Nothing is
+half finished. Gate numbers, deviations and the verification: `docs/sessions/ws6.md` "Part 6a".
 
-- **Done (committed, pushed):** `996561b` factions and attitude, `9a0a6c8` reputation events, `861cfa8` builders and
-  social/index.js, `7f7b736` the factions screen (P), `225a41c` check-social. `node tools/check-social.mjs` passes
-  (bot: map and 3D both Hollowmere 100 → 90 at the first blow → 85 at the kill, both witnesses hostile and hunting, the
-  far villager and the Clatter trader neutral; 566 talkers walked, 13,057 nodes; 0 problems). check-imports and
-  check-names pass. Baseline run-all at p0-done: 35 of 37, only timed checks failing under load (check-dungeons
-  alone: p95 37 ms, passes).
-- **Exact next step (WS6a still):** 1) run-all at 225a41c: 36 of 37 (152.7 s), only check-perf failing (timed, under load); rerun it alone
-  against p0-done (`check-perf --against p0-done`) and record the numbers. 2) Browser: serve
-  `node tools/serve.mjs 8646`, run the scratch script (copy it into the scratchpad again from the session, or write
-  `tools/browser-ws6.mjs` as an integration request): P in both views, a click on "Esc close", a villager struck
-  on the map, a priest's dialogue; `?silent=1`. `browser-0d1` will fail "modes never reached: factions" (P0 tool):
-  add an integration request with a block after its target block (on the map press P → "factions"; Esc, and a click
-  on "Esc close" → "map"). 3) Independent sceptical verification (gate + mutants; the old game in both views against
-  p0-done; spec review), one commit per finding. 4) Write `docs/sessions/ws6.md` "Part 6a" with the numbers above
-  and the run-all/browser numbers. 5) Tag `p1-ws6a`, push it.
-- **Then WS6b** (same worktree): trade screen through `openTrade` (replace builders.js's merchant `{ shop: "buy" }`),
-  the Kindling (rep ±40 / ±80 via `addRep(game, id, n, "kindling")`), voices from `FACTIONS[id].voice`, shrines, the
-  item backing; add its cases after Part 6a's in tests/checks/social.js.
-- **Deviations to record:** attackPenalty −10 is our number (the bible gives none); a talker that can't fight is
-  "wary" where a fighter would be "hostile"; ghosts are perceived by dark-sighted creatures (bible §15.4 over
-  TECH_DESIGN); the Assize's hatred of the Bent is a hidden group `bent` (Hollowmere and the Bent villages under
-  it); the quick game's player (no genotype) reads as Bent.
+### For the integrator (merging `p1-ws6a`)
+
+- Requests 1-11 above. The ones that matter most for play: **1** (people with health, so a talking villager can be
+  struck: without it the witness system fires only on faction members that don't talk), **2** (harm without a source
+  counts as yours: spikes and status deaths cost rep), **10** (`browser-0d1`'s tour block for the factions screen).
+- No P0 check, fixture or recorded frame was changed; the only file outside §8.4's WS6a list is the new
+  `tools/browser-ws6.mjs` (request 11).
+- Dependency table "WS6a witnesses": `reputation.js` uses WS8's `creatures.witnessesOf` by itself once both are in
+  (a namespace import); rerun `node tools/check-social.mjs` after the merge. Its bot's fellow behind a wall and the
+  range edges on the span 1,0,0 should agree with WS8's sight rules (WS8's `sees` adds darkness and stealth, so a
+  witness in the dark may not see you: if the bot's witnesses read neutral after the merge, check the light there).
+- WS8 #2 is applied here (a creature hostile to you is hostile to your followers); WS4 #8 too (start by genotype,
+  Pilgrim's floor), except `villageRep`, which is `chargen.js`'s (request 4).
+- Timing: `attitude` is now cheaper than P0's stub for creatures with no faction (190-380 against 1,460-1,840 ns a
+  call); passTime alone against `p0-done` ×1.05. In a full run-all with other sessions busy, check-perf reads the
+  machine (`docs/sessions/ws6.md` §3, §6).
+
+### Next: WS6b in this worktree (TECH_DESIGN §8.3 "WS6b")
+
+WS6b's files: `dialogue.js`, `social/merchants.js`, `social/ritual.js`, `social/voices.js`, `social/shrines.js`,
+`social/backings.js`, `social/liquids.js`, `screens/trade.js`, `screens/ritual.js`, `content/liquids.js`,
+`content/items/containers.js`, and its cases added to `tests/checks/social.js` (after Part 6a's, keeping
+`run(env)`). DECISIONS: glim is a counter with **no liquid backing and no containers** (so `backings.js` builds the
+item backing only and `content/items/containers.js` stays an empty table, or holds nothing that backs money); liquids
+are the factions' sacraments for the Kindling and the base of tonics; the bonding rite is **the Kindling** (the
+Tracing on the map, the Lighting in lit 3D, the Snuffing in the dark; numbers in bible §15.6 and §3.3).
+
+The exact first steps:
+
+1. **Trade** (`social/merchants.js openTrade`, `screens/trade.js` MODE "trade"): replace `builders.js`'s merchant
+   option `{ shop: "buy" }` with `openTrade(game, c)` (keep `{ shop: … }` for the legacy Pell until his services are
+   proved through the new screen). Prices through `currency.js buyPrice/sellPrice` (EGO and rep: `stats.js priceMul`
+   reads rep? check it; bible §3.5 "Warm: the shop discount", "Bright: the best stock"). Use `standingOf(game, c)` for
+   the band, and keep the Cold rule (curt → the pack shut).
+2. **The Kindling** (`social/ritual.js openRitual`, `screens/ritual.js` MODE "ritual"): rep `±40 / ±80` with
+   `addRep(game, id, n, "kindling")` (bible §3.5), readings bought and sold once, a power learned, recruiting through
+   WS8's `ai.recruit` (the follower rules in `factions.js` already hold); add it as a talk option with
+   `registerTalkOptions` for talkers whose faction's `rite` allows the current view (map / lit 3D / dark).
+3. **Voices** (`social/voices.js voiceFor(c)`): from `FACTIONS[id].voice` (`{ hz, wave, flags }`, bible §15.4) of the
+   main faction (`standingOf` or `membershipsOf`), else the species; `sfx.js speakLetter` takes it (`dialogue.js`
+   passes `t.npc.type` today).
+4. **Shrines** (`social/shrines.js`): the legacy shrine as a component any statue creature can carry.
+5. **Backings** (`social/backings.js`): the "item" backing only, `registerBacking("item", { funds, pay, receive })`.
+6. **Restock** on `zone:enter` after `away` ≥ two game days; the acceptance: price multipliers against EGO, pay and
+   receive with overflow for the item backing, Pell's legacy services all reachable through `registerService` (they
+   are, since 0C: keep `check-talk` green), the trade and ritual screens in the browser (extend
+   `tools/browser-ws6.mjs`).
+
+### Surprising / worth knowing
+
+- **Talkers can't be struck** in P0 (and WS8): `touchable` refuses any talker. Until request 1 lands, a builder's
+  talker (villager, priest…) is never hit and only non-talking faction members fire the witnesses.
+- **A talker that can't fight is "wary", not "hostile"**, where the table says hostile; the builders speak curtly to
+  a wary talker and refuse only at Dark (or a fighter out for you).
+- **`membershipsOf` returns a shared, frozen list for a creature type**: never sort or edit it in place (copy it).
+- **Followers**: the house rule applies to them; a cycle of leaders answers "neutral" (a depth guard).
+- **Running checks while another agent mutates the tree** gives nonsense: the gate verifier's mutation testing
+  happened in this worktree, and a parallel `browser-0d2` run read its mutant. Run verifiers' mutants in a copy.
+- **Timing on this machine**: with WS9, WS4b and the integrator busy, a full run-all reads the timed checks 2-4×
+  slow; take timed numbers alone, alternating with `p0-done` (`check-perf --against p0-done`).
