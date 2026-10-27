@@ -650,9 +650,11 @@ async function quests7b(env, { fail, stats, test, json, startRun, game }) {
         if (q.stage !== "return") throw new Error(`the thing in the pack: stage ${q.stage}`);
         // Dropped on the way back: fetching again, and no turn-in for it.
         const held = p.inv.find((i) => i.uid === prm.itemUid);
-        p.inv = p.inv.filter((i) => i !== held); tick();
-        events.emit(game, "quest:turnIn", { q });
-        if (q.stage !== "fetch" || q.done) throw new Error(`the thing dropped: stage ${q.stage}, done ${q.done}`);
+        p.inv = p.inv.filter((i) => i !== held);
+        events.emit(game, "quest:turnIn", { q });   // (before the tick that notices: the turn-in itself must refuse)
+        if (q.done) throw new Error("turned in with the thing dropped");
+        tick();
+        if (q.stage !== "fetch") throw new Error(`the thing dropped: stage ${q.stage}`);
         p.inv.push(held); tick();
       } else if (T === "carry") {
         enter(prm.target.key);
