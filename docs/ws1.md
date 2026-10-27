@@ -56,13 +56,16 @@ worldStep(game, dx, dy, { confirm, fast, drop = true }) → { ok, why?, confirm?
 fastTravel(game, { wx, wy }, { confirm }) → { ok, why?, confirm?, steps, seconds, path, stopped }
 leaveWorldMap(game, { at: "edge" | "center" | "site" | "lost", siteId }) → true | Promise (a zone read from the save)
 travelPath(game, from, to) → [{ wx, wy }] | null · stepHours(game, from, to, edge) → hours · answer(game, yes)
+dropInto(game, encounter) → true | Promise   // down at the edge, then the band or legend placed into the zone you
+          // are then in (8-12 tiles from where you arrive, also when that is the zone you opened the map from)
 rest(game, { until: "healed" | "dawn" | "noon" | "dusk" | "midnight" | seconds, keepLit }) → { elapsed, interrupted,
      why: null | "until" | "hostile" | "encounter" | "dead", encounter }                              // rest.js
 waitChoices(game) → [{ id, label, until }]
 reveal(game, wx, wy, radius = 0) → n · isKnown(game, wx, wy) · pin(game, wx, wy, { label, secretId }) → pin
 unpin(game, id) · pinsAt(game, wx, wy) · knownSites(game, wx, wy) · visit(game, wx, wy) · discoveryXp(game, site)
      // discovery.js; emits "discover" { kind, id, at, how } once a site
-isLost(game) · lostChance(game, to, edge, { fast }) · findBearings(game, line)                    // lost.js
+isLost(game) · lostChance(game, to, edge, { fast, learn, flying }) · findBearings(game, line)    // lost.js
+     // flying: as you set out (worldStep reads it before the hours pass)
 encounterChance(game, tile, { fast, rest }) · rollEncounter(game, at, opts) · placeEncounter(game, key, enc)
 atlas(game) · canStep(world, from, dx, dy) → reason | null                                        // state.js
 renderWorld(game) · worldView · spanAtCell(cell)                                                  // renderWorld.js
@@ -75,6 +78,8 @@ MODE = "world" · WAIT_MODE = "wait" · openWorldMap(game, { center }) · openWa
   `world: { visited, revealed, pins }` lives under `atlas`. `n` counts the travel stream's rolls
   (`hashFloat(seed, "travel", n)`), so a load rolls on where the save left off. The world screen isn't `saveable`:
   a save waits until you are back in a view.
+- **The journey** is `game.trip` (runtime, never saved). Going down clears it; any other zone entry (a new run, a
+  load) clears one left behind, and a death on the road clears it, so a later Z never rests "on the world map".
 - **RULES.overworld** (`state.js`): every number above, and `xp: { landmark: 0.3, site: 0.1 }`, read only where
   `RULES.progression.xp.rewards` (WS4's) doesn't name the kind.
 - **Zone patches:** `{ op: "band", types, elite, level?, state? }` (registered in `PATCH_OPS` by encounters.js); a
@@ -149,5 +154,14 @@ MODE = "world" · WAIT_MODE = "wait" · openWorldMap(game, { center }) · openWa
 
 ## Handoff
 
-See `docs/sessions/ws1.md` for the state of the gate. Next: the integrator merges `p1-ws1` (§8.5's order puts WS1
-last) and applies the requests above.
+**Done:** tag `p1-ws1` on `ws/ws1` (the commit after this file's last change). `node tools/run-all.mjs` 37 of 37;
+every §8.3 item with its numbers in `docs/sessions/ws1.md`; one independent verification (8 bugs, 9 check gaps, 3
+text items) and its recheck (2 more), all fixed, one commit each.
+
+**For the integrator** (§8.5 puts WS1 last): merge `p1-ws1`. Expect one conflict, the two import lines at the top of
+`tests/checks/world.js` (request 12: keep both). Then apply requests 2 (the journal's key), 3 and 4 (WS4's `needs`
+and `site` reward), 5 (`browser-0d1`'s tour, or it fails "modes never reached: world, wait"), 6 and 7 (torch.js,
+restClears) as you judge, and carry 8-10. A scratch merge into `p2-ws7b` was tested (`docs/sessions/ws1.md` §2, §5):
+the legend chain through a real lair, the secret's pin, Pilgrim's × 2.2 and the browser tools all pass there.
+
+**Nothing is half finished.** Nothing waits on the user.
