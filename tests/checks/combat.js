@@ -45,7 +45,8 @@ import { enterZone, changeZone, cachedZone, zoneState } from "../../src/zones.js
 import { spawnCreature, addCreature, CREATURE_TYPES, pickCreatureType, touchable, nearestCreature, witnessesOf, creaturesAlong } from "../../src/creatures.js";
 import { resolveAttack, rollToHit, hitChance, toHitMod, critNat, dvOf, weaponSpec, naturalSpec, playerMelee, bumpAttack, combatLine, thrownSpec } from "../../src/combat.js";
 import { guardianThink } from "../../src/guardians.js";
-import { pushPlayerOut } from "../../src/monsters.js";
+import { pushPlayerOut, killMonster } from "../../src/monsters.js";
+import { killXp } from "../../src/leveling.js";
 import { mapStep, passTime, refreshView, startTravel, travelStep } from "../../src/turns.js";
 import { overrideRules, RULES } from "../../src/rules.js";
 import { invalidateStats, mod, maxHp, av as armourValue, bonusTable } from "../../src/stats.js";
@@ -409,6 +410,24 @@ export function checkCombat({ game, startRun, srcFiles }) {
       kills.length = 0;
       for (let k = 0; k < 50 && z.creatures.includes(v); k++) resolveAttack(game, a, v, naturalSpec(a));
       expect(!z.creatures.includes(v) && p.xp === xp0 && kills[0]?.src === a, `the orc's kill: dead ${!z.creatures.includes(v)}, XP ${xp0} → ${p.xp}, kill src ${kills[0]?.src?.name}`);
+      // Your kill's XP (monsters.js killMonster, WS4's request 5): the parent's m.xp under the legacy set, the bible's
+      // killXp under the attribute set, and the float says what you gained.
+      {
+        const gained = {};
+        for (const set of ["legacy", "attributes"]) {
+          const undo = overrideRules("stats", set);
+          Object.assign(p, { level: 3, xp: 0 });
+          const g = addCreature(z, spawnCreature("goblin", 12, 4, FLOOR_Z, { rng: () => 0.5, level: 5, state: "idle" }));
+          const want = set === "legacy" ? g.xp : killXp(game, g);
+          killMonster(game, g, "The goblin dies.");
+          const float = game.effects.filter((f) => /XP$/.test(f.text || "")).at(-1)?.text;
+          gained[set] = { xp: p.xp, want, float };
+          undo();
+        }
+        Object.assign(p, { level: 1, xp: 0 });
+        expect(gained.legacy.xp === gained.legacy.want && gained.attributes.xp === gained.attributes.want && gained.attributes.want !== gained.legacy.want &&
+               gained.attributes.float === `+${gained.attributes.want} XP`, `your kill of a level-5 goblin: ${JSON.stringify(gained)} (want m.xp under legacy, killXp under attributes, the float the same)`);
+      }
       // On you: a higher AGI is hit less often.
       const rates = {};
       for (const agi of [12, 24]) {

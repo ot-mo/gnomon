@@ -9,7 +9,8 @@
 import { DIRS8 } from "./pathing.js";
 import { makeItem, randomPotion, randomScroll, randomEquipment, randomJewel, awayFromWalls } from "./items.js";
 import { HEIGHT, RADIUS, moveAxis, bonus } from "./player.js";
-import { gainXp } from "./leveling.js";
+import { gainXp, killXp, modeXp } from "./leveling.js";
+import { RULES } from "./rules.js";
 import { sfx } from "./sfx.js";
 import { maxHp } from "./stats.js";
 import { setStatusHarm, STATUS_DEFS } from "./status.js";
@@ -43,9 +44,12 @@ export function killMonster(game, m, message, dropLoot = true, byPlayer = true, 
   zone.sightings.delete(m.id);
   if (m.uid && uidWhere(game, m.uid)) killUid(game, m.uid);   // a claimed uid (a quest's, a legend's) stays dead
   if (Math.hypot(game.player.x - m.x, game.player.y - m.y) < 14) { game.log(message, [230, 230, 230]); sfx("kill", { at: m }); }
-  if (byPlayer && m.xp > 0) {
-    game.effects.push({ kind: "damage", x: m.x, y: m.y, z: m.z + m.h + 0.5, text: `+${m.xp} XP`, color: [160, 230, 255], time: game.time });
-    gainXp(game, m.xp);
+  if (byPlayer && m.xp > 0) {   // (the parent's xp says whether a kill gives any: the Lich King's 0 is the end)
+    // The legacy set gives the parent's m.xp; the attribute set the bible's (leveling.js killXp: by level, elites
+    // and legends more, two tiers below you less, three none). The float shows what you gain (Pilgrim's kills: 0).
+    const xp = RULES.stats === "legacy" ? m.xp : killXp(game, m, { legendary: !!(m.legend || t?.boss) });
+    game.effects.push({ kind: "damage", x: m.x, y: m.y, z: m.z + m.h + 0.5, text: `+${modeXp(game, xp, "kill")} XP`, color: [160, 230, 255], time: game.time });
+    gainXp(game, xp, { source: "kill" });
   }
   const ground = zone.stand[m.tx + m.ty * zone.w];
   const p = game.player;
