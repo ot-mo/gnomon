@@ -47,11 +47,13 @@ parent's order, so golden (a) and (b), the 47 recorded screen frames and the leg
 
 | File | What 4b builds |
 |---|---|
-| `content/mutations.js`, `progression/mutations.js` | ≥ 16 physical and mental mutations, 4 defects, 2 planar ones that bridge the views; `mutationOffers` (3 seeded offers, one of them planar), `gainMutation` (4 creases), `raiseMutation` (1 crease, cap floor(level / 2) + 1, at most 10), defects refunding 2-3; Cast (bible §10.3); the reputation changes of bible §10.4 |
-| `abilities.js` | Fold Step becomes the Bent's mutation (bible §15; `0D2.md` deviation 17), the innate grant dropped (id `foldStep` and hotbar key 1 kept); mutation and power abilities as sources; the map's target through WS8's screen (integration request 1 below) |
-| `screens/abilities.js` (B), `screens/charsheet.js` (K) | the list with cooldowns and assigning to 1-9; the sheet's tabs (attributes and derived stats, mutations or implants, powers, effects); the hotbar hint `0D2.md` §5 asks for |
-| `screens/create.js` | the mutation step with real offers (4a's step already spends creases through `gainMutation` once it exists) |
-| `progression/*` | spending creases after creation (the sheet), the crease economy at level-up |
+| `content/mutations.js` | 20 entries: 12 physical (Shellback, Thistlehide, Wings, Stilt Legs, Lampskin, Night Eyes, Regeneration, Spare Heart, Bellows Throat, Flatwise, Gills, Echo Throat), 4 mental (Fold Step, Overlook, Shadowsense, Kindle), 4 defects (Lightsick +2, Dark-fear +3, Moth-kissed +2, Crooked Manner +2); bible §13.5's planar flag (11), and `bridge` on the 5 that carry one view into the other (Flatwise, Echo Throat, Fold Step, Overlook, Shadowsense); every one costs 4 (bible §10.3, §15.6); bonus keys, abilities, bible §10.4's reputation. The rest of §13.5 waits for its hooks (the file's header lists why) |
+| `progression/mutations.js` | `mutationOffers` (3 seeded, one planar; never a defect), `offerRng` (the sheet's: stands until you buy one), `gainMutation` (4 creases; a defect refunds 2-3, only at creation; reputation; the ability on the first free hotbar key), `raiseMutation` (1 crease, cap floor(level / 2) + 1 and the mutation's max, at most 10), `canGain`, `canRaise`, `mutationLevel` (a mental one + EGO's modifier), Cast (`castOf`, `wakeChance`, `turnWorld`: wakes per zone, the third warns and emits `"smoothers"` 10 s later), the defects that come and go (statuses `shaken`, `mobbed`, `sunsick`) |
+| `progression/abilities.js` | the mutations' abilities: Fling, Wings, Bellows, Flatwise, Echo, Overlook, Shadowsense (and its status), Kindle; each in both views with the same cooldown seconds |
+| `abilities.js` | Fold Step is the Bent's mental mutation (4 + level; `0D2.md` deviation 17), id `foldStep` and hotbar key 1 kept; the quick start keeps P0's innate grant (4 tiles: its hotbar is in recorded frames), a made character has none; the `"mutations"` and `"powers"` ability sources; `abilityRange` (`rangeFor`); `requestTarget` unchanged for WS8's swap (integration request 1), and a picked tile (no creature) on the map is honoured by every ability that aims |
+| `screens/abilities.js` (B), `screens/charsheet.js` (K) | B: every ability with level, source, aim, range, WIL-scaled cooldown and seconds left; 1-9 / a click on a slot assign, 0 / a right click clear, Enter the first free key; the hint that keys 1-9 use the hotbar in both views. K: Attributes (derived numbers, level, XP, creases, Cast; attribute points spent), Mutations (raise for a crease, buy one of three offers for 4) or Implants, Powers, Effects (statuses, cooldowns, the bonus table) |
+| `screens/create.js` | the mutation step with real offers, the defects with their refunds, give-backs (a defect only while the rest still fits) |
+| `player.js`, `progression/chargen.js` | Night Eyes' dark range (`torchRange`), the attribute set's jump height (1.5 + the jump bonus, so Stilt Legs' halves count; the legacy set's two heights unchanged); a made character's `innate: []` and hotbar from its mutations, mutations validated (known, once, exclusions, creases), defects applied first, their reputation at `beginRun` |
 
 **4b's acceptance:** mutation offers identical for the same seed; each active mutation fires through the 3D aim path
 and the map's `requestTarget` in Node; abilities in both views with the same cooldown seconds; the B and K screens at
@@ -92,16 +94,69 @@ takePerk(game, id) · perkRank(p, id) · perkLabel(p, id)
 // RULES.progression = { xp: { killShare, elite, legendary, tiersBelow, pilgrimKill, pilgrimOther, rewards, beatEarly },
 //                       level: { attrPointEvery: 4, milestoneEvery: 5, offers: 3, offersHighInt: 4, highInt: 18 } }
 
+// progression/mutations.js (4b; re-exported by progression/index.js: mutationOffers, gainMutation, raiseMutation)
+mutationOffers(game, p, rng = offerRng(game, p)) → ids   // 3, one planar at least, none had or excluded, no defect
+offerRng(game, p) → rng                // seeded by (seed, "mutations", mutations gained): the sheet's offers stand until one is bought
+gainMutation(game, p, id) → 1          // 4 creases (a defect: −2/−3, only with game = null); invalidateStats; reputation; the
+                                       //   ability on the first free hotbar key; emits "mutate" { e, id, level, how }; throws on a refusal
+raiseMutation(game, p, id) → level     // 1 crease, to levelCap(p, id) = min(max, floor(level / 2) + 1, 10); throws on a refusal
+canGain(game, p, id) · canRaise(p, id) → null | why · levelCap(p, id) · mutationLevel(e, id) (mental: + mod(ego), ≥ 1)
+isMental(id) · isDefect(id) · creasesSpent(ids) · mutationRep(game, p, id) · watchDefects(game, p)
+castOf(e) · wakeChance(e) · packFor(cast) → { size, burnisher, great } · turnWorld(game) → woke
+// RULES.mutations = { cost: 4, raiseCost: 1, levelsPerCap: 2, maxLevel: 10, offers: 3, planarOffers: 1,
+//   cast: { free: 10, perEgo: 2, chance: 0.02, max: 0.75, wakes: 3, fade: 3600, delay: 10, pack: { over: 12, per: 8, max: 4, burnisher: 30, great: 45 } },
+//   sunsick: { period: 20, light: 0.5 } }
+// game.state.cast = { turns, wakes: { zoneKey: [time] }, pack: { zone, at, size, burnisher, great } | null }   (saved with the state)
+// events: "mutate" { e, id, level, how: "gain" | "raise" } · "smoothers" { zone, size, burnisher, great }
+// statuses: shaken (Dark-fear), mobbed (Moth-kissed), sunsick (Lightsick), shadowsense; the update ids "mutations:turns", "mutations:defects"
+
+// abilities.js (4b additions): sources "mutations" and "powers" (after "innate" and "item") · abilityRange(e, id, lvl) ·
+//   AbilityDef.rangeFor?(lvl, e) · info(lvl, e). progression/abilities.js registers fling, wingsUp, bellows, flatwise,
+//   echo, overlook, shadowsense, kindle (source "mutation")
+
 // screens/levelup.js:  checkLevelUp(game) · choosePerk(game, k) · levelCard(game) → { level, gift, milestone, draw, step, sel, rows }
-// screens/create.js:   MODE "create" (pushed with { seed, mode }) · openCreate(game, { seed, mode }) · wizard() · wizardChoices()
+// screens/create.js:   MODE "create" (pushed with { seed, mode }) · openCreate(game, { seed, mode }) · wizard() · wizardChoices() · trackRows(game)
+// screens/abilities.js: MODE "abilities", B in "play" · openAbilities(game) · abilitiesView(game) → { rows, sel, hotbar }
+// screens/charsheet.js: MODE "char", K in "play" · openSheet(game, tab) · sheetView(game) → { tab, tabs, sel, rows, msg }
 
 // content
 GENOTYPES[id] = { name, plural, info, base, points, perPoint, steepAt, steepCost, maxAtCreation, track, creases?,
                   creasesPerLevel?, grade?, freeImplantCost?, names, tonics }
 BACKGROUNDS[id] = { name, genotype, info, bonus, trees, glim, purse?, rep, villageRep?, kit: { equip, belt?, pack, wants }, level?, implant? }
 LEVELS[id] = { name, info, bonus?, torchCost?, script? } · backgroundsOf(genotype) → ids
-POWERS[id] = { name, info, tree, general?, major?, max?, bonus?(rank), needs? } · TREES[id] = { name } · LEGACY_PERKS · powersOfTree(tree)
+POWERS[id] = { name, info, tree, general?, major?, max?, bonus?(rank), needs?, ability? } · TREES[id] = { name } · LEGACY_PERKS · powersOfTree(tree)
+MUTATIONS[id] = { name, kind: "physical" | "mental" | "defect", cost, max, excludes, planar?, bridge?, info(lvl), bonus?(lvl, e),
+                  ability?, rep?, repAll?, status?, darkRange?(lvl) } · BIBLE_FACTIONS (bible §15.4's 21 ids)
 ```
+
+**The mutations, with what they add (for the balance pass at the flip; levels are the mutation's, a mental one's with
+EGO's modifier):**
+
+| Mutation | Kind | Bonus keys (stat bus) | Ability (cooldown s × WIL) | Reputation |
+|---|---|---|---|---|
+| Shellback | physical | `av` 2 + floor(L / 3), only with no body armour over it | | Clatter +200 |
+| Thistlehide | physical | `thorns` 2 | Fling (10): 1-3 + floor(L / 2) to each hostile in the 8 tiles around | |
+| Wings ◆ | physical | `travel` 1 | Wings (60): flying 20 + 5L s | Kites +400 |
+| Stilt Legs ◆ | physical | `jump` 0.5 × ceil(L / 2) | | |
+| Lampskin ◆ | physical | `darkSight` 2, `stealth` −0.25 | | Moths +200, Lampless −200 |
+| Night Eyes ◆ | physical | `darkSight` 2; sees 3 + L / 2 tiles with the torch out | | |
+| Regeneration | physical | `regen` 1.2L (L HP every 10 s) | | |
+| Spare Heart | physical | `tou` 2 | | |
+| Bellows Throat | physical | | Bellows (15): a 3-tile cone, Ld4 and burning 3 s | |
+| Flatwise ◆ | physical | | Flatwise (30): flat 3 + floor(L / 2) s | Flatfolk +200, Pressed +100, Assize −200 |
+| Gills ◆ | physical | `swim` 1 | | Clatter +100 |
+| Echo Throat ◆ | physical | | Echo (20): every creature within 6 + L tiles on the map | |
+| Fold Step ◆ | mental | | Fold Step (12): 4 + L tiles | |
+| Overlook ◆ | mental | | Overlook (max(10, 32 − 2L)): a 9 × 9 within 20 tiles onto the map | |
+| Shadowsense ◆ | mental | | Shadowsense (60): 8 + 2L s, flat beings and ghosts within 12 + 2L shown | |
+| Kindle ◆ | mental | | Kindle (5): a cold brazier within 5 + L tiles | |
+| Lightsick | defect +2 | (status `sunsick`: 1 HP / 20 s under the open sky) | | |
+| Dark-fear | defect +3 | `toHit` −2, `dv` −1 while the torch is out (status `shaken`) | | |
+| Moth-kissed | defect +2 | `stealth` −0.3 while the torch is lit (status `mobbed`) | | |
+| Crooked Manner | defect +2 | | | every faction −50 |
+
+No power has an ability or a new bonus key in 4b (4a's table in `content/powers.js` stands: Steady hand's `missileAcc`
+is integration request 2). No combat number changed.
 
 - **Under the legacy set nothing changes:** a quick game's player, its +3 HP a level, the parent's card, perks offered
   from the parent's 25 with `Math.random`. Everything above that changes numbers reads `RULES.stats`.
@@ -114,14 +169,20 @@ POWERS[id] = { name, info, tree, general?, major?, max?, bonus?(rank), needs? } 
 
 ## Integration requests
 
-Changes to files that aren't WS4's, for the integrator (or their owners). 4a works without them; each says what changes
-when it lands. 1-3 are WS8's requests 1, 8 and 11 (`git show p1-ws8:docs/ws8.md`).
+Changes to files that aren't WS4's, for the integrator (or their owners). 4a and 4b work without them; each says what
+changes when it lands. 1-3 are WS8's requests 1, 8 and 11 (`git show p1-ws8:docs/ws8.md`); 15-23 are 4b's.
 
 1. **`abilities.js` (WS4, for 4b), WS8's request 1:** route the map's `requestTarget` through `screens/target.js`
    (`requestTarget as targetScreen`): in 3D `done(aimTarget(...))` at once, on the map the target screen answers later,
    and `useAbility` goes on in the callback (`def.target === "self"` at once; on the map `return false` and act when the
-   screen confirms). `check-abilities` §5 then drives the screen with Enter. 4b does it once `ws/ws8` is merged (its
-   `screens/target.js` isn't in this tree).
+   screen confirms). `check-abilities` §5 then drives the screen with Enter. **4b left it to the integrator** (the
+   coordinator's instruction: `ws/ws8` stays out of `ws/ws4`): `abilities.js requestTarget(game, ability, done)` keeps
+   its signature and every caller goes on in `done`, so only the map's body changes at the merge. `useAbility` passes
+   the ability's range at its level (`abilityRange`: Fold Step 4 + level, Kindle 5 + level) in the def it hands over.
+   Every ability that aims honours a **picked tile with no creature** on the map (`target.tile`): Fold Step steps onto it
+   (as far as it reaches), Overlook draws the 9 × 9 around it, Kindle lights the brazier there, Bellows breathes toward
+   it; check-progression §7.4 drives each with such a target, so the screen's answer works as it lands. An ability's
+   `use` doesn't read the target's creature when a creature uses it (none of the mutations' do: they are the player's).
 2. **`stats.js` `BONUS_KEYS` (the integrator), WS8's request 8:** the integrator adds `missileAcc` at the WS8 merge
    (its message of 2026-10-27), and `missileSpec` adds `bonus(p, "missileAcc")` to the accuracy. `content/powers.js`
    `steadyHand` then gets `bonus: () => ({ missileAcc: 2 })` in the same commit and loses its `needs` line, so it is
@@ -129,8 +190,9 @@ when it lands. 1-3 are WS8's requests 1, 8 and 11 (`git show p1-ws8:docs/ws8.md`
 3. **`stats.js` (the integrator), WS8's request 11:** settled by the integrator at the WS8 merge: a creature's own bonus
    table moves from `e.innate` to `e.bonuses` (stats.js's "innate" source reads `e.bonuses`), and `innate` means a list
    of ability ids only, as `abilities.js`, `player.js` (`innate: ["foldStep"]`) and WS8's `ai.js` read it. WS4 keeps
-   the name; if 4b drops the innate Fold Step grant, the field stays a list (or empty). (Until then the player's
-   `["foldStep"]` adds a stray key `"0"` to its bonus table, as in P0.)
+   the name. 4b keeps the quick start's `["foldStep"]` (its hotbar is in recorded frames) and gives a made character
+   `innate: []`. (Until the integrator's change the quick start's `["foldStep"]` adds a stray key `"0"` to its bonus
+   table, as in P0; a made character's empty list adds nothing.)
 4. **`game.js` `startRun(seed, world, { mode, player })` (the integrator; with WS9's request 2):** take the made
    character and the mode there. Then `chargen.js beginRun` calls it so, and `player.js` drops `nextRunPlayer` (the
    seam that hands the character to `startRun`'s `makePlayer()` today).
@@ -170,7 +232,42 @@ when it lands. 1-3 are WS8's requests 1, 8 and 11 (`git show p1-ws8:docs/ws8.md`
     max HP 20; no creases a level). WS9's title pushes `"create"` as soon as it is registered, so flip `RULES.stats` to
     `"attributes"` at the WS4 merge (§8.5: WS8 merges before WS4), or keep the title on the quick game until the flip.
 14. **`tools/README.md` (frozen) and §8.4:** `check-progression.mjs`'s sections (the header of
-    `tests/checks/progression.js`); `tools/browser-ws4.mjs` (serve with `node tools/serve.mjs 8644`) as WS4's.
+    `tests/checks/progression.js`: sections 1-6 are 4a's, 7 is 4b's); `tools/browser-ws4.mjs` (serve with
+    `node tools/serve.mjs 8644`; the wizard, the level-up card, B and K) as WS4's; `src/progression/abilities.js` is new
+    (inside `progression/*`).
+15. **`tools/browser-0d1.mjs` (the integrator's; its mode tour fails on a registered screen it can't reach):** WS4
+    registers `create` (4a), `abilities` and `char` (4b). Add, after the target screen's tour: on the map, `KeyB` opens
+    `abilities` (Esc closes it; by the mouse a click on `[ Close ]`), `KeyK` opens `char` (Esc; `[ Close ]`); and
+    `create` through WS9's title (its New game, once the title pushes it) or `screens.pushMode(game, "create", { seed })`
+    then Esc back to the title or the run. `tools/browser-ws4.mjs` already does the same by real keys and clicks (its
+    section 4, and the wizard in sections 1-2). Until then browser-0d1 reports those three as never reached.
+16. **`screens/play.js` `toggleMap` (P0, the integrator's):** emit `"view:turn" { from, to }` when the player turns the
+    world (Tab, Esc on the map), so Cast's `turnWorld` (progression/mutations.js) can listen instead of watching
+    `game.view` each frame (its watch counts a view change in the same zone while you aren't flat; the cube's first turn
+    and a forced flat map aren't turns). **Under the Hand** (bible §10.3: a turn under the Hand leaves no wake): WS1/WS3's
+    predicate (say `underHand(game)`) once the Hand exists; `turnWorld` then skips the roll.
+17. **The Smoothers (C2's creatures, with WS8's flat movement):** `progression/mutations.js` emits `"smoothers" { zone,
+    size, burnisher, great }` 10 s of game time after the third wake in a zone (bible §10.3: 1 + floor((Cast − 12) / 8),
+    at most 4; a burnisher at Cast 30, the Great Smoother at 45) and the HUD's log has warned ("The floor smooths itself
+    out towards you."). A listener spawns the pack along the floor (flat beings, map only), each dropping a smoothed page
+    (the Flatfolk pay +35). Until then the warning shows and nothing comes.
+18. **`creatures.js` `ghostHidden` (P0; optional):** Shadowsense (4b) marks flat beings and ghosts with a glyph over
+    them in 3D (drawn through walls) and a sighting on the map every half second; if ghosts should also be drawn whole
+    while it lasts, `ghostHidden` returns false for the player while `hasStatus(game.player, "shadowsense")` (seeing, not
+    touching).
+19. **WS5 (`inventory.js` / `body.js` equip) and C4:** Shellback "no body armour": refuse body armour other than
+    clothes while you have it, with a line (today the shell's +2 AV only counts with nothing over it, so armour still
+    goes on). Lightsick's "unless you wear a hood or veil": a worn piece with a flag (say `veil: true` on a head or face
+    item, or a bonus key) that `progression/mutations.js`'s `sunlit` check reads.
+20. **`torch.js` (with request 6):** Lampskin's free light: `bonus: { torchCost: -1 }` once the key exists (the
+    glim heart likewise).
+21. **WS6b (the Kindling):** Crooked Manner's other half: every Kindling gains 20 less, and the rude gesture for the
+    words (bible §13.5 and its note on Crooked Manner); read `game.player.mutations.crookedManner`.
+22. **WS1 (travel):** Wings gives `bonus(travel) = 1` for "world-map travel × 2", as Pathfinder's ×1.5 would be 0.5
+    (bible §10.8): read it as a multiplier of 1 + travel.
+23. **`turns.js` (P0; optional):** the map climbs 2 blocks at `jumpBonus(p) >= 1` (High jumper); Stilt Legs' 0.5 a
+    two levels reach 1 at level 3, where bible §13.5 says "from level 5". Keep it (a deviation, `docs/sessions/ws4.md`) or
+    give the map its own threshold.
 
 ## Handoff
 
