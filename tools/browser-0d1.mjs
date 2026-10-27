@@ -14,7 +14,8 @@
 //      page without ?quick=1: Enter, then a click on "New quick game"), since WS8's merge the target screen
 //      (L on the map; Esc, a right click) and since WS4a's the creation wizard (pushed over the map as WS9's
 //      title will push it; Esc, a click on [ Back ]), and since WS5's examine (I, L; Esc, a right click) and the
-//      Truing Cradle (a Cradle block walked into; Esc, a right click), so every registered mode is reached.
+//      Truing Cradle (a Cradle block walked into; Esc, a right click), and since WS6a's the factions screen (P on
+//      the map; Esc, a click on "Esc close"), so every registered mode is reached.
 //   2. The HUD at 100×30 (a 600-pixel window 30 cells tall: 300 px with 10-pixel cells, 330 with Windows'
 //      11): tests/checks/hud.js in the browser (screen sizes 100×30,
 //      100×40, 180×56, 80×25), then on the real canvas with every Phase 0 segment and seven statuses on, in
@@ -192,6 +193,19 @@ try {
       await frames(page, 2);
       const closed = await mode();
       if (closed !== "map") problems.push(`target by ${how}: ${how === "keys" ? "Esc" : "a right click"} led to ${closed}, not back to the map`);
+    }
+    // The factions screen (WS6a's, merged at p2-ws6a): P on the map opens it; Esc closes it, and again by a click on
+    // its "Esc close".
+    if ((await mode()) === "map") for (const how of ["keys", "mouse"]) {
+      await page.keyboard.press("KeyP");
+      await frames(page, 2);
+      const opened = await mode();
+      if (opened !== "factions") { problems.push(`factions by ${how}: P on the map led to ${opened}, not factions`); break; }
+      reached.add("factions");
+      if (how === "keys") await page.keyboard.press("Escape"); else await click("Esc close");
+      await frames(page, 2);
+      const closed = await mode();
+      if (closed !== "map") problems.push(`factions by ${how}: ${how === "keys" ? "Esc" : "a click on Esc close"} led to ${closed}, not back to the map`);
     }
     // The creation wizard (WS4's, merged at p2-ws4a): pushed over the map with { seed, mode } as WS9's title will
     // push it (no key opens it before that title is in); Esc on its first step goes back, and again by a click on
