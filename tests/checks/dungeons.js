@@ -26,6 +26,7 @@ import { generateSurface, validateSurface } from "../../src/gen/surface.js";
 import { TEST_WORLD } from "../../src/content/world/test-world.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
 import { DUNGEONS } from "../../src/content/dungeons.js";
+import { legendLooks } from "../../src/content/creatures/legends.js";
 
 const pct = (sorted, q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))];
 
@@ -127,6 +128,9 @@ export function checkDungeonParams() {
   const owner = lair.creatures.find((c) => c.uid === def.uid);
   test(!!owner && owner.flags?.legend === def.uid && owner.level === def.level && validateDungeonLevel(lair).length === 0,
     `a legend bottom: its owner (${owner?.name}) with its uid, at its level, and the level validates alone (${validateDungeonLevel(lair).join(", ")})`);
+  const withAttrs = { attrs: { str: 14, agi: 12 }, color: [0, 0, 0] };
+  legendLooks(withAttrs, def); legendLooks(withAttrs, def);
+  test(withAttrs.attrs.str === 15 && withAttrs.attrs.agi === 13, `a legend's +1 to every attribute, once (${JSON.stringify(withAttrs.attrs)})`);
   test(!throws(() => generateDungeonLevel(3, { ...legacyParams(2, 3), creatureTable: null, holesIn: undefined })), "null or missing WS10 parts are fine");
   return { name: "dungeon params", ok: problems.length === 0, problems, stats: { cases } };
 }

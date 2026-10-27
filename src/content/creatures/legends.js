@@ -14,8 +14,8 @@
 //                       (creature fields guardians.js re-applies on every entry, so a load keeps them)
 //   LEGENDS.factions    the factions a legend can love or hate, each with the reasons it gives
 //   LEGENDS.names       the Hours' phonology (bible §2.3), 3 to 9 letters
-//   legendLooks(c, def) → c   what a legend wears beyond its species: the magenta of legends, its mutations'
-//                       armour, speed, venom and damage, and its template's plane (flat or ghostly). None of it is
+//   legendLooks(c, def) → c   what a legend wears beyond its species: the magenta of legends, +1 to each attribute
+//                       it has, its mutations' armour, speed, venom and damage, and its template's plane (flat or ghostly). None of it is
 //                       a saved creature field, so it is applied when the legend is made and again on every
 //                       entry (guardians.js); each mutation once per creature object.
 export const LEGENDS = {
@@ -74,6 +74,12 @@ export const LEGENDS = {
 
 export function legendLooks(c, def) {
   c.color = LEGENDS.base.color;
+  // +1 to every attribute (bible §12.13), for a creature that carries attributes (none of the legacy ones do yet:
+  // their to-hit and damage come from their level, which is already +3).
+  if (c.attrs && !c.mutated?.attrs) {
+    for (const k of Object.keys(c.attrs)) c.attrs[k] += LEGENDS.base.attr;
+    (c.mutated ||= {}).attrs = true;
+  }
   for (const id of def.mutations || []) {
     const m = LEGENDS.mutations[id];
     if (!m || c.mutated?.[id]) continue;
