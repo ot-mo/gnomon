@@ -44,6 +44,7 @@ function samples() {
   out.push({ kind: "knife", count: 3 }, { kind: "bomb", count: 1 }, { kind: "key" }, { kind: "heart" }, { kind: "strength" },
     { kind: "gold", amount: 7 }, { kind: "cash", amount: 7 }, { kind: "cube" },
     { kind: "quest", id: "skull", name: "Brann's skull", info: "A ghost wants this back." }, { kind: "relic?" });
+  out.push({ kind: "missile", id: "sling", ench: 0 }, { kind: "missile", id: "boltBow", ench: 1 }, { kind: "ammo", effect: "bolt", count: 12 });   // WS8
   return out;
 }
 

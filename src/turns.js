@@ -7,12 +7,21 @@
 //
 // It's the same world and the same player as the 3D view, so when you switch back
 // you're standing on the tile you walked to.
+//
+// Walking into a creature: something hostile to you is attacked; a follower of yours swaps places with
+// you; anything else (neutral) is in the way, and Shift + the direction attacks it anyway (§4.3).
+// Pressed flat (status.js "flat", bible §10.2) you move in the Plane: chasms, pits and deep water are
+// floor you cross at your height, ledges up to 2 blocks up or down are floor, you slide under closed
+// doors and gates (locked ones too), walls still stop you, and you can't use levers or anything that
+// stands up. You talk only to flat people, and strike only flat things (combat.js).
 import { KIND, B, FLOOR_Z, solidFor as zoneSolidFor } from "./world.js";
 import { castRay, lineOfSight } from "./raycast.js";
 import { lightAt } from "./light.js";
 import { bumpAttack } from "./combat.js";
-import { updateCreatures } from "./ai.js";
-import { creatureAt, talkerAt, hostilesTo, ghostHidden, ghostOffMap, canTalk } from "./creatures.js";
+import { updateCreatures, leaderOf } from "./ai.js";
+import { CREATURE_TYPES, creatureAt, talkerAt, ghostHidden, ghostOffMap, canTalk, isFlat } from "./creatures.js";
+import { attitude } from "./factions.js";
+import { keys } from "./input.js";
 import { pickUpItems } from "./items.js";
 import { useColumn, usableAt } from "./interact.js";
 import { EYE, WALK, HEIGHT, WADE_SLOWDOWN, HASTE, attackTime, torchRange, canSwim, speedMul, jumpBonus, hasFeatherFall, bonus } from "./player.js";
@@ -49,7 +58,7 @@ export function passTime(game, seconds) {
     p.throwCd = Math.max(0, p.throwCd - dt);
     p.hurt = Math.max(0, p.hurt - dt);
   }
-  if (game.mode === "map" && !statusFlag(p, "flying")) land(game);   // flight over: come down (or fall)
+  if (game.mode === "map" && !statusFlag(p, "flying") && !statusFlag(p, "flat")) land(game);   // flight over: come down (or fall)
   if (game.mode === "map") refreshView(game);
 }
 
@@ -102,19 +111,24 @@ export function refreshView(game) {
       castRay(zone, ex, ey, ez, ca * cp, sa * cp, Math.sin(pitch), 24, zone.seen, torch, holes);
     }
   }
+  // Every creature you see (not people: the map draws those itself): hostile ones in their colour, your
+  // followers (and anything else on your side) tinted toward ALLY so you can tell them apart.
   const sense = bonus(p, "sense");   // an amulet of sight: monsters close by show, seen or not
-  for (const m of hostilesTo(game, p)) {
+  for (const m of zone.creatures) {
+    if (canTalk(m) || m.brain?.arriving > 0) continue;
     if (ghostHidden(game, m)) continue;   // the Gloom Warden: only in the dark (light.js inDark)
     const cz = m.z + m.h * 0.6;
     const dist = Math.hypot(m.x - p.x, m.y - p.y);
-    if (dist < sense) { zone.sightings.set(m.id, { x: m.x, y: m.y, glyph: m.glyph, color: m.color, name: m.name, time: game.time }); continue; }
+    const color = m.brain?.leader !== undefined && attitude(game, m, p) === "friendly" ? m.color.map((v, k) => Math.round((v + ALLY[k]) / 2)) : m.color;
+    if (dist < sense) { zone.sightings.set(m.id, { x: m.x, y: m.y, glyph: m.glyph, color, name: m.name, time: game.time }); continue; }
     if (dist > 24) continue;
     const { sky, lamp } = lightAt(game, zone, m.x, m.y, cz);   // sky × daylight (light.js)
     const lit = sky * 0.6 + lamp * Math.sqrt(lamp) * 2 > 0.15 || dist < torch;
     if (lit && lineOfSight(zone, ex, ey, ez, m.x, m.y, cz))
-      zone.sightings.set(m.id, { x: m.x, y: m.y, glyph: m.glyph, color: m.color, name: m.name, time: game.time });
+      zone.sightings.set(m.id, { x: m.x, y: m.y, glyph: m.glyph, color, name: m.name, time: game.time });
   }
 }
+const ALLY = [90, 230, 255];
 
 // Stand exactly in the middle of the current tile (the map works in whole tiles).
 function settle(game) {
@@ -123,6 +137,7 @@ function settle(game) {
   p.x = tx + 0.5; p.y = ty + 0.5; p.vz = 0;
   if (statusFlag(p, "flying")) return;   // flying: stay at this height
   p.onGround = true;
+  if (statusFlag(p, "flat")) return;     // in the Plane your height is where the Plane put you
   const z = groundBelow(solidFor(game), tx, ty, p.z);
   if (z >= 0) p.z = z;
 }
@@ -131,11 +146,13 @@ function settle(game) {
 // or lever uses it. Returns true if that took a turn.
 // Moves are always to a neighbouring tile: you can't jump gaps on the map (that's what
 // the 3D view is for), but you can climb up to 2 blocks, and fly anywhere while flying.
-export function mapStep(game, dx, dy) {
+// force: attack whatever is there, friend or not (Shift held: shiftHeld()).
+export const shiftHeld = () => keys.has("ShiftLeft") || keys.has("ShiftRight");
+export function mapStep(game, dx, dy, { force = shiftHeld() } = {}) {
   const { zone, player: p } = game;
   settle(game);
   const S = solidFor(game);
-  const flying = statusFlag(p, "flying"), swimmer = canSwim(p);
+  const flying = statusFlag(p, "flying"), swimmer = canSwim(p), flat = statusFlag(p, "flat");
   const climb = PLAYER_STEP_UP + (jumpBonus(p) >= 1 ? 1 : 0);
   const tx = Math.floor(p.x), ty = Math.floor(p.y);
   const nx = tx + dx, ny = ty + dy;
@@ -147,15 +164,27 @@ export function mapStep(game, dx, dy) {
   const m = creatureAt(zone, nx, ny);
   if (m && canTalk(m)) {
     if (ghostOffMap(game, m)) game.log("The air here is icy, as if someone were standing in your way. Someone you can't see from up here.", [150, 210, 240]);
+    else if (flat && !isFlat(m)) game.log(`${m.name} can't hear you from the Plane. Only the Flatfolk can.`, [220, 220, 230]);
     else game.onTalk(m);
     return false;
   }
   if (m) {
-    if (Math.abs(m.z - p.z) > 1.5) { game.log(`You can't reach the ${m.name} from here.`, [170, 170, 170]); return false; }
+    if (Math.abs(m.z - p.z) > 1.5 && !(flat && isFlat(m))) { game.log(`You can't reach the ${m.name} from here.`, [170, 170, 170]); return false; }
+    const feel = attitude(game, m, p);
+    if (!force && feel !== "hostile") {
+      // Your follower swaps places with you; anything else not out for you stands in the way.
+      if (feel === "friendly" && leaderOf(game, m) === p && swapPlaces(game, m)) {
+        passTime(game, ((dx && dy ? Math.SQRT2 : 1) * STEP_TIME) / haste(p) / fleet(p));
+        return true;
+      }
+      game.log(`The ${m.name} is in your way. (Shift + direction attacks it.)`, [170, 170, 170]);
+      return false;
+    }
     bumpAttack(game, m);
     passTime(game, attackTime(p));
     return true;
   }
+  if (flat) return flatStep(game, dx, dy, nx, ny);
 
   const kind = zone.kind[nx + ny * zone.w];
   const coldBrazier = zone.get(nx, ny, FLOOR_Z) === B.BRAZIER;   // bump it to light it
@@ -218,6 +247,55 @@ export function mapStep(game, dx, dy) {
   const slow = (swimming ? 0.45 : wading ? WADE_SLOWDOWN : 1) * statusSpeed(p);
   passTime(game, ((dx && dy ? Math.SQRT2 : 1) * STEP_TIME) / slow / haste(p) / fleet(p));
   return true;
+}
+
+// Your follower and you change places (a step's time). Not if it can't stand where you stand.
+function swapPlaces(game, m) {
+  const { zone, player: p } = game;
+  const tx = Math.floor(p.x), ty = Math.floor(p.y), s = zone.stand[tx + ty * zone.w];
+  if (s < 0 || statusFlag(m, "noMove") || statusFlag(m, "noAct")) return false;
+  const [mx, my, mz] = [m.tx, m.ty, zone.stand[m.tx + m.ty * zone.w]];
+  if (mz < 0) return false;
+  Object.assign(m, { tx, ty, nx: tx, ny: ty, p: 0, x: tx + 0.5, y: ty + 0.5, z: s + (CREATURE_TYPES[m.type].hover || 0) });
+  p.x = mx + 0.5; p.y = my + 0.5; p.z = mz;
+  pickUpItems(game);
+  return true;
+}
+
+// A step in the Plane (pressed flat; see the header). Walls stop you; levers and the like stand up out
+// of it; doors and gates you slide under; chasms, pits and deep water are floor at your height.
+const DOORISH = new Set([B.DOOR, B.LOCKED, B.GATE]);
+function flatStep(game, dx, dy, nx, ny) {
+  const { zone, player: p } = game;
+  const kind = zone.kind[nx + ny * zone.w];
+  if (kind === KIND.WALL) return false;
+  if (kind === KIND.LEVER || zone.get(nx, ny, FLOOR_Z) === B.BRAZIER || usableAt(game, nx, ny, { legacy: false }) >= 0) {
+    game.log("You can't work that from the Plane: it stands up out of it.", [220, 220, 230]);
+    return false;
+  }
+  const tx = Math.floor(p.x), ty = Math.floor(p.y);
+  const wall = (x, y) => zone.kind[x + y * zone.w] === KIND.WALL;
+  if (dx && dy && wall(tx + dx, ty) && wall(tx, ty + dy)) return false;   // no squeezing between two walls
+  const z = planeHeight(game, nx, ny, p.z);
+  if (z === null) { game.log("That's more than 2 blocks up or down: a cliff, even in the Plane.", [170, 170, 170]); return false; }
+  game.confirmJump = -1;
+  p.x = nx + 0.5; p.y = ny + 0.5; p.z = z; p.wade = 0;
+  pickUpItems(game);
+  if (game.checkFloorEvents()) return true;   // stairs
+  passTime(game, ((dx && dy ? Math.SQRT2 : 1) * STEP_TIME) / statusSpeed(p) / haste(p) / fleet(p));
+  return true;
+}
+// Where the Plane holds you on tile (x, y), coming from height z: the highest floor within 2 blocks up
+// or down (a closed door or gate counts as air: you slide under it); over a chasm, a pit or deep water,
+// or a column with no floor at all, your own height. null: a cliff more than 2 blocks away.
+export function planeHeight(game, x, y, z) {
+  const zone = game.zone, kind = zone.kind[x + y * zone.w];
+  if (kind === KIND.HOLE || kind === KIND.DEEP) return z;
+  const solid = (zz) => zone.solid(x, y, zz) && !DOORISH.has(zone.get(x, y, zz));
+  const top = Math.floor(z + 2 + 0.01), low = Math.max(1, Math.ceil(z - 2 - 0.01));
+  for (let zz = top; zz >= low; zz--) if (solid(zz - 1) && !solid(zz)) return zz;
+  for (let zz = top; zz >= 0; zz--) if (solid(zz)) return null;
+  return z;
 }
 
 // A step off the map's edge (TECH_DESIGN §5.1): on a surface zone, into the next span's zone at the
@@ -334,19 +412,29 @@ function planExplore(game) {
   return findRoute(game, (x, y) => hasItem(x, y) || frontier(x, y), (x, y) => routable(game, x, y));
 }
 
+// What you see now that is out for you (sighted this moment): a click-travel or an explore stops when one
+// comes into view that wasn't there when it began. Your followers coming and going don't stop it.
+function foesInView(game) {
+  const { zone, player: p } = game, out = new Set();
+  for (const [id, s] of zone.sightings) {
+    if (s.time !== game.time) continue;
+    const c = zone.creatures.find((o) => o.id === id);
+    if (!c || attitude(game, c, p) === "hostile") out.add(id);
+  }
+  return out;
+}
+
 export function startExplore(game) {
   const path = planExplore(game);
   if (!path) { game.log("Nothing left to explore that you can walk to from here.", [170, 170, 170]); return false; }
-  const visible = new Set([...game.zone.sightings].filter(([, s]) => s.time === game.time).map(([id]) => id));
-  game.travel = { path, visible, hp: game.player.hp, timer: 0, explore: true };
+  game.travel = { path, visible: foesInView(game), hp: game.player.hp, timer: 0, explore: true };
   return true;
 }
 
 export function startTravel(game, gx, gy) {
   const path = planTravel(game, gx, gy);
   if (!path) return false;
-  const visible = new Set([...game.zone.sightings].filter(([, s]) => s.time === game.time).map(([id]) => id));
-  game.travel = { path, visible, hp: game.player.hp, timer: 0 };
+  game.travel = { path, visible: foesInView(game), hp: game.player.hp, timer: 0 };
   return true;
 }
 
@@ -358,10 +446,10 @@ export function travelStep(game) {
   const [x, y] = tr.path[0];
   const dx = x - Math.floor(p.x), dy = y - Math.floor(p.y);
   const there = creatureAt(game.zone, x, y), attacking = !!there && !canTalk(there);
-  if (Math.abs(dx) > 1 || Math.abs(dy) > 1 || !mapStep(game, dx, dy) || attacking) { game.travel = null; return; }
+  if (Math.abs(dx) > 1 || Math.abs(dy) > 1 || !mapStep(game, dx, dy, { force: false }) || attacking) { game.travel = null; return; }
   if (game.mode !== "map") { game.travel = null; return; }
   if (Math.floor(p.x) === x && Math.floor(p.y) === y) tr.path.shift();   // (opening a door doesn't move you)
-  const newcomer = [...game.zone.sightings].some(([id, s]) => s.time === game.time && !tr.visible.has(id));
+  const newcomer = [...foesInView(game)].some((id) => !tr.visible.has(id));
   if (p.hp < tr.hp || newcomer) { game.travel = null; return; }
   if (!tr.path.length) {
     if (!tr.explore) { game.travel = null; stepOutward(game, dx, dy); return; }

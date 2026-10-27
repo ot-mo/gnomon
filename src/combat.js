@@ -16,15 +16,23 @@
 //     "d20"     d20 + toHitMod > DV, a natural 1 misses, a natural ≥ critNat hits and crits (× RULES.d20.crit);
 //               damage = the weapon's range + material + floor((STR − req) / 2) + enchantment, then the
 //               element/holy/crush/burn/executioner/giant-slayer multipliers; armour soaks 0..AV at random.
-//               Creatures roll d20 + floor(level / 3) against your DV (stats.js dv, 0 while unable to act).
-//   weaponSpec(e), naturalSpec(c), thrownSpec(game)       the specs
+//               A missile weapon's shot adds its material and enchantment, not STR. Creatures roll
+//               d20 + floor(level / 3) against your DV (stats.js dv, 0 while unable to act). Every blow
+//               tells one line in one format, in both views (combatLine).
+//   Pressed flat (bible §10.2): you and deep things don't touch each other at all (creatures.js touchable,
+//   touchesYou): their blows and arrows pass through you, yours under them; flat things touch you as ever.
+//   weaponSpec(e), naturalSpec(c), thrownSpec(game)       the specs (missiles.js missileSpec for missile
+//       weapons). A spec may carry noun ("bolt": how the log names it) and onHit(game, tgt, result), run
+//       after a d20 blow that hurt and didn't kill (a bolt pins, a stone dazes).
+//   combatLine(game, result, spec, ctx) → string          the d20 log line of a resolved blow
 //   toHitMod(game, att, tgt, spec, ctx), critNat(att), dvOf(game, e), avOf(e)
 //   rollToHit(game, att, tgt, spec, ctx, rng) → { nat, mod, total, dv, crit, hit }
 //   hitChance(mod, dv, crit = 20) → the analytic chance of a hit (check-combat's tables)
 //   applyDamage(game, tgt, dmg, { src, label, color, deathText }) → the damage done (no to-hit, no soak
 //       beyond an armoured creature's): spikes, bombs, scrolls. src: who did it (XP only for the player).
-//   playerMelee(game)        3D: swing at the best target in the cone (reach and line of sight)
-//   bumpAttack(game, c)      the map: you walked into c
+//   playerMelee(game)        3D: swing at the best target in the cone (reach and line of sight): something
+//                            hostile first; at anything else the first swing holds back, a second strikes
+//   bumpAttack(game, c)      the map: you walked into c (turns.js: a friend or a neutral only with Shift)
 //   hitPlayer(game, c, dmg, source, blocked, ranged)   a blow that has landed on you (the legacy tail)
 //   elementVs(c, el), resistText(c)
 //   combatRng(game)          game.combatRng if a test set one, else Math.random
@@ -41,7 +49,8 @@ import { addStatus, hasStatus, statusFlag, cooldownLeft, startCooldown, dvOf as 
 import { RULES } from "./rules.js";
 import { emit } from "./events.js";
 import { distance } from "./rng.js";
-import { CREATURE_TYPES, touchable, isFlat } from "./creatures.js";
+import { CREATURE_TYPES, touchable, touchesYou, isFlat, ghostHidden } from "./creatures.js";
+import { attitude } from "./factions.js";
 import { killMonster } from "./monsters.js";
 import { hasKey } from "./keyset.js";
 
@@ -157,7 +166,7 @@ function hurtCreature(game, m, dmg, label, color, src) {
     const brain = (m.brain ||= {});
     brain.hurtBy = src.id;
     (brain.grudges ||= {})[src.id] = 1;
-  }
+  } else if (src) turnOnYou(game, m, state, lost);
   emit(game, "hurt", { tgt: m, src: src || null, dmg });
 }
 
@@ -165,11 +174,20 @@ function hurtCreature(game, m, dmg, label, color, src) {
 // hurtCreature does (you: it hunts you; a creature: it bears that one a grudge).
 function noticeBlow(game, m, src) {
   if (isPlayer(game, m)) return;
-  if (isPlayer(game, src)) { m.state = "chase"; m.lost = 0; return; }
+  if (isPlayer(game, src)) { const state = m.state, lost = m.lost; m.state = "chase"; m.lost = 0; turnOnYou(game, m, state, lost); return; }
   if (m.state === "idle") m.state = "wander";
   const brain = (m.brain ||= {});
   brain.hurtBy = src.id;
   (brain.grudges ||= {})[src.id] = 1;
+}
+// Your blow on a creature that wasn't out for you: your friend (a follower) takes it and goes on as it was
+// (a shot of yours that hit it on the way, a slip); anything else holds it against you (a grudge: factions.js
+// attitude turns hostile) and hunts you. One already running from it keeps running. (Under the legacy set
+// every creature is out for you, so nothing here changes the parent's game.)
+function turnOnYou(game, m, state, lost) {
+  const feel = attitude(game, m, game.player);
+  if (feel === "friendly" || state === "flee") { m.state = state; m.lost = lost; return; }
+  if (feel !== "hostile") ((m.brain ||= {}).grudges ||= {}).player = 1;
 }
 
 // Armoured elites shrug off part of every hit (never all of it): the legacy soak.
@@ -190,8 +208,9 @@ export function applyDamage(game, m, dmg, { src = game.player, color = [255, 255
 export const damageMonster = (game, m, dmg, color, deathText) => applyDamage(game, m, dmg, { color, deathText });
 
 // A blow that has landed on you (after the to-hit): the amulet, armour, thorns, venom, burns, drain.
-// The legacy order exactly (its Math.random draws).
-export function hitPlayer(game, m, dmg, source, blocked, ranged = false, rng = Math.random, soaked = null) {
+// The legacy order exactly (its Math.random draws). crit: null for the legacy set (hurtPlayer tells it the
+// parent's way); true or false for d20, which tells it in combatLine's format ("hits you (x2) for 8").
+export function hitPlayer(game, m, dmg, source, blocked, ranged = false, rng = Math.random, soaked = null, crit = null) {
   const p = game.player;
   if (statusFlag(p, "untouchable")) { game.log(`The blow passes through you: you're still half turned out of the world.`, [200, 230, 255]); return 0; }
   // The warding amulet: the first blow misses, then not again for RULES.cooldown.firstBlock seconds.
@@ -205,7 +224,11 @@ export function hitPlayer(game, m, dmg, source, blocked, ranged = false, rng = M
   dmg -= soaked ?? soakRoll(rng, arm);
   if (ranged) dmg -= bonus(p, "ward");
   if (dmg <= 0) { game.log(`Your armour turns ${blocked}.`, [170, 180, 200]); sfx("block", { at: m }); return 0; }
-  game.hurtPlayer(dmg, source);
+  if (crit === null) game.hurtPlayer(dmg, source);
+  else {
+    if (game.mode !== "dead") { game.log(`${cap(source)} hits you${crit ? ` (x${RULES.d20.crit})` : ""} for ${dmg}.`, [255, 110, 100]); sfx("hurt"); }
+    game.hurtPlayer(dmg, source, true);
+  }
   emit(game, "hurt", { tgt: p, src: m, dmg });
   // Thorns: whoever hit you (up close) gets hurt back.
   const thorns = bonus(p, "thorns");
@@ -236,12 +259,13 @@ export function resolveAttack(game, att, tgt, spec, ctx = {}) {
   const result = { att, tgt, view: ctx.view || game.view, touched: true, hit: false, crit: false, nat: 0, mod: 0, total: 0, dv: 0,
                    dmg: 0, soaked: 0, killed: false };
   const you = isPlayer(game, att);
-  // 1 Touchable? (planes, ghosts, the risen queen; people never)
-  if (!isPlayer(game, tgt) && !touchable(game, tgt, att, { blade: spec.kind === "melee" })) {
+  // 1 Touchable? (planes, ghosts, the risen queen; people never; pressed flat, only flat things)
+  if (isPlayer(game, tgt) ? !touchesYou(game, att) : !touchable(game, tgt, att, { blade: spec.kind === "melee" })) {
     result.touched = false;
     if (you && spec.kind === "melee") {
       const t = CREATURE_TYPES[tgt.type];
-      game.log(tgt.risen ? `Your blow passes under the ${tgt.name}: she has risen out of the plane! Turn the world (Tab) to strike her.`
+      game.log(statusFlag(att, "flat") ? `Your flat hand slides under the ${tgt.name}: from the Plane you can only touch flat things.`
+                         : tgt.risen ? `Your blow passes under the ${tgt.name}: she has risen out of the plane! Turn the world (Tab) to strike her.`
                          : t.ghostly ? `Your blow passes through empty air. Something cold is here, but your torchlight hides it.`
                          : `You can't touch the ${tgt.name} from here.`, [200, 190, 255]);
     }
@@ -269,16 +293,17 @@ function yourMultipliers(game, p, m, dmg, el, vs) {
 }
 
 // After your blade lands: the number, the log, the kill or the element's after-effects, the arc.
-function yourBladeLanded(game, p, m, dmg, { crit, el, vs, core, rng, soak }) {
+// line(killed): the d20 set's log line (combatLine); without it the parent's lines.
+function yourBladeLanded(game, p, m, dmg, { crit, el, vs, core, rng, soak, line = null }) {
   const color = el ? ELEMENTS[el].color : crit ? [255, 220, 80] : [255, 255, 255];
   hurtCreature(game, m, dmg, crit ? `${dmg}!` : `${dmg}`, color, p);
   game.effects.push({ kind: "spark", time: game.time, crit, color });
   if (bonus(p, "leech") > 0 && p.hp < maxHp(p) && rng() < bonus(p, "leech")) p.hp++;
   const killed = m.hp <= 0;
-  if (killed) killMonster(game, m, `You slay the ${m.name}.`);
+  if (killed) killMonster(game, m, line ? line(true) : `You slay the ${m.name}.`);
   else {
     if (!core) game.log(`Your blow glances off its stone legs. Its core glows far above you: get up high!`, [255, 200, 120]);
-    else game.log(`You ${crit ? "smash" : "hit"} the ${m.name} (${dmg}).${vs === "weak" ? " It's weak to that!" : ""}`, [230, 230, 230]);
+    else game.log(`${line ? line(false) : `You ${crit ? "smash" : "hit"} the ${m.name} (${dmg}).`}${vs === "weak" ? " It's weak to that!" : ""}`, [230, 230, 230]);
     if (vs === "resist") game.log(`The ${m.name} shrugs off the ${{ fire: "flames", frost: "frost", shock: "lightning", holy: "light" }[el]}.`, [170, 170, 190]);
     else {
       if (el === "fire") { if (!hasStatus(m, "burning")) game.log(`The ${m.name} catches fire!`, ELEMENTS.fire.color); addStatus(game, m, "burning", { t: 3, stack: "refresh" }); }
@@ -330,6 +355,14 @@ function legacyBlow(game, att, tgt, spec, ctx, result) {
     const dmg = applyDamage(game, tgt, base * (crit ? 2 : 1), { color: crit ? [255, 220, 80] : [255, 255, 255] });
     game.log(`Your knife ${crit ? "sinks deep into" : "hits"} the ${name} (${dmg}).`, [220, 220, 230]);
     Object.assign(result, { crit, dmg, killed: tgt.hp <= 0 });
+  } else if (isPlayer(game, att) && spec.kind === "missile") {   // (no parent counterpart: a thrown knife's rules)
+    const crit = R() < RULES.legacy.crit;
+    const base = roll(R, spec.dmg[0], spec.dmg[1]) + (spec.ench || 0);
+    const name = tgt.name;
+    const dmg = applyDamage(game, tgt, base * (crit ? 2 : 1), { color: crit ? [255, 220, 80] : [255, 255, 255] });
+    game.log(`Your ${spec.noun || "shot"} ${crit ? "sinks deep into" : "hits"} the ${name} (${dmg}).`, [220, 220, 230]);
+    Object.assign(result, { crit, dmg, killed: tgt.hp <= 0 });
+    if (!result.killed && spec.onHit && game.zone.creatures.includes(tgt)) spec.onHit(game, tgt, result);
   } else if (isPlayer(game, tgt)) {
     const dmg = spec.fixed ?? roll(R, spec.dmg[0], spec.dmg[1]) + (spec.plus || 0);
     result.dmg = hitPlayer(game, att, dmg, ctx.source || `the ${att.name}`, ctx.blocked || `the ${att.name}'s blow`, !!ctx.ranged);
@@ -346,9 +379,10 @@ function legacyBlow(game, att, tgt, spec, ctx, result) {
 function d20Blow(game, att, tgt, spec, ctx, result) {
   const p = game.player, rng = ctx.rng || combatRng(game), D = RULES.d20;
   const you = isPlayer(game, att), onYou = isPlayer(game, tgt);
+  const source = ctx.source || `the ${att.name}`, blocked = ctx.blocked || `the ${att.name}'s blow`;
   // Your own shields come before the roll: half turned out of the world, the warding amulet.
   if (onYou && (statusFlag(p, "untouchable") || (bonus(p, "firstBlock") > 0 && !(cooldownLeft(p, "firstBlock") > 0)))) {
-    hitPlayer(game, att, 0, ctx.source || `the ${att.name}`, ctx.blocked || `the ${att.name}'s blow`, !!ctx.ranged, rng, 0);
+    hitPlayer(game, att, 0, source, blocked, !!ctx.ranged, rng, 0, false);
     return;
   }
   // 2 To-hit.
@@ -356,20 +390,23 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
   if (!result.hit) {
     float(game, tgt, "miss", [170, 170, 180]);
     noticeBlow(game, tgt, att);
-    if (you) game.log(spec.kind === "thrown" ? `Your knife misses the ${tgt.name}.` : `You miss the ${tgt.name}.`, [170, 170, 180]);
-    else if (onYou) { game.log(`${ctx.blocked ? cap(ctx.blocked) : `The ${att.name}`} misses you.`, [170, 170, 180]); sfx("block", { at: att }); }
+    tell(game, result, spec, ctx, [170, 170, 180]);
+    if (onYou) sfx("block", { at: att });
     return;
   }
   const crit = result.crit;
-  // 3 Damage: the range, + material, + STR over the requirement, + enchantment (yours); a creature's
-  // level bonus; then the multipliers and the crit.
+  // 3 Damage: the range, + material, + STR over the requirement, + enchantment (your blade; a missile
+  // weapon's shot takes material and enchantment, no STR); a creature's level bonus; then the multipliers
+  // and the crit.
   let dmg = spec.fixed ?? roll(rng, spec.dmg[0], spec.dmg[1]) + (spec.plus || 0);
   if (you && spec.kind === "melee") dmg += (spec.material || 0) + Math.floor((attr(p, "str") - (spec.fists ? D.fistReq : spec.req)) / 2) + spec.ench;
+  else if (you && spec.kind === "missile" && spec.fixed === undefined) dmg += (spec.material || 0) + (spec.ench || 0);
   dmg = Math.max(1, dmg);
   if (onYou) {
-    if (crit) dmg *= D.crit;
+    result.mult = crit ? D.crit : 1;
+    dmg *= result.mult;
     const soaked = soakRoll(rng, armourValue(p));
-    result.dmg = hitPlayer(game, att, dmg, ctx.source || `the ${att.name}`, ctx.blocked || `the ${att.name}'s blow`, !!ctx.ranged, rng, soaked);
+    result.dmg = hitPlayer(game, att, dmg, source, blocked, !!ctx.ranged, rng, soaked, crit);
     result.soaked = soaked;
     return;
   }
@@ -377,7 +414,8 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
   const el = you && spec.kind === "melee" ? spec.element : null, vs = elementVs(tgt, el);
   if (you) dmg = yourMultipliers(game, p, tgt, dmg, el, vs);
   const sunder = you && crit && spec.kind === "melee" && bonus(p, "sunder") > 0;   // Sunder: crits ×3, through armour
-  if (crit) dmg *= sunder ? 3 : D.crit;
+  result.mult = crit ? (sunder ? 3 : D.crit) : 1;
+  dmg *= result.mult;
   if (you && isFlat(tgt) && result.view !== "map") dmg = Math.max(1, Math.floor(dmg / 2));   // the Edge of the Plane, in 3D
   const core = you && t.guardian === "colossus" ? colossusCore(game, tgt) : true;
   if (!core) dmg = 1;
@@ -390,28 +428,69 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
     result.dmg = 0;
     float(game, tgt, "0", [170, 180, 200]);
     noticeBlow(game, tgt, att);
-    if (you) game.log(`The ${tgt.name}'s hide turns your ${spec.kind === "thrown" ? "knife" : "blow"}.`, [170, 180, 200]);
+    tell(game, result, spec, ctx, [170, 180, 200]);
     sfx("block", { at: tgt });
     return;
   }
   // 5 Apply and tell.
+  const line = (killed) => combatLine(game, { ...result, killed }, spec, ctx);
   if (you && spec.kind === "melee") {
-    result.killed = yourBladeLanded(game, p, tgt, dmg, { crit, el, vs, core, rng, soak: (o, n) => Math.max(0, n - soakRoll(rng, avOf(o))) || 1 });
+    result.killed = yourBladeLanded(game, p, tgt, dmg, { crit, el, vs, core, rng, line, soak: (o, n) => Math.max(0, n - soakRoll(rng, avOf(o))) || 1 });
   } else if (you) {
     hurtCreature(game, tgt, dmg, crit ? `${dmg}!` : `${dmg}`, crit ? [255, 220, 80] : [255, 255, 255], p);
-    const name = tgt.name;
-    if (tgt.hp <= 0) killMonster(game, tgt, `You slay the ${name}.`);
-    else game.log(`Your knife ${crit ? "sinks deep into" : "hits"} the ${name} (${dmg}).`, [220, 220, 230]);
+    if (tgt.hp <= 0) killMonster(game, tgt, line(true));
+    else game.log(line(false), [220, 220, 230]);
     result.killed = tgt.hp <= 0;
   } else {
     hurtCreature(game, tgt, dmg, `${dmg}`, [255, 150, 150], att);
-    if (tgt.hp <= 0) killMonster(game, tgt, `The ${att.name} kills the ${tgt.name}.`, true, false, att);
+    const seen = inYourSight(game, att) || inYourSight(game, tgt);
+    if (tgt.hp <= 0) killMonster(game, tgt, seen ? line(true) : `The ${att.name} kills the ${tgt.name}.`, true, false, att);
+    else if (seen) game.log(line(false), [200, 170, 170]);
     result.killed = tgt.hp <= 0;
   }
+  if (!result.killed && spec.onHit && tgt.hp > 0 && game.zone.creatures.includes(tgt)) spec.onHit(game, tgt, result);
 }
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
+// --- The combat log (d20) ---------------------------------------------------------------------------
+// One line a blow, in one format for both views (TECH_DESIGN §3.1, step 6):
+//   You hit the goblin for 5.   You hit the goblin (x2) for 10.   You slay the goblin (5).   You miss the goblin.
+//   Your bolt hits the goblin for 4.   Your knife misses the goblin.   The goblin's hide turns your blow.
+//   The goblin hits you for 3.   The goblin hits you (x2) for 6.   The goblin misses you.   Your armour turns …
+//   The orc hits the goblin for 3.   The orc misses the goblin.   The orc slays the goblin (x2, 6).
+// (A blow on you that lands is told by hitPlayer, after your armour and the ward have had their say.)
+// Creatures' blows on each other are told only where you'd see them (inYourSight).
+export function combatLine(game, r, spec = {}, ctx = {}) {
+  const you = isPlayer(game, r.att), onYou = isPlayer(game, r.tgt);
+  const noun = spec.noun || (spec.kind === "thrown" ? "knife" : spec.kind === "missile" ? "shot" : "blow");
+  const melee = spec.kind === "melee" || spec.kind === "natural";
+  const mult = r.mult > 1 ? `x${r.mult}` : "";
+  if (onYou) {
+    if (!r.hit) return `${cap(ctx.blocked || `the ${r.att.name}`)} misses you.`;
+    if (r.dmg <= 0) return `Your armour turns ${ctx.blocked || `the ${r.att.name}'s blow`}.`;
+    return `${cap(ctx.source || `the ${r.att.name}`)} hits you${mult ? ` (${mult})` : ""} for ${r.dmg}.`;
+  }
+  const who = you ? (melee ? "You" : `Your ${noun}`) : `The ${r.att.name}`, s = you && melee ? "" : "s";
+  const name = r.tgt.name;
+  if (!r.hit) return `${who} miss${s ? "es" : ""} the ${name}.`;
+  if (r.dmg <= 0) return `The ${name}'s hide turns ${you ? `your ${melee ? "blow" : noun}` : `the ${r.att.name}'s ${melee ? "blow" : noun}`}.`;
+  if (r.killed) return `${who} slay${s} the ${name} (${mult ? `${mult}, ` : ""}${r.dmg}).`;
+  return `${who} hit${s} the ${name}${mult ? ` (${mult})` : ""} for ${r.dmg}.`;
+}
+// Log a miss or a soaked blow: yours and those on you always, creatures' only where you'd see them.
+function tell(game, r, spec, ctx, color) {
+  if (isPlayer(game, r.att) || isPlayer(game, r.tgt) || inYourSight(game, r.att) || inYourSight(game, r.tgt))
+    game.log(combatLine(game, r, spec, ctx), color);
+}
+// Within 12 tiles and in your line of sight (and not a ghost the light hides): a fight you'd notice.
+function inYourSight(game, c) {
+  const p = game.player;
+  if (!c || distance(p.x - c.x, p.y - c.y) > 12 || ghostHidden(game, c)) return false;
+  return lineOfSight(game.zone, p.x, p.y, p.z + EYE, c.x, c.y, c.z + (c.h ?? 1) * 0.6);
+}
+
 // --- The two views ----------------------------------------------------------------------------------
+const HOLD_BACK = 2;   // seconds: a second swing at someone you held back from strikes
 // 3D: swing at whatever is in front of you (the best target in the cone, within reach and sight).
 export function playerMelee(game) {
   const p = game.player;
@@ -424,7 +503,10 @@ export function playerMelee(game) {
   const cp = Math.cos(p.pitch);
   const fx = cp * Math.cos(p.yaw), fy = cp * Math.sin(p.yaw), fz = Math.sin(p.pitch);
   const ex = p.x, ey = p.y, ez = p.z + EYE;
-  let best = null, bestDist = Infinity;
+  // The nearest in the cone: something hostile to you first, else the nearest of the rest. One that isn't out
+  // for you (your follower, a neutral) isn't struck by the first swing (Appendix B: "a second click to attack a
+  // friend", as Shift + direction on the map): you hold back, and a second swing at it within HOLD_BACK s strikes.
+  let best = null, bestDist = Infinity, foe = false;
   for (const m of game.zone.creatures) {
     if (!touchable(game, m, p, { blade: true })) continue;   // a flat being: your blade passes through its shadow; people
     const cz = m.z + m.h * 0.5;
@@ -433,7 +515,17 @@ export function playerMelee(game) {
     if (dist > reach + m.w * 0.5) continue;
     if ((vx * fx + vy * fy + vz * fz) / dist < (dist < 1.2 ? 0.2 : 0.7)) continue;
     if (!lineOfSight(game.zone, ex, ey, ez, m.x, m.y, cz)) continue;
-    if (dist < bestDist) { bestDist = dist; best = m; }
+    const hostile = attitude(game, m, p) === "hostile";
+    if ((hostile && !foe) || (hostile === foe && dist < bestDist)) { bestDist = dist; best = m; foe = hostile; }
+  }
+  if (best && !foe) {
+    const held = game.heldBack;
+    if (!(held && held.id === best.id && game.time >= held.t && game.time - held.t <= HOLD_BACK)) {
+      game.heldBack = { id: best.id, t: game.time };
+      game.log(`You hold back from the ${best.name}. (Swing again to strike it.)`, [170, 170, 170]);
+      return null;
+    }
+    game.heldBack = null;
   }
   return best ? resolveAttack(game, p, best, weaponSpec(p), { view: "3d" }) : null;
 }

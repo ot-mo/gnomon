@@ -1,17 +1,35 @@
-// Throwing knives, potions and bombs.
+// Throwing knives, potions and bombs; everything in flight (missiles.js's shots too).
 //
 // 3D: a thrown thing really flies (and drops a little) until it hits a monster, a wall or the
 //     floor — so aim matters. T or right-click throws.
-// Map: T throws straight at the nearest monster you can see (it always hits), and takes a turn.
+// Map: under the d20 set T opens the target screen (screens/target.js): pick a creature or a tile, and the
+//     thing is launched on an exact ballistic arc at it (throwAt) and flies while the turn's time passes,
+//     so it can miss, and the first creature in its way is hit first (your follower too). Under the
+//     legacy set T throws straight at the nearest monster you can see (it always hits), as the parent did.
 //
 // Knives do 2–4 damage and usually land where you can pick them up again.
 // Potions shatter and splash whatever is close to where they land: throw the harmful ones
 // (poison gas, paralysis, darkness…). Good ones help the monsters — and if you're standing
 // too close, the splash reaches you too. Throwing a potion you don't know identifies it.
-// Bombs go off 2 s after they leave your hand (on the map you set them down at your feet):
-// they hurt everything close, smash crates, and open the thin walls of secret rooms.
+// Bombs go off 2 s after they leave your hand (on the map you set them down at your feet, or with the
+// d20 set lob them at a tile): they hurt everything close, smash crates, and open the thin walls of
+// secret rooms. Pressed flat you are under all of it: deep things' arrows, splashes and blasts pass over.
+//
+// Over an open edge of a surface zone a flight goes on above the apron (the next span's ground): what
+// lands there lands in that zone (a knife or a bolt by a zone patch, waiting for you there); a potion
+// shatters, a bomb goes off where it fell.
+//
+//   ballistic(sx, sy, sz, tx, ty, tz, speed, gravity) → { vx, vy, vz, time }   the exact arc
+//   launch(game, it, from, to, { speed, gravity, extra }) → projectile           yours, in flight
+//   flightOf(game, pr, { maxT = 3 }) → { t, x, y, z, creature, stop, path }      where it would go now (no
+//       side effects): the target screen's line of fire, and how long a map throw lasts
+//   throwAt(game, stack, target) → projectile | null    the map's throw at a target screen's pick
+//   aimPoint(game, target) → { x, y, z }                where a shot at a target is aimed: a creature's
+//       middle, else the tile's floor (+0.3): height still decides what can be hit
+//   finishFlight(game, pr, seconds)                     the map: `seconds` pass, and then as long as it
+//       still flies
 import { damageMonster, resolveAttack, thrownSpec } from "./combat.js";
-import { touchable, hostilesTo } from "./creatures.js";
+import { touchable, touchesYou, hostilesTo, canTalk } from "./creatures.js";
 import { POTIONS, POTION_COLORS, FLOOR_ART, itemPalette, makeItem, awayFromWalls, takeOne } from "./items.js";
 import { B, FLOOR_Z } from "./world.js";
 import { EYE, RADIUS, HEIGHT } from "./player.js";
@@ -20,8 +38,17 @@ import { sfx } from "./sfx.js";
 import { maxHp } from "./stats.js";
 import { addStatus, hasStatus, statusFlag } from "./status.js";
 import { hasKey } from "./keyset.js";
+import { RULES } from "./rules.js";
+import { neighbourAddr, addZonePatch, PATCH_OPS } from "./zones.js";
+import { passTime, mapUseTime } from "./turns.js";
+import { MISSILE_ART } from "./content/items/missiles.js";
 
 export const THROW_TIME = 0.5;
+export const THROW_RANGE = 10, BOMB_RANGE = 8;   // the map's target screen (tiles)
+// The map's aimed throw: screens/target.js fills it in when it loads (aim(game, stack) opens the screen; its
+// confirm calls throwAt and finishFlight). A hook rather than an import, so that hud.js, which reads
+// readyStack here, doesn't load the screens through this module.
+export const THROW_AIM = { aim: null };
 const SPEED = 15, GRAVITY = 12, SPLASH = 1.8;
 const FUSE = 2, BLAST = 2.3;
 
@@ -53,11 +80,13 @@ export function throwReady(game, stack = readyStack(game.player)) {
   return true;
 }
 
-// Map: throw at the nearest monster you can see (within 10 tiles), or set a bomb down at
-// your feet. Returns true if you did (it takes a turn).
+// Map: under the d20 set, open the target screen for the ready thing (the throw and its time happen
+// when you confirm, so this returns false); under the legacy set throw at the nearest monster you can
+// see (within 10 tiles), or set a bomb down at your feet. Returns true if you did (it takes a turn).
 export function throwAtNearest(game, stack = readyStack(game.player)) {
   const { zone, player: p } = game;
   if (!stack) { game.log("You have nothing to throw. (T in the inventory throws a potion.)", [170, 170, 170]); return false; }
+  if (RULES.combat === "d20" && THROW_AIM.aim) { THROW_AIM.aim(game, stack); return false; }
   if (stack.kind === "bomb") {
     p.ready = { kind: "bomb" };
     takeOne(p, stack);
@@ -76,6 +105,101 @@ export function throwAtNearest(game, stack = readyStack(game.player)) {
   sfx("throw");
   impact(game, it, m.x, m.y, m.z + m.h * 0.6, m);
   return true;
+}
+
+// --- Aimed flights (both views share the arc and the contact) ---------------------------------------
+export function ballistic(sx, sy, sz, tx, ty, tz, speed, gravity) {
+  const dx = tx - sx, dy = ty - sy, dz = tz - sz;
+  const time = Math.max(0.05, Math.hypot(dx, dy, dz) / speed);
+  return { vx: dx / time, vy: dy / time, vz: dz / time + 0.5 * gravity * time, time };
+}
+export function aimPoint(game, target) {
+  const c = target?.creature;
+  if (c) return { x: c.x, y: c.y, z: c === game.player ? c.z + EYE * 0.6 : c.z + (c.h || 1) * 0.6 };
+  const zone = game.zone, tx = target.tile.x, ty = target.tile.y;
+  const s = tx >= 0 && ty >= 0 && tx < zone.w && ty < zone.d ? zone.stand[tx + ty * zone.w] : -1;
+  return { x: tx + 0.5, y: ty + 0.5, z: (s >= 0 ? s : target.point?.z ?? FLOOR_Z) + 0.3 };
+}
+// What it is thrown with: a bomb is lobbed (slower, so it arcs higher), the rest at full speed.
+export const throwSpeed = (it) => (it.kind === "bomb" ? SPEED * 0.6 : SPEED);
+export const THROW_GRAVITY = GRAVITY;
+const ownFrom = (p) => ({ x: p.x, y: p.y, z: p.z + EYE - 0.2 });
+export function launch(game, it, from, to, { speed = throwSpeed(it), gravity = GRAVITY, extra = {} } = {}) {
+  const v = ballistic(from.x, from.y, from.z, to.x, to.y, to.z, speed, gravity);
+  const pr = { ...it, ...extra, x: from.x, y: from.y, z: from.z, vx: v.vx, vy: v.vy, vz: v.vz, g: gravity,
+               life: v.time + 1.5, spin: 0, mine: true, fuse: it.kind === "bomb" ? FUSE : undefined };
+  game.zone.projectiles.push(pr);
+  return pr;
+}
+
+// The map's throw at what the target screen picked: the ready thing on its arc (a bomb aimed at your own
+// tile is set down at your feet, as before).
+export function throwAt(game, stack, target) {
+  const { zone, player: p } = game;
+  if (!stack || !target || !p.inv.includes(stack)) return null;
+  p.ready = { kind: stack.kind, effect: stack.effect };
+  const to = aimPoint(game, target);
+  if (stack.kind === "bomb" && target.tile.x === Math.floor(p.x) && target.tile.y === Math.floor(p.y)) {
+    takeOne(p, stack);
+    zone.bombs.push({ x: p.x, y: p.y, z: p.z, fuse: FUSE });
+    game.log("You light a bomb and set it down. Get away from it!", [255, 170, 70]);
+    return null;
+  }
+  const it = takeOne(p, stack);
+  p.yaw = Math.atan2(to.y - p.y, to.x - p.x);
+  if (it.kind === "bomb") game.log("You light the fuse and throw the bomb!", [255, 170, 70]);
+  sfx("throw");
+  return launch(game, it, ownFrom(p), to);
+}
+// A pretend projectile for flightOf, from you at `to` (a target).
+export function ballisticFrom(game, target, speed, gravity) {
+  const from = ownFrom(game.player), to = aimPoint(game, target);
+  const v = ballistic(from.x, from.y, from.z, to.x, to.y, to.z, speed, gravity);
+  return { x: from.x, y: from.y, z: from.z, vx: v.vx, vy: v.vy, vz: v.vz, g: gravity, life: v.time + 1.5, mine: true };
+}
+export function finishFlight(game, pr, seconds) {
+  mapUseTime(game, seconds);
+  if (!pr || game.mode !== "map" || !game.zone.projectiles.includes(pr)) return;
+  const rest = flightOf(game, pr).t;
+  if (rest > 0) passTime(game, rest + 1 / 60);
+}
+
+// What a projectile at (nx, ny, nz) runs into this sub-step: you (a creature's arrow or bolt, unless you
+// are flat and it isn't), a creature (yours: the first one you could strike, wherever it stands on the
+// way), STOP (a block, deep water, the bottom of the world, a border with nothing built beyond it), or null.
+const STOP = "stop";
+function collide(game, pr, nx, ny, nz, ignore = null) {
+  const { zone, player: p } = game;
+  if (pr.hostile) {
+    // (one of your followers in the way takes it first; the shooter's own kind it flies past, as ever)
+    for (const mo of zone.creatures)
+      if (mo.brain?.leader === "player" && touchable(game, mo, pr.from) && Math.hypot(nx - mo.x, ny - mo.y) < mo.w * 0.45 + 0.15 && nz > mo.z - 0.1 && nz < mo.z + mo.h + 0.1) return mo;
+    if (touchesYou(game, pr.from) && Math.abs(nx - p.x) < RADIUS + 0.1 && Math.abs(ny - p.y) < RADIUS + 0.1 && nz > p.z && nz < p.z + HEIGHT) return p;
+  } else {
+    for (const mo of zone.creatures)
+      if (!canTalk(mo) && touchable(game, mo) && !ignore?.(mo) && Math.hypot(nx - mo.x, ny - mo.y) < mo.w * 0.45 + 0.15 && nz > mo.z - 0.1 && nz < mo.z + mo.h + 0.1) return mo;
+  }
+  const bx = Math.floor(nx), by = Math.floor(ny), bz = Math.floor(nz);
+  if (zone.solid(bx, by, bz) || zone.voxel(bx, by, bz) === B.WATER_DEEP || nz < -1) return STOP;   // (solid: beyond a border without an apron too)
+  return null;
+}
+
+// Where a projectile would go from here, if nothing moved meanwhile. ignore(c) → true: fly through c (the target
+// screen leaves out what you can't see).
+export function flightOf(game, pr, { maxT = 3, ignore = null } = {}) {
+  const q = { x: pr.x, y: pr.y, z: pr.z, vx: pr.vx, vy: pr.vy, vz: pr.vz, g: pr.g ?? GRAVITY, hostile: pr.hostile, from: pr.from };
+  const h = 1 / 120, path = [{ x: q.x, y: q.y, z: q.z }];
+  let t = 0, life = Math.min(maxT, pr.life ?? maxT);
+  for (; t < life; t += h) {
+    q.vz -= q.g * h;
+    const nx = q.x + q.vx * h, ny = q.y + q.vy * h, nz = q.z + q.vz * h;
+    const hit = collide(game, q, nx, ny, nz, ignore);
+    if (hit === STOP) return { t, x: q.x, y: q.y, z: q.z, creature: null, stop: true, path };
+    if (hit) return { t, x: nx, y: ny, z: nz, creature: hit, stop: false, path };
+    q.x = nx; q.y = ny; q.z = nz;
+    if (Math.floor(path[path.length - 1].x) !== Math.floor(nx) || Math.floor(path[path.length - 1].y) !== Math.floor(ny)) path.push({ x: nx, y: ny, z: nz });
+  }
+  return { t, x: q.x, y: q.y, z: q.z, creature: null, stop: false, path };
 }
 
 // Move everything in flight. Each step: did it hit a monster (or you, for arrows and bolts
@@ -97,37 +221,51 @@ export function updateProjectiles(game, dt) {
     for (let s = 0; s < steps && !done; s++) {
       pr.vz -= (pr.g ?? GRAVITY) * h;
       const nx = pr.x + pr.vx * h, ny = pr.y + pr.vy * h, nz = pr.z + pr.vz * h;
-      const m = !pr.hostile && hostilesTo(game, p).find((mo) => touchable(game, mo) &&
-        Math.hypot(nx - mo.x, ny - mo.y) < mo.w * 0.45 + 0.15 && nz > mo.z - 0.1 && nz < mo.z + mo.h + 0.1);
-      const bx = Math.floor(nx), by = Math.floor(ny), bz = Math.floor(nz);
-      if (pr.hostile && Math.abs(nx - p.x) < RADIUS + 0.1 && Math.abs(ny - p.y) < RADIUS + 0.1 && nz > p.z && nz < p.z + HEIGHT) {
+      const hit = collide(game, pr, nx, ny, nz);
+      if (hit === p) {
         const what = pr.kind === "bolt" ? "bolt" : "arrow";
         resolveAttack(game, pr.from, p, { kind: "missile", fixed: pr.dmg }, { aimed: true, ranged: true, source: `the ${pr.from.name}'s ${what}`, blocked: `the ${what}` });
         done = true;
-      } else if (m) { impact(game, pr, nx, ny, nz, m); done = true; }
-      else if (zone.solid(bx, by, bz) || zone.get(bx, by, bz) === B.WATER_DEEP || nz < -1 ||
-               bx < 0 || by < 0 || bx >= zone.w || by >= zone.d) {   // nothing leaves its zone, even over the apron
+      } else if (hit === STOP) {
         impact(game, pr, pr.x, pr.y, pr.z, null);   // stop just before the surface it hit
         done = true;
-      } else { pr.x = nx; pr.y = ny; pr.z = nz; }
+      } else if (hit && pr.hostile) {   // your follower, in the way
+        resolveAttack(game, pr.from, hit, { kind: "missile", fixed: pr.dmg }, { aimed: true, ranged: true });
+        done = true;
+      } else if (hit) { impact(game, pr, nx, ny, nz, hit); done = true; }
+      else { pr.x = nx; pr.y = ny; pr.z = nz; }
     }
     if (done) zone.projectiles = zone.projectiles.filter((o) => o !== pr);
   }
 }
 
-// It landed. A knife hurts what it hit (if anything) and drops; a potion shatters.
+// It landed. A knife hurts what it hit (if anything) and drops; a potion shatters; a missile weapon's
+// shot hurts what it hit, and a bolt that didn't break drops. Beyond the zone's border (over the apron)
+// it lands in the next span's zone (landOutside).
 function impact(game, it, x, y, z, m) {
   if (it.hostile) return;   // a monster's arrow or bolt hit a wall: gone
   if (it.kind === "potion") { shatter(game, it.effect, x, y, z); return; }
   const { zone } = game;
+  const outside = x < 0 || y < 0 || x >= zone.w || y >= zone.d;
   if (it.kind === "bomb") {   // it drops where it stopped and fizzes until it goes off
+    if (outside) { const g = groundUnder(zone, x, y, z); if (g >= 0) zone.bombs.push({ x, y, z: g, fuse: it.fuse ?? FUSE }); return; }
     const ground = zone.stand[Math.floor(x) + Math.floor(y) * zone.w];
     if (ground < 0) { game.log("The bomb tumbles into the dark. A dull boom echoes from far below.", [170, 170, 170]); return; }
     const [bx, by] = awayFromWalls(zone, x, y, ground);
     zone.bombs.push({ x: bx, y: by, z: ground, fuse: it.fuse ?? FUSE });
     return;
   }
+  if (it.kind === "missile") {   // missiles.js: a stone or a bolt
+    if (m) resolveAttack(game, game.player, m, it.spec, { aimed: true, ranged: true });
+    if (!it.ammo || Math.random() < (it.breaks ?? 0)) return;
+    const drop = { kind: "ammo", effect: it.ammo, count: 1 };
+    if (outside) { landOutside(game, drop, x, y); return; }
+    const ground = zone.stand[Math.floor(x) + Math.floor(y) * zone.w];
+    if (ground >= 0) zone.items.push(makeItem(drop, Math.floor(x) + 0.5, Math.floor(y) + 0.5, ground));
+    return;
+  }
   if (m) resolveAttack(game, game.player, m, thrownSpec(game), { aimed: true, ranged: true });   // it reached it: aimed, in both views
+  if (outside) { if (Math.random() >= 0.2) landOutside(game, { kind: "knife", count: 1 }, x, y); return; }
   // Where does it come to rest? On the ground under where it stopped — unless that's a
   // chasm or deep water, or it snapped (1 in 5).
   const tx = Math.floor(x), ty = Math.floor(y);
@@ -135,6 +273,37 @@ function impact(game, it, x, y, z, m) {
   if (ground < 0 || Math.random() < 0.2) return;
   zone.items.push(makeItem({ kind: "knife", count: 1 }, tx + 0.5, ty + 0.5, ground));
 }
+
+// The first floor under (x, y, z), over the apron too (−1: none).
+function groundUnder(zone, x, y, z) {
+  const bx = Math.floor(x), by = Math.floor(y);
+  for (let k = Math.floor(z); k >= 1; k--) if (zone.solid(bx, by, k - 1) && !zone.solid(bx, by, k)) return k;
+  return -1;
+}
+// A thing that came down beyond the border, over an open edge or corner: it waits in that span's zone (a zone
+// patch, applied when you next enter it: zones.js addZonePatch), as far into it as it flew past the edge. Spans
+// line up along a shared edge, so the coordinate along it carries over. → the patch, or null (no open way there).
+export function landOutside(game, item, x, y) {
+  const zone = game.zone;
+  const ns = y < 0 ? "n" : y >= zone.d ? "s" : "", ew = x < 0 ? "w" : x >= zone.w ? "e" : "";
+  const addr = ns + ew && neighbourAddr(game, zone, ns + ew);
+  if (!addr) return null;
+  const patch = { op: "landItem", item, ox: ew === "e" ? x - zone.w : x, oy: ns === "s" ? y - zone.d : y };
+  addZonePatch(game, addr.key, patch);
+  return patch;
+}
+// { op: "landItem", item, ox, oy }: on the ground there, if there is ground. ox, oy: from this zone's west and
+// north edges, or (negative) back from its east and south ones.
+PATCH_OPS.landItem = (game, zone, p) => {
+  const x = Math.floor(p.ox < 0 ? zone.w + p.ox : p.ox), y = Math.floor(p.oy < 0 ? zone.d + p.oy : p.oy);
+  if (x < 0 || y < 0 || x >= zone.w || y >= zone.d) return;
+  const ground = zone.stand[x + y * zone.w];
+  if (ground >= 0) zone.items.push(makeItem(p.item, x + 0.5, y + 0.5, ground));
+};
+
+// Every creature a splash, a blast or gas can reach: friend or foe (people never; nor one still on its way in).
+// (Under the legacy set every one of them is out for you, as the parent's list was.)
+const bodies = (game) => game.zone.creatures.filter((c) => !canTalk(c) && !(c.brain?.arriving > 0));
 
 // A potion smashes at (x, y, z) and splashes everything within SPLASH blocks.
 function shatter(game, effect, x, y, z) {
@@ -145,8 +314,8 @@ function shatter(game, effect, x, y, z) {
   game.log(known ? `The potion of ${POTIONS[effect].name} shatters!`
                  : `The ${color.name} potion shatters. It was a potion of ${POTIONS[effect].name}!`, color.rgb);
   game.effects.push({ kind: "burst", x, y, z, color: color.rgb, time: game.time });
-  const near = hostilesTo(game, p).filter((m) => touchable(game, m) && Math.hypot(m.x - x, m.y - y) <= SPLASH && Math.abs(m.z - z) < 2.5);
-  const youToo = Math.hypot(p.x - x, p.y - y) <= SPLASH && Math.abs(p.z + 1 - z) < 2.5;
+  const near = bodies(game).filter((m) => touchable(game, m) && Math.hypot(m.x - x, m.y - y) <= SPLASH && Math.abs(m.z - z) < 2.5);
+  const youToo = touchesYou(game, null) && Math.hypot(p.x - x, p.y - y) <= SPLASH && Math.abs(p.z + 1 - z) < 2.5;   // (flat: it splashes over you)
   const names = () => near.map((m) => m.name).join(", ");
 
   switch (effect) {
@@ -217,10 +386,10 @@ function explode(game, x, y, z) {
   sfx("boom", { at: { x, y } });
   const demo = hasKey(p.perks, "demolitionist"), blast = demo ? BLAST * 1.4 : BLAST;   // the Demolitionist perk
   for (const o of zone.bombs) if (Math.hypot(o.x - x, o.y - y) < blast) o.fuse = Math.min(o.fuse, 0.15);
-  for (const m of hostilesTo(game, p))
+  for (const m of bodies(game))
     if (Math.hypot(m.x - x, m.y - y) <= blast && Math.abs(m.z + m.h / 2 - z) < 2.5)
       damageMonster(game, m, 10 + Math.floor(Math.random() * 7), [255, 160, 60], `The ${m.name} is blown apart.`);
-  if (Math.hypot(p.x - x, p.y - y) <= blast && Math.abs(p.z + 0.8 - z) < 2.5)
+  if (touchesYou(game, null) && Math.hypot(p.x - x, p.y - y) <= blast && Math.abs(p.z + 0.8 - z) < 2.5)   // (flat: the blast passes over you)
     game.hurtPlayer(Math.ceil((8 + Math.floor(Math.random() * 5)) / (demo ? 2 : 1)), "your own bomb");
 
   let opened = false, changed = false, wallNear = false;
@@ -253,9 +422,9 @@ export function updateClouds(game, dt) {
   const { zone, player: p } = game;
   for (const c of zone.clouds) {
     c.time -= dt;
-    for (const m of hostilesTo(game, p))
+    for (const m of bodies(game))
       if (touchable(game, m) && Math.hypot(m.x - c.x, m.y - c.y) <= c.r && Math.abs(m.z - c.z) < 2.5) addStatus(game, m, "poisoned", { t: 2, mag: 2, stack: "max" });
-    if (Math.hypot(p.x - c.x, p.y - c.y) <= c.r && Math.abs(p.z + 1 - c.z) < 2.5) {
+    if (touchesYou(game, null) && Math.hypot(p.x - c.x, p.y - c.y) <= c.r && Math.abs(p.z + 1 - c.z) < 2.5) {
       if (!hasStatus(p, "poisoned")) game.log("You're in the poison cloud!", [150, 210, 80]);
       addStatus(game, p, "poisoned", { t: 2, stack: "max" });
     }
@@ -302,6 +471,9 @@ export function projectileSprites(game) {
     } else if (pr.kind === "bolt") {
       out.push({ x: pr.x, y: pr.y, z: pr.z - 0.2, w: 0.4, h: 0.4, art: [" o ", "oOo", " o "], emit: [0.5, 1.2, 0.7],
                  palette: { o: [[120, 255, 160], 1.5], O: [[230, 255, 235], 2.5] } });
+    } else if (pr.kind === "missile") {   // missiles.js: a stone, or a bolt pointing the way it flies
+      if (pr.shape === "stone") out.push({ x: pr.x, y: pr.y, z: pr.z - 0.06, w: 0.12, h: 0.12, art: ["s"], palette: { s: [[150, 145, 135], 0.15] } });
+      else out.push({ x: pr.x, y: pr.y, z: pr.z - 0.05, w: 0.4, h: 0.08, art: MISSILE_ART.bolt.art, palette: { I: [[205, 210, 225], 0.3], h: [[125, 85, 50], 0.1], H: [[165, 120, 75], 0.1] } });
     } else if (pr.kind === "knife") {
       out.push({ x: pr.x, y: pr.y, z: pr.z - 0.12, w: 0.3, h: 0.3, art: KNIFE_FRAMES[Math.floor(pr.spin) % 2],
                  palette: { w: [[235, 240, 250], 0.3], W: [[190, 198, 215], 0.3], s: [[110, 118, 135], 0.2], h: [[125, 80, 45], 0.1] } });

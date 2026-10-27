@@ -56,6 +56,7 @@ export const ITEM_SAMPLES = {
   knife: { kind: "knife", count: 3 }, bomb: { kind: "bomb", count: 1 }, key: { kind: "key" }, heart: { kind: "heart" },
   strength: { kind: "strength" }, gold: { kind: "gold", amount: 5 }, cash: { kind: "cash", amount: 5 }, cube: { kind: "cube" },
   quest: { kind: "quest", name: "skull" }, "relic?": { kind: "relic?" },
+  missile: { kind: "missile", id: "boltBow", ench: 1 }, ammo: { kind: "ammo", effect: "bolt", count: 10 },   // WS8 (content/items/missiles.js)
 };
 const STATUS_FLAGS = ["noAct", "noMove", "flying", "hidden", "untouchable", "noRegen", "flat"];
 const ABILITY_SOURCES = ["mutation", "implant", "item", "power", "innate"];
