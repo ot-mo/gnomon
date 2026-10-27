@@ -492,20 +492,23 @@ export async function checkLegends({ seed = 7 } = {}) {
   go(deep);
   const inLair = game.zone.creatures.some((o) => o.uid === L.uid);
   if (met !== road || count(L.uid) !== 1 || inLair) problems.push(`met on the road first: claimed by ${met}, ${count(L.uid)} in memory, in the lair ${inLair}`);
-  // 5. A follower takes its home along.
+  // 5. A follower takes its home along (WS8's zone:leave brings it, since the WS10 merge: the check used to move it by
+  // hand): one of it wherever you go, claimed where it is; back down with you it is the follower, not a second one;
+  // left behind upstairs, the lair makes none.
   startRun(seed, TEST_WORLD);
   go(deep);
   const f = game.zone.creatures.find((o) => o.uid === L.uid);
   if (f) {
     f.brain = { ...(f.brain || {}), leader: "player" };
-    const lairZone = game.zone;
-    go(top);
-    lairZone.creatures = lairZone.creatures.filter((o) => o !== f);
-    game.zone.creatures.push(f);   // (as WS8's zone:leave takes a follower along)
-    go(surface); go(top);
+    go(top); go(surface); go(top);
     if (uidWhere(game, L.uid) !== top || count(L.uid) !== 1 || !game.zone.creatures.includes(f)) problems.push(`a following legend: claimed by ${uidWhere(game, L.uid)}, ${count(L.uid)} in memory`);
     go(deep);
-    if (game.zone.creatures.some((o) => o.uid === L.uid)) problems.push("a following legend is also back in its lair");
+    const here = game.zone.creatures.filter((o) => o.uid === L.uid);
+    if (count(L.uid) !== 1 || here.length !== 1 || here[0] !== f || uidWhere(game, L.uid) !== deep) problems.push(`back in its lair with you: ${here.length} of it there (the follower ${here[0] === f}), ${count(L.uid)} in memory, claimed by ${uidWhere(game, L.uid)}`);
+    go(top);
+    f.brain.leader = undefined;   // it stays upstairs
+    go(deep);
+    if (game.zone.creatures.some((o) => o.uid === L.uid) || count(L.uid) !== 1 || uidWhere(game, L.uid) !== top) problems.push(`a legend left upstairs is also back in its lair (${count(L.uid)} in memory, claimed by ${uidWhere(game, L.uid)})`);
   } else problems.push("no legend to follow you");
   // 6. A Lampless Saint burnt away by a lit brazier is as dead as a slain legend.
   const { AI_HOOKS } = await import("../../src/ai.js");
