@@ -19,7 +19,8 @@
 //       people's faction or the Bent villages 0.25-0.5), the leader named with its opinions, readings and teaches.
 //   zone.village = { siteId, shrine: { x, y, z, view }, lamp: { x, y, dark }, perch: { x, y, z } | null, buildings }
 //
-//   ensureVillageFaction(game, v)   registers the village's faction (factions.js registerFaction) once a page
+//   ensureVillageFaction(game, v)   registers the village's faction (factions.js registerFaction), or brings a generated one
+//                                   registered by an earlier run in this page up to this run's
 //   VILLAGE_REWARD                  the first visit's XP: 0.2 of a level's at the village's level (bible §9.1); WS4's
 //                                   xpReward("village", level) when it exists
 // The layout draws from its own stream (seedFor(zone seed, "village", site id)), so the surface's own draws don't move.
@@ -218,7 +219,7 @@ function teachesFor(skill) {
 export function ensureVillageFaction(game, v) {
   const def = villageFaction(v), have = factions.FACTIONS[def.id];
   if (!have) factions.registerFaction(def.id, def);
-  else if (have.siteId === def.siteId && have.name !== def.name) Object.assign(have, def);   // another run of this page
+  else if (have.generated) Object.assign(have, def);   // another run in this page: the same id, maybe other relations
   return factions.FACTIONS[def.id];
 }
 
