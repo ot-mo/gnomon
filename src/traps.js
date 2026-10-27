@@ -70,7 +70,9 @@ export function updateSpikes(game) {
     if (creatures.canTalk(m) || m.vis.statue || t.hover || t.flat || t.boss || !hits(m.x, m.y, m.z, m.spikeBeat)) continue;
     m.spikeBeat = beat;
     // Nobody's harm (WS6a request 2): no grudge, no reputation, and a kill that isn't yours (no experience).
-    applyDamage(game, m, 3 + Math.floor(Math.random() * 3), { src: null, color: [200, 200, 210], deathText: `The ${m.name} is skewered by the spikes.` });
+    // Nobody's harm (no grudge, no reputation: WS6a #2), but the kill's experience is yours, as in the parent (the
+    // integrator's call on WS10 #10, as for status kills).
+    applyDamage(game, m, 3 + Math.floor(Math.random() * 3), { src: null, byPlayer: true, color: [200, 200, 210], deathText: `The ${m.name} is skewered by the spikes.` });
   }
 }
 

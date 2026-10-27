@@ -208,12 +208,14 @@ const flatSoak = (m, dmg, pierce = false) => Math.max(1, dmg - (pierce ? 0 : m.a
 const soakRoll = (rng, avv) => (avv >= 0 ? Math.floor(rng() * (avv + 1)) : -Math.floor(rng() * (-avv + 1)));
 
 // Damage from something other than a blow (a bomb, spikes, a scroll): no to-hit roll. Returns what it did.
-export function applyDamage(game, m, dmg, { src = null, color = [255, 255, 255], label = null, deathText = null } = {}) {
+// byPlayer: the kill is yours (its experience, a vampiric ring's heal) though the harm is nobody's, as for spikes
+// (traps.js); it follows the source otherwise.
+export function applyDamage(game, m, dmg, { src = null, byPlayer = isPlayer(game, src), color = [255, 255, 255], label = null, deathText = null } = {}) {
   if (!touchable(game, m, src || game.player)) return 0;
   if (CREATURE_TYPES[m.type].guardian === "colossus" && !colossusCore(game, m)) dmg = Math.min(dmg, 2);
   dmg = flatSoak(m, dmg);
   hurtCreature(game, m, dmg, label ?? `${dmg}`, color, src);
-  if (m.hp <= 0) killMonster(game, m, deathText || `You slay the ${m.name}.`, true, isPlayer(game, src), src);
+  if (m.hp <= 0) killMonster(game, m, deathText || `You slay the ${m.name}.`, true, byPlayer, src);
   return dmg;
 }
 // (The 0B name, for spikes and bombs: yours, as in the parent. applyDamage itself has no source unless one is

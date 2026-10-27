@@ -604,7 +604,8 @@ export async function checkTraps() {
   updateSpikes(game);
   stats.deep = `${hp0} → ${p.hp}`;
   if (!(p.hp < hp0)) problems.push("deep: the spikes didn't hurt you");
-  // A goblin on a spike beside you: hurt by nobody, and its death is nobody's kill.
+  // A goblin on a spike beside you: hurt by nobody (no grudge, no rep), its death nobody's kill for the "kill" event,
+  // but its experience yours, as in the parent (the integrator's call on WS10 #10 at the merge).
   const spot = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [tx + dx, ty + dy]).find(([x, y]) => zone.stand[x + y * zone.w] === FLOOR_Z);
   if (spot) {
     const m = addCreature(zone, spawnCreature("goblin", spot[0], spot[1], FLOOR_Z, { rng: Math.random, state: "idle", level: 1 }));
@@ -618,7 +619,7 @@ export async function checkTraps() {
     stats.goblin = { dead: !zone.creatures.includes(m), srcs: srcs.map((x) => (x === null ? "nobody" : x === game.player ? "you" : String(x?.type))), xp: `${xp0} → ${p.xp}` };
     if (zone.creatures.includes(m)) problems.push("the goblin on a spike didn't die");
     if (!srcs.length || srcs.some((s) => s !== null)) problems.push(`a spike's wound came from [${srcs}] (want one wound from nobody)`);
-    if (p.xp !== xp0) problems.push(`a spike kill gave you experience (${xp0} → ${p.xp})`);
+    if (!(p.xp > xp0)) problems.push(`a spike kill gave you no experience (${xp0} → ${p.xp}; the parent gave it)`);
   } else problems.push("no floor beside you for the goblin");
   // The beat in 3D: with BEAT_SIGHT on, a spike about to rise shows; off, it doesn't.
   zone.spikes.set(tx + ty * zone.w, { phase: ((Math.floor(game.time / TICK) + 1) % period + period) % period, period, up: 1, pattern: "test" });
