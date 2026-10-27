@@ -211,7 +211,16 @@ export async function run(env) {
     if (journal.journalOf(game).triangulated["ishvalet:3"] !== undefined) fail("two accounts triangulated an event");
     SEC.learnSecret(game, "hist:ishvalet:3:dark", "talk");
     const want = SEC.TRIANGULATION.xp(5);   // the request's tier 2 → level 5
-    const { xpToNext } = await env.src("leveling.js");
+    const { xpToNext, lvlXP } = await env.src("leveling.js");
+    // WS4's rate is the one source (RULES.progression.xp.rewards.triangulation, since the WS7a merge): doubled there,
+    // the triangulation's XP doubles.
+    {
+      const { RULES: RR, overrideRules: OR } = await env.src("rules.js"), X = RR.progression.xp;
+      const undo = OR("progression", { xp: { ...X, rewards: { ...X.rewards, triangulation: 2 * X.rewards.triangulation } } });
+      const doubled = SEC.TRIANGULATION.xp(5);
+      undo();
+      if (doubled !== Math.round(2 * X.rewards.triangulation * lvlXP(5)) || want !== Math.round(X.rewards.triangulation * lvlXP(5))) fail(`the triangulation's XP isn't WS4's xpReward: ${want}, ${doubled} with the rate doubled`);
+    }
     let gained = p.xp - xp0;
     for (let l = lv0; l < p.level; l++) gained += xpToNext(l);
     if (journal.journalOf(game).triangulated["ishvalet:3"] === undefined || gained !== want || journal.journalOf(game).notes.length !== notes0 + 1)

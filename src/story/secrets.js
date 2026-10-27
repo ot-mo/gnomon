@@ -18,8 +18,8 @@
 //   secretDef(run, id) · secretText(run, idOrDef) · secretTitle(run, idOrDef) → string
 //   muralSecret(run, text) → id | null  the history account a mural's text is (murals.js)
 //   readings(game) → [{ id, kind, reading, text, sold }]   what you know, for WS6b's Kindling; markSold(game, id)
-//   TRIANGULATION = { xp(level) → amount }   0.15 of a level's XP at the event's tier (bible §8.5); a seam WS4's
-//                                     xpReward("triangulation", level) replaces (integration request)
+//   TRIANGULATION = { xp(level) → amount }   WS4's xpReward("triangulation", level): 0.15 of a level's XP at the
+//                                     event's tier (bible §8.5; RULES.progression.xp.rewards)
 //
 // Triangulation (bible §8.5): all three accounts of one event known → it is triangulated: XP, and a hidden fact comes
 // out of the disagreement (the event's site's place, the floor a lost relic waits on, or the Hour's true age), filed
@@ -31,12 +31,12 @@ import { expand, numberWords, cap } from "./grammar.js";
 import { journalOf, addNote } from "./journal.js";
 import { registerQuest, startQuest, questOf, advanceQuest } from "./quests.js";
 import { parseKey } from "../zones.js";
-import { gainXp, xpToNext } from "../leveling.js";
+import { gainXp, xpReward } from "../leveling.js";
 import * as discovery from "../overworld/discovery.js";
 
 export const ACCOUNT = { flat: "gospel", deep: "inscription", dark: "hostile" };
 export const READINGS = ["flat", "deep", "dark"];
-export const TRIANGULATION = { xp: (level) => Math.round(0.15 * xpToNext(level)) };
+export const TRIANGULATION = { xp: (level) => xpReward("triangulation", level) };
 
 const PRONOUN_FORMS = { she: { they: "she", them: "her" }, he: { they: "he", them: "him" } };
 const forms = (r) => PRONOUN_FORMS[r?.pronoun] || { they: "they", them: "them" };
