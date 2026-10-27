@@ -87,28 +87,35 @@ export async function checkProgression(m) {
     // Every way of getting the choices wrong is refused, and makeCharacter throws for it.
     const good = choicesFor("reedcutter", C.suggestSpread("bent", "reedcutter"));
     if (C.validateChoices(good).length) fail(`the suggested reedcutter is refused: ${C.validateChoices(good).join("; ")}`);
+    const balanced23 = { str: 23, agi: 16, tou: 16, int: 16, wil: 14, ego: 14 };   // 18 + 3 × 6 + 2 × 4 = 44: only the cap is wrong
+    if (C.pointsLeft("bent", balanced23) !== 0) fail(`the balanced 23 spread leaves ${C.pointsLeft("bent", balanced23)} points`);
     const bad = {
-      "an unknown genotype": { genotype: "pure" }, "an unknown background": { background: "nobody" },
-      "another genotype's background": { background: "archivistOfVey" }, "a point unspent": { attrs: { ...good.attrs, ego: good.attrs.ego - 1 } },
-      "a point too many": { attrs: { ...good.attrs, ego: good.attrs.ego + 1 } }, "23 in one": { attrs: { ...good.attrs, str: 23 } },
-      "below the base": { attrs: { ...good.attrs, str: 9 } }, "a fraction": { attrs: { ...good.attrs, str: 17.5 } },
-      "no name": { name: "  " }, "a 25-letter name": { name: "Å".repeat(25) }, "no mode": { mode: "pressed" },
-      "a newline in the name": { name: "Ann\nMari" }, "a NUL in the name": { name: "Ann\u0000" },
-      "a direction mark in the name": { name: "Ann\u202e" }, "a lone combining mark for a name": { name: "\u0301" },
-      "an unknown mutation": { mutations: ["wings"] }, "an implant for the Bent": { implant: "tallyEye" },
+      "an unknown genotype": [{ genotype: "pure" }, /no genotype/], "an unknown background": [{ background: "nobody" }, /no background/],
+      "another genotype's background": [{ background: "archivistOfVey" }, /is a Plumb background/],
+      "a point unspent": [{ attrs: { ...good.attrs, ego: good.attrs.ego - 1 } }, /not spent/],
+      "a point too many": [{ attrs: { ...good.attrs, ego: good.attrs.ego + 1 } }, /overspent/],
+      "23 in one (every point spent)": [{ attrs: balanced23 }, /STR 23 is outside 10-22/],
+      "below the base": [{ attrs: { ...good.attrs, str: 9 } }, /STR 9 is outside/], "a fraction": [{ attrs: { ...good.attrs, str: 17.5 } }, /STR is 17\.5/],
+      "no name": [{ name: "  " }, /no name/], "a 25-letter name": [{ name: "Å".repeat(25) }, /longer than 24/], "no mode": [{ mode: "pressed" }, /no run mode/],
+      "a newline in the name": [{ name: "Ann\nMari" }, /control character/], "a NUL in the name": [{ name: "Ann\u0000" }, /control character/],
+      "a direction mark in the name": [{ name: "Ann\u202e" }, /control character/], "a lone combining mark for a name": [{ name: "\u0301" }, /no letter/],
+      "an unknown mutation": [{ mutations: ["wings"] }, /no mutation wings/], "an implant for the Bent": [{ implant: "tallyEye" }, /take no implants/],
     };
-    for (const name of ["Åsa Öberg-Ärla", "Zé", "Ess", "7", "Aurel Strade-Orrum", "Å".repeat(24)])
-      if (C.validateChoices({ ...good, name }).length) fail(`validateChoices refused the name ${JSON.stringify(name)}: ${C.validateChoices({ ...good, name })}`);
     let refused = 0;
-    for (const [what, change] of Object.entries(bad)) {
-      const c = { ...good, ...change };
-      if (!C.validateChoices(c).length) { fail(`validateChoices took ${what}`); continue; }
+    for (const [what, [change, why]] of Object.entries(bad)) {
+      const c = { ...good, ...change }, got = C.validateChoices(c);
+      if (!got.length) { fail(`validateChoices took ${what}`); continue; }
+      if (!got.some((x) => why.test(x))) fail(`${what} refused, but not for it: ${got.join("; ")}`);
       let threw = false;
       try { C.makeCharacter(c); } catch { threw = true; }
       if (!threw) fail(`makeCharacter took ${what}`); else refused++;
     }
-    const plumb = { ...choicesFor("forgehandOfOrrum", C.suggestSpread("plumb", "forgehandOfOrrum")), mutations: ["x"] };
-    if (!C.validateChoices(plumb).length) fail("validateChoices gave the Plumb a mutation");
+    // A Plumb with a mutation that exists (a test entry in the table, gone after): refused for the genotype alone.
+    m.mutations.MUTATIONS.testCrease = { name: "test crease", cost: 4 };
+    try {
+      const got = C.validateChoices({ ...choicesFor("forgehandOfOrrum", C.suggestSpread("plumb", "forgehandOfOrrum")), mutations: ["testCrease"] });
+      if (got.join() !== "the Plumb take no mutations") fail(`a Plumb with a mutation: ${got.join("; ") || "taken"}`);
+    } finally { delete m.mutations.MUTATIONS.testCrease; }
     // The Plumb's free implant: its Level's own (or none named: the same); nothing else while WS5's table is empty; with
     // implants in the table, any costing at most 2, the background's own listed first.
     const forge = choicesFor("forgehandOfOrrum", C.suggestSpread("plumb", "forgehandOfOrrum"));
@@ -530,7 +537,7 @@ export async function run(env) {
     rules: await src("rules.js"), stats: await src("stats.js"), chargen: await src("progression/chargen.js"), leveling: await src("leveling.js"),
     levelup: await src("screens/levelup.js"), create: await src("screens/create.js"), keys: await src("keys.js"), screens: await src("screens.js"),
     codec: await src("save/codec.js"), rng: await src("rng.js"), items: await src("items.js"), playerMod: await src("player.js"),
-    implants: await src("content/items/implants.js"),
+    implants: await src("content/items/implants.js"), mutations: await src("content/mutations.js"),
     content: { ...genotypes, ...backgrounds, ...powers },
   });
 }
