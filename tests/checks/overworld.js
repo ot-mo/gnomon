@@ -330,6 +330,16 @@ function bands(G, name, world, problems) {
     killUid(game, uid);
     if (legendsFor(game, u).length) problems.push(`${name} legend: rolled again once dead`);
   }
+  // A legend with a lair roams near its lair's tier, not its own (3 levels higher, bible §12.13).
+  const home = [...game.run.sites.values()].find((x) => x.kind !== "landmark");
+  if (home) {
+    const d2 = { uid: `legend:home:${name}`, species: "goblin", name: "Vey", level: levelOfTier(home.tier) + 3, siteId: home.id };
+    game.run.legends = new Map([[d2.uid, d2]]);
+    const at = (dt) => W.tiles.find((v) => v.tier === home.tier + dt && (v.wx !== home.at.wx || v.wy !== home.at.wy));
+    const same = at(0), far = at(2);
+    if (same && !legendsFor(game, same).includes(d2)) problems.push(`${name} legend: a tier-${home.tier} lair's legend doesn't roam tier ${home.tier}`);
+    if (far && legendsFor(game, far).includes(d2)) problems.push(`${name} legend: a tier-${home.tier} lair's legend roams tier ${far.tier}`);
+  }
   game.run.legends = new Map();
   return { unvisited: range(dists.unvisited), visited: range(dists.visited), short, real };
 }
