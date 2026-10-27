@@ -445,6 +445,7 @@ export async function run(env) {
     }
     fresh(1234, { genotype: "bent" });
     const shown = Object.values(F.FACTIONS).filter((f) => !f.hidden), curtSeen = {};
+    const opens = (x) => !!(x?.trade || x?.shop);   // the pack: WS6b's trade screen (Pell keeps his shop)
     for (const role of builders.ROLES) for (const f of shown) for (const [bandId, [lo]] of Object.entries(EDGES)) {
       game.state.rep = { [f.id]: bandId === "hated" ? -800 : lo };
       const c = person("mira", role, f.id);
@@ -462,7 +463,7 @@ export async function run(env) {
       if (role === "merchant" && !refused) {
         const shop = root.options.find((o) => /what you have/.test(o.label))?.go();
         const want = curt ? "node" : "shop";
-        if ((shop?.shop ? "shop" : "node") !== want) fail(`merchant of ${f.id} at ${bandId}: the pack gives ${JSON.stringify(shop?.shop ?? shop?.text)}`);
+        if ((opens(shop) ? "shop" : "node") !== want) fail(`merchant of ${f.id} at ${bandId}: the pack gives ${JSON.stringify(shop?.trade ?? shop?.shop ?? shop?.text)}`);
       }
     }
     // Cold is reached by a talker of one faction (every role, every temperament, the merchant's pack shut).
@@ -472,7 +473,7 @@ export async function run(env) {
       const c = person("mira", "merchant", "drovers"); c.brain = { temperament: temper };
       c.talk.state = { stock: [{ item: { kind: "potion", id: "heal" }, price: 10, count: 1 }] };
       const root = talk.talkTo(game, c), pack = root.options.find((o) => /what you have/.test(o.label))?.go();
-      if (root.text !== builders.GREET.merchant.disliked || !pack || pack.shop) fail(`a ${temper} Drover merchant at Cold: "${root.text}", the pack ${JSON.stringify(pack?.shop ?? pack?.text)}`);
+      if (root.text !== builders.GREET.merchant.disliked || !pack || opens(pack)) fail(`a ${temper} Drover merchant at Cold: "${root.text}", the pack ${JSON.stringify(pack?.shop ?? pack?.text)}`);
     }
     // A grudge makes a Grey talker curt, and curt never says "New face." (met or not).
     {
@@ -498,10 +499,10 @@ export async function run(env) {
       if (st.faction !== "survey" || st.attitude !== "neutral" || root.text !== builders.GREET.merchant.disliked)
         fail(`a merchant 0.6 Survey (Cold) 0.4 Drovers: main ${st.faction}, ${st.attitude}, "${root.text}"`);
       const shut = root.options.find((o) => /what you have/.test(o.label))?.go();
-      if (!shut || shut.shop) fail(`the same merchant at Cold opens its pack: ${JSON.stringify(shut?.shop)}`);
+      if (!shut || opens(shut)) fail(`the same merchant at Cold opens its pack: ${JSON.stringify(shut?.trade)}`);
       game.state.rep = {};
       const open = talk.talkTo(game, mix).options.find((o) => /what you have/.test(o.label))?.go();
-      if (open?.shop !== "buy") fail(`a Grey merchant's pack opens on ${JSON.stringify(open?.shop)}, want buy`);
+      if (open?.trade !== "theirs") fail(`a Grey merchant's pack opens on ${JSON.stringify(open?.trade ?? open?.shop)}, want the trade screen on theirs (WS6b)`);
     }
     // A talker with no faction (the roles work for anyone).
     for (const role of builders.ROLES) {
