@@ -278,12 +278,23 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
       zone.set(x, y, top, road[i] ? B.ROAD : base.ground[i]);
     }
 
+  // The columns the zone's own features changed from the world functions (an apron built from them
+  // differs there until this zone is in memory, §6.1): heights, water, roads, the footprint and the plan;
+  // below, a tree that gave way or stands on ground the zone moved, with its canopy, and sinkholes.
+  // zone.gen.local; a zone-local builder marks its own columns too.
+  const local = new Uint8Array(n);
+  for (let i = 0; i < n; i++) if (H[i] !== base.H[i] || water[i] !== base.water[i] || road[i] || reserved[i] || plan[i]) local[i] = 1;
+  const markTree = (t) => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (t.x + dx >= 0 && t.y + dy >= 0 && t.x + dx < ZW && t.y + dy < ZD) local[t.x + dx + (t.y + dy) * ZW] = 1;
+  };
+
   // 6. Trees. A tree whose canopy stays inside the zone gives way to the zone's own things; one that
   //    crosses an edge never does (the world function keeps those clear of ports), so both zones have it.
   const scenery = new Uint8Array(n);   // columns whose standing spot is on scenery (a tree, a wall's top)
   for (const t of base.trees) {
     const ti = t.x + t.y * ZW, inside = t.x >= 1 && t.y >= 1 && t.x < ZW - 1 && t.y < ZD - 1;
-    if (inside && (road[ti] || water[ti] || reserved[ti] || plan[ti] || (t.x === hub.x && t.y === hub.y))) continue;
+    if (inside && (road[ti] || water[ti] || reserved[ti] || plan[ti] || (t.x === hub.x && t.y === hub.y))) { markTree(t); continue; }
+    if (inside && local[ti]) markTree(t);
     buildTree(zone, inside ? { ...t, base: FLOOR_Z + H[ti] } : t, scenery);   // (banks may have lowered an inner one's ground)
   }
 
@@ -338,6 +349,7 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
         if (distance(x - e.x, y - e.y) < 5 || NEXT4.some(([dx, dy]) => water[x + dx + (y + dy) * ZW])) continue;
         if (below && !below(x - r.ox, y - r.oy)) continue;
         for (let z = 0; z < zone.h; z++) zone.set(x, y, z, B.AIR);
+        local[i] = 1;
         made++;
       }
     }
@@ -350,7 +362,7 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
   yield "refresh";
   zone.spawn = spawn || pickAnchor(zone, hub, scenery);
   zone.gen = { ports: base.ports.map((p) => ({ ...p, tiles: Array.from({ length: p.width }, (_, k) => portTile(p, k)) })),
-               keyPoints, scenery, cliff: base.cliff, worldWater: base.water, plan, planAt, hub, entranceGated };
+               keyPoints, scenery, cliff: base.cliff, worldWater: base.water, plan, planAt, hub, entranceGated, local };
   return zone;
 }
 

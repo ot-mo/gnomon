@@ -1,8 +1,9 @@
 // The apron's band builder (TECH_DESIGN §6.1, §1.4 zones.js APRON_BUILDERS; owner WS2), registered as
 // APRON_BUILDERS.surface by world/zonegen.js.
 //
-//   buildApronBand(run, zone, side, neighbour = null) → band    side: "n" | "e" | "s" | "w" | "ne" | "nw" | "se" | "sw";
-//        a copy of the neighbour's blocks when it is in memory, else built from the world functions (and kept)
+//   buildApronBand(run, zone, side, neighbour = null, { fresh = false } = {}) → band
+//        side: "n" | "e" | "s" | "w" | "ne" | "nw" | "se" | "sw"; a copy of the neighbour's blocks when it is in
+//        memory, else built from the world functions and kept (fresh: built anew and not kept, for checks)
 //   apronBandSteps(run, wx, wy) → iterator   builds and keeps the world-function bands span (wx, wy)'s apron
 //        will want, one band per next(); gen/surface.js surfaceSteps runs one with each of its stages
 //   APRON_KEEP                               how many world-function bands are kept (the most recent)
@@ -28,11 +29,11 @@ const floorDiv = (a, b) => Math.floor(a / b);
 export const APRON_KEEP = 64;   // bands: 8 zones' worth, the zone you are in and its neighbours with room to spare
 const kept = new WeakMap();     // world → Map(`${seed}:${wx},${wy}:${side}` → band), oldest first
 
-export function buildApronBand(run, zone, side, neighbour = null) {
+export function buildApronBand(run, zone, side, neighbour = null, { fresh = false } = {}) {
   const { w, d, h } = zone;
   if (neighbour && neighbour.w === w && neighbour.d === d && neighbour.h === h) return copyBand(zone, side, neighbour);
   const surface = w === ZW && d === ZD && h === SURFACE.h;
-  if (!surface) return worldBand(run, zone, side);
+  if (!surface || fresh) return worldBand(run, zone, side);
   let byKey = kept.get(run.world);
   if (!byKey) kept.set(run.world, (byKey = new Map()));
   const key = `${run.seed >>> 0}:${zone.wx},${zone.wy}:${side}`;
