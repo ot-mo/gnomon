@@ -4,15 +4,15 @@ Update this file as the last act of every session (see `CLAUDE.md`, "Handing off
 
 **Updated:** 2026-10-27, the integrator (local session), on `integration`. **Phase 1 is running and Phase 2's
 integration has started: WS3, WS8, WS4 and WS6 (both halves each), WS5 and WS10 are merged (`p2-ws3`, `p2-ws8`,
-`p2-ws4a`, `p2-ws5`, `p2-ws6a`, `p2-ws4b`, `p2-ws6b`, `p2-ws10`); the flip waits for the user (below), and the next
-`p1-*` tag merges as it lands (WS9 is paused before its tag).** From here on only the integrator edits this file and
+`p2-ws4a`, `p2-ws5`, `p2-ws6a`, `p2-ws4b`, `p2-ws6b`, `p2-ws10`), and the flip is in (`p2-flip`: the attribute set and
+d20 by default); the next `p1-*` tag merges as it lands (WS9 is paused before its tag).** From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p2-ws10` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
-  `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b` and `p1-ws10` with their integration requests; `p2-ws3` …
-  `p2-ws6b` before it).
+- **Last tag:** `p2-flip` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+  `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b` and `p1-ws10` with their integration requests, then the
+  flip; `p2-ws3` … `p2-ws10` before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
 - **Branch:** `integration`, in the worktree `C:\Users\Otto Mörner\Code\gnomon-wt\integration` (serves on port
   8660). Nothing is half finished.
@@ -29,10 +29,7 @@ moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## Next step
 
-**The integrator, now:** the flip waits for the user's call on the tier 5-8 balance ("Waiting on the user"); when it
-comes, flip (or retune first) as "The flip" under "Carried integration requests" says, on its own tag.
-
-**The integrator, meanwhile:** wait for the coordinator's message; merge each `p1-*` tag as it lands, in §8.5's
+**The integrator:** wait for the coordinator's message; merge each `p1-*` tag as it lands, in §8.5's
 order (WS9, WS3, WS8, WS5, WS4, WS6a, WS6b, WS10, WS2, WS7, WS1). For each: read `docs/<ws>.md` and
 `docs/sessions/<ws>.md`; merge the tag; apply the requests aimed at P0's, unowned, the integrator's or merged
 workstreams' files, and carry the rest (below, "Carried integration requests"); rerun its dependency-table items
@@ -129,39 +126,12 @@ job does. For a timed gate number, run that check alone on an idle machine and a
 
 ## Waiting on the user
 
-**The d20 balance at tiers 5-8, before the flip** (the user's decision of 2026-10-27: no retune until WS4's powers are
-in, then settle it with the tables). With WS4 and WS8 both merged (`p2-ws4b`), `RULES.stats` and `RULES.combat` stay
-`"legacy"` until the user has looked at this. `node tools/check-combat.mjs --only ttk` (WS8's tables; two builds added
-at the WS4b merge, `02c7213`): a fighter at each tier's level (STR 18 / AGI 17 / TOU 16 at creation, an attribute
-point every 4 levels, the tier's weapon and armour, enchanted +level/6 and +level/8) against the creatures that level
-brings, weighted by how often each turns up; melee only. "You kill" is your seconds to kill one, "a kill costs" the
-share of your health it takes meanwhile.
+Nothing.
 
-| Tier (level) | d20, no powers | d20, a combat power each level | d20, powers + a Bent's mutations | the parent (legacy) |
-|---|---|---|---|---|
-| 1 (2) | 1.12 s, 7.5% | 0.90 s, 6.0% | 0.77 s, 4.3% | 0.97 s, 8.7% |
-| 2 (5) | 1.17 s, 7.8% | 0.82 s, 5.4% | 0.73 s, 3.7% | 1.04 s, 8.5% |
-| 3 (8) | 2.01 s, 10.1% | 0.89 s, 4.4% | 0.83 s, 2.7% | 1.58 s, 9.7% |
-| 4 (11) | 2.72 s, 17.7% | 1.21 s, 6.5% | 1.16 s, 4.1% | 2.16 s, 16.3% |
-| 5 (14) | 4.47 s, 33.7% (troll 71%) | 1.94 s, 9.0% (troll 19%) | 1.86 s, 6.0% | 3.01 s, 24.9% |
-| 6 (17) | 5.62 s, 44.3% (troll 78%) | 2.38 s, 11.8% | 2.27 s, 7.7% | 3.67 s, 30.0% |
-| 7 (20) | 6.94 s, 54.2% (troll 76%) | 2.92 s, 14.6% | 2.80 s, 9.3% | 4.49 s, 34.8% |
-| 8 (23) | 7.67 s, 60.0% (troll 83%) | 3.17 s, 16.6% (troll 23%) | 3.05 s, 10.6% | 4.92 s, 37.7% |
-
-"A combat power each level" is a best case: Quick strikes, Keen eye and Mighty twice each, then Iron skin, Tough,
-the Executioner, Regeneration (11 powers by level 14), as if every level offered the one wanted; the real offers are
-3-4 seeded picks from your trees. "Powers + a Bent's mutations" adds Spare Heart, Thistlehide and Regeneration at
-level / 2. C4's gear isn't in yet (DECISIONS: the integrator settles this before or at the flip). What the tables say:
-without powers the d20 set is much harsher than the parent's from tier 4 (a troll costs 71-83% of your health at tiers
-5-8); with a fighter's powers it is much kinder than the parent's from tier 3. **The user's call:** flip as built,
-retune (say the creatures' level scaling or the tier gear's enchantment), or wait for C4's gear.
-
-With it, the **leveling pace** under the attribute set (WS4 #5, applied at `p2-ws4a`): a kill gives the bible's
-`killXp`, about 1% of a level for a same-level kill, so a level takes ~100 kills at every level (the integrator's
-probe at `p2-ws4a`: level 1 ~20 kills, 3 ~100, 5 ~87, 8 ~93, 14 ~99, 20 ~101) against the parent's ~3, 9, 20, 41, 91,
-147; until WS1 and WS7 give discovery and quest XP, the old campaign under the attribute set levels several times
-slower through level 8.
-
+- **The flip** (decided by the user on 2026-10-27, given in chat in the coordinating session: "Flip as built now:
+  switch to the attribute set and d20 combat, and settle the tuning (creature scaling, kill XP) in the balance phase
+  once C4's gear and WS1/WS7's XP are in."): done at `p2-flip`, no retune; the deferred tuning is under "Open items
+  carried forward", "Balance phase".
 - **The Lamplighter of Cassin's purse** (`docs/sessions/ws4.md` deviation 2): settled by the user in WS4a's session on
   2026-10-27: it keeps the 500 purse that holds its 250 glim, as built (recorded on `ws/ws4` in `95f8fcc`; it reaches
   `integration` with `p1-ws4b`).
@@ -172,8 +142,8 @@ legend in pause card key list"), each now a carried item below:
 - **WS9's recorded frames:** at WS9's merge the integrator excludes from `tests/checks/screen-frames.js`, by exact name
   in `NOT_COMPARED`, only the frames WS9's HUD, pause and death screens change, each with its reason; WS9's own check
   must hold the new screens; golden (b) stays held. No blanket exclusion.
-- **The d20 balance at tiers 5-8:** no retune until WS4's powers are in, then settle it before or at the flip with
-  WS8's TTK tables shown to the user: the tables are above (WS4 merged at `p2-ws4b`; C4's gear not yet).
+- **The d20 balance at tiers 5-8:** no retune until WS4's powers are in, then settle it with WS8's TTK tables shown to
+  the user: shown at `p2-ws4b`; the user flipped as built and put the tuning in the balance phase (above).
 - **The map's key hints** (L look, V fire, `,` legend, hotbar key 1): in WS9's pause card key list (WS9 has been told).
 
 ## Carried integration requests (by owner)
@@ -181,12 +151,6 @@ legend in pause card key list"), each now a carried item below:
 Requests the integrator can't apply yet because the file belongs to a workstream that hasn't merged; each is applied
 at that merge (so it doesn't conflict with the branch). Numbers are the asking workstream's (`docs/<ws>.md`).
 
-- **The flip** (§8.5; WS8 #9, WS4 #13), now that WS4 and WS8 are both in, **after the user's call above**:
-  `RULES.stats = "attributes"` and `RULES.combat = "d20"` (DECISIONS: d20, not §8.5's "dice") by default; golden (a)
-  retires; `check-legacyfights` then needs `overrideRules("combat", "legacy")` around its fights (its fixture is the
-  parent's); WS8's TTK tables become the balance reference. Under d20 the map's T opens the target screen, creatures
-  flee, and the log takes the d20 lines. WS9's title pushes the wizard (`create`, for the attribute set) only from the
-  flip on (WS4 #13).
 - **C1 (from the WS10 merge):** the Square's free fittings for a Plumb at Assize ≥ Warm (WS5 #20's other half):
   whoever opens the Square's Cradle passes `openTruing(game, { at: "cradle", …, waive: true })`; landmark dungeons
   may carry `floorGimmicks`, `named`, `cradle` and `bottom: { kind: "legend" | "relic", … }`, their bible gimmick
@@ -260,9 +224,8 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   calls it so and `player.js` drops `nextRunPlayer`. WS6a #7: "P factions" on the pause
   card's key list beside the others (WS9 was paused before its tag and not told; add it at the merge).
   WS4 #12 and #13: WS9's title pushes `"create"` with `{ seed, mode }` (the wizard is registered on `integration`
-  since `p2-ws4a`), and the wizard can read `save.js RUN_MODES` instead of its own copy; but **the wizard is for the
-  attribute set**, so if WS9 merges before the flip, its title stays on the quick game (or hides New game) until the
-  flip. WS4 #4 with WS9 #2 (startRun's `{ mode, player }`): above, under WS4b.
+  since `p2-ws4a`), and the wizard can read `save.js RUN_MODES` instead of its own copy; the wizard is for the
+  attribute set, which is the default since `p2-flip`, so the title's New game pushes it. WS4 #4 with WS9 #2 (startRun's `{ mode, player }`): above, under WS4b.
 - **WS2** (at its merge): WS3 #5, `map` looks for the reserved TRUNK, SHALE, LEAVES, REED (blocks.js); note bible
   §15.7 reserves `♣` (speaking trees) and `^` (spikes), as blocks.js's comments say. WS3 #5 for GRASS (id 7, the
   integrator's): **not applied**: §6.5's grass `"` is the amulet's reserved glyph (bible §15.7 outranks TECH_DESIGN),
@@ -283,6 +246,28 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p2-flip`** (2026-10-27): the formula flip (TECH_DESIGN §8.5; WS8 #9, WS4 #13), on its own tag after `p2-ws10`, at the
+user's call (above): `RULES.stats = "attributes"` and `RULES.combat = "d20"` by default (`0e79899`, `rules.js`). Nothing
+is re-recorded: what replays the parent's fixtures sets the legacy sets itself. Golden: `checkGolden` replays under
+them (golden (a) retires as the default game's check and holds the legacy sets; frames, dungeons, vaults and temple as
+before), and so do `browser-0d1`'s frames and `check-stats`' replays, which go through it. The legacy fights:
+`playLegacyFights` with `overrideRules("combat", "legacy")` and the stats. The recorded screen frames: `screenFrames`
+takes the tree's `rules`. Also on the legacy sets: `check-currency` (Pell's prices; the attribute set's are
+check-social's), check-items' `p0-done` consumables trace, check-status's legacy salamander bite, check-shell's parent
+level-up card (the attribute set's is WS4's), check-combat's P0 d20 rows (STR 10 on the legacy stat set),
+check-progression's section 6. check-stats and check-progression now hold the new defaults. `tools/bot.mjs` confirms a
+target screen (the map's T under d20, an aimed ability) with Enter, else Esc: check-save's session had left the game
+on the target screen and `saveGame` waited for ever (exit 13, no output).
+- Checks: `run-all` at `0e79899` **38 of 38** (244 s, the CPU at 100% with two other sessions working; the timed ones
+  passed in the run). Golden mechanics 86 and frames 27, 0 mismatched; legacy fights 1,359 / 1,027 steps, 0 differing;
+  screen frames 38 of 47 compared, 0 mismatched; the bot (both views) and check-save's session on the d20 default.
+  Browser (`tools/serve.mjs 8660`, `?silent=1`, 0 console errors): `browser-0d1 --against p0-done` 23 of 23 modes, the
+  HUD at 100×30, golden (b) 27 of 27 in the browser, per tick underground +1.4% (3D) and +1.2% (map); `browser-gate`
+  (1234, 7); `browser-0c` (1234, 7: both sets in both views); `browser-0d2 --all` (boot with 155 modules,
+  `test-world.html` 34 passed, 0 failed); `browser-silent`; `browser-ws8` (1234, 7); `browser-ws6`; `browser-ws5`;
+  `browser-ws4` (both sizes). A probe of the default game in the browser: `RULES` attributes and d20, the quick start
+  STR 16, max HP 20, T on the map opens the target screen and Esc goes back, no console error.
 
 **`p2-ws10`** (2026-10-27): `p1-ws10` (1bbd302) merged into `integration` (`2b343b7`), no conflicts. Its one P0 check
 change, confirmed (coordinator-approved, `// WS10`): `tests/checks/world.js` `siteRules` skips the region-chance line
@@ -601,6 +586,28 @@ its §8.4 files and two P0 checks).
 
 ## Open items carried forward
 
+- **Balance phase** (the user, 2026-10-27: "settle the tuning (creature scaling, kill XP) in the balance phase once
+  C4's gear and WS1/WS7's XP are in"): with C4's gear and WS1's and WS7's discovery and quest XP (`xpReward`) in, rerun
+  WS8's TTK tables (`node tools/check-combat.mjs --only ttk`, the balance reference since the flip) and settle the
+  creatures' level scaling (`spawnCreature`: +6% HP a level, +1 damage per 4), the tier gear's enchantment, and the
+  kill-XP pace (the bible's `killXp`: about 1% of a level for a same-level kill, so ~100 kills a level at every level,
+  against the parent's ~3 / 9 / 20 / 41 / 91 / 147 at levels 1 / 3 / 5 / 8 / 14 / 20). The tables at `p2-ws4b` (each
+  cell your seconds to kill a creature of that level, and the share of your health one kill costs): without powers d20
+  is much harsher than the parent's from tier 4 (a troll 71-83% of your health at tiers 5-8), with a fighter's powers
+  much kinder from tier 3. "A combat power each level" is a best case (every level offering the one wanted);
+  "powers + a Bent's mutations" adds Spare Heart, Thistlehide and Regeneration at level / 2.
+
+  | Tier (level) | d20, no powers | d20, a combat power each level | d20, powers + a Bent's mutations | the parent (legacy) |
+  |---|---|---|---|---|
+  | 1 (2) | 1.12 s, 7.5% | 0.90 s, 6.0% | 0.77 s, 4.3% | 0.97 s, 8.7% |
+  | 2 (5) | 1.17 s, 7.8% | 0.82 s, 5.4% | 0.73 s, 3.7% | 1.04 s, 8.5% |
+  | 3 (8) | 2.01 s, 10.1% | 0.89 s, 4.4% | 0.83 s, 2.7% | 1.58 s, 9.7% |
+  | 4 (11) | 2.72 s, 17.7% | 1.21 s, 6.5% | 1.16 s, 4.1% | 2.16 s, 16.3% |
+  | 5 (14) | 4.47 s, 33.7% (troll 71%) | 1.94 s, 9.0% (troll 19%) | 1.86 s, 6.0% | 3.01 s, 24.9% |
+  | 6 (17) | 5.62 s, 44.3% (troll 78%) | 2.38 s, 11.8% | 2.27 s, 7.7% | 3.67 s, 30.0% |
+  | 7 (20) | 6.94 s, 54.2% (troll 76%) | 2.92 s, 14.6% | 2.80 s, 9.3% | 4.49 s, 34.8% |
+  | 8 (23) | 7.67 s, 60.0% (troll 83%) | 3.17 s, 16.6% (troll 23%) | 3.05 s, 10.6% | 4.92 s, 37.7% |
+
 - **WS3 (merged; what's left):** the edge-swap frame's step (the far apron bands built in the swap frame: carried to
   WS2 above); the underground legend says "gold" while golden (b) holds (WS3 #9: change `renderMap.js`'s `$` row
   when it retires; the outdoor legend says glim). The outdoor frame, the horizon band and the clock's looks are done
@@ -626,7 +633,7 @@ its §8.4 files and two P0 checks).
   dropped after the save is duplicated); §7.3's save on a completed zone change fixes it. Saves are in memory only
   (IndexedDB, periodic and unload saves, the oneWick slot deleted on death, checkpoints). Prefetch is skipped while
   `ZONE_LOADER.load` is set (prefetch through the loader). `?debug=1` is parsed but unused.
-- **WS4 (merged; what's left):** the flip waits for the user (above). 20 of the bible's 40 mutations (deviation 17);
+- **WS4 (merged; what's left):** the flip is in (`p2-flip`); its tuning is the balance phase's (above). 20 of the bible's 40 mutations (deviation 17);
   the Smoothers never come until something listens to `"smoothers"` (C2); Cast watches the view each frame until
   `"view:turn"` exists (the integrator's backlog). On the map an ability aims within its own reach now (WS8's target
   screen): Fold Step 4 + level, Kindle 5 + level; P0's stub took any hostile within 10 and stepped toward it. The quick
