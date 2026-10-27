@@ -767,13 +767,15 @@ export async function checkProgression(m) {
       const avPlate = st.av(sh);
       if (avPlate !== m.items.ARMOURS.plate.armour) fail(`Shellback under plate: AV ${avPlate}, want the plate's ${m.items.ARMOURS.plate.armour} alone`);
       out.shellback = `AV ${avBare} bare, ${avPlate} in plate`;
-      // Reputation (bible §10.4): begun with Wings and Flatwise, once each; Wings gained in play.
+      // Reputation (bible §10.4): begun with Wings and Flatwise, once each; Wings gained in play. Each moves rep from
+      // where the run began: the start by genotype (factions.js baseRep, WS6a) and the background's change.
       const rep = (f) => m.factions.repOf(game, f);
       C.beginRun(game, choicesFor("reedcutter", attrs, { mutations: ["wings", "flatwise"] }), { seed: 3 });
-      if (rep("kites") !== 400 || rep("flatfolk") !== 200 || rep("pressed") !== 100 || rep("assize") !== -200 || rep("clatter") !== 50) fail(`begun with Wings and Flatwise: kites ${rep("kites")}, flatfolk ${rep("flatfolk")}, pressed ${rep("pressed")}, assize ${rep("assize")}, clatter ${rep("clatter")} (the Reedcutter's 50)`);
-      const g = bentIn([]);
+      const begun = (f) => rep(f) - m.factions.baseRep(game, f) - (BACKGROUNDS.reedcutter.rep[f] || 0);
+      if (begun("kites") !== 400 || begun("flatfolk") !== 200 || begun("pressed") !== 100 || begun("assize") !== -200 || begun("clatter") !== 0) fail(`begun with Wings and Flatwise, beyond the start and the Reedcutter's: kites ${begun("kites")}, flatfolk ${begun("flatfolk")}, pressed ${begun("pressed")}, assize ${begun("assize")}, clatter ${begun("clatter")}`);
+      const g = bentIn([]), clatter0 = rep("clatter");
       PM.gainMutation(game, g, "gills");
-      if (rep("clatter") !== 150) fail(`Gills gained in play: clatter ${rep("clatter")}, want 150 (50 + 100)`);
+      if (rep("clatter") !== clatter0 + 100) fail(`Gills gained in play: clatter ${clatter0} → ${rep("clatter")}, want +100`);
       if (g.hotbar.includes("gills")) fail("a mutation without an ability went on the hotbar");
       // Every hotbar key taken: the new ability goes on none, and the log and the sheet say B puts it on one.
       {
@@ -1133,7 +1135,7 @@ export async function checkProgression(m) {
       out.defects = `shaken / mobbed by the torch, held through a 5 s action; Lightsick on the surface: ${JSON.stringify(lost)}${sunny ? "" : " (no sky here!)"}`;
       // Crooked Manner: −50 with every faction.
       C.beginRun(game, choicesFor("reedcutter", C.suggestSpread("bent", "reedcutter"), { mutations: ["crookedManner"] }), { seed: 4 });
-      const reps = m.mutations.BIBLE_FACTIONS.map((f) => m.factions.repOf(game, f) - (BACKGROUNDS.reedcutter.rep[f] || 0));
+      const reps = m.mutations.BIBLE_FACTIONS.map((f) => m.factions.repOf(game, f) - m.factions.baseRep(game, f) - (BACKGROUNDS.reedcutter.rep[f] || 0));
       if (reps.some((n) => n !== -50)) fail(`Crooked Manner: ${reps.join(", ")}`);
     }
 
