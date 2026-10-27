@@ -30,7 +30,7 @@ import { findHits, DENY } from "./names.js";
 const NAME = "progression";
 
 export async function checkProgression(m) {
-  const { game, step, draw, rules, stats: st, chargen: C, leveling: L, levelup: LU, create: W, keys, screens, codec,
+  const { game, step, draw, rules, stats: st, chargen: C, leveling: L, levelup: LU, create: W, keys, screens, codec, factions: F,
           content: { GENOTYPES, BACKGROUNDS, LEVELS, POWERS, LEGACY_PERKS }, rng: R, capture } = m;
   const problems = [], out = {};
   const fail = (msg) => problems.push(msg);
@@ -208,7 +208,12 @@ export async function checkProgression(m) {
       const p = begun(choicesFor(bg, C.suggestSpread(g, bg), { name: "Åke", mode: "pilgrim" }), 900 + runs);
       runs++;
       if (game.player.background !== bg || game.state.mode !== "pilgrim" || game.mode !== "map") fail(`${bg}: the run began as ${game.player.background}, mode ${game.state.mode}, in ${game.mode}`);
-      for (const [f, n] of Object.entries(B.rep || {})) if (game.state.rep?.[f] !== n) fail(`${bg}: ${f} at ${game.state.rep?.[f]}, want ${n}`);
+      // The background's change goes on top of the start by genotype, with Pilgrim's floor (factions.js baseRep,
+      // WS6a; P0's stub started every faction at 0).
+      for (const [f, n] of Object.entries(B.rep || {})) {
+        const want = Math.max(F.REP_MIN, Math.min(F.REP_MAX, F.baseRep(game, f) + n));
+        if (F.repOf(game, f) !== want) fail(`${bg}: ${f} at ${F.repOf(game, f)}, want ${want} (the start ${F.baseRep(game, f)} and ${n})`);
+      }
       // The purse once the run has begun: the world's start purse where it has one (the test world's 1,000, for the
       // parent's prices: game.js startRun), else the background's; the glim is the background's either way.
       const purse = game.world.startPurse || B.purse || 200;
@@ -587,7 +592,7 @@ export async function run(env) {
     game, step, draw, capture,
     rules: await src("rules.js"), stats: await src("stats.js"), chargen: await src("progression/chargen.js"), leveling: await src("leveling.js"),
     levelup: await src("screens/levelup.js"), create: await src("screens/create.js"), keys: await src("keys.js"), screens: await src("screens.js"),
-    codec: await src("save/codec.js"), rng: await src("rng.js"), items: await src("items.js"), playerMod: await src("player.js"),
+    codec: await src("save/codec.js"), rng: await src("rng.js"), factions: await src("factions.js"), items: await src("items.js"), playerMod: await src("player.js"),
     implants: await src("content/items/implants.js"), mutations: await src("content/mutations.js"),
     content: { ...genotypes, ...backgrounds, ...powers },
   });
