@@ -272,6 +272,50 @@ if (args.browser) {
     if (!dbg.ids.includes("debug") || !/^0,0,0 /.test(dbg.text)) fail(`?debug=1: ${JSON.stringify(dbg)}`);
     stats.debug = `?debug=1: "${dbg.text}"`;
 
+    // 6b. WS9's two new modes by keys and clicks in a real page (browser-shell, which browser-0d1 counts modes by,
+    // doesn't know them yet: docs/ws9.md, integration request 11): the log by H on the map and in 3D, closed by H and
+    // by a click; the options by Esc on the pause card and by a click on its line, closed by Esc.
+    if (args.verbose) console.log("· 6b. options and log by keys and clicks");
+    {
+      await G(page, async () => {   // (what the canvas presents, kept for the clicks)
+        const { canvasBackend } = await import("/src/screen-canvas.js");
+        const present = canvasBackend.present.bind(canvasBackend);
+        canvasBackend.present = (chars, colors, cols, rows) => { present(chars, colors, cols, rows); window.__frame = { chars: chars.slice(), cols, rows }; };
+      });
+      const frames = (n = 3) => G(page, (n) => new Promise((ok) => { let k = 0; const f = () => (++k >= n ? ok() : requestAnimationFrame(f)); requestAnimationFrame(f); }), n);
+      const clickOn = async (label) => {
+        await frames(2);
+        const at = await G(page, async (label) => {
+          const S = await import("/src/screen.js"), c = document.getElementById("screen").getBoundingClientRect(), f = window.__frame;
+          for (let y = 0; y < f.rows; y++) {
+            const x = f.chars.slice(y * f.cols, (y + 1) * f.cols).join("").indexOf(label);
+            if (x >= 0) return { x: c.left + ((x + 0.5) / S.cols) * c.width, y: c.top + ((y + 0.5) / S.rows) * c.height };
+          }
+          return null;
+        }, label);
+        if (!at) { fail(`"${label}" isn't on screen (${await G(page, () => window.game.mode)})`); return; }
+        await page.mouse.click(at.x, at.y);
+        await frames(2);
+      };
+      const mode = () => G(page, () => window.game.mode), seen = [];
+      const expect = async (want, what) => { await frames(2); const m = await mode(); seen.push(`${what}: ${m}`); if (m !== want) fail(`${what}: in ${m}, not ${want}`); };
+      for (let k = 0; k < 10 && (await mode()) === "story"; k++) await press(page, "Space");
+      await G(page, () => { window.game.story.cube = true; });
+      await press(page, "KeyH"); await expect("log", "H on the map");
+      await press(page, "KeyH"); await expect("map", "H in the log");
+      await press(page, "KeyH"); await clickOn("Messages ("); await expect("map", "a click in the log");
+      await press(page, "Tab"); await expect("explore", "Tab");
+      await press(page, "KeyH"); await expect("log", "H in 3D");
+      await press(page, "Escape"); await expect("explore", "Esc in the log");
+      await G(page, () => document.exitPointerLock()); await expect("pause", "the lock let go");
+      await press(page, "Escape"); await expect("options", "Esc on the pause card");
+      await press(page, "Escape"); await expect("pause", "Esc in the options");
+      await page.waitForTimeout(900);   // (the card's line comes after its beat)
+      await clickOn("Esc: options"); await expect("options", "a click on the card's line");
+      await press(page, "Escape"); await expect("pause", "Esc in the options again");
+      stats.newModes = seen.join("; ");
+    }
+
     // 7. The IndexedDB adapter.
     if (args.verbose) console.log("· 7. The IndexedDB adapter");
     const idb = await G(page, async () => {
