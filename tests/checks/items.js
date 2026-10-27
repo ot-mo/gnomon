@@ -527,6 +527,14 @@ export function checkItems(m) {
       for (let k = 0; k < steps; k++) AR.rechargeCells(game, p, t0 + k * each, t0 + (k + 1) * each);
       return [s.charge, d.charge];
     };
+    // The plumb-line ear marks a hidden pit within 6 tiles as time passes, in either view.
+    for (const view of ["map", "3d"]) {
+      p = fresh({ view, depth: 4 });
+      const hole = carveHole(p);
+      IM.grantImplant(p, "plumbEar");
+      if (view === "map") m.time.skipTime(game, 1, { interruptible: false }); else game.debug.step(1 / 30);
+      if (game.zone.holeSeen[hole] !== 1) fail(`${view}: the plumb-line ear didn't mark a pit 2 tiles away`);
+    }
     const one = recharge(1, 600, false, false), split = recharge(10, 60, false, false);
     if (!same(one, split) || one[1] !== 500 || one[0] !== 0) fail(`a dark cell over 600 s underground with the torch out: one step ${one}, ten steps ${split} (want [0, 500])`);
     stats.cells = { darkOver600s: one[1], glimFill: paid };
@@ -585,7 +593,16 @@ export function checkItems(m) {
     game.invSel = 0;
     const drink = m.inventory.inventoryKey(game, "Enter");
     if (!same(answers, [0, "throw", null]) || drink !== RULES().body.drinkTime) fail(`the parent's keys: ${JSON.stringify(answers)}, drinking ${drink}`);
-    void q;
+    // G picks up what you just dropped (walking over it doesn't, until you've stepped away).
+    game.modeStack = []; game.mode = "map";
+    const knife = I.makeItem({ kind: "knife", count: 1 }, q.x, q.y, q.z);
+    knife.dropped = true;
+    game.zone.items.push(knife);
+    const n0 = q.inv.find((x) => x.kind === "knife")?.count || 0;
+    I.pickUpItems(game);
+    const left = game.zone.items.includes(knife);
+    m.keys.dispatchKey(game, "KeyG", false, "g");
+    if (!left || game.zone.items.includes(knife) || (q.inv.find((x) => x.kind === "knife")?.count || 0) !== n0 + 1) fail("G didn't pick up the knife you'd just dropped");
   });
 
   // --- 7. The consumable effects table ---------------------------------------------------------------------------

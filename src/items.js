@@ -15,7 +15,7 @@
 //   stackKey(it) → key | null       items with the same key stack (null: never)
 //   isGear(it)                      the kind has a slot (body.js puts it on a part)
 //   addToInventory(e, it) → stack   takeOne(e, stack) → item (the one way to split a stack)
-//   pickUpItems(game)  makeItem(item, x, y, z)  awayFromWalls(zone, x, y, z)
+//   pickUpItems(game)  pickUpHere(game) → n (G)  makeItem(item, x, y, z)  awayFromWalls(zone, x, y, z)
 //
 // Unknown kinds answer with the defaults (no name, no price, no aura) instead of throwing.
 import { sfx } from "./sfx.js";
@@ -212,6 +212,18 @@ export function takeOne(e, stack) {
 }
 
 // --- Picking things up ---------------------------------------------------------------
+// G (TECH_DESIGN §4.3): pick up what lies at your feet now, even something you've just dropped (walking over things
+// picks them up anyway; this is for the thing you dropped and changed your mind about). Returns how many were taken.
+export function pickUpHere(game) {
+  const { zone, player: p } = game, before = zone.items.length;
+  for (const it of zone.items)
+    if (it.dropped && Math.hypot(it.x - p.x, it.y - p.y) <= 0.65 && Math.abs(it.z - p.z) <= 1.2) delete it.dropped;
+  pickUpItems(game);
+  const n = before - zone.items.length;
+  if (!n) game.log("There's nothing here to pick up.", [170, 170, 170]);
+  return n;
+}
+
 export function pickUpItems(game) {
   const { zone, player: p } = game;
   zone.items = zone.items.filter((it) => {

@@ -9,9 +9,24 @@
 // docs/ws5.md lists everything else they export.
 import "./stations.js";
 import { setBodyNote } from "../inventory.js";
-import { isPlumb, gradeOf, gradeUsed, trueMarks } from "./implants.js";
+import { pickUpHere } from "../items.js";
+import { bind } from "../keys.js";
+import { on } from "../events.js";
+import { isPlumb, gradeOf, gradeUsed, trueMarks, implantEffect } from "./implants.js";
+import { markHoles } from "./artifacts.js";
 export { canInstall, install, uninstall } from "./implants.js";
 export { examineArtifact } from "./artifacts.js";
+
+// G (TECH_DESIGN §4.3, WS5's key): pick up what lies at your feet, in either view; it takes no time, as walking over
+// things doesn't.
+bind("play", "KeyG", (game) => { pickUpHere(game); }, { help: "pick up" });
+
+// The plumb-line ear: pits and chasms within 6 tiles mark themselves on the map as time passes (both views: the clock
+// ticks with 3D frames and with map actions alike).
+on("clock:tick", (game) => {
+  const p = game.player;
+  if (game.zone && implantEffect(p, "plumbEar")) markHoles(game.zone, p.x, p.y, 6);
+});
 
 setBodyNote((game, p) => (isPlumb(p)
   ? `Grade ${gradeUsed(p)} of ${gradeOf(p)} used · ${trueMarks(p)} true-mark${trueMarks(p) === 1 ? "" : "s"} · implants go in and out only at a Truing Cradle`
