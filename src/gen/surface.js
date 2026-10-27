@@ -8,6 +8,9 @@
 //                                       apron ahead of the swap (gen/apron.js, WS3 #6)
 //   validateSurface(zone) → string[]    the §5.3 item 9 rules (empty: fine)
 //   dungeonRectFor(entrance) → rect     where the dungeon's 48×48 levels sit under the surface (§5.5)
+//   forgetWorld(world)                  drop everything kept for a world (world functions, ports, apron bands):
+//                                       call it when its spans change in a run (the Lengthening turns spans
+//                                       to Shade), before any zone is made again
 //   BIOME_BUILDERS, SITE_BUILDERS       TECH_DESIGN §1.4's registries, re-exported: biome id → (ctx) => void from
 //                                       gen/biomes/index.js, site kind → (ctx, site) => void from world/sites.js
 //                                       (where 0A2 put it, so this file can read it)
@@ -32,9 +35,9 @@ import { SITE_BUILDERS, dungeonParams } from "../world/sites.js";
 import { generateDungeonLevel } from "./dungeon.js";
 import { zoneSeed } from "../world/run.js";
 import { stampVault } from "./vaults.js";
-import { worldFns, heightAt, treeAt, SURFACE_RULES } from "./terrain.js";
-import { portsOf } from "./ports.js";
-import { buildApronBand, apronBandSteps } from "./apron.js";
+import { worldFns, heightAt, treeAt, SURFACE_RULES, forgetWorldFns } from "./terrain.js";
+import { portsOf, forgetPorts } from "./ports.js";
+import { buildApronBand, apronBandSteps, forgetBands } from "./apron.js";
 export { SITE_BUILDERS } from "../world/sites.js";
 export { BIOME_BUILDERS } from "./biomes/index.js";
 export { worldFns, heightAt, treeAt, SURFACE_RULES, portsOf, buildApronBand };
@@ -43,6 +46,8 @@ const R = SURFACE_RULES;
 const ZW = SURFACE.w, ZD = SURFACE.d;
 const clampInt = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const floorDiv = (a, b) => Math.floor(a / b);
+
+export function forgetWorld(world) { forgetWorldFns(world); forgetPorts(world); forgetBands(world); }
 
 // --- Where the dungeon sits ---------------------------------------------------------------------
 // Levels are 48×48 and the surface 80×48: the levels sit centred under the entrance (§5.5).
@@ -559,7 +564,8 @@ const isStairs = (zone, i) => { const g = zone.blocks[i + (FLOOR_Z - 1) * zone.w
 // Navigability is the map's (§5.3: "under the map's step rules", pathing.js): the ground is every column
 // you can stand on that the map doesn't draw as a wall, and it is reached from the anchor with the map's
 // steps, never across a wall. The map draws ground 4 or more blocks up as wall (world.js computeKinds), so
-// cliff tops are 3D-only ground: counted apart (zone.ground3d), never against the zone. zone.navigability
+// cliff tops are no map ground: counted apart (zone.ground3d: ground only 3D could reach, by a ramp or a climb a
+// builder makes; a bare cliff of 5 has none), never against the zone. zone.navigability
 // is the share reached.
 // Water: every column holding water holds it at the datum, with rock under it (it never drops you a level).
 export function validateSurface(zone) {
@@ -577,17 +583,16 @@ export function validateSurface(zone) {
   // Holes only over a dungeon, inside its rect; no standable ground above 12.
   const r = zone.dungeonRect;
   let total = 0, reached = 0, ground3d = 0, high = 0, badWater = 0;
-  const blocks = zone.blocks, layer = w * d;
+  const blocks = zone.blocks, layer = w * d, datum = (FLOOR_Z - 1) * layer, WS = B.WATER_SHALLOW, WD = B.WATER_DEEP;
+  // Water: off the datum anywhere (one flat pass over the other layers), or at it without rock under it.
+  for (let j = 0; j < blocks.length; j++) if ((blocks[j] === WS || blocks[j] === WD) && (j < datum || j >= datum + layer)) badWater++;
+  for (let i = 0; i < layer; i++)
+    if (blocks[datum + i] === WS || blocks[datum + i] === WD)
+      for (let u = 0; u < datum; u += layer) if (blocks[u + i] !== B.ROCK) { badWater++; break; }
   for (let i = 0; i < w * d; i++) {
     const x = i % w, y = (i - x) / w;
     if (!blocks[i] && !blocks[i + (FLOOR_Z - 1) * layer]) {
       if (!zone.hasBelow || !r || x < r.ox || y < r.oy || x >= r.ox + r.w || y >= r.oy + r.d) { problems.push(`a hole at (${x}, ${y}) outside the dungeon's rect`); break; }
-    }
-    for (let z = 0; z < zone.h; z++) {
-      const b = blocks[i + z * layer];
-      if ((b === B.WATER_SHALLOW || b === B.WATER_DEEP) && z !== FLOOR_Z - 1) { badWater++; break; }
-      if (z === FLOOR_Z - 1 && (b === B.WATER_SHALLOW || b === B.WATER_DEEP))
-        for (let u = 0; u < z; u++) if (blocks[i + u * layer] !== B.ROCK) { badWater++; break; }
     }
     if (stand[i] >= 0 && !scenery[i] && stand[i] > FLOOR_Z + R.maxStand) high++;
     if (!ground(i)) { if (stand[i] >= 0 && !scenery[i]) ground3d++; continue; }

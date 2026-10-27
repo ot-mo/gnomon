@@ -64,13 +64,80 @@ at most `RULES.surface.jumpSpots` a zone); zone-local clutter 2 tiles from open 
 2a's items still hold with the builders in; wildlife glyphs pass `check-creatures` (no reserved glyph, unique pairs);
 screenshots of three biomes in the browser (`?silent=1`, port 8652).
 
-## Public API
+## Public API (as of `p1-ws2a`)
 
-(Filled in at the 2a tag.)
+### `gen/terrain.js`: the world functions
+
+- `worldFns(world, seed) → W`, cached per world and seed (the last 4 seeds):
+  - `W.heightAt(gx, gy) → int`: ground height above the datum (stand = `FLOOR_Z` + height), at most 12.
+  - `W.columnAt(gx, gy) → { height, cliff, tier, water, ground, near }`: `cliff` 1 on a cliff (≥ 5 up, a map wall),
+    `tier` 1 or 2 (2: a mesa on a mesa, `content/biomes.js cliffTiers`), `water` 0 / 1 shallow / 2 deep (a river's
+    straight channel by an edge), `ground` the terrain's top block, `near` tiles to the nearest port channel or
+    landmark footprint.
+  - `W.treeAt(cx, cy) → { gx, gy, base, trunk } | null`: the tree of 3×3 world cell (cx, cy); its top leaf
+    (`base + trunk + 1`) stays under the zone's roof.
+  - `W.portsOf(wx, wy)`, `W.channel(wx, wy, port)`: as below; a port's straight approach in world coordinates.
+  - `W.liquidOf(wx, wy) → liquid id`: the span's river's liquid, else its biome's.
+- `heightAt(world, seed, gx, gy)`, `treeAt(world, seed, cx, cy)`: uncached.
+- `SURFACE_RULES`: the numbers (gen/surface.js re-exports them). `forgetWorldFns(world)`.
+
+### `gen/ports.js`
+
+- `portsOf(world, seed, wx, wy) → [{ side, kind: "road" | "river", edgeId, width, along, liquid? }]` (cached),
+  `portTable(world, seed) → (wx, wy) → [port]`, `edgePorts(run, wx, wy) → { n, e, s, w: [{ kind, at, width, edgeId,
+  liquid? }] }` (§1.4's shape). A river port's `liquid` is `tile.riverLiquid` of either span (the lower id if both
+  say one), else `"water"`, the same from both sides. `forgetPorts(world)`.
+
+### `gen/apron.js`
+
+- `buildApronBand(run, zone, side, neighbour = null, { fresh = false } = {}) → band` (`APRON_BUILDERS.surface`): a copy
+  of the neighbour in memory, else from the world functions, kept (the 64 most recent, `APRON_KEEP`; `fresh` builds
+  without keeping). A band is never written to: one object may serve every fill.
+- `apronBandSteps(run, wx, wy) → iterator`: builds and keeps span (wx, wy)'s world-function bands (the open sides and
+  the corners `zones.js neighbourAddr` fills), one per `next()`. `forgetBands(world)`.
+
+### `gen/surface.js`
+
+- `generateSurface(run, wx, wy) → Zone` (no bands built), `surfaceSteps(run, wx, wy)` (the same zone in stages, each
+  also building one of its world-function bands, leftovers a stage each), `validateSurface(zone) → string[]`,
+  `dungeonRectFor(entrance)`, `forgetWorld(world)` (drops world functions, ports and bands: call it when a world's
+  spans change in a run), and the re-exports above, `BIOME_BUILDERS`, `SITE_BUILDERS`.
+- A surface zone has `zone.liquid` (one liquid per span), `zone.navigability` (the map's: ground the map draws as a
+  wall, 4 or more up, isn't map ground), `zone.ground3d` (ground the map draws as wall: cliff tops, which only 3D can reach and only by a way up a
+  builder makes; none in 2a), and `zone.gen.local` (a
+  `Uint8Array` w·d: the columns the zone's own features changed from the world functions, which an apron built from
+  them doesn't show; not saved).
+
+### `content/biomes.js`
+
+- `BIOMES[biome] = { liquid, cliffTiers }` (2a's fields; 2b adds the builder's), `DEFAULT_BIOME`, `biomeOf(id)`. A
+  biome id is a terrain's `biome`, else its id; the test world's `flats` shares the real world's id.
 
 ## Integration requests
 
-(Filled in as they come.)
+1. **`save/codec.js` (WS9's, or the integrator's at the merge): save `zone.liquid`.** It isn't in the codec's `AFTER`
+   list, so a surface zone read back from the save holds plain water (`liquidAt` falls back to `"water"`): the Brine
+   Flats' brine, the Tessellate's ink, the Shade's umbra and the Lattice's turnwater are lost on reload. One string per
+   zone.
+2. **`world/worldmodel.js compileWorld` (frozen; the integrator): copy a river's `liquid` onto its spans as
+   `tile.riverLiquid`** (`link(W.rivers, …)`: `t.riverLiquid = p.liquid ?? null` for every span of the path). The ports
+   read it already (`gen/ports.js riverLiquid`, both sides agreeing). Then C1 gives the Inkrun `liquid: "ink"` in
+   `content/world/worldmap.js` (bible §15.2: "Slake …; Inkrun [22,22,32]"); until both, every river is plain water.
+3. **`zones.js` (the integrator, WS3 #6 with WS9's "prefetch through the loader")**: 3D prefetch through
+   `surfaceSteps` now builds a zone's far bands ahead (nothing to change for that). Two paths still build them in the
+   swap: a neighbour **read from the save** (`readAhead`: no `surfaceSteps` runs) and one **made on the map**
+   (`makeZone` → `generateSurface`). For the first, step `apronBandSteps(game.run, wx, wy)` a band a frame once the
+   read lands (in the prefetch update, as a job beside `game.prefetchJob`); the map's needs nothing (time stands still
+   between actions there).
+4. **Information for WS3 and the integrator**: TRUNK and LEAVES have a map look now (`♠`), so any recorded outdoor
+   map frame with a tree in it changes at the merge (golden (b) and the underground frames don't: renderMap reads
+   `map` only outdoors). SHALE, CRYSTAL and GLASS show `.` in their colours; REED `¦`.
+5. **Information for whoever builds the Lengthening (WS1 or C)**: the world functions, ports and kept apron bands are
+   cached per world model; when spans change terrain in a run, call `gen/surface.js forgetWorld(run.world)` before
+   any zone is made again (zones already made keep their blocks, as a saved zone would).
+6. **Information**: the world model's `elev` (per-span elevation 0-3) is not read: the map draws ground 4 or more blocks
+   up as wall (`world.js computeKinds`), so an elevated span would be a sea of walls on the map. All the height the
+   map can show is the relief (≤ 3); cliffs and mesas are walls on the map and ground in 3D.
 
 ## Handoff
 

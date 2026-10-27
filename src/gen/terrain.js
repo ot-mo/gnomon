@@ -9,6 +9,7 @@
 //     W.channel(wx, wy, port) → rect    a port's straight approach in world coordinates
 //     W.liquidOf(wx, wy) → liquid id    what the span's surface water holds: its river's, else its biome's
 //   heightAt(world, seed, gx, gy), treeAt(world, seed, cx, cy)   the same, uncached
+//   forgetWorldFns(world)               drop the cached ones (gen/surface.js forgetWorld)
 //   SURFACE_RULES                       the numbers (gen/surface.js re-exports them)
 //
 // World coordinates: column x of span wx is gx = wx·80 + x (row y of span wy: gy = wy·48 + y), so two
@@ -25,8 +26,9 @@
 //           foot is 4 or more and the map draws it as a wall). No cliff within 10 tiles of a port or a
 //           landmark's flattened ground. Where the biome stacks them (content/biomes.js cliffTiers 2: the Rust
 //           Steps' mesas) the mask's cores rise 5 more, a mesa on a mesa (`tier` 2). The map draws all ground
-//           4 or more blocks up as wall (world.js computeKinds), so cliff tops are 3D ground: the map's
-//           navigability leaves them out (gen/surface.js validateSurface).
+//           4 or more blocks up as wall (world.js computeKinds), so a cliff top is ground only in 3D, and only
+//           once a builder makes a way up (a ramp, a climb); the map's navigability leaves it out
+//           (gen/surface.js validateSurface).
 //   rivers  a river comes in from its port straight for 8 tiles on both sides of the edge (the approach);
 //           the ground within d tiles of that channel is at most d high, so its banks slope down to the
 //           water, which sits at the datum on rock (it never drops you a level; every body floats on it).
@@ -81,6 +83,8 @@ export function worldFns(world, seed) {
   bySeed.set(seed >>> 0, W);
   return W;
 }
+// Drop what is kept for a world (its spans changed: the Lengthening). gen/surface.js forgetWorld calls it.
+export function forgetWorldFns(world) { fnCache.delete(world); }
 export const heightAt = (world, seed, gx, gy) => makeWorldFns(world, seed >>> 0).heightAt(gx, gy);
 export const treeAt = (world, seed, cx, cy) => makeWorldFns(world, seed >>> 0).treeAt(cx, cy);
 

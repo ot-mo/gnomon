@@ -17,12 +17,12 @@
 //    with a liquid set on one span only.
 // 5. The edge-swap frame (WS3 #6): after a zone's staged make (surfaceSteps) its world-function bands are kept,
 //    so building them again takes no time and gives the same band; cold and warm times reported.
-// 6. Ports: edgePorts is portsOf in §1.4's shape.
+// 6. Ports: edgePorts is portsOf in §1.4's shape. forgetWorld drops what is kept (world functions, ports, bands).
 // 7. validateSurface catches what it must (each a mutant of a valid zone): a hole outside the dungeon's rect,
 //    water with air under it, the anchor walled in, an open edge cut off; and ground 13 up can't be stood on.
 import { buildRun } from "../../src/world/run.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
-import { generateSurface, surfaceSteps, validateSurface, worldFns, buildApronBand, SURFACE_RULES } from "../../src/gen/surface.js";
+import { generateSurface, surfaceSteps, validateSurface, worldFns, buildApronBand, forgetWorld, SURFACE_RULES } from "../../src/gen/surface.js";
 import { edgePorts, portsOf, portTable } from "../../src/gen/ports.js";
 import { apronBandSteps } from "../../src/gen/apron.js";
 import { biomeOf } from "../../src/content/biomes.js";
@@ -186,6 +186,13 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
       const want = flat.map((p) => `${p.side}:${p.kind}:${p.along}:${p.width}:${p.edgeId}:${p.liquid ?? ""}`).sort();
       if (back.join() !== want.join()) fail(`seed ${seed} (${t.wx}, ${t.wy}): edgePorts ${back} vs portsOf ${want}`);
     }
+    {
+      const t = pick.find((p) => sides(p.wx, p.wy).length && made.get(`${p.wx},${p.wy}`)), z = made.get(`${t.wx},${t.wy}`), side = sides(t.wx, t.wy)[0];
+      const band = buildApronBand(run, z, side, null), ports = portsOf(world, run.seed, t.wx, t.wy);
+      forgetWorld(world);
+      if (worldFns(world, run.seed) === W || portsOf(world, run.seed, t.wx, t.wy) === ports || buildApronBand(run, z, side, null) === band)
+        fail(`seed ${seed}: forgetWorld kept something`);
+    }
   }
 
   // 4b. A river's liquid set on some spans only (a world whose rivers name one, through tile.riverLiquid):
@@ -244,7 +251,7 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
   if (!slope.tier2) fail("no stacked cliff (tier 2) anywhere: the Rust Steps' mesas are missing");
   if (apron.pairs < pairs * seeds.length) fail(`only ${apron.pairs} apron pairs found`);
   stats.spans = `${zones} zones (${spans} a seed × ${seeds.length} seeds, the real world), ${retried} needed a retry, ${twice} made twice the same`;
-  stats.navigability = `map: min ${(100 * navs[0]).toFixed(1)}%, p5 ${(100 * q(navs, 0.05)).toFixed(1)}%, mean ${(100 * navs.reduce((a, b) => a + b, 0) / navs.length).toFixed(1)}%; 3D-only ground (cliff tops) ${(ground3d / zones).toFixed(0)} columns a zone`;
+  stats.navigability = `map: min ${(100 * navs[0]).toFixed(1)}%, p5 ${(100 * q(navs, 0.05)).toFixed(1)}%, mean ${(100 * navs.reduce((a, b) => a + b, 0) / navs.length).toFixed(1)}%; ground the map draws as wall (cliff tops, no way up yet) ${(ground3d / zones).toFixed(0)} columns a zone`;
   stats.ms = `generateSurface p50 ${ms(q(times, 0.5))}, p95 ${ms(p95)}, max ${ms(max)}${budget ? " (budget held)" : " (budget: --budget, alone)"}`;
   stats.slope = `${slope.columns} columns, ${slope.steps} steps: ${slope.over} over 1 without a cliff, ${slope.feet} cliff feet under 4, ${slope.high} over 12; highest ${slope.maxH}; ${slope.tier2} on stacked mesas; ${slope.trees} trees, ${slope.tallTrees} too tall`;
   stats.apron = `${apron.pairs} pairs (${apron.corners} corners): ${apron.columns} band columns, ${apron.voxels} voxels equal; ${apron.left} (${(100 * apron.left / Math.max(1, apron.columns)).toFixed(2)}%) the neighbour's own features left out, ${apron.leftDiffer} of them different; ${apron.told} of ${apron.decoys} decoys (another seed's neighbour) told apart`;

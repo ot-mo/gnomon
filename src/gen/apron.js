@@ -45,6 +45,8 @@ export function buildApronBand(run, zone, side, neighbour = null, { fresh = fals
   return band;
 }
 
+export function forgetBands(world) { kept.delete(world); }   // gen/surface.js forgetWorld
+
 // The bands span (wx, wy)'s apron will want from the world functions (its open sides, and the open corners
 // zones.js neighbourAddr would fill), built and kept one per next().
 export function* apronBandSteps(run, wx, wy) {

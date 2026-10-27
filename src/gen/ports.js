@@ -32,6 +32,7 @@ export function portTable(world, seed) {
   return fn;
 }
 
+export function forgetPorts(world) { tables.delete(world); }   // gen/surface.js forgetWorld
 export const portsOf = (world, seed, wx, wy) => portTable(world, seed)(wx, wy);
 
 export function edgePorts(run, wx, wy) {
