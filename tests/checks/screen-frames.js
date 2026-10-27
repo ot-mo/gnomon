@@ -74,10 +74,10 @@ export function screenFrames({ game, startRun, inputHandlers, addStatus, frameHa
 // integrator joins the lists.)
 export const NOT_COMPARED = new Map([
   // WS9
-  ["seed 99 depth 3 3d pause card", "the pause card names L look, V fire, the hotbar and G the legend (the user's decision, 2026-10-27); tests/checks/save.js section 20 holds the card in this state, and the other frames and golden (b) stay held"],
-  ["seed 99 depth 11 3d pause card", "the pause card names L look, V fire, the hotbar and G the legend (the user's decision, 2026-10-27); tests/checks/save.js section 20 holds the card in this state, and the other frames and golden (b) stay held"],
-  ["seed 31 depth 3 3d pause card", "the pause card names L look, V fire, the hotbar and G the legend (the user's decision, 2026-10-27); tests/checks/save.js section 20 holds the card in this state, and the other frames and golden (b) stay held"],
-  ["seed 31 depth 11 3d pause card", "the pause card names L look, V fire, the hotbar and G the legend (the user's decision, 2026-10-27); tests/checks/save.js section 20 holds the card in this state, and the other frames and golden (b) stay held"],
+  ["seed 99 depth 3 3d pause card", "the pause card names L look, V fire, the hotbar and the map legend's key (the user's decision, 2026-10-27); tests/checks/save.js section 20 holds the card in this state, and the other frames and golden (b) stay held"],
+  ["seed 99 depth 11 3d pause card", "the pause card names L look, V fire, the hotbar and the map legend's key (the user's decision, 2026-10-27); tests/checks/save.js section 20 holds the card in this state, and the other frames and golden (b) stay held"],
+  ["seed 31 depth 3 3d pause card", "the pause card names L look, V fire, the hotbar and the map legend's key (the user's decision, 2026-10-27); tests/checks/save.js section 20 holds the card in this state, and the other frames and golden (b) stay held"],
+  ["seed 31 depth 11 3d pause card", "the pause card names L look, V fire, the hotbar and the map legend's key (the user's decision, 2026-10-27); tests/checks/save.js section 20 holds the card in this state, and the other frames and golden (b) stay held"],
 ]);
 
 export function checkScreenFrames(frames, fixture) {
