@@ -714,7 +714,13 @@ function screen(G, scr, problems) {
       else if (right && text[info].indexOf(`(${game.trip.wx}`) < cols - 41) problems.push(`${tag}: the info isn't in the right-hand panel`);
       else if (!right && info < rows - 7) problems.push(`${tag}: the info isn't in the bottom strip`);
       if (!text[rows - 1].includes("Enter: go down")) problems.push(`${tag}: no key footer`);
-      out[`${name} ${cols}×${rows}`] = { drawn, panel: v.panel };
+      // A right click in the margin beside the world (at 180×56 it is narrower than the view): no pin, nowhere.
+      if (v.sx0 < 0 || v.sy0 < 0) {
+        const pins0 = Object.keys(atlas(game).pins).length;
+        SCREENS.get("world").mouse(game, 2, { x: 0, y: v.y0 });
+        if (Object.keys(atlas(game).pins).length !== pins0) problems.push(`${tag}: a right click in the margin pinned ${JSON.stringify(Object.values(atlas(game).pins).pop())}`);
+      }
+      out[`${name} ${cols}×${rows}`] = { drawn, panel: v.panel, origin: [v.sx0, v.sy0] };
     }
   // Played by keys and the mouse on the test world, at 100×30.
   scr.resize(100, 30);

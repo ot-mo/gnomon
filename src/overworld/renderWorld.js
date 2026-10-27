@@ -8,8 +8,8 @@
 //                            screen has 2·w + 42 columns, else in a 6-row strip at the bottom. Header: the date,
 //                            the span, the lamp; footer: the keys, each a button. A prompt or the "go down where?"
 //                            menu is drawn over it all.
-//   worldView                where the last frame put things: { x0, y0, viewW, viewH, sx0, sy0, panel, keys }
-//   spanAtCell(cell) → { wx, wy } | null      which span a screen cell shows (the mouse)
+//   worldView                where the last frame put things: { x0, y0, viewW, viewH, sx0, sy0, w, h, panel, keys }
+//   spanAtCell(cell) → { wx, wy } | null      which span of the world a screen cell shows (the mouse; null in a margin)
 //   spanLines(game, wx, wy) → [{ text, color }]   the info panel's lines for a span
 //   FOOTER                   [label, code]: the footer's buttons
 //
@@ -27,7 +27,7 @@ import { isLost, lostChance } from "./lost.js";
 import { encounterChance } from "./encounters.js";
 import { stepHours, travelPath } from "./travel.js";
 
-export const worldView = { x0: 0, y0: 1, viewW: 0, viewH: 0, sx0: 0, sy0: 0, panel: "right", keys: [] };
+export const worldView = { x0: 0, y0: 1, viewW: 0, viewH: 0, sx0: 0, sy0: 0, w: 0, h: 0, panel: "right", keys: [] };
 export const PANEL_W = 40, STRIP_H = 6;
 export const SITE_MARK = { village: "⌂", ruin: "∩", lair: "Ω", historic: "†", station: "¤", dungeon: "¤" };
 const ROAD = [172, 162, 142], RIVER = [90, 150, 200], PIN = [255, 220, 90], GOLD = [255, 210, 110], YOU = [255, 255, 255];
@@ -44,7 +44,8 @@ export function spanAtCell(cell) {
   if (!cell) return null;
   const sx = Math.floor((cell.x - v.x0) / 2), sy = cell.y - v.y0;
   if (sx < 0 || sy < 0 || sx >= v.viewW || sy >= v.viewH) return null;
-  return { wx: v.sx0 + sx, wy: v.sy0 + sy };
+  const wx = v.sx0 + sx, wy = v.sy0 + sy;   // (a world narrower than the view sits in a margin: no span there)
+  return wx >= 0 && wy >= 0 && wx < v.w && wy < v.h ? { wx, wy } : null;
 }
 
 // travelPath is a Dijkstra over every span: kept while you stand still and know no new span.
@@ -109,7 +110,7 @@ export function renderWorld(game) {
   const viewW = Math.max(1, Math.floor(mapW / 2)), viewH = Math.max(1, mapH);
   const at = trip?.cursor || trip || { wx: game.zone?.wx ?? 0, wy: game.zone?.wy ?? 0 };
   const sx0 = pickOrigin(world.w, viewW, at.wx), sy0 = pickOrigin(world.h, viewH, at.wy);
-  Object.assign(worldView, { x0: 0, y0: top, viewW, viewH, sx0, sy0, panel: right ? "right" : "strip", keys: footer });
+  Object.assign(worldView, { x0: 0, y0: top, viewW, viewH, sx0, sy0, w: world.w, h: world.h, panel: right ? "right" : "strip", keys: footer });
 
   // Header.
   const lamp = p.torch ? "torch lit" : "torch out";
