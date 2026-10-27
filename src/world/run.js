@@ -19,11 +19,11 @@ import { makeRng, seedFor } from "../rng.js";
 import { compileWorld } from "./worldmodel.js";
 import { placeSites, placeLegends } from "./sites.js";
 import { generateHistory } from "../story/history.js";
-import { makeVillages } from "../story/villages.js";
+import { makeVillages, villageFaction } from "../story/villages.js";
 import { makeSecrets } from "../story/secrets.js";
 
 export const RUN_VERSION = 1;   // the shape of a saved run
-export const GEN_VERSION = 3;   // bumps whenever buildRun would make a different run from the same seed (2: WS10's sites and legends; 3: WS7's generated history and secrets)
+export const GEN_VERSION = 4;   // bumps whenever buildRun would make a different run from the same seed (2: WS10's sites and legends; 3: WS7's generated history and secrets; 4: WS7b's villages, their secrets and factions)
 export const RUN_STATS = { builds: 0 };
 const MAPS = ["sites", "sitesAt", "villages", "factions", "relations", "legends", "secrets"];
 
@@ -34,11 +34,11 @@ export const RUN_STEPS = [
   { id: "history", run: (run) => { run.history = generateHistory(run.seed, run.world); } },
   { id: "sites", run: (run) => { placeSites(run); } },
   { id: "villages", run: (run) => { run.villages = makeVillages(run); } },
-  // Factions and relations: the static FACTIONS arrive with 0C's content; P0 has the villages' own.
+  // Factions and relations: the static FACTIONS arrive with 0C's content; the run has the villages' own, each under the
+  // Bent villages or its people's (WS7b's villageFaction; village-site.js registers it on entering).
   { id: "factions", run: (run) => {
     run.factions = new Map();
-    for (const v of run.villages.values())
-      run.factions.set(v.factionId, { id: v.factionId, name: v.name, parent: "village", generated: true, siteId: v.siteId });
+    for (const v of run.villages.values()) run.factions.set(v.factionId, villageFaction(v));
     run.relations = new Map();
   } },
   { id: "legends", run: (run) => { run.legends = placeLegends(run); } },   // WS10: every lair's owner, by uid
