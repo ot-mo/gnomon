@@ -30,7 +30,7 @@ import { pay, funds, formatPrice } from "../currency.js";
 import { requestTarget } from "../abilities.js";
 import { mapUseTime } from "../turns.js";
 import { applyDamage, elementVs } from "../combat.js";
-import { touchable, ghostHidden } from "../creatures.js";
+import { touchable, ghostHidden, theOf, TheOf } from "../creatures.js";
 import { arrivalPoint } from "../zones.js";
 import { nightSeconds } from "../clock.js";
 import { zoneIsLightless } from "../light.js";
@@ -287,7 +287,7 @@ const EFFECTS = {
     const c = target?.creature;
     if (!c || !touchable(game, c) || ghostHidden(game, c)) { game.log("The glimgun spits a bolt of burning glim into the dark.", [255, 160, 70]); return true; }
     const vs = elementVs(c, "fire"), dmg = Math.max(1, Math.round(d6(2) * (vs === "resist" ? 0.5 : vs === "weak" ? 1.5 : 1)));
-    game.log(`A bolt of burning glim hits the ${c.name}${vs === "weak" ? " (it burns well)" : vs === "resist" ? " (it barely singes)" : ""}.`, [255, 160, 70]);
+    game.log(`A bolt of burning glim hits ${theOf(c)}${vs === "weak" ? " (it burns well)" : vs === "resist" ? " (it barely singes)" : ""}.`, [255, 160, 70]);
     applyDamage(game, c, dmg, { src: p, color: [255, 160, 70] });
     if (c.hp > 0 && vs !== "resist") addStatus(game, c, "burning", { t: 3, src: "player" });
     return true;

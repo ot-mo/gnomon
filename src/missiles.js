@@ -29,6 +29,7 @@ import { bonus } from "./stats.js";
 import { addStatus, registerStatus, statusFlag, cooldownLeft, startCooldown } from "./status.js";
 import { bind } from "./keys.js";
 import { registerHudSegment } from "./hud.js";
+import { theOf, TheOf } from "./creatures.js";
 
 registerStatus("pinned", { name: "pinned", color: [215, 205, 160], t: 2, stack: "max", flags: { noMove: true },
   hud: (s) => `PINNED ${Math.ceil(s.t)}s`, ended: "You pull yourself free." });
@@ -51,7 +52,7 @@ export function missileSpec(p, launcher) {
     onHit: hit ? (game, tgt) => {
       if (combatRng(game)() >= hit.chance) return;
       addStatus(game, tgt, hit.status, { t: hit.t, stack: "max" });
-      game.log(hit.status === "pinned" ? `The bolt pins the ${tgt.name} where it stands!` : `The ${tgt.name} reels, dazed.`, [215, 205, 160]);
+      game.log(hit.status === "pinned" ? `The bolt pins ${theOf(tgt)} where it stands!` : `${TheOf(tgt)} reels, dazed.`, [215, 205, 160]);
     } : null,
   };
 }

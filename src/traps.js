@@ -72,7 +72,7 @@ export function updateSpikes(game) {
     // Nobody's harm (WS6a request 2): no grudge, no reputation, and a kill that isn't yours (no experience).
     // Nobody's harm (no grudge, no reputation: WS6a #2), but the kill's experience is yours, as in the parent (the
     // integrator's call on WS10 #10, as for status kills).
-    applyDamage(game, m, 3 + Math.floor(Math.random() * 3), { src: null, byPlayer: true, color: [200, 200, 210], deathText: `The ${m.name} is skewered by the spikes.` });
+    applyDamage(game, m, 3 + Math.floor(Math.random() * 3), { src: null, byPlayer: true, color: [200, 200, 210], deathText: `${creatures.TheOf(m)} is skewered by the spikes.` });
   }
 }
 

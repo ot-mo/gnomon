@@ -50,7 +50,7 @@ import { addStatus, hasStatus, statusFlag, cooldownLeft, startCooldown, dvOf as 
 import { RULES } from "./rules.js";
 import { emit } from "./events.js";
 import { distance } from "./rng.js";
-import { CREATURE_TYPES, touchable, touchesYou, isFlat, ghostHidden } from "./creatures.js";
+import { CREATURE_TYPES, touchable, touchesYou, isFlat, ghostHidden, theOf, TheOf } from "./creatures.js";
 import { attitude } from "./factions.js";
 import { killMonster } from "./monsters.js";
 import { hasKey } from "./keyset.js";
@@ -215,7 +215,7 @@ export function applyDamage(game, m, dmg, { src = null, byPlayer = isPlayer(game
   if (CREATURE_TYPES[m.type].guardian === "colossus" && !colossusCore(game, m)) dmg = Math.min(dmg, 2);
   dmg = flatSoak(m, dmg);
   hurtCreature(game, m, dmg, label ?? `${dmg}`, color, src);
-  if (m.hp <= 0) killMonster(game, m, deathText || `You slay the ${m.name}.`, true, byPlayer, src);
+  if (m.hp <= 0) killMonster(game, m, deathText || `You slay ${theOf(m)}.`, true, byPlayer, src);
   return dmg;
 }
 // (The 0B name, for spikes and bombs: yours, as in the parent. applyDamage itself has no source unless one is
@@ -249,17 +249,17 @@ export function hitPlayer(game, m, dmg, source, blocked, ranged = false, rng = M
   const thorns = bonus(p, "thorns");
   if (thorns > 0 && !ranged && m.hp > 0 && game.zone.creatures.includes(m)) {
     hurtCreature(game, m, thorns, `${thorns}`, [150, 200, 90], p);
-    if (m.hp <= 0) killMonster(game, m, `The ${m.name} dies on your thorns.`, true, true, p, { splash: true });
+    if (m.hp <= 0) killMonster(game, m, `${TheOf(m)} dies on your thorns.`, true, true, p, { splash: true });
   }
   if (m.burns) {   // a salamander's bite sets you smouldering: 1 damage a second
     // The legacy set keeps the parent's bite exactly: poison, the same stream as venom (Thick blood halves
     // it, regeneration goes on, the cause is poison). Otherwise it's burning at half rate.
     const old = RULES.stats === "legacy", id = old ? "poisoned" : "burning";
-    if (!hasStatus(p, id)) game.log(`The ${m.name}'s bite burns!`, [255, 140, 60]);
+    if (!hasStatus(p, id)) game.log(`${TheOf(m)}'s bite burns!`, [255, 140, 60]);
     addStatus(game, p, id, old ? { t: m.burns, stack: "max" } : { t: m.burns, mag: 0.5, stack: "max" });
   }
   if (m.venom) {
-    if (!hasStatus(p, "poisoned")) game.log(`The ${m.name}'s venom burns in your veins!`, [150, 210, 80]);
+    if (!hasStatus(p, "poisoned")) game.log(`${TheOf(m)}'s venom burns in your veins!`, [150, 210, 80]);
     addStatus(game, p, "poisoned", { t: m.venom, stack: "max" });
   }
   if (m.drain && m.hp > 0 && m.hp < m.maxHp) {
@@ -279,10 +279,10 @@ export function resolveAttack(game, att, tgt, spec, ctx = {}) {
     result.touched = false;
     if (you && spec.kind === "melee") {
       const t = CREATURE_TYPES[tgt.type];
-      game.log(statusFlag(att, "flat") ? `Your flat hand slides under the ${tgt.name}: from the Plane you can only touch flat things.`
-                         : tgt.risen ? `Your blow passes under the ${tgt.name}: she has risen out of the plane! Turn the world (Tab) to strike her.`
+      game.log(statusFlag(att, "flat") ? `Your flat hand slides under ${theOf(tgt)}: from the Plane you can only touch flat things.`
+                         : tgt.risen ? `Your blow passes under ${theOf(tgt)}: ${tgt.type === "flatqueen" ? "she has" : "it has"} risen out of the plane! Turn the world (Tab) to strike ${tgt.type === "flatqueen" ? "her" : "it"}.`
                          : t.ghostly ? `Your blow passes through empty air. Something cold is here, but your torchlight hides it.`
-                         : `You can't touch the ${tgt.name} from here.`, [200, 190, 255]);
+                         : `You can't touch ${theOf(tgt)} from here.`, [200, 190, 255]);
     }
     emit(game, "attack", { att, tgt, result });
     return result;
@@ -317,13 +317,13 @@ function yourBladeLanded(game, p, m, dmg, { crit, el, vs, core, rng, soak, line 
   game.effects.push({ kind: "spark", time: game.time, crit, color });
   if (bonus(p, "leech") > 0 && p.hp < maxHp(p) && rng() < bonus(p, "leech")) p.hp++;
   const killed = m.hp <= 0;
-  if (killed) killMonster(game, m, line ? line(true) : `You slay the ${m.name}.`);
+  if (killed) killMonster(game, m, line ? line(true) : `You slay ${theOf(m)}.`);
   else {
     if (!core) game.log(`Your blow glances off its stone legs. Its core glows far above you: get up high!`, [255, 200, 120]);
-    else game.log(`${line ? line(false) : `You ${crit ? "smash" : "hit"} the ${m.name} (${dmg}).`}${vs === "weak" ? " It's weak to that!" : ""}`, [230, 230, 230]);
-    if (vs === "resist") game.log(`The ${m.name} shrugs off the ${{ fire: "flames", frost: "frost", shock: "lightning", holy: "light" }[el]}.`, [170, 170, 190]);
+    else game.log(`${line ? line(false) : `You ${crit ? "smash" : "hit"} ${theOf(m)} (${dmg}).`}${vs === "weak" ? " It's weak to that!" : ""}`, [230, 230, 230]);
+    if (vs === "resist") game.log(`${TheOf(m)} shrugs off the ${{ fire: "flames", frost: "frost", shock: "lightning", holy: "light" }[el]}.`, [170, 170, 190]);
     else {
-      if (el === "fire") { if (!hasStatus(m, "burning")) game.log(`The ${m.name} catches fire!`, ELEMENTS.fire.color); addStatus(game, m, "burning", { t: 3, stack: "refresh", src: "player" }); }
+      if (el === "fire") { if (!hasStatus(m, "burning")) game.log(`${TheOf(m)} catches fire!`, ELEMENTS.fire.color); addStatus(game, m, "burning", { t: 3, stack: "refresh", src: "player" }); }
       if (el === "frost") addStatus(game, m, "chilled", { t: 3, stack: "refresh" });
     }
     const poison = bonus(p, "poisonHit");
@@ -340,8 +340,8 @@ function yourBladeLanded(game, p, m, dmg, { crit, el, vs, core, rng, soak, line 
     if (other) {
       const arc = soak(other, Math.max(1, Math.ceil(dmg / 2)));
       hurtCreature(game, other, arc, `${arc}`, ELEMENTS.shock.color, p);
-      game.log(`Lightning arcs to the ${other.name} (${arc}).`, ELEMENTS.shock.color);
-      if (other.hp <= 0) killMonster(game, other, `The ${other.name} is struck down.`, true, true, p, { splash: true });
+      game.log(`Lightning arcs to ${theOf(other)} (${arc}).`, ELEMENTS.shock.color);
+      if (other.hp <= 0) killMonster(game, other, `${TheOf(other)} is struck down.`, true, true, p, { splash: true });
     }
   }
   return killed;
@@ -382,12 +382,12 @@ function legacyBlow(game, att, tgt, spec, ctx, result) {
     if (!result.killed && spec.onHit && game.zone.creatures.includes(tgt)) spec.onHit(game, tgt, result);
   } else if (isPlayer(game, tgt)) {
     const dmg = spec.fixed ?? roll(R, spec.dmg[0], spec.dmg[1]) + (spec.plus || 0);
-    result.dmg = hitPlayer(game, att, dmg, ctx.source || `the ${att.name}`, ctx.blocked || `the ${att.name}'s blow`, !!ctx.ranged);
+    result.dmg = hitPlayer(game, att, dmg, ctx.source || `${theOf(att)}`, ctx.blocked || `${theOf(att)}'s blow`, !!ctx.ranged);
   } else {   // one creature on another: no XP, no loot from you
     let dmg = spec.fixed ?? roll(R, spec.dmg[0], spec.dmg[1]) + (spec.plus || 0);
     dmg = flatSoak(tgt, dmg);
     hurtCreature(game, tgt, dmg, `${dmg}`, [255, 150, 150], att);
-    if (tgt.hp <= 0) killMonster(game, tgt, `The ${att.name} kills the ${tgt.name}.`, true, false, att);
+    if (tgt.hp <= 0) killMonster(game, tgt, `${TheOf(att)} kills ${theOf(tgt)}.`, true, false, att);
     Object.assign(result, { dmg, killed: tgt.hp <= 0 });
   }
 }
@@ -396,7 +396,7 @@ function legacyBlow(game, att, tgt, spec, ctx, result) {
 function d20Blow(game, att, tgt, spec, ctx, result) {
   const p = game.player, rng = ctx.rng || combatRng(game), D = RULES.d20;
   const you = isPlayer(game, att), onYou = isPlayer(game, tgt);
-  const source = ctx.source || `the ${att.name}`, blocked = ctx.blocked || `the ${att.name}'s blow`;
+  const source = ctx.source || `${theOf(att)}`, blocked = ctx.blocked || `${theOf(att)}'s blow`;
   // Your own shields come before the roll: half turned out of the world, the warding amulet.
   if (onYou && (statusFlag(p, "untouchable") || (bonus(p, "firstBlock") > 0 && !(cooldownLeft(p, "firstBlock") > 0)))) {
     hitPlayer(game, att, 0, source, blocked, !!ctx.ranged, rng, 0, false);
@@ -459,7 +459,7 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
   } else {
     hurtCreature(game, tgt, dmg, `${dmg}`, [255, 150, 150], att);
     const seen = inYourSight(game, att) || inYourSight(game, tgt);
-    if (tgt.hp <= 0) killMonster(game, tgt, seen ? line(true) : `The ${att.name} kills the ${tgt.name}.`, true, false, att);
+    if (tgt.hp <= 0) killMonster(game, tgt, seen ? line(true) : `${TheOf(att)} kills ${theOf(tgt)}.`, true, false, att);
     else if (seen) game.log(line(false), [200, 170, 170]);
     result.killed = tgt.hp <= 0;
   }
@@ -481,16 +481,15 @@ export function combatLine(game, r, spec = {}, ctx = {}) {
   const melee = spec.kind === "melee" || spec.kind === "natural";
   const mult = r.mult > 1 ? `x${r.mult}` : "";
   if (onYou) {
-    if (!r.hit) return `${cap(ctx.blocked || `the ${r.att.name}`)} misses you.`;
-    if (r.dmg <= 0) return `Your armour turns ${ctx.blocked || `the ${r.att.name}'s blow`}.`;
-    return `${cap(ctx.source || `the ${r.att.name}`)} hits you${mult ? ` (${mult})` : ""} for ${r.dmg}.`;
+    if (!r.hit) return `${cap(ctx.blocked || `${theOf(r.att)}`)} misses you.`;
+    if (r.dmg <= 0) return `Your armour turns ${ctx.blocked || `${theOf(r.att)}'s blow`}.`;
+    return `${cap(ctx.source || `${theOf(r.att)}`)} hits you${mult ? ` (${mult})` : ""} for ${r.dmg}.`;
   }
-  const who = you ? (melee ? "You" : `Your ${noun}`) : `The ${r.att.name}`, s = you && melee ? "" : "s";
-  const name = r.tgt.name;
-  if (!r.hit) return `${who} miss${s ? "es" : ""} the ${name}.`;
-  if (r.dmg <= 0) return `The ${name}'s hide turns ${you ? `your ${melee ? "blow" : noun}` : `the ${r.att.name}'s ${melee ? "blow" : noun}`}.`;
-  if (r.killed) return `${who} slay${s} the ${name} (${mult ? `${mult}, ` : ""}${r.dmg}).`;
-  return `${who} hit${s} the ${name}${mult ? ` (${mult})` : ""} for ${r.dmg}.`;
+  const who = you ? (melee ? "You" : `Your ${noun}`) : TheOf(r.att), s = you && melee ? "" : "s";
+  if (!r.hit) return `${who} miss${s ? "es" : ""} ${theOf(r.tgt)}.`;
+  if (r.dmg <= 0) return `${TheOf(r.tgt)}'s hide turns ${you ? `your ${melee ? "blow" : noun}` : `${theOf(r.att)}'s ${melee ? "blow" : noun}`}.`;
+  if (r.killed) return `${who} slay${s} ${theOf(r.tgt)} (${mult ? `${mult}, ` : ""}${r.dmg}).`;
+  return `${who} hit${s} ${theOf(r.tgt)}${mult ? ` (${mult})` : ""} for ${r.dmg}.`;
 }
 // Log a miss or a soaked blow: yours and those on you always, creatures' only where you'd see them.
 function tell(game, r, spec, ctx, color) {
@@ -537,7 +536,7 @@ export function playerMelee(game) {
     const held = game.heldBack;
     if (!(held && held.id === best.id && game.time >= held.t && game.time - held.t <= HOLD_BACK)) {
       game.heldBack = { id: best.id, t: game.time };
-      game.log(`You hold back from the ${best.name}. (Swing again to strike it.)`, [170, 170, 170]);
+      game.log(`You hold back from ${theOf(best)}. (Swing again to strike it.)`, [170, 170, 170]);
       return null;
     }
     game.heldBack = null;

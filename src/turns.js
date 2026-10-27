@@ -19,7 +19,7 @@ import { castRay, lineOfSight } from "./raycast.js";
 import { lightAt } from "./light.js";
 import { bumpAttack } from "./combat.js";
 import { updateCreatures, leaderOf } from "./ai.js";
-import { CREATURE_TYPES, creatureAt, talkerAt, ghostHidden, ghostOffMap, canTalk, isFlat } from "./creatures.js";
+import { CREATURE_TYPES, creatureAt, talkerAt, ghostHidden, ghostOffMap, canTalk, isFlat, theOf, TheOf } from "./creatures.js";
 import { attitude } from "./factions.js";
 import { keys } from "./input.js";
 import { pickUpItems } from "./items.js";
@@ -169,7 +169,7 @@ export function mapStep(game, dx, dy, { force = shiftHeld() } = {}) {
     return false;
   }
   if (m) {
-    if (Math.abs(m.z - p.z) > 1.5 && !(flat && isFlat(m))) { game.log(`You can't reach the ${m.name} from here.`, [170, 170, 170]); return false; }
+    if (Math.abs(m.z - p.z) > 1.5 && !(flat && isFlat(m))) { game.log(`You can't reach ${theOf(m)} from here.`, [170, 170, 170]); return false; }
     const feel = attitude(game, m, p);
     if (!force && feel !== "hostile") {
       // Your follower swaps places with you; anything else not out for you stands in the way.
@@ -177,7 +177,7 @@ export function mapStep(game, dx, dy, { force = shiftHeld() } = {}) {
         passTime(game, ((dx && dy ? Math.SQRT2 : 1) * STEP_TIME) / haste(p) / fleet(p));
         return true;
       }
-      game.log(`The ${m.name} is in your way. (Shift + direction attacks it.)`, [170, 170, 170]);
+      game.log(`${TheOf(m)} is in your way. (Shift + direction attacks it.)`, [170, 170, 170]);
       return false;
     }
     bumpAttack(game, m);

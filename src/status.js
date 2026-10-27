@@ -36,6 +36,7 @@ import { B } from "./world.js";
 import { hasKey } from "./keyset.js";
 
 export const STATUS_DEFS = {};
+const TheOf = (e) => (e?.named ? e.name : `The ${e?.name}`);   // (creatures.js theOf: a legend takes no article)
 export function registerStatus(id, def) {
   STATUS_DEFS[id] = { name: id, color: [200, 200, 200], kind: "bad", stack: "refresh", t: 10, ...def };
   return STATUS_DEFS[id];
@@ -195,7 +196,7 @@ registerStatus("shadowed", { color: [150, 140, 190], kind: "good", t: 30, flags:
 // Thick blood halves it.
 registerStatus("poisoned", { color: [150, 210, 80], t: 6, stack: "max", flags: { noRegen: legacyRegen },
   period: (e, s) => (1 / s.mag) * (hasKey(e.perks, "thickBlood") ? 2 : 1), cause: "poison",
-  hud: () => "POISONED", ended: "The sickness passes.", killed: (e) => `The ${e.name} chokes on the poison.` });
+  hud: () => "POISONED", ended: "The sickness passes.", killed: (e) => `${TheOf(e)} chokes on the poison.` });
 registerStatus("paralyzed", { color: [200, 120, 255], t: 5, stack: "max", flags: { noAct: true, noMove: true },
   hud: (s) => `PARALYZED ${secs(s)}s`, ended: "You can move again." });
 registerStatus("stunned", { color: [200, 120, 255], t: 2, stack: "max", flags: { noAct: true, noMove: true },
@@ -207,7 +208,7 @@ registerStatus("guarded", { color: [200, 230, 255], kind: "good", t: 1, flags: {
 // Fire: 1 damage every 0.5/mag seconds; stops regeneration; frost puts it out (and fire ends frost).
 registerStatus("burning", { color: [255, 140, 60], t: 3, ends: ["chilled"], flags: { noRegen: true },
   period: (e, s) => 0.5 / s.mag, cause: "fire",
-  hud: () => "BURNING", ended: "The burning stops.", killed: (e) => `The ${e.name} burns to ashes.` });
+  hud: () => "BURNING", ended: "The burning stops.", killed: (e) => `${TheOf(e)} burns to ashes.` });
 registerStatus("chilled", { color: [140, 190, 255], t: 3, ends: ["burning"], hud: (s) => `CHILLED ${secs(s)}s` });
 registerStatus("blinded", { color: [120, 120, 140], t: 10, hud: (s) => `BLIND ${secs(s)}s`, ended: "You can see again." });
 
@@ -227,7 +228,7 @@ registerStatus("drowning", { color: [90, 150, 230], t: Infinity, cause: "drownin
   hud: (s, game, e) => { const air = e ? airOf(e) : RULES.drown.air; return s.acc < air ? `AIR ${Math.ceil(air - s.acc)}s` : "DROWNING"; },
   onStart: (game, e) => log(game, e, "The water closes over your head. You can't swim: get out before your breath runs out!", [110, 170, 240]),
   onEnd: (game, e, s) => { if (s.acc >= airOf(e)) log(game, e, "You drag yourself out of the water, coughing.", [110, 170, 240]); },
-  killed: (e) => `The ${e.name} drowns.` });
+  killed: (e) => `${TheOf(e)} drowns.` });
 
 // Flat (bible §10.2, §15.6; DECISIONS): you exist only in the Plane. Phase 0 makes the status, forces the
 // map view and locks Tab (game.js); how you move while flat (chasms and deep water as floor, ledges up to

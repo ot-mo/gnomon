@@ -16,7 +16,7 @@ import { maxHp } from "./stats.js";
 import { setStatusHarm, STATUS_DEFS } from "./status.js";
 import { uidWhere, killUid } from "./zones.js";
 import { emit } from "./events.js";
-import { CREATURE_TYPES, spawnCreature, addCreature, removeCreature, isFlat, ghostHidden, canTalk } from "./creatures.js";
+import { CREATURE_TYPES, spawnCreature, addCreature, removeCreature, isFlat, ghostHidden, canTalk, theOf, TheOf } from "./creatures.js";
 import { hasKey } from "./keyset.js";
 import { membershipsOf } from "./factions.js";
 
@@ -38,7 +38,7 @@ setStatusHarm((game, e, n, id) => {
   e.hp -= n;
   e.hurt = 0.1;
   if (e.hp <= 0 && game.zone?.creatures.includes(e))
-    killMonster(game, e, def?.killed?.(e) || `The ${e.name} dies.`, true, true, e.status?.[id]?.src === "player" ? game.player : null);
+    killMonster(game, e, def?.killed?.(e) || `${TheOf(e)} dies.`, true, true, e.status?.[id]?.src === "player" ? game.player : null);
 });
 
 // splash: a kill that was not your aim (thorns, a lightning arc: combat.js), told in the "kill" payload so the
@@ -82,7 +82,7 @@ export function killMonster(game, m, message, dropLoot = true, byPlayer = true, 
       .filter(([x, y]) => x >= 0 && y >= 0 && x < zone.w && y < zone.d && zone.stand[x + y * zone.w] >= 0 &&
         !zone.creatures.some((o) => !canTalk(o) && o.tx === x && o.ty === y));
     for (const [x, y] of spots.slice(0, 2)) addCreature(zone, spawnCreature(t.splits, x, y, zone.stand[x + y * zone.w], { rng: Math.random, state: "chase", level: zone.level }));
-    if (spots.length) game.log(`The ${m.name} splits in two!`, m.color);
+    if (spots.length) game.log(`${TheOf(m)} splits in two!`, m.color);
   }
   emit(game, "kill", { c: m, src, uid: m.uid ?? null, factions: membershipsOf(m).map(([id]) => id), ...(splash ? { splash: true } : {}) });
 }

@@ -60,7 +60,7 @@ import { B, FLOOR_Z } from "./world.js";
 import { EYE, RADIUS } from "./player.js";
 import { hasStatus, statusFlag, tickStatuses, removeStatus, capStatus, catchUpStatuses, cooldownLeft } from "./status.js";
 import { RULES, extendRules } from "./rules.js";
-import { CREATURE_TYPES, spawnCreature, addCreature, removeCreature, isFlat, canTalk, creaturesNear, buildBuckets, dropBuckets, sees } from "./creatures.js";
+import { CREATURE_TYPES, spawnCreature, addCreature, removeCreature, isFlat, canTalk, creaturesNear, buildBuckets, dropBuckets, sees, theOf, TheOf } from "./creatures.js";
 import { attitude } from "./factions.js";
 import { distance } from "./rng.js";
 import { killMonster } from "./monsters.js";
@@ -181,7 +181,7 @@ export function updateCreatures(game, dt, radius = Infinity) {
       if (b?.braveT > 0) b.braveT -= dt;      // cornered: time before it thinks of running again
 
       // The ground vanished (a trap opened): it falls to the floor below.
-      if (stand[m.tx + m.ty * w] < 0) { killMonster(game, m, `The ${m.name} falls into the dark.`, false, false); continue; }
+      if (stand[m.tx + m.ty * w] < 0) { killMonster(game, m, `${TheOf(m)} falls into the dark.`, false, false); continue; }
 
       // Its statuses: on fire or poisoned, 1 damage every half second (status.js; the kill goes through
       // the harm handler in monsters.js); chill, blindness, haste and stuns run down.
@@ -374,7 +374,7 @@ function perceive(game, m, t) {
       brain.fleeLeft = AI_RULES.flee.most;
       brain.target = null;
       m.state = "flee";
-      if (dist < 14 && from === player) game.log(`The ${m.name} turns and runs!`, m.color);
+      if (dist < 14 && from === player) game.log(`${TheOf(m)} turns and runs!`, m.color);
       return;
     }
   }
@@ -611,7 +611,7 @@ function arrive(game, m, occ) {
     if (spot) Object.assign(m, { tx: spot[0], ty: spot[1], nx: spot[0], ny: spot[1], p: 0, x: spot[0] + 0.5, y: spot[1] + 0.5, z: stand[spot[0] + spot[1] * w] + (CREATURE_TYPES[m.type].hover || 0) });
   }
   occ[m.tx + m.ty * w] = m.id;
-  if (m.state === "chase") { m.lost = 0; if (distance(game.player.x - m.x, game.player.y - m.y) < 14) game.log(`The ${m.name} comes after you!`, m.color); }
+  if (m.state === "chase") { m.lost = 0; if (distance(game.player.x - m.x, game.player.y - m.y) < 14) game.log(`${TheOf(m)} comes after you!`, m.color); }
 }
 
 // A zone you come back to after `away` seconds: the time passes for it all at once.

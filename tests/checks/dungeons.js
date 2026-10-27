@@ -480,6 +480,15 @@ export async function checkLegends({ seed = 7 } = {}) {
   const c = game.zone.creatures.find((o) => o.uid === L.uid);
   if (!c || uidWhere(game, L.uid) !== deep || count(L.uid) !== 1) problems.push(`in its lair: present ${!!c}, claimed by ${uidWhere(game, L.uid)}, ${count(L.uid)} in memory`);
   if (c && JSON.stringify(c.color) !== JSON.stringify([235, 90, 235])) problems.push("in its lair: not in the legends' magenta");
+  // The log names it without an article (WS10 #12, at the merge): "You hit Zhadran the Beatkeeper", a goblin still "the goblin".
+  if (c) {
+    const { combatLine } = await import("../../src/combat.js"), { STATUS_DEFS } = await import("../../src/status.js");
+    const gob = { name: "goblin" }, spec = { kind: "melee" };
+    const lines = [combatLine(game, { att: game.player, tgt: c, hit: true, dmg: 3, mult: 1 }, spec), combatLine(game, { att: c, tgt: gob, hit: false }, { kind: "natural" }),
+                   STATUS_DEFS.burning.killed(c), combatLine(game, { att: game.player, tgt: gob, hit: true, dmg: 3, mult: 1 }, spec)];
+    stats.namedLines = lines.join(" | ");
+    if (lines[0] !== `You hit ${c.name} for 3.` || lines[1] !== `${c.name} misses the goblin.` || lines[2] !== `${c.name} burns to ashes.` || lines[3] !== "You hit the goblin for 3.") problems.push(`the log's names: ${stats.namedLines}`);
+  }
   // 2. Up and back: still one.
   go(top); go(deep);
   if (count(L.uid) !== 1 || uidWhere(game, L.uid) !== deep) problems.push(`after leaving and coming back: ${count(L.uid)} of it, claimed by ${uidWhere(game, L.uid)}`);

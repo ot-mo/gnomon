@@ -29,7 +29,7 @@
 //   finishFlight(game, pr, seconds)                     the map: `seconds` pass, and then as long as it
 //       still flies
 import { damageMonster, resolveAttack, thrownSpec } from "./combat.js";
-import { touchable, touchesYou, hostilesTo, canTalk } from "./creatures.js";
+import { touchable, touchesYou, hostilesTo, canTalk, theOf, TheOf } from "./creatures.js";
 import { POTIONS, POTION_COLORS, FLOOR_ART, itemPalette, makeItem, awayFromWalls, takeOne } from "./items.js";
 import { B, FLOOR_Z } from "./world.js";
 import { EYE, RADIUS, HEIGHT } from "./player.js";
@@ -346,7 +346,7 @@ function explode(game, x, y, z) {
   for (const o of zone.bombs) if (Math.hypot(o.x - x, o.y - y) < blast) o.fuse = Math.min(o.fuse, 0.15);
   for (const m of bodies(game))
     if (Math.hypot(m.x - x, m.y - y) <= blast && Math.abs(m.z + m.h / 2 - z) < 2.5)
-      damageMonster(game, m, 10 + Math.floor(Math.random() * 7), [255, 160, 60], `The ${m.name} is blown apart.`);
+      damageMonster(game, m, 10 + Math.floor(Math.random() * 7), [255, 160, 60], `${TheOf(m)} is blown apart.`);
   if (touchesYou(game, null) && Math.hypot(p.x - x, p.y - y) <= blast && Math.abs(p.z + 0.8 - z) < 2.5)   // (flat: the blast passes over you)
     game.hurtPlayer(Math.ceil((8 + Math.floor(Math.random() * 5)) / (demo ? 2 : 1)), "your own bomb");
 

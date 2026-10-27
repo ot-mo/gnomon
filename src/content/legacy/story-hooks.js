@@ -5,7 +5,7 @@
 //   win(game)   the run is won: the epilogue's pages, then the victory card
 import { on } from "../../events.js";
 import { setMode } from "../../screens.js";
-import { CREATURE_TYPES } from "../../creatures.js";
+import { CREATURE_TYPES, theOf, TheOf } from "../../creatures.js";
 import { makeItem, makeRelic, pickRelic, randomEquipment, awayFromWalls, RELICS, RELIC_COLOR } from "../../items.js";
 import { mapView } from "../../renderMap.js";
 import { openStory } from "../../dialogue.js";
@@ -38,7 +38,7 @@ function guardianFalls(game, m) {
   if (hall) for (const [x, y, z] of hall.gate) zone.set(x, y, z, B.AIR);
   zone.slam = null;
   zone.refresh();
-  game.log(`The ${m.name} falls! Behind it, the gate to the stairs grinds open.`, [255, 230, 140]);
+  game.log(`${TheOf(m)} falls! Behind it, the gate to the stairs grinds open.`, [255, 230, 140]);
   const ground = zone.stand[m.tx + m.ty * zone.w] >= 0 ? zone.stand[m.tx + m.ty * zone.w] : FLOOR_Z;
   const key = pickRelic(game.relicsFound);
   const it = key ? makeRelic(key) : { ...randomEquipment(Math.random, zone.level + 2, 0.5), known: true };

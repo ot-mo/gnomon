@@ -64,7 +64,7 @@ export function offend(game, by, victim) {
   if (out.witnesses.length) {
     for (const [id, w] of mine) out.rep[id] = addRep(game, id, REP_RULES.attackPenalty * w, "attack");
     const names = mine.map(([id]) => FACTIONS[id].name);
-    game.log?.(`${cap(names.join(" and "))} saw you strike the ${victim.name}.`, [230, 150, 120]);
+    game.log?.(`${cap(names.join(" and "))} saw you strike ${creatures.theOf(victim)}.`, [230, 150, 120]);
   }
   return out;
 }
