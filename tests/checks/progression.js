@@ -197,7 +197,13 @@ export async function checkProgression(m) {
     let pointsGot = 0, pointsSpent = 0, majors = 0;
     for (let level = 2; level <= 20; level++) {
       const fullBefore = p.hp === st.maxHp(p), maxBefore = st.maxHp(p);
+      game.messages = [];
       L.gainXp(game, L.xpToNext(p.level) - p.xp, { source: "quest" });
+      // What the level gave, in the log and on its card: "+N max HP" (max(1, 3 + TOU mod)), the Bent's crease, the point.
+      const hpPer = Math.max(1, 3 + Math.floor((st.attr(p, "tou") - 16) / 2));
+      const gains = [`+${hpPer} max HP`, ...(g === "bent" ? ["+1 crease"] : []), ...(level % 4 === 0 ? ["an attribute point"] : [])];
+      const line = `You reach level ${level}${level % 5 === 0 ? " (a milestone!)" : ""}! (${gains.join(", ")})`;
+      if (!game.messages.some((x) => x.text === line)) issues.push(`level ${level}: the log says ${JSON.stringify(game.messages.map((x) => x.text))}, want "${line}"`);
       if (p.level !== level || p.pendingLevels !== 1) { issues.push(`level ${p.level}, pending ${p.pendingLevels} (want ${level}, 1)`); break; }
       // The level's HP is yours at once: full before, full after (the HP gain is the max HP gain).
       if (!fullBefore) issues.push(`level ${level}: not at full health before the level (${p.hp}/${maxBefore})`);
@@ -214,6 +220,15 @@ export async function checkProgression(m) {
       }
       const card = LU.levelCard(game), ids = [...game.perkChoices];
       offers.push(`${level}:${ids.join(",")}`);
+      if (card.gains.join(" · ") !== gains.join(" · ")) issues.push(`level ${level}: the card's gains are "${card.gains.join(" · ")}", want "${gains.join(" · ")}"`);
+      else { frame(); if (!Array.from({ length: capture.rows }, (_, y) => rowText(y)).some((r) => r.includes(gains.join(" · ")))) issues.push(`level ${level}: the card doesn't show "${gains.join(" · ")}"`); }
+      // Offers come from the open trees and the general pool first (bible §10.8); only when those can't fill the card do
+      // the other trees come in.
+      const mine = Object.keys(POWERS).filter((id) => !POWERS[id].needs && !POWERS[id].major && L.perkRank(p, id) < (POWERS[id].max || 1) &&
+        (POWERS[id].general || p.trees.includes(POWERS[id].tree)));
+      const minor = ids.filter((id) => !POWERS[id]?.major);
+      if (minor.length && (mine.length >= minor.length ? minor.some((id) => !mine.includes(id)) : mine.some((id) => !ids.includes(id))))
+        issues.push(`level ${level}: offers ${ids} pass over the open trees and the general pool (${mine})`);
       const n = st.attr(p, "int") >= 18 ? 4 : 3;
       if (card.step !== "power") issues.push(`level ${level}: the card is on ${card.step}`);
       if (ids.length !== n) issues.push(`level ${level}: ${ids.length} offers at INT ${st.attr(p, "int")}, want ${n}`);
@@ -288,7 +303,23 @@ export async function checkProgression(m) {
         if (game.mode === "levelup") fail(`six levels at once: level ${cd.level}'s card stays open`);
       }
       if (p.attrPoints !== 0) fail(`six levels at once: ${p.attrPoints} points left`);
-      out.together = `levels 3-8 in one gain: cards ${seen.join(" ")}, a point kept for later`;
+      // Two gifts at level 10 (a teacher's trick: bonusPerks): no milestone and no major, a draw each, other offers.
+      L.gainXp(game, L.xpToNext(8) + L.xpToNext(9) - p.xp, { source: "quest" });
+      for (let k = 0; k < 4 && p.pendingLevels > 0; k++) { step(1 / 60); if (LU.levelCard(game).step === "attr") press("Digit3"); press("Digit1"); }
+      p.bonusPerks = 2;
+      const gifts = [];
+      for (let k = 0; k < 2; k++) {
+        step(1 / 60);
+        const cd = LU.levelCard(game);
+        gifts.push([...game.perkChoices]);
+        // Each gift draws on its own (draw 1, 2…), never the level's own offers (draw 0).
+        const own = L.offerPowers(game, p, { level: 10, milestone: false, draw: k + 1 }), level0 = L.offerPowers(game, p, { level: 10, milestone: false, draw: 0 });
+        if (game.perkChoices.join() !== own.join() || game.perkChoices.join() === level0.join()) fail(`gift ${k + 1}: offers ${game.perkChoices}, its draw ${own}, the level's ${level0}`);
+        if (game.mode !== "levelup" || !cd.gift || cd.milestone || cd.level !== 10 || game.perkChoices.some((id) => POWERS[id].major)) fail(`gift ${k + 1} at level ${p.level}: ${JSON.stringify({ mode: game.mode, gift: cd.gift, milestone: cd.milestone, level: cd.level, offers: game.perkChoices })}`);
+        press("Digit1");
+      }
+      if (p.bonusPerks !== 0 || p.giftDraws !== 2 || gifts[0].join() === gifts[1].join()) fail(`two gifts: ${p.bonusPerks} left, draws ${p.giftDraws}, offers ${gifts.map((o) => o.join(",")).join(" / ")}`);
+      out.together = `levels 3-8 in one gain: cards ${seen.join(" ")}, a point kept for later; two gifts at 10: ${gifts.map((o) => o.join(",")).join(" / ")}`;
     }
     // XP (bible §10.7, §15.6).
     const p = begun(choicesFor("reedcutter", C.suggestSpread("bent", "reedcutter")), 5);
