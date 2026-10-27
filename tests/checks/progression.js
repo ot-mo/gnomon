@@ -351,6 +351,14 @@ export async function checkProgression(m) {
       if (!/name/.test(W.wizard().msg)) fail(`wizard: no word about the missing name (${W.wizard().msg})`);
       press("Escape"); expect("track", "Esc on the name");
       steps.push("bent by mouse (refusals)");
+      // Every step reached, back to the start, the cursor moved to the other genotype, and a click on Begin at the top:
+      // the new genotype forgets the rest, so it goes to the backgrounds (it once drew the summary with no background).
+      for (let k = 0; k < 8 && at() !== "begin"; k++) press("Enter");
+      for (let k = 0; k < 8 && at() !== "genotype"; k++) press("Escape");
+      press("ArrowDown");
+      let threw = null;
+      try { click("Begin", { row: "Genotype" }); frame(); } catch (err) { threw = err.message; }
+      if (threw || at() !== "background" || W.wizard().genotype !== "plumb") fail(`wizard: a jump to Begin after changing the genotype: ${threw || `on ${at()}, ${W.wizard().genotype}`}`);
     }
     // Every step fits 100×30: the buttons and the key help are on screen.
     out.wizard = `${steps.join(", ")} at ${capture.cols}×${capture.rows}`;

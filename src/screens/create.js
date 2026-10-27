@@ -120,7 +120,10 @@ function rowsOf(game) {
 function go(game, to) {
   to = Math.max(0, Math.min(STEPS.length - 1, to));
   wiz.msg = "";
-  if (to > wiz.step && !leave(game)) return;
+  if (to > wiz.step) {
+    if (!leave(game)) return;
+    to = Math.min(to, wiz.reached + 1);   // a new genotype or background forgets the steps after it: no jumping past them
+  }
   wiz.step = to;
   wiz.reached = Math.max(wiz.reached, to);
   if (stepId() === "name" && !wiz.name.text) suggest();
