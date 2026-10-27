@@ -148,7 +148,7 @@ EGO's modifier):**
 | Echo Throat ◆ | physical | | Echo (20): every creature within 6 + L tiles on the map | |
 | Fold Step ◆ | mental | | Fold Step (12): 4 + L tiles | |
 | Overlook ◆ | mental | | Overlook (max(10, 32 − 2L)): a 9 × 9 within 20 tiles onto the map | |
-| Shadowsense ◆ | mental | | Shadowsense (60): 8 + 2L s, flat beings and ghosts within 12 + 2L shown | |
+| Shadowsense ◆ | mental | | Shadowsense (60): 8 + 2L s, every flat being and ghost on the floor shown | |
 | Kindle ◆ | mental | | Kindle (5): a cold brazier within 5 + L tiles | |
 | Lightsick | defect +2 | (status `sunsick`: 1 HP / 20 s under the open sky) | | |
 | Dark-fear | defect +3 | `toHit` −2, `dv` −1 while the torch is out (status `shaken`) | | |

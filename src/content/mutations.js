@@ -114,7 +114,7 @@ export const MUTATIONS = {
   shadowsense: {
     name: "Shadowsense", kind: "mental", cost: 4, max: 10, excludes: [], planar: true,
     bridge: "flat beings and ghosts show in 3D and on the map",
-    info: (l) => `For ${8 + 2 * l} s, flat beings and ghosts within ${tiles(12 + 2 * l)} show in every view.`,
+    info: (l) => `For ${8 + 2 * l} s, every flat being and ghost on this floor shows in every view.`,
     ability: "shadowsense",
   },
   kindle: {

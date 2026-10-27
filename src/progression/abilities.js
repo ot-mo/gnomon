@@ -10,8 +10,8 @@
 //   flatwise     Flatwise: pressed flat (status.js "flat") for 3 + floor(level / 2) s: the map view only
 //   echo         Echo Throat: every creature within 6 + level tiles shows on the map (a sighting), lit or not
 //   overlook     Overlook: a 9 × 9 area up to 20 tiles off is drawn onto the map, with what stands in it
-//   shadowsense  Shadowsense: for 8 + 2 × level s, flat beings and ghosts within 12 + 2 × level tiles show in both
-//                views (a mark over each in 3D, a sighting on the map), refreshed every half second
+//   shadowsense  Shadowsense: for 8 + 2 × level s, every flat being and ghost on the floor (bible §13.5: "in every
+//                view", no reach given) shows in both views (a mark over each in 3D, a sighting on the map), refreshed every half second
 //   kindle       Kindle: the nearest cold brazier within 5 + level tiles of what you aim at (3D) or of you (the
 //                map) catches, as if you had walked up with your torch
 import { registerAbility } from "../abilities.js";
@@ -187,9 +187,8 @@ registerStatus("shadowsense", { color: [190, 180, 255], kind: "good", t: 10,
     s.acc += dt;
     if (s.acc < 0.5 && s.marked) return;
     s.acc = 0; s.marked = true;
-    const r = 12 + 2 * s.mag;
     for (const c of game.zone.creatures) {
-      if (!(isFlat(c) || isGhostly(c)) || distance(c.x - e.x, c.y - e.y) > r) continue;
+      if (!(isFlat(c) || isGhostly(c))) continue;
       sight(game, c);
       game.effects.push({ kind: "damage", x: c.x, y: c.y, z: c.z + (c.h ?? 1) + 0.3, text: c.glyph, color: [190, 180, 255], time: game.time });
     }
@@ -197,7 +196,7 @@ registerStatus("shadowsense", { color: [190, 180, 255], kind: "good", t: 10,
 registerAbility("shadowsense", {
   name: "Shadowsense", source: "mutation", target: "self", mapTime: 0.5,
   cooldown: () => 60,
-  info: (l) => `For ${8 + 2 * l} s, flat beings and ghosts within ${12 + 2 * l} tiles show in every view.`,
+  info: (l) => `For ${8 + 2 * l} s, every flat being and ghost on this floor shows in every view.`,
   use(game, e, lvl) {
     if (hasStatus(e, "shadowsense")) { say(game, e, "You're sensing the shadows already."); return false; }
     addStatus(game, e, "shadowsense", { t: 8 + 2 * lvl, mag: lvl });

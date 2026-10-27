@@ -803,9 +803,20 @@ export async function checkProgression(m) {
         echo: { muts: ["echoThroat"], set: (p, at) => { p.torch = false; return { r: rat(at.x + 6, at.y, at.z) }; },
                 ok: (p, s) => game.zone.sightings.get(s.r.id)?.time === game.time },
         overlook: { muts: ["overlook"], set: () => { game.zone.seen.fill(0); return {}; }, ok: (p, s, at) => { let n = 0; for (let y = 0; y < game.zone.d; y++) for (let x = 0; x < game.zone.w; x++) if (game.zone.seen[x + y * game.zone.w] && Math.hypot(x - at.x, y - at.y) > 4) n++; return n >= 20; } },
-        shadowsense: { muts: ["shadowsense"], set: (p, at) => ({ r: rat(at.x + 5, at.y, at.z, { vis: { flat: true } }) }),
+        // (a flat rat 5 tiles off and a ghostly one at the far side of the floor: both marked, as the bible gives no reach)
+        // (held still: a mark shows where it was; the far one on the standable tile farthest from you, since a ghost in your
+        // light burns away, P0's rule)
+        shadowsense: { muts: ["shadowsense"], set: (p, at) => {
+                         const z = game.zone;
+                         let far = null, fd = 0;
+                         for (let y = 1; y < z.d - 1; y++) for (let x = 1; x < z.w - 1; x++) {
+                           const d = Math.hypot(x - at.x, y - at.y);
+                           if (z.stand[x + y * z.w] >= 0 && d > fd && !CR.creatureAt(z, x, y)) { fd = d; far = { x, y, z: z.stand[x + y * z.w] }; }
+                         }
+                         return { r: rat(at.x + 5, at.y, at.z, { vis: { flat: true }, speedMul: 0 }), g: rat(far.x, far.y, far.z, { vis: { flat: true }, speedMul: 0 }), fd };
+                       },
                        after: () => { for (let k = 0; k < 40; k++) game.mode === "map" ? T.mapWait(game) : game.debug.step(1 / 60); },
-                       ok: (p, s) => game.zone.sightings.has(s.r.id) && game.effects.some((e) => e.kind === "damage" && e.text === s.r.glyph && Math.hypot(e.x - s.r.x, e.y - s.r.y) < 1.5) },
+                       ok: (p, s) => s.fd > 20 && [s.r, s.g].every((c) => game.zone.sightings.has(c.id) && game.effects.some((e) => e.kind === "damage" && e.text === c.glyph && Math.hypot(e.x - c.x, e.y - c.y) < 1.5)) },
         kindle: { muts: ["kindle"], set: (p, at) => {
                     const bx = at.x + 3, by = at.y;
                     game.zone.set(bx, by, WD.FLOOR_Z, WD.B.BRAZIER); game.zone.refresh();
