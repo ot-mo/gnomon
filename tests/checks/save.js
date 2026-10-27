@@ -78,6 +78,18 @@ export async function digestGame(game, keys) {
 }
 const visitedKeys = (game) => [...game.zones.keys()].filter((k) => k === game.zone.key || game.state.zoneLeft[k] !== undefined).sort();
 const playing = (game, view = game.view) => { game.view = view; game.mode = view === "map" ? "map" : "explore"; game.paused = false; game.modeStack = []; };
+// WS4's creation wizard, which the title's first item opens since it is registered (p2-ws4a; at the WS9 merge), by the
+// keys alone: Enter on each step, on the mutations' (or implants') list its last row first (End), on the name a
+// suggestion first (Tab). → whether it began the run.
+async function throughWizard(game, key) {
+  const { wizard } = await import("../../src/screens/create.js");
+  for (let k = 0; k < 20 && game.mode === "create"; k++) {
+    const step = wizard().step;
+    if (step === "track") key("End"); else if (step === "name") key("Tab");
+    key("Enter");
+  }
+  return game.mode !== "create";
+}
 
 // Sections 1-8 hold Phase 0's saves, asked for by hand (the automatic ones off); 9-18 are WS9's (ws9Sections).
 export async function checkSave(opts) {
@@ -455,23 +467,40 @@ async function checkSections({ game, startRun, inputHandlers, runSession, fresh,
     const saveOne = async () => {
       game.pages = null; playing(game, "map");
       game.debug.enterZone("0,0,1", "down"); playing(game, "map");
+      // (A save asked for where none can be made waits for a frame that never comes here: say so instead.)
+      if (!canSave(game)) { fail(`a save asked for in ${game.mode} at ${game.zone?.key} would wait (zone loading: ${game.zoneLoading})`); return null; }
       return saveGame(game, {});
+    };
+    // The first item: "New quick game" on p0-done, "New game" once WS4's wizard is registered (p2-ws4a), which it opens
+    // with the title's seed and mode (WS4 #12; at the WS9 merge); the wizard by Enter alone starts the run in that mode.
+    const wizard = !!screenFor("create"), first = wizard ? "New game" : "New quick game";
+    const begun = async (how, want) => {
+      if (wizard) {
+        if (game.mode !== "create") { fail(`${how} on "${first}": mode ${game.mode}, not the wizard`); return; }
+        await throughWizard(game, key);
+      }
+      if (game.mode !== "story" || !game.player || game.zone?.key !== "0,0,0" || game.state?.mode !== want)
+        fail(`${how} on "${first}": mode ${game.mode}, zone ${game.zone?.key}, the run's mode ${game.state?.mode} (want ${want})`);
+      else ways++;
     };
     await openTitle(game);
     let t = text(), ways = 0;
-    if (game.mode !== "title" || !t.includes("New quick game") || t.includes("Continue")) fail(`the title with nothing saved: mode ${game.mode}, "${t.replace(/\s+/g, " ").trim().slice(0, 120)}"`);
+    if (game.mode !== "title" || !t.includes(first) || t.includes("Continue")) fail(`the title with nothing saved: mode ${game.mode}, "${t.replace(/\s+/g, " ").trim().slice(0, 120)}"`);
     const m0 = game.messages.length;
     key("KeyM", "m");
     if (game.messages.length !== m0 + 1 || !/Music/.test(game.messages[game.messages.length - 1]?.text)) fail("M didn't switch the music on the title screen");
     key("KeyM", "m");
+    key("ArrowDown"); key("Enter"); key("Enter"); key("ArrowUp");   // the mode line twice: Pilgrim
     key("Enter");
-    if (game.mode !== "story" || !game.player || game.zone?.key !== "0,0,0") fail(`Enter on "New quick game": mode ${game.mode}, zone ${game.zone?.key}`); else ways++;
+    await begun("Enter", "pilgrim");
     await openTitle(game);
-    click("New quick game");
-    if (game.mode !== "story") fail(`a click on "New quick game": mode ${game.mode}`); else ways++;
+    click(first);
+    await begun("a click", "pilgrim");
+    await openTitle(game); key("ArrowDown"); key("Enter");   // (the mode line once more: One Wick again, as section 17 expects it)
     // Continue: by ↓ Enter, by 2, by a click; each loads the newest slot.
     for (const how of ["keys", "digit", "click"]) {
       const m = await saveOne();
+      if (!m) continue;
       startRun(11); game.pages = null;
       await openTitle(game);
       t = text();
@@ -481,7 +510,7 @@ async function checkSections({ game, startRun, inputHandlers, runSession, fresh,
       if (game.mode === "title" || game.saving?.slotId !== m.id || game.zone?.key !== "0,0,1") fail(`Continue by ${how}: mode ${game.mode}, slot ${game.saving?.slotId} (want ${m.id}), zone ${game.zone?.key}`);
       else ways++;
     }
-    stats.title = `100×30: New quick game and Continue reached ${ways} of 5 ways (Enter, click; ↓ Enter, 2, click)`;
+    stats.title = `100×30: ${first}${wizard ? " (through the wizard, the run in the title's Pilgrim)" : ""} and Continue reached ${ways} of 5 ways (Enter, click; ↓ Enter, 2, click)`;
     useStore(was);
   }
 
@@ -1318,6 +1347,7 @@ async function ws9Sections(ctx) {
     key("Enter");
     const seedOk = title.titleState().seed === "4242" && game.messages.length === m0;
     key("Home"); key("Enter");
+    if (screenFor("create")) await throughWizard(game, key);   // (the wizard, with the title's seed and mode)
     if (!modeLine || !seedOk || game.seed !== 4242 || game.state?.mode !== "commonsLamp" || game.mode !== "story")
       fail(`the title's mode and seed: mode line ${modeLine}, seed ${title.titleState().seed} (M typed nothing: ${game.messages.length === m0}); the game: seed ${game.seed}, ${game.state?.mode}, ${game.mode}`);
     out.push("the mode (→ Commons Lamp) and a typed seed (4242; M typed into it did nothing) made the game");
