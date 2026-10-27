@@ -25,16 +25,45 @@
 // 8. Roads never climb a cliff: the test world's spans where the zone centre (a road's hub) is on a cliff
 //    (verification of 2a: seeds 3, 20 and 42) have their hub on plain ground and no road on a map wall.
 // 9. The test world's zones all hold plain water (the real world's biome data isn't theirs).
+//
+// The 2b half (docs/ws2.md "2b"), on the same zones:
+// 10. Dressing, zone by zone: every 3D-only plateau is out of the map's reach (no column of it reached under the
+//     map's rules) and in 3D's (a walk with steps up of 1 and jumps up 1 over a tile's gap, from the anchor), its
+//     reward on top; every ramp's top is a cliff top 4 or more up (a map wall) that 3D reaches; every cache too;
+//     every wildlife creature stands on map ground the anchor reaches, inside the keep, 2 tiles from the edges;
+//     plateaus at most SURFACE_RULES.jumpSpots. Counts by biome are reported (plateaus, ramps, caches, creatures,
+//     props) with the share of cliff tops 3D now reaches.
+// 11. The builders and the tables: a builder for every terrain of the real world (BIOME_BUILDERS) and the test
+//     world (TEST_BUILDERS); every biome's spawn keys registered creatures; no wildlife type has `depths` (it would
+//     join the dungeons' default pool and move the legacy levels); every prop kind a biome names exists, with a
+//     map glyph no creature family uses; the test world holds no wildlife.
+// 12. WS2's legend handlers: every one registered, and a plan with each letter stamped into a flat zone builds
+//     what it says (a trunk and its canopy, a prop, shallow and deep water at the datum on rock, road and dirt
+//     ground, a step of rubble, a lamp post, the plan's creature).
+// 13. Sub-ground: a raised column holds its biome's sub block from the datum's layer up (the Rust Steps' clay
+//     cliffs), the same in the apron (item 3 compares every voxel).
+// 14. The Gnomon's foot (WS3 #10): its span's middle column is solid from the datum to 14 blocks up, on every seed.
 import { buildRun } from "../../src/world/run.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
 import { TEST_WORLD } from "../../src/content/world/test-world.js";
-import { generateSurface, surfaceSteps, validateSurface, worldFns, buildApronBand, forgetWorld, SURFACE_RULES } from "../../src/gen/surface.js";
+import { generateSurface, surfaceSteps, validateSurface, worldFns, buildApronBand, forgetWorld, SURFACE_RULES, stampPlan,
+         BIOME_BUILDERS, TEST_BUILDERS } from "../../src/gen/surface.js";
 import { edgePorts, portsOf, portTable } from "../../src/gen/ports.js";
 import { apronBandSteps } from "../../src/gen/apron.js";
-import { biomeFor } from "../../src/content/biomes.js";
-import { B, FLOOR_Z, SURFACE, APRON_SIDES } from "../../src/world.js";
+import { biomeFor, BIOMES, DEFAULT_BIOME, PROPS, SETTLED_KINDS } from "../../src/content/biomes.js";
+import { WILDLIFE } from "../../src/content/creatures/wildlife.js";
+import { TERRAINS } from "../../src/content/world/terrains.js";
+import { TEST_TERRAINS } from "../../src/content/world/test-world.js";
+import { legendHandlers } from "../../src/gen/vaults.js";
+import { WS2_LEGEND } from "../../src/gen/biomes/legend.js";
+import { CRYSTAL_SHARE } from "../../src/gen/biomes/common.js";
+import { CREATURE_TYPES } from "../../src/creatures.js";
+import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../../src/pathing.js";
+import { FAMILY_GLYPHS } from "./creatures.js";
+import { KIND } from "../../src/blocks.js";
+import { Zone, B, FLOOR_Z, SURFACE, APRON_SIDES, standWith } from "../../src/world.js";
 import { SIDE_STEP } from "../../src/world/worldmodel.js";
-import { makeRng } from "../../src/rng.js";
+import { makeRng, distance } from "../../src/rng.js";
 
 const ZW = SURFACE.w, ZD = SURFACE.d, ZH = SURFACE.h;
 const q = (sorted, p) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))];
@@ -52,6 +81,7 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
   const apron = { pairs: 0, columns: 0, left: 0, leftDiffer: 0, voxels: 0, corners: 0, decoys: 0, told: 0 };
   const liquids = { zones: 0, rivers: 0, byLiquid: {} };
   const swap = { cold: [], warm: [], same: 0 };
+  const dressed = { byBiome: {}, plateaus: 0, ramps: 0, caches: 0, creatures: 0, props: 0, tops: 0, topsReached: 0, sub: 0, localColumns: 0, overMarked: 0, rewards: 0, crystals: 0 };
 
   for (const seed of seeds) {
     const run = buildRun(seed, REAL_WORLD), world = run.world, W = worldFns(world, run.seed);
@@ -79,6 +109,7 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
       else if (validateSurface(z).length) fail(`${at}: validates in generation but not again`);
       navs.push(z.navigability);
       ground3d += z.ground3d;
+      dressing(z, t, dressed, fail, at, W);
       if (zones % 25 === 0) {   // twice the same, on a sample
         const again = generateSurface(run, t.wx, t.wy);
         twice++;
@@ -298,6 +329,31 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
     if (c.cliff || c.water || z.problems.length) fail(`test world seed ${seed} (${wx}, ${wy}): hub (${hub.x}, ${hub.y}) cliff ${c.cliff}, water ${c.water}; ${z.problems.join("; ")}`);
   }
 
+  // 10b. Spans the verification of 2b found a fault in (whatever the random sample holds), item 10's rules.
+  for (const [seed, wx, wy, what] of REGRESSIONS) {
+    const run = buildRun(seed, REAL_WORLD), t = run.world.tileAt(wx, wy), z = generateSurface(run, wx, wy);
+    for (const p of z.problems) fail(`seed ${seed} (${wx}, ${wy}) (${what}): ${p}`);
+    dressing(z, t, dressed, fail, `seed ${seed} (${wx}, ${wy}) ${t.terrain} (${what})`, worldFns(run.world, run.seed));
+  }
+
+  // 10c. Every biome's features fire: over 20 or more sampled zones of a biome whose data asks for plateaus, ponds or
+  // ramps, some are made (dense woods leave no free ground without their clearings).
+  for (const [id, b] of Object.entries(dressed.byBiome)) {
+    const data = BIOMES[id] || {};
+    if (b.n < 20) continue;
+    if (data.plateaus > 0 && !b.plateaus) fail(`biome ${id}: no plateau in ${b.n} zones`);
+    if (data.ponds?.count?.[1] > 0 && !b.ponds) fail(`biome ${id}: no pond in ${b.n} zones`);
+    if (data.ramps?.[1] > 0 && !b.ramps) fail(`biome ${id}: no ramp in ${b.n} zones`);
+  }
+
+  // 10d. Rewards stay prizes (the user's taste: meaningful to the end): crystals at most twice CRYSTAL_SHARE of the
+  // plateaus' and caches' rewards, once there are 100 of them.
+  if (dressed.rewards >= 100 && dressed.crystals > 2 * CRYSTAL_SHARE * dressed.rewards)
+    fail(`${dressed.crystals} of ${dressed.rewards} plateau and cache rewards are crystals (want at most ${(200 * CRYSTAL_SHARE).toFixed(0)}%)`);
+
+  // 11-14.
+  builders(fail, dressed);
+
   // Numbers.
   times.sort((a, b) => a - b);
   navs.sort((a, b) => a - b);
@@ -307,7 +363,10 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
   if (!slope.tier2) fail("no stacked cliff (tier 2) anywhere: the Rust Steps' mesas are missing");
   if (apron.pairs < pairs * seeds.length) fail(`only ${apron.pairs} apron pairs found`);
   stats.spans = `${zones} zones (${spans} a seed × ${seeds.length} seeds, the real world), ${retried} needed a retry, ${twice} made twice the same`;
-  stats.navigability = `map: min ${(100 * navs[0]).toFixed(1)}%, p5 ${(100 * q(navs, 0.05)).toFixed(1)}%, mean ${(100 * navs.reduce((a, b) => a + b, 0) / navs.length).toFixed(1)}%; ground the map draws as wall (cliff tops, no way up yet) ${(ground3d / zones).toFixed(0)} columns a zone`;
+  stats.navigability = `map: min ${(100 * navs[0]).toFixed(1)}%, p5 ${(100 * q(navs, 0.05)).toFixed(1)}%, mean ${(100 * navs.reduce((a, b) => a + b, 0) / navs.length).toFixed(1)}%; ground the map doesn't walk (cliff tops, plateaus) ${(ground3d / zones).toFixed(0)} columns a zone, ${(100 * dressed.topsReached / Math.max(1, dressed.tops)).toFixed(0)}% of the cliff tops reached in 3D`;
+  stats.dressing = `${dressed.rewards} plateau and cache rewards, ${dressed.crystals} crystals; ${dressed.localColumns} columns marked local away from footprints and canopies, ${dressed.overMarked} of them the world function's; ${dressed.plateaus} plateaus, ${dressed.ramps} ramps, ${dressed.caches} caches, ${dressed.creatures} creatures, ${dressed.props} props over ${zones} zones; ` +
+    Object.entries(dressed.byBiome).map(([k, v]) => `${k} ${v.n}: ${v.plateaus}/${v.ramps}/${v.caches}/${v.creatures}/${v.props}`).join(", ") + " (plateaus/ramps/caches/creatures/props)";
+  stats.builders = dressed.builders;
   stats.ms = `generateSurface p50 ${ms(q(times, 0.5))}, p95 ${ms(p95)}, max ${ms(max)}${budget ? " (budget held)" : " (budget: --budget, alone)"}`;
   stats.slope = `${slope.columns} columns, ${slope.steps} steps: ${slope.over} over 1 without a cliff, ${slope.feet} cliff feet under 4, ${slope.high} over 12; highest ${slope.maxH}; ${slope.tier2} on stacked mesas (${slope.strayTier2} outside a stacking biome, ${slope.sheer} beside the plain); ${slope.trees} trees, ${slope.tallTrees} too tall`;
   stats.apron = `${apron.pairs} pairs (${apron.corners} corners): ${apron.columns} band columns, ${apron.voxels} voxels equal; ${apron.left} (${(100 * apron.left / Math.max(1, apron.columns)).toFixed(2)}%) the neighbour's own features left out, ${apron.leftDiffer} of them different; ${apron.told} of ${apron.decoys} decoys (another seed's neighbour) told apart`;
@@ -316,6 +375,212 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
   stats.swap = `a zone's world-function bands: cold p50 ${ms(q(swap.cold, 0.5))} / p95 ${ms(q(swap.cold, 0.95))} ms, after its staged make p50 ${ms(q(swap.warm, 0.5))} / p95 ${ms(q(swap.warm, 0.95))} ms; ${swap.same} of ${swap.cold.length} the same bits`;
   stats.seconds = ((performance.now() - t0) / 1000).toFixed(1);
   return { name: "surface", ok: problems.length === 0, problems, stats, notes };
+}
+
+// [seed, wx, wy, what was wrong there] (docs/sessions/ws2.md, Part 2b §4).
+const REGRESSIONS = [
+  [42, 20, 9, "a ramp up a cliff a site's skirt had pulled down to 3"],
+  [1, 14, 10, "a shrub buried in a barrow"], [42, 17, 20, "a pack's hound within 10 tiles of the anchor"], [42, 31, 6, "a sinkhole under a prop"], [1, 34, 6, "a Stacks floor plan's stone outline on stone, marked local"], [1, 20, 15, "bones inside a crag"], [42, 10, 9, "a cache's scrap by the edge"],
+];
+
+// --- 10. Dressing, zone by zone ---------------------------------------------------------------------------
+// Where 3D reaches from the anchor, column by column: a step up of at most 1 (a jump is 1.5 blocks), any drop,
+// and a jump straight over one tile to a column at most 1 above, the tile between no higher than the take-off + 1
+// (the parent's climb rooms: 2-tile gaps, +1 a jump). Columns with nowhere to stand are never entered.
+export function reach3d(zone) {
+  const { w, d } = zone, stand = standWith(zone, "open"), dist = new Int16Array(w * d).fill(-1);
+  const a = Math.floor(zone.spawn.x) + Math.floor(zone.spawn.y) * w, q = [a];
+  if (stand[a] < 0) return dist;
+  dist[a] = 0;
+  for (let h = 0; h < q.length; h++) {
+    const i = q[h], x = i % w, y = (i - x) / w, s = stand[i];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      for (const k of [1, 2]) {
+        const nx = x + dx * k, ny = y + dy * k;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= d) break;
+        const j = nx + ny * w;
+        if (k === 2) { const m = stand[x + dx + (y + dy) * w]; if (m < 0 || m > s + 1) break; }
+        if (stand[j] >= 0 && stand[j] - s <= 1 && dist[j] < 0) { dist[j] = dist[i] + 1; q.push(j); }
+      }
+    }
+  }
+  return dist;
+}
+
+function dressing(z, t, out, fail, at, W) {
+  const g = z.gen, { w, d } = z, R = SURFACE_RULES;
+  const b = (out.byBiome[t.biome] ||= { n: 0, plateaus: 0, ramps: 0, caches: 0, creatures: 0, props: 0, ponds: 0 });
+  b.n++;
+  b.ponds += g.ponds.length;
+  const open = standWith(z, "open");
+  for (let i = 0; i < w * d; i++) if (z.kind[i] === KIND.WALL) open[i] = -1;
+  const map = reachable(open, w, d, Math.floor(z.spawn.x), Math.floor(z.spawn.y), PLAYER_STEP_UP, PLAYER_DROP), deep = reach3d(z);
+  const onMap = (x, y) => map[x + y * w] >= 0, in3d = (x, y) => deep[x + y * w] >= 0;
+  if (g.plateaus.length > R.jumpSpots) fail(`${at}: ${g.plateaus.length} plateaus`);
+  for (const p of g.plateaus) {
+    out.plateaus++; b.plateaus++;
+    for (let y = p.y; y < p.y + p.d; y++)
+      for (let x = p.x; x < p.x + p.w; x++) {
+        if (onMap(x, y)) fail(`${at}: the plateau at (${p.x}, ${p.y}) is walked onto on the map at (${x}, ${y})`);
+        if (!in3d(x, y)) fail(`${at}: the plateau at (${p.x}, ${p.y}) can't be reached in 3D at (${x}, ${y})`);
+      }
+    const it = z.items.find((i) => Math.floor(i.x) === p.reward.x && Math.floor(i.y) === p.reward.y && i.z === p.z);
+    if (!it) fail(`${at}: the plateau at (${p.x}, ${p.y}) has no reward`);
+    else { out.rewards++; if (it.kind === "heart" || it.kind === "strength") out.crystals++; if (it.kind === "cash" || it.kind === "relic?") fail(`${at}: a plateau's reward is ${it.kind}`); }
+  }
+  for (const r of g.ramps) {
+    out.ramps++; b.ramps++;
+    if (r.top.z < FLOOR_Z + 4 || onMap(r.top.x, r.top.y)) fail(`${at}: a ramp's top (${r.top.x}, ${r.top.y}) at ${r.top.z} isn't a map wall`);
+    if (!in3d(r.top.x, r.top.y) && in3d(r.foot.x, r.foot.y)) fail(`${at}: the ramp from (${r.foot.x}, ${r.foot.y}) doesn't reach its top (${r.top.x}, ${r.top.y}) in 3D`);
+  }
+  for (const c of g.caches) {
+    out.caches++; b.caches++;
+    if (onMap(c.x, c.y)) fail(`${at}: the cache at (${c.x}, ${c.y}) is on map ground`);
+    const it = z.items.find((i) => Math.floor(i.x) === c.x && Math.floor(i.y) === c.y);
+    if (!it) fail(`${at}: the cache at (${c.x}, ${c.y}) holds nothing`);
+    else { out.rewards++; if (it.kind === "heart" || it.kind === "strength") out.crystals++; if (it.kind === "cash" || it.kind === "relic?") fail(`${at}: a cache's reward is ${it.kind}`); }
+  }
+  for (const c of z.creatures) {
+    if (!WILDLIFE[c.type] && !(biomeFor({ terrains: TERRAINS }, t).spawns || []).some(([id]) => id === c.type)) continue;
+    out.creatures++; b.creatures++;
+    if (!onMap(c.tx, c.ty) || c.tx < R.edgeKeep || c.ty < R.edgeKeep || c.tx >= w - R.edgeKeep || c.ty >= d - R.edgeKeep)
+      fail(`${at}: the ${c.type} at (${c.tx}, ${c.ty}) stands where the map doesn't reach, or by an edge`);
+    if (distance(c.tx - Math.floor(z.spawn.x), c.ty - Math.floor(z.spawn.y)) < 10) fail(`${at}: the ${c.type} at (${c.tx}, ${c.ty}) is within 10 tiles of the anchor`);
+  }
+  const propTiles = new Set();
+  for (const p of z.props) {
+    out.props++; b.props++;
+    const x = Math.floor(p.x), y = Math.floor(p.y);
+    if (!PROPS[p.kind]) fail(`${at}: an unknown prop ${p.kind}`);
+    // On the ground, in air, inside the keep, one a tile.
+    if (z.get(x, y, p.z) || !z.get(x, y, p.z - 1) || x < R.edgeKeep || y < R.edgeKeep || x >= w - R.edgeKeep || y >= d - R.edgeKeep || propTiles.has(x + y * w))
+      fail(`${at}: the ${p.kind} at (${x}, ${y}, ${p.z}) is inside ${z.get(x, y, p.z)}, floats, sits by an edge or shares its tile`);
+    propTiles.add(x + y * w);
+  }
+  // Over-marking: a column marked local really differs from the world function's (rock, sub-ground, ground, water),
+  // away from a site's footprint (marked whole by 2a) and from tree canopies (columnAt doesn't build trees).
+  const ox = z.wx * w, oy = z.wy * d, C = R.treeCell, treeNear = (x, y) => {
+    for (let cy = Math.floor((oy + y - 1) / C); cy <= Math.floor((oy + y + 1) / C); cy++)
+      for (let cx = Math.floor((ox + x - 1) / C); cx <= Math.floor((ox + x + 1) / C); cx++) {
+        const tr = W.treeAt(cx, cy);
+        if (tr && Math.abs(tr.gx - ox - x) <= 1 && Math.abs(tr.gy - oy - y) <= 1) return true;
+      }
+    return false;
+  };
+  for (let i = 0; i < w * d; i++) {
+    if (!g.local[i] || g.footprint[i] || g.plan[i]) continue;
+    const x = i % w, y = (i - x) / w;
+    if (treeNear(x, y)) continue;
+    const c = W.columnAt(ox + x, oy + y), top = FLOOR_Z - 1 + c.height;
+    let same = true;
+    for (let k = 0; k < z.h && same; k++) {
+      const want = c.water ? (k < FLOOR_Z - 1 ? B.ROCK : k === FLOOR_Z - 1 ? (c.water === 2 ? B.WATER_DEEP : B.WATER_SHALLOW) : 0)
+        : k < FLOOR_Z - 1 ? B.ROCK : k < top ? c.sub : k === top ? c.ground : 0;
+      same = z.get(x, y, k) === want;
+    }
+    out.localColumns++;
+    if (same) { out.overMarked++; fail(`${at}: (${x}, ${y}) is marked local but is the world function's column`); break; }
+  }
+  // Cliff tops (ground the map draws as wall): how many 3D reaches.
+  for (let i = 0; i < w * d; i++) if (g.cliff[i] && open[i] < 0 && z.stand[i] >= 0) { out.tops++; if (deep[i] >= 0) out.topsReached++; }
+  // 13. Sub-ground: a raised plain column (no feature of the zone's own) holds the biome's sub from the datum's layer up.
+  const sub = B[biomeFor({ terrains: TERRAINS }, t).sub] ?? B.ROCK;
+  for (let i = 0; i < w * d; i += 97) {
+    if (g.local[i] || z.stand[i] < FLOOR_Z + 2 || g.worldWater[i] || g.scenery[i]) continue;
+    const x = i % w, y = (i - x) / w;
+    if (z.get(x, y, FLOOR_Z - 1) !== sub || z.get(x, y, 0) !== B.ROCK) { fail(`${at}: (${x}, ${y}) is ${z.get(x, y, FLOOR_Z - 1)} at the datum's layer, want the sub-ground ${sub}`); break; }
+    out.sub++;
+  }
+}
+
+// --- 11, 12, 14. The builders, the tables, the legend, the Gnomon's foot ---------------------------------
+function builders(fail, out) {
+  const lacking = [...Object.entries(TERRAINS).filter(([id, T]) => !BIOME_BUILDERS[T.biome || id]).map(([id]) => id),
+                   ...Object.keys(TEST_TERRAINS).filter((id) => !TEST_BUILDERS[id]).map((id) => `test ${id}`)];
+  if (lacking.length) fail(`no builder for ${lacking.join(", ")}`);
+  for (const [id, bio] of Object.entries(BIOMES))
+    for (const [type] of bio.spawns || []) if (!CREATURE_TYPES[type]) fail(`biome ${id}: spawn key ${type} is no creature`);
+  // Every span you can be in has a species of its own level in its biome's table (no fallback to the nearest).
+  {
+    const world = buildRun(1, REAL_WORLD).world, gaps = new Map();
+    for (const t of world.tiles.filter((s) => s.edges === "open" || s.landmark)) {
+      const spawns = biomeFor(world, t).spawns || [];
+      if (!spawns.length) continue;
+      const ok = spawns.some(([type]) => { const T = CREATURE_TYPES[type], [lo, hi] = T?.levels || T?.depths || [1, 99]; return T && lo <= t.level && t.level <= hi; });
+      if (!ok) gaps.set(`${t.biome} level ${t.level}`, (gaps.get(`${t.biome} level ${t.level}`) || 0) + 1);
+    }
+    for (const [k, v] of gaps) fail(`no wildlife of ${k} (${v} spans)`);
+    out.levelSpans = world.tiles.length;
+  }
+  for (const [id, t] of Object.entries(WILDLIFE)) {
+    if (t.depths) fail(`wildlife ${id} has depths (it would join the dungeons' default pool)`);
+    if (!t.levels) fail(`wildlife ${id} has no levels`);
+  }
+  for (const [id, bio] of [...Object.entries(BIOMES), ["(default)", DEFAULT_BIOME]])
+    for (const [kind] of bio.props?.kinds || []) if (!PROPS[kind]) fail(`biome ${id}: prop ${kind} doesn't exist`);
+  for (const [id, p] of Object.entries(PROPS)) if (FAMILY_GLYPHS.includes(p.glyph)) fail(`prop ${id}'s glyph ${p.glyph} is a creature family's`);
+  // The test world: no wildlife.
+  {
+    const run = buildRun(7, TEST_WORLD);
+    let wild = 0, zones = 0;
+    for (const t of run.world.tiles.filter((s) => s.edges === "open").slice(0, 400).filter((_, k) => k % 10 === 0)) {
+      zones++;
+      wild += generateSurface(run, t.wx, t.wy).creatures.filter((c) => WILDLIFE[c.type]).length;
+    }
+    if (wild) fail(`the test world holds ${wild} wildlife over ${zones} zones`);
+  }
+  // 12. The legend.
+  const missing = WS2_LEGEND.filter((id) => !legendHandlers().includes(id));
+  if (missing.length) fail(`legend handlers not registered: ${missing.join(", ")}`);
+  {
+    const z = new Zone({ key: "0,0,0", wx: 0, wy: 0, z: 0, type: "surface", level: 4, tier: 2, seed: 99, ...SURFACE });
+    for (let y = 0; y < z.d; y++) for (let x = 0; x < z.w; x++) { z.set(x, y, 0, B.ROCK); z.set(x, y, FLOOR_Z - 1, B.GRASS); }
+    const plan = { id: "legendTest", rows: ["T.p.s.d.r.a.u.l.c"], legend: { T: "tree", p: "prop", s: "shallow", d: "deep", r: "road", a: "path", u: "rubble", l: "station", c: "creature" },
+                   props: { p: "bones" }, creatures: { c: "saltrat" }, wall: B.STONE };
+    stampPlan(z, plan, 10, 10, makeRng(5));
+    const col = (x, dz) => z.get(10 + x, 10, FLOOR_Z + dz);
+    const want = [
+      ["tree", col(0, 0) === B.TRUNK && col(0, 3) === B.TRUNK && z.get(11, 11, FLOOR_Z + 4) === B.LEAVES],
+      ["prop", z.props.some((p) => p.kind === "bones" && Math.floor(p.x) === 12)],
+      ["shallow", z.get(14, 10, FLOOR_Z - 1) === B.WATER_SHALLOW && z.get(14, 10, 0) === B.ROCK && !col(4, 0)],
+      ["deep", z.get(16, 10, FLOOR_Z - 1) === B.WATER_DEEP && z.get(16, 10, 0) === B.ROCK],
+      ["road", z.get(18, 10, FLOOR_Z - 1) === B.ROAD && !col(8, 0)],
+      ["path", z.get(20, 10, FLOOR_Z - 1) === B.DIRT],
+      ["rubble", col(12, 0) === B.ROCK && !col(12, 1)],
+      ["station", col(14, 0) === B.STONE && col(14, 1) === B.STONE && col(14, 2) === B.LAMP],
+      ["creature", z.creatures.some((c) => c.type === "saltrat" && c.tx === 26 && c.ty === 10)],
+    ];
+    for (const [id, ok] of want) if (!ok) fail(`legend "${id}" didn't build what it says`);
+    out.legend = want.length;
+  }
+  // Settlements hold no wildlife: every span of a settled landmark, on 5 seeds.
+  {
+    let spans = 0;
+    for (const seed of [1, 7, 42, 1234, 31337]) {
+      const run = buildRun(seed, REAL_WORLD);
+      for (const L of run.world.landmarks.values()) {
+        if (!SETTLED_KINDS.includes(L.kind)) continue;
+        for (const [wx, wy] of L.spans || [[L.wx, L.wy]]) {
+          spans++;
+          const wild = generateSurface(run, wx, wy).creatures.filter((c) => WILDLIFE[c.type]);
+          if (wild.length) fail(`seed ${seed}: ${L.name} (${wx}, ${wy}) holds ${wild.length} wildlife (${wild[0].type})`);
+        }
+      }
+    }
+    out.settled = spans;
+  }
+  // 14. The Gnomon's foot.
+  let feet = 0;
+  for (const seed of [1, 7, 42, 1234, 31337]) {
+    const run = buildRun(seed, REAL_WORLD), L = run.world.landmarks.get("gnomon"), z = generateSurface(run, L.wx, L.wy);
+    const cx = z.w >> 1, cy = z.d >> 1;
+    let solid = 0;
+    for (let k = FLOOR_Z; k < FLOOR_Z + 14; k++) if (z.get(cx, cy, k)) solid++;
+    if (solid !== 14 || z.problems.length) fail(`seed ${seed}: the Gnomon's foot is ${solid} blocks (want 14)${z.problems.length ? `; ${z.problems.join("; ")}` : ""}`);
+    else feet++;
+  }
+  out.builders = `${Object.keys(BIOME_BUILDERS).length} real biome builders, ${Object.keys(TEST_BUILDERS).length} test; ${Object.keys(WILDLIFE).length} wildlife types; ` +
+    `${WS2_LEGEND.length} legend handlers, ${out.legend} built right; the Gnomon's 14-block foot on ${feet} seeds; no wildlife in ${out.settled} settlement spans; ${out.sub} raised columns of their sub-ground`;
 }
 
 // tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser).

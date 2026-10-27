@@ -65,22 +65,24 @@ at most `RULES.surface.jumpSpots` a zone); zone-local clutter 2 tiles from open 
 2a's items still hold with the builders in; wildlife glyphs pass `check-creatures` (no reserved glyph, unique pairs);
 screenshots of three biomes in the browser (`?silent=1`, port 8652).
 
-## Public API (as of `p1-ws2a`)
+## Public API (as of `p1-ws2b`)
 
 ### `gen/terrain.js`: the world functions
 
 - `worldFns(world, seed) → W`, cached per world and seed (the last 4 seeds):
   - `W.heightAt(gx, gy) → int`: ground height above the datum (stand = `FLOOR_Z` + height), at most 12.
-  - `W.columnAt(gx, gy) → { height, cliff, tier, water, ground, near }`: `cliff` 1 on a cliff (≥ 5 up, a map wall),
+  - `W.columnAt(gx, gy) → { height, cliff, tier, water, ground, sub, near }`: `cliff` 1 on a cliff (≥ 5 up, a map wall),
     `tier` 1 or 2 (2: a mesa on a mesa, `content/biomes.js cliffTiers`), `water` 0 / 1 shallow / 2 deep (a river's
-    straight channel by an edge), `ground` the terrain's top block, `near` tiles to the nearest port channel or
+    straight channel by an edge), `ground` the terrain's top block, `sub` the biome's sub-ground (what a raised
+    column is made of from the datum's layer up; rock below that), `near` tiles to the nearest port channel or
     landmark footprint.
   - `W.treeAt(cx, cy) → { gx, gy, base, trunk } | null`: the tree of 3×3 world cell (cx, cy); its top leaf
     (`base + trunk + 1`) stays under the zone's roof.
   - `W.portsOf(wx, wy)`, `W.channel(wx, wy, port)`: as below; a port's straight approach in world coordinates.
   - `W.liquidOf(wx, wy) → liquid id`: the span's river's liquid, else its biome's.
 - `heightAt(world, seed, gx, gy)`, `treeAt(world, seed, cx, cy)`: uncached.
-- `SURFACE_RULES`: the numbers (gen/surface.js re-exports them). `forgetWorldFns(world)`.
+- `SURFACE_RULES`: the numbers (gen/surface.js re-exports them), 2b's `siteMargin` 6, `jumpSpots` 2, `plateauRise` 2.
+  `forgetWorldFns(world)`.
 
 ### `gen/ports.js`
 
@@ -100,23 +102,55 @@ screenshots of three biomes in the browser (`?silent=1`, port 8652).
 ### `gen/surface.js`
 
 - `generateSurface(run, wx, wy) → Zone` (no bands built), `surfaceSteps(run, wx, wy)` (the same zone in stages, each
-  also building one of its world-function bands, leftovers a stage each), `validateSurface(zone) → string[]`,
-  `dungeonRectFor(entrance)`, `forgetWorld(world)` (drops world functions, ports and bands: call it when a world's
-  spans change in a run), and the re-exports above, `BIOME_BUILDERS`, `SITE_BUILDERS`.
+  also building one of its world-function bands, leftovers a stage each; 2b adds a "biome" stage), `validateSurface(zone)
+  → string[]`, `dungeonRectFor(entrance)`, `forgetWorld(world)` (drops world functions, ports and bands: call it when a
+  world's spans change in a run), `stampPlan(zone, plan, ox, oy, rng) → { spawn, keyPoints }` (a landmark plan through
+  `stampVault` with its `roof`, `wallHeight`, `props`, `creatures`, `rubble`, and its trees' canopies), and the
+  re-exports above, `BIOME_BUILDERS`, `TEST_BUILDERS`, `builderFor`, `SITE_BUILDERS`.
+- The order of a zone's make (2b): world layer, footprint, hub, rivers, roads, ground, the biome's clearings, trees,
+  **the biome's dressing** (`builderFor(world, tile)(ctx)`), the landmark's plan or its builder (`LANDMARK_BUILDERS`,
+  while it has no plan) or the site, the dungeon's sinkholes, the anchor, validation, and last **the wildlife**
+  (`populate`, on the map reach validation measured; none in a settlement's span, `SETTLED_KINDS`).
 - A surface zone has `zone.liquid` (one liquid per span), `zone.navigability` (the map's: ground the map draws as a
   wall, 4 or more up, isn't map ground), `zone.ground3d` (ground the map draws as wall: cliff tops, which only 3D can reach and only by a way up a
   builder makes: 2a's own features make none, though a landmark plan may, Kettle Mesa's on seed 1), and `zone.gen.local` (a
   `Uint8Array` w·d: the columns the zone's own features changed from the world functions, which an apron built from
-  them doesn't show; not saved).
+  them doesn't show; not saved). 2b adds to `zone.gen` (not saved): `planned` (faces of 2 or more that are meant:
+  ramps, plateaus, posts; validation's step count skips them), `jump` (a plateau's top: 3D's ground, counted in
+  `zone.ground3d`), `footprint` (a site's rect and skirt), and the lists `plateaus` `[{ x, y, w, d, z, stone, reward }]`,
+  `ramps` `[{ top, foot, steps }]`, `caches` `[{ x, y, z }]`, `ponds` `[{ x, y, r }]`.
+- What a dressed zone holds beyond 2a's: `zone.props` (`[{ x, y, z, kind }]`, kinds of `content/biomes.js PROPS`; saved
+  since P0, drawn once request 7 is in), wildlife in `zone.creatures` (types of `content/creatures/wildlife.js`), rewards
+  in `zone.items` (`surfaceReward`), and `zone.planWalls` for the dressing's posts, outcrops, spires and crags (walls on
+  the map however low; saved since P0).
+
+### `gen/biomes/`
+
+- `index.js`: `BIOME_BUILDERS` (the 14 real biomes), `TEST_BUILDERS` (the test world's 6 terrains: the plain dressing),
+  `builderFor(world, tile)`, `LANDMARK_BUILDERS` (re-exported from `landmarks.js`); importing it registers the wildlife
+  and WS2's legend handlers.
+- `common.js`: `withHelpers(ctx)` (the writers: `column`, `pool`, `put`, `carve`, `reserve`, `reserved`, `addProp`,
+  `placeItem`, `placeCreature`, `free`, `freeRect`, `occupy`; one `set()` marks a column local only when it changes),
+  `dress(ctx, data)` (ponds, ramps, plateaus, rocks, lights, props), `populate(ctx, dist)`, `spawnPick(rng, spawns,
+  level)`, `surfaceReward(rng, level)` and `CRYSTAL_SHARE`, and the parts of `dress` for a builder's own use. Its header
+  says what ctx holds.
+- `legend.js`: the handlers `tree`, `prop`, `shallow`, `deep`, `road`, `path`, `rubble`, `station`, `creature`
+  (`WS2_LEGEND`; what each builds is in its header), `TREE_TRUNK`.
+- `landmarks.js`: `LANDMARK_BUILDERS.gnomon` (WS3 #10: the 14-block foot at the span's middle, the stairs south of it).
+- `<biome>.js`: one builder each.
 
 ### `content/biomes.js`
 
-- `BIOMES[biome] = { liquid, cliffTiers }` (2a's fields; 2b adds the builder's), `DEFAULT_BIOME`, `biomeOf(id)`,
+- `BIOMES[biome] = { liquid, cliffTiers, sub, rocks, ponds, props, lights, plateaus, ramps, caches, clearings, spawns,
+  wildlife }` (the file's header says what each is), `PROPS` (15 kinds: name, map glyph and colour, a small picture),
+  `SETTLED_KINDS`, `DEFAULT_BIOME` (the test world's: plain dressing, no wildlife), `biomeOf(id)`,
   `biomeFor(world, tile)` (what the world functions read: the tile's biome data when its terrain is the real world's,
   `content/world/terrains.js`, else the defaults, so the test world's fixture terrains, whose `flats` shares an id,
   keep plain water and single cliffs). A biome id is a terrain's `biome`, else its id.
 
 ## Integration requests
+
+(1-6 are 2a's; 7-11 are 2b's.)
 
 1. **`save/codec.js` (WS9's, or the integrator's at the merge): save `zone.liquid`.** It isn't in the codec's `AFTER`
    list, so a surface zone read back from the save holds plain water (`liquidAt` falls back to `"water"`): the Brine
@@ -143,59 +177,55 @@ screenshots of three biomes in the browser (`?silent=1`, port 8652).
 6. **Information**: the world model's `elev` (per-span elevation 0-3) is not read: the map draws ground 4 or more blocks
    up as wall (`world.js computeKinds`), so an elevated span would be a sea of walls on the map. All the height the
    map can show is the relief (≤ 3); cliffs and mesas are walls on the map and ground in 3D.
+7. **WS3 / the integrator (`render3d.js`, `renderMap.js`): draw `zone.props`.** Props are non-blocking sprites the
+   dressing places (shrubs, reeds, glimseed, bones, salt blooms, ferns, mushrooms, scrap, glass and crystal shards, ash
+   drifts, ink stains, webs, nests): `zone.props = [{ x, y, z, kind }]` (saved since P0), looks in
+   `content/biomes.js PROPS[kind] = { name, glyph, color, art, palette }` (`art`/`palette` in the creatures' pixel
+   format, one picture; `glyph`/`color` the map's, webs `-` and nests `°` as bible §15.7 gives them, the rest letters no
+   registry entry uses). In 3D a billboard like an item's sprite, lit by `sampleLight`; on the map the glyph under items
+   and creatures; the map legend (`,`) and the inspect describer could name them (`PROPS[kind].name`). Until then they
+   are invisible (nothing else changes: they block nothing).
+8. **Information for the integrator (the merge)**: `tests/checks/edges.js` now checks a border tile the map draws as
+   wall (a cliff top, which ramps let the anchor reach) for the 3D arrival only (the map never stands there; walking off
+   it is a drop, and `zones.js edgeArrival` keeps your exact point). The staged make (`surfaceSteps`) has one more stage
+   ("biome"): `browser-gate` shows 8 prefetch frames where it showed 7. Surface zones of the real world now hold wildlife
+   (hostile under factions.js's stub; at integration their `factions` are WS6a's ids: saltbeasts, rustbacks, kites,
+   pleatwood, sporeMoot, assize, plan, unlit, clatter, errata, askew, all in `content/factions.js` on `integration`).
+   The test world's zones gain the plain dressing (rocks, props, an occasional plateau with its reward) and no wildlife.
+9. **C1 (landmark plans)**: a plan may use WS2's legend letters through `legend: { ch: id }`, with `props: { ch: kind }`,
+   `creatures: { ch: type }` and `rubble: block id` on the plan (`gen/biomes/legend.js` says what each builds); a
+   landmark with a plan no longer gets `LANDMARK_BUILDERS` (the Gnomon's plan must stand its own 14-block foot at the
+   span's middle, (40, 24), where render3d starts the needle). The biome's dressing keeps off a landmark's footprint and
+   skirt, and off a per-run site's.
+10. **C3 and the balance phase (wildlife)**: 36 species carry the parent's traits only; bible §12's hooks (a brine-grub's
+   tunnel shown as `;`, a ledgehorn's 2-block climb, a kite's nest, a salt mirage seen only in 3D, a tile mimic that
+   moves only while you're in 3D…) are C3's, as are the spawn keys' people and machines and the water's creatures
+   (docs/sessions/ws2.md Part 2b §3). d20: no species has `dv` or attributes yet (combat.js reads `t.dv`, 0 if absent);
+   their hit points and damage are the parent's analogues' at the zone's level (+6% HP a level, +1 damage per 4).
+   `content/biomes.js` `wildlife` counts and `spawns` weights are first numbers.
+11. **WS1 (encounters)**: `BIOMES[biome].spawns` are bible §15.2's spawn keys as registered types with weights, and
+   `gen/biomes/common.js spawnPick(rng, spawns, level)` picks one by level; an encounter table may read them.
 
 ## Handoff
 
-**For WS2b** (written at `p1-ws2a`). Branch `ws/ws2` in the worktree `gnomon-wt/ws2`; 2a is tagged `p1-ws2a` and its
-numbers are in `docs/sessions/ws2.md` "Part 2a". Nothing is half finished. The integrator merges `p1-ws2a` on its
-own (the requests above); 2b tags `p1-ws2b` on the same branch.
+**For the integrator** (written at `p1-ws2b`). Branch `ws/ws2` in the worktree `gnomon-wt/ws2`; WS2 is done: 2a tagged
+`p1-ws2a`, 2b `p1-ws2b`, numbers in `docs/sessions/ws2.md` "Part 2a" and "Part 2b". Nothing is half finished. Merge
+`p1-ws2b` (it contains `p1-ws2a`); requests 1-3 and 7 are code for others' files, 4-6 and 8-11 are information.
 
-**The exact next step:** call the biome builders. `gen/surface.js buildSurface` doesn't call `BIOME_BUILDERS` yet:
-give it a step after the trees (6) and before the plan (7), `BIOME_BUILDERS[tile.biome]?.(ctx)`, with §1.4's ctx
-(`run, zone, tile, rng, level, heightAt(x, y), groundZ(x, y), reserve, reserved, carve, placeCreature, placeItem,
-ports, margin`) built from what `buildSurface` already holds (`H`, `water`, `road`, `reserved`, `plan`, `scenery`,
-`local`, `hub`, `keep`). Then the builders, one file each in `gen/biomes/`, with their data in `content/biomes.js`
-(keep `liquid` and `cliffTiers` there; add the rest beside them).
-
-**What a builder must keep, or a check fails:**
-- Draw only from `ctx.rng` (R6; `check-determinism`, `check-surface`'s "twice the same").
-- Keep 2 tiles from open edges (`keep(x, y)`; `check-edges` rule e) and per-run sites 6.
-- Mark every column it changes in `zone.gen.local`, or `check-surface`'s apron comparison fails there (it compares
-  every voxel of 16-deep bands with the neighbour's blocks outside that mask). Not marking is caught; marking too
-  much isn't, so mark only what you change (the check reports how many left-out columns really differ: all of them
-  in 2a).
-- Ponds: at the datum, on rock, in `zone.liquid` (the span's one liquid; a river's span keeps the river's).
-  `validateSurface` fails water off the datum or without rock under it.
-- Navigability is the map's: ground 4 or more blocks up is a map wall (`world.js computeKinds`), not map ground.
-  Anything a builder raises to 4 or more is a wall on the map. Unplanned 2-block steps are capped at 4 a zone:
-  give `validateSurface`'s step counter a `gen.planned` mask for the plateaus' and ramps' faces (as it skips
-  `g.cliff` and `g.plan`).
-
-**Open items for 2b:**
-- **A way up the cliffs.** Cliff tops (5 up, the Rust Steps' mesas 10) have no way up in either view:
-  `zone.ground3d` counts them, about 14 columns a zone on average. The bible's Steps ("ledges and sheer drops",
-  "houses cut into a mesa's ledges … joined by ladders and ramps", "the map shows one layer, 3D shows four")
-  want ramps or climbs, 2 tiles from edges, marked local and planned. On the map a ramp ends at a wall (height
-  4), so a mesa top is 3D-only ground: one of the views mattering.
-- **The 3D-only plateaus** (§5.3 item 8): 2 blocks up, a jump, a reward each, at most `jumpSpots` a zone (there is no
-  `RULES.surface`; put the number in `SURFACE_RULES`, gen/terrain.js).
-- **Legend handlers** (§5.4): `tree`, `prop`, `shallow`, `deep`, `road`, `path`, `rubble`, `station`, `creature`
-  through `registerLegend` (gen/vaults.js; it throws on a duplicate).
-- **WS3 #10**, the Gnomon's 14-block voxel foot at span (37, 3), if C1's plan for it doesn't come first (render3d starts
-  the needle on whatever stands at the span's middle). 14 blocks is scenery's ceiling (DECISIONS).
-- **Wildlife**: `content/creatures/wildlife.js`, registered with `creatures.js registerCreatures` (say from
-  `gen/biomes/index.js`, which `gen/surface.js` imports); glyphs by bible §15.7 (`check-creatures`).
-- `check-landmarks` for the real world's landmarks × 5 seeds once they have plans (C1's), and screenshots of three
-  biomes (`node tools/serve.mjs 8652`, `?silent=1`).
+**At the merge, rerun:** `check-surface` (alone with `--budget` for the timing), `check-edges`, `check-landmarks`,
+`check-creatures` (the wildlife against every creature on `integration`: WS7's villagers and WS10's legends came after
+this branch), `check-imports`, `check-determinism`, golden and the legacy fights; `browser-gate` (the prefetch's 8
+frames) and `browser-0d1` (the outdoor frame with dressed zones). Known conflicts: none in WS2's own files; `gen/vaults.js`
+legend ids don't collide (`registerLegend` would throw at load).
 
 **Things worth knowing:**
-- The map can't show height: ground 4 or more up is a wall glyph, so per-span elevation (`tile.elev`) is unread, and
-  any raised feature is a wall on the map.
-- World-function bands are kept (`gen/apron.js`, 64): a band is shared by every zone fill, so never write into one.
-  `forgetWorld(world)` drops all kept state (world functions, ports, bands).
-- Timing on this machine: other workstreams and the user's training job share the CPU. `check-perf`'s
-  `gen.surface.max` is one sample and swings 130-290 ms at `p0-done` itself. For a fair comparison time both trees in
-  one process, span by span in alternating order (`docs/sessions/ws2.md` "Part 2a" says how), with
-  `git archive p0-done` unpacked in the scratchpad.
+- The map can't show height: ground 4 or more up is a wall glyph. That is what makes ramps' tops, cliff caches and
+  plateaus 3D's alone; the map shows the reward and can't reach it. The Tessellate's mosaics are the other way round:
+  vivid on the map, faded at eye level.
+- A builder must write through ctx (`gen/biomes/common.js`): only inside the keep, marking local only what changes (check-
+  surface fails a column marked local that is the world function's, and any change not marked), water at the datum on
+  rock, a 2-step only where planned. Rewards come from `surfaceReward` (crystals 3%, never glim or a relic).
+- Timing on this machine: the CPU is shared and often at 100%; compare trees in one process, span by span alternating
+  (`docs/sessions/ws2.md` Part 2b §2 item 8 says how). Lamps cost about 1 ms each at every refresh: keep them few.
 - A worktree made from `p0-done` carries DECISIONS' older "Browser checks" text naming Python's server: use
   `node tools/serve.mjs <port>`.

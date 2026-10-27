@@ -3,7 +3,7 @@
 //
 //   worldFns(world, seed) → W           the world functions of one run, cached (the last few seeds)
 //     W.heightAt(gx, gy) → int          ground height in blocks above the datum (stand = FLOOR_Z + height)
-//     W.columnAt(gx, gy) → { height, cliff, tier, water, ground, near }   the same with what made it
+//     W.columnAt(gx, gy) → { height, cliff, tier, water, ground, sub, near }   the same with what made it
 //     W.treeAt(cx, cy) → tree | null    the tree of 3×3-tile world cell (cx, cy): { gx, gy, base, trunk }
 //     W.portsOf(wx, wy) → [port]        where roads and rivers cross the span's open edges (gen/ports.js)
 //     W.channel(wx, wy, port) → rect    a port's straight approach in world coordinates
@@ -40,6 +40,10 @@
 // Clamping with distances keeps every step at most 1 block, the property the slope rule needs. Last, no
 // ground stands more than 12 blocks above the datum (DECISIONS: heights).
 //
+// A column is rock below the datum's layer, the biome's sub-ground (content/biomes.js `sub`: the Rust Steps'
+// red clay, the Lattice's crystal) from that layer up to the ground block on top, so a cliff or a hill shows
+// its biome's stuff in 3D. Both the zone and the apron build it from the span alone (columnAt `sub`).
+//
 // A tree's trunk is 4-5 blocks with a 3×3 canopy on top; on high ground it is shorter, so its top leaf stays
 // in the zone's 16 blocks (scenery at most 14 above the datum, DECISIONS), and none grows where that leaves
 // under 3. No world tile's span carries an elevation of its own (the world model's `elev`): ground 4 blocks up
@@ -65,6 +69,9 @@ export const SURFACE_RULES = {
   treeCell: 3,        // tiles: one tree candidate per 3×3-tile world cell
   treeClear: 3,       // tiles: no tree this close to a port's channel
   edgeKeep: 2,        // tiles: zone-local features keep this far from open edges (§5.1 e)
+  siteMargin: 6,      // tiles: per-run sites keep this far from every edge (§5.4)
+  jumpSpots: 2,       // at most this many 3D-only plateaus a zone (§5.3 item 8; there is no RULES.surface)
+  plateauRise: 2,     // blocks a plateau stands above everything round it: the map's step (1) can't reach it
   maxStand: 12,       // standable ground at most 12 blocks above the datum (DECISIONS: heights)
   minNav: 0.9,        // at least 90% of the ground in one piece, under the map's step rules
   maxSteps: 4,        // unplanned 2-block steps allowed
@@ -98,12 +105,14 @@ function makeWorldFns(world, seed) {
   const sRelief = seedFor(seed, "relief") | 0, sCliff = seedFor(seed, "cliffs") | 0;
   // Per-span terrain parameters (spans off the map take the nearest one's).
   const n = WW * WH, relief = new Float64Array(n), cliffs = new Float64Array(n), trees = new Float64Array(n);
-  const stacked = new Float64Array(n), ground = new Uint8Array(n);
+  const stacked = new Float64Array(n), ground = new Uint8Array(n), sub = new Uint8Array(n);
   for (const t of world.tiles) {
     const T = world.terrains[t.terrain] || {}, i = t.wx + t.wy * WW;
     relief[i] = T.relief ?? 0.3; cliffs[i] = T.cliffs ?? 0; trees[i] = T.trees ?? 0;
-    stacked[i] = biomeFor(world, t).cliffTiers >= 2 ? cliffs[i] : 0;
+    const bio = biomeFor(world, t);
+    stacked[i] = bio.cliffTiers >= 2 ? cliffs[i] : 0;
     ground[i] = B[T.ground] ?? B.GRASS;
+    sub[i] = B[bio.sub] ?? B.ROCK;
   }
   const spanIndex = (tx, ty) => clampInt(tx, 0, WW - 1) + clampInt(ty, 0, WH - 1) * WW;
   // Bilinear blend of a per-span value between the four nearest span centres.
@@ -190,8 +199,9 @@ function makeWorldFns(world, seed) {
     }
     const height = Math.min(R.maxStand, Math.max(0, Math.floor(raw + 0.5)));
     const isCliff = cliff > 0 && height >= R.cliffRise;
+    const si = spanIndex(wx, wy);
     return { height: water ? 0 : height, cliff: isCliff ? 1 : 0, tier: isCliff ? tier : 0, water,
-             ground: ground[spanIndex(wx, wy)], near };
+             ground: ground[si], sub: sub[si], near };
   }
 
   // The tree of world cell (cx, cy), or null. The trunk sits somewhere in the cell's 3×3 tiles; the

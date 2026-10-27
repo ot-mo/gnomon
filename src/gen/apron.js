@@ -10,7 +10,8 @@
 //
 // One band of zone.apron (world.js apronRect gives its place). With the neighbour zone in memory (neighbour,
 // the span that way) the band is a copy of its blocks, so you walk onto exactly the ground you will stand on;
-// without it, the band is built from the world functions: the ground of columnAt, the world's water, and every
+// without it, the band is built from the world functions: the ground of columnAt (rock, the biome's sub-ground
+// from the datum's layer up, its ground block on top), the world's water, and every
 // tree of treeAt. The neighbour's own features (its road's bends, a plan, a village) appear only once it is in
 // memory. The fourth argument (the neighbour zone) is 0A2's addition to §1.4 (0A2.md deviation 17).
 //
@@ -91,7 +92,7 @@ function worldBand(run, zone, side) {
         continue;
       }
       const top = FLOOR_Z - 1 + c.height;
-      for (let z = 0; z < top; z++) blocks[at(x, y, z)] = B.ROCK;
+      for (let z = 0; z < top; z++) blocks[at(x, y, z)] = z < FLOOR_Z - 1 ? B.ROCK : c.sub;
       blocks[at(x, y, top)] = c.ground;
     }
   // Trees whose canopy touches the band, built the way gen/surface.js buildTree builds them.

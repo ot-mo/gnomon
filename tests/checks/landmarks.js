@@ -12,8 +12,13 @@
 // 2. Navigability: 500 random spans you can be in (spread over the seeds) all validate, and each has at
 //    least 90% of its ground in one piece reachable from the anchor under the map's step rules. The
 //    numbers (lowest, mean, attempts, timing) are reported.
+// 3. The real world's landmarks (WS2b; bible §15.3): every span of every landmark validates on every seed, twice
+//    the same, named for its landmark, with the way down where it has a dungeon (zone.entrance a STAIRS block,
+//    reachable: a key point); their plans come in C1, and until then a landmark stands on its stub footprint
+//    (the Gnomon on its 14-block foot, check-surface).
 import { buildRun } from "../../src/world/run.js";
 import { TEST_WORLD } from "../../src/content/world/test-world.js";
+import { REAL_WORLD } from "../../src/content/world/worldmap.js";
 import { generateSurface, validateSurface, dungeonRectFor, SURFACE_RULES } from "../../src/gen/surface.js";
 import { siteWithDungeon, dungeonParams } from "../../src/world/zonegen.js";
 import { generateDungeonLevel, validateDungeonLevel } from "../../src/gen/dungeon.js";
@@ -94,6 +99,24 @@ export function checkLandmarks({ seeds = [1, 7, 42, 1234, 31337], tiles = 500 } 
     }
   }
 
+  // The real world's landmarks.
+  let realZones = 0, realRetried = 0;
+  for (const seed of seeds) {
+    const run = buildRun(seed, REAL_WORLD), world = run.world;
+    for (const L of world.landmarks.values())
+      for (const [wx, wy] of L.spans || [[L.wx, L.wy]]) {
+        const at = `real world seed ${seed} ${L.id} (${wx}, ${wy})`, z = generateSurface(run, wx, wy);
+        realZones++;
+        if (z.attempts > 1) realRetried++;
+        for (const p of z.problems) problems.push(`${at}: ${p}`);
+        expect(sameZone(z, generateSurface(run, wx, wy)), `${at}: two generations differ`);
+        expect(z.landmarkId === L.id && z.name === L.name, `${at}: the zone doesn't say it is ${L.name}`);
+        if (L.dungeon && wx === L.wx && wy === L.wy && !L.dungeon.legacy)
+          expect(z.entrance && z.get(z.entrance.x, z.entrance.y, FLOOR_Z - 1) === B.STAIRS && z.gen.keyPoints.some((k) => k.x === z.entrance.x && k.y === z.entrance.y),
+                 `${at}: no way down into ${L.dungeon.id}`);
+      }
+  }
+
   // Navigability on random spans.
   const navs = [], ms = [];
   let failed = 0, attempts = 0;
@@ -119,6 +142,7 @@ export function checkLandmarks({ seeds = [1, 7, 42, 1234, 31337], tiles = 500 } 
   }
   navs.sort((a, b) => a - b); ms.sort((a, b) => a - b);
   stats.landmarkZones = `${zones} (${retried} needed a retry), ruin levels ${levels}`;
+  stats.realLandmarks = `${realZones} zones (every span of ${REAL_WORLD.landmarks.length} landmarks × ${seeds.length} seeds), ${realRetried} needed a retry`;
   stats.spans = `${navs.length} (each a different span of its seed)`;
   stats.failed = failed;
   stats.navigability = { min: +(100 * navs[0]).toFixed(1), p5: +(100 * pct(navs, 0.05)).toFixed(1),

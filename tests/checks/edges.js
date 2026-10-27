@@ -22,7 +22,10 @@
 // lands in B within ±1 of your height and not shifted (zones.js arrivalPoint "edge"); and back from B.
 // The share of arrivals on the mirrored tile itself is reported, and the border tiles left out (not
 // reachable from A's anchor, or treetops). In 3D your exact point is kept: 2.5 blocks up in the air, and
-// half a tile past the far border along the edge (beside an open corner). With real = true, the real world's
+// half a tile past the far border along the edge (beside an open corner). A border tile the map draws as wall
+// (ground 4 or more up: a cliff top, which WS2b's ramps let the anchor reach) is 3D's alone: the map never
+// stands there, so only the 3D arrival is checked from it, the exact point kept when the mirrored tile is no
+// higher than a step (walking off a cliff top is a drop); counted as such. With real = true, the real world's
 // landmark spans are checked too (seed 42, rules (a)-(d) and arrival; its plans are still placeholders), and
 // `realPairs` random pairs of its spans with all the rules (seed 1234; WS2a: the Rust Steps' stacked mesas and
 // the other terrains the test world lacks).
@@ -33,6 +36,7 @@ import { generateSurface, worldFns, buildApronBand, SURFACE_RULES } from "../../
 import { arrivalPoint } from "../../src/zones.js";
 import { SIDES, SIDE_STEP, OPPOSITE, SITE_MARGIN } from "../../src/world/worldmodel.js";
 import { B, FLOOR_Z } from "../../src/world.js";
+import { KIND } from "../../src/blocks.js";
 import { PLAYER_STEP_UP } from "../../src/pathing.js";
 import { makeRng } from "../../src/rng.js";
 
@@ -48,14 +52,14 @@ const planWall = (zone, x, y) => !!zone.gen?.plan[x + y * zone.w] && !!zone.get(
 
 export function checkEdges({ seeds = [1, 42, 1234], pairs = 200, real = true, realPairs = 100 } = {}) {
   const problems = [], notes = [], stats = {};
-  const tally = { edges: 0, tiles: 0, crossings: 0, mirrored: 0, shifted: 0, exact: 0, skipUnreachable: 0, skipScenery: 0, trees: 0, ports: 0, apronTiles: 0, zones: 0 };
+  const tally = { edges: 0, tiles: 0, crossings: 0, mirrored: 0, shifted: 0, exact: 0, skipUnreachable: 0, skipScenery: 0, walls3d: 0, trees: 0, ports: 0, apronTiles: 0, zones: 0 };
   const t0 = performance.now();
   for (const seed of seeds) checkWorld(TEST_WORLD, seed, { pairs, landmarks: true, near: true }, problems, tally);
   if (real) checkWorld(REAL_WORLD, 42, { pairs: 0, landmarks: true, near: false }, problems, tally);
   if (real && realPairs) checkWorld(REAL_WORLD, 1234, { pairs: realPairs, landmarks: false, near: true }, problems, tally);
   stats.edges = `${tally.edges} edges (${tally.tiles} seam tiles) over ${tally.zones} zones; ${tally.ports} ports, ${tally.trees} trees across an edge`;
   stats.apron = `${tally.apronTiles} apron tiles next to a seam compared`;
-  stats.arrivals = `${tally.crossings} crossings, ${tally.shifted} shifted, ${(100 * tally.mirrored / Math.max(1, tally.crossings)).toFixed(1)}% on the mirrored tile; ${tally.exact} 3D points in the air or by a corner kept; border tiles left out: ${tally.skipUnreachable} the anchor can't reach, ${tally.skipScenery} treetops`;
+  stats.arrivals = `${tally.crossings} crossings, ${tally.shifted} shifted, ${(100 * tally.mirrored / Math.max(1, tally.crossings)).toFixed(1)}% on the mirrored tile; ${tally.exact} 3D points in the air or by a corner kept (${tally.walls3d} from cliff tops only 3D stands on); border tiles left out: ${tally.skipUnreachable} the anchor can't reach, ${tally.skipScenery} treetops`;
   stats.seconds = ((performance.now() - t0) / 1000).toFixed(1);
   return { name: "edges", ok: problems.length === 0, problems, stats, notes };
 }
@@ -219,16 +223,21 @@ function checkSeam(run, W, A, Bz, side, at, near, problems, tally) {
       // exclusion stays visible.
       if (reach[i] < 0) { tally.skipUnreachable++; continue; }
       if (from.gen?.scenery[i]) { tally.skipScenery++; continue; }
-      const arr = arrivalPoint(to, "edge", { side: leave, along: k, fromStand: s });
-      tally.crossings++;
       const [mx, my] = toTile(k);
-      const onMirror = Math.floor(arr.x) === mx && Math.floor(arr.y) === my;
-      if (onMirror) tally.mirrored++;
-      if (arr.shifted) { tally.shifted++; fail("arrival", `${from.key} → ${to.key} at ${k}: shifted to (${Math.floor(arr.x)}, ${Math.floor(arr.y)})`); }
-      else if (Math.abs(arr.z - s) > 1) fail("arrival", `${from.key} → ${to.key} at ${k}: height ${arr.z} from ${s}`);
+      if (from.kind[i] === KIND.WALL) {   // a cliff top: 3D's alone (no map step starts here)
+        if (to.stand[mx + my * to.w] < 0 || to.stand[mx + my * to.w] > s + 1) continue;   // a wall you can't walk into
+        tally.walls3d++;
+      } else {
+        const arr = arrivalPoint(to, "edge", { side: leave, along: k, fromStand: s });
+        tally.crossings++;
+        const onMirror = Math.floor(arr.x) === mx && Math.floor(arr.y) === my;
+        if (onMirror) tally.mirrored++;
+        if (arr.shifted) { tally.shifted++; fail("arrival", `${from.key} → ${to.key} at ${k}: shifted to (${Math.floor(arr.x)}, ${Math.floor(arr.y)})`); }
+        else if (Math.abs(arr.z - s) > 1) fail("arrival", `${from.key} → ${to.key} at ${k}: height ${arr.z} from ${s}`);
+        if (!onMirror || Math.abs(arr.z - s) > 1) continue;
+      }
       // 3D (§5.1, no camera pop): your exact point is kept, also 2.5 blocks up in the air (a jump), and at
       // the ends of the edge also half a tile past the far border along it (crossing next to an open corner).
-      if (!onMirror || Math.abs(arr.z - s) > 1) continue;
       const acrossX = leave === "e" || leave === "w";
       const off = k === 0 ? -0.4 : k === len - 1 ? 1.4 : 0.6;
       const exact = acrossX ? { x: mx + 0.3, y: my + off, z: s + 2.5 } : { x: mx + off, y: my + 0.3, z: s + 2.5 };
