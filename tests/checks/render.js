@@ -16,7 +16,8 @@
 //   3. The dark-only rules by the clock (not setDaylight): on a sky-lit field with your torch out a ghost plank
 //      is not drawn at noon and is at midnight (never with the torch lit); runes don't glow at noon and do at
 //      midnight; with the torch out at night the auto-map marks only what lamps light, by day much more, in 3D
-//      and on the map (refreshView); the Shade is dark by day.
+//      and on the map (refreshView); the Shade is dark by day. Creatures see you by the same light (WS8's
+//      creatures.sees): a goblin sees you at noon from 0.7 of its sight, at midnight with your torch out it doesn't.
 //   4. The edge clamp: on open ground the light at a zone's border is the light inside.
 //   5. The baked sun: behind a wall (from the sun) the voxels are in shade and the open ones in sun; the 08:00
 //      sun (east-south-east) throws an east-west wall's shadow north, the 16:00 one (north-north-east) south;
@@ -313,6 +314,22 @@ export async function checkRender(m) {
     let lateSeen = 0; for (let i = 0; i < late.seen.length; i++) lateSeen += late.seen[i];
     expect(lateSeen <= 9, `a zone entered at midnight, the map looking before any frame: ${lateSeen} columns seen (want the 3 × 3 around you)`);
     seen.enteredAtNight = lateSeen;
+    // Daylight perception (TECH_DESIGN §8.3's dependency table, "WS3 daylight perception": WS8's creatures.sees asks
+    // light.inDark at your eyes): on open ground with your torch out, a goblin 0.7 of its sight away sees you at noon,
+    // not at midnight (the dark takes its sight to 0.55), and does again once your torch is lit.
+    if (creatures.sees) {
+      zones.enterZone(game, lit, { how: "start" }); stand(10.5, 10.5);
+      const range = creatures.CREATURE_TYPES.goblin.sight;
+      const gob = creatures.addCreature(lit, creatures.spawnCreature("goblin", 17, 10, FLOOR_Z, { rng: () => 0.5, level: 1, state: "idle" }));
+      Object.assign(gob, { x: 10.5 + 0.7 * range, y: 10.5 });
+      const seesAt = (h, torch) => { game.time = T(h); p().torch = torch; p().torchBurn = 0; return creatures.sees(game, gob, p()); };
+      const perceived = { noon: seesAt(12, false), midnight: seesAt(24, false), midnightTorch: seesAt(24, true), dusk: seesAt(18.5, false) };
+      lit.creatures.splice(lit.creatures.indexOf(gob), 1);
+      game.time = T(12); p().torch = false;
+      expect(perceived.noon && !perceived.midnight && perceived.midnightTorch,
+        `a goblin ${(0.7 * range).toFixed(1)} tiles off, you on open ground: sees you ${JSON.stringify(perceived)} (want at noon, not at midnight with the torch out, and with it lit)`);
+      stats.perceived = perceived;
+    }
     stats.dark = { plank: drawn, runeGlowCells: { noon: runeNoon, midnight: runeNight }, seen };
   }
 
