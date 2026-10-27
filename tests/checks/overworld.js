@@ -6,8 +6,8 @@
 //   1. walk        a random walk of 10⁴ steps a world (drop: false, so it stays on the map): no crash; every step
 //                  legal, never onto a travel "no" span; hours as the data and the night rule give them; the lost
 //                  chance of every step as the data gives it (terrain × 2 at night, 0 along roads and rivers), and
-//                  per terrain (≥ 500 rolls) the lost rate and the encounter rate within ±2 points of the chances
-//                  rolled; the time passed is exactly the hours' seconds (R10); no zone made or entered, and the
+//                  per terrain (topped up by steps back and forth onto it to 40,000·q(1 − q) rolls, so ±2 points are 4
+//                  standard deviations) the lost rate and the encounter rate within ±2 points of the chances rolled; the time passed is exactly the hours' seconds (R10); no zone made or entered, and the
 //                  zone you left untouched (no zone simulation while travelling)
 //   2. fast        200 fast-travel paths a world over a random half of the spans visited: every step legal and
 //                  along a road or river or onto a visited span, never a travel "no" span; a path exists exactly
@@ -93,24 +93,15 @@ function walk(G, name, world, steps, problems, walkSeed = 0) {
   const rng = makeRng((name === "test" ? 77 : 78) + walkSeed);
   const per = {}, kinds = {};
   let seconds = 0, refused = 0, badHours = 0, badChance = 0, onNo = 0, prompts = 0, travellers = 0, t0 = game.time, hours = 0;
-  for (let k = 0; k < steps; k++) {
+  // One step (dx, dy) from where you are, checked against the data and counted.
+  const take = (dx, dy, k) => {
     const from = { wx: game.trip.wx, wy: game.trip.wy };
-    // Now and then a step that isn't allowed: refused, nothing passes.
-    const [ax, ay] = DIRS[Math.floor(rng() * 8)];
-    if (canStep(W, from, ax, ay)) {
-      const t = game.time, r = worldStep(game, ax, ay, { confirm: true, drop: false });
-      if (r.ok || game.time !== t || game.trip.wx !== from.wx || game.trip.wy !== from.wy) problems.push(`${name} walk: a refused step (${ax}, ${ay}) from (${from.wx}, ${from.wy}) moved you or passed time`);
-      refused++;
-    }
-    const legal = DIRS.filter(([dx, dy]) => !canStep(W, from, dx, dy));
-    if (!legal.length) { problems.push(`${name} walk: stuck at (${from.wx}, ${from.wy})`); break; }
-    const [dx, dy] = legal[Math.floor(rng() * legal.length)];
     const to = { wx: from.wx + dx, wy: from.wy + dy }, t = W.tileAt(to.wx, to.wy), e = edgeBetween(W, from, to);
     const nightBefore = isNight(game);
     let want = t.travel === "drop" ? (W.tileAt(from.wx, from.wy).travelHours ?? O.roadHours) * O.dropHours : e.road ? O.roadHours : t.travelHours;
     if (!e.road && nightBefore) want *= O.nightHours;
     const r = worldStep(game, dx, dy, { confirm: true, drop: false });
-    if (!r.ok) { problems.push(`${name} walk: step ${k} (${dx}, ${dy}) from (${from.wx}, ${from.wy}) refused: ${r.why}`); break; }
+    if (!r.ok) { problems.push(`${name} walk: step ${k} (${dx}, ${dy}) from (${from.wx}, ${from.wy}) refused: ${r.why}`); return false; }
     if (t.travel === "no") onNo++;
     if (!near(r.hours, want)) badHours++;
     hours += r.hours; seconds += r.seconds;
@@ -126,7 +117,50 @@ function walk(G, name, world, steps, problems, walkSeed = 0) {
     if (r.encounter) kinds[r.encounter.kind] = (kinds[r.encounter.kind] || 0) + 1;
     if (r.encounter?.kind === "travellers") travellers++;
     if (game.trip.prompt) { prompts++; answer(game, false); }
-    if (game.mode === "dead") { problems.push(`${name} walk: died on the road at step ${k}`); break; }
+    if (game.mode === "dead") { problems.push(`${name} walk: died on the road at step ${k}`); return false; }
+    return true;
+  };
+  for (let k = 0; k < steps; k++) {
+    const from = { wx: game.trip.wx, wy: game.trip.wy };
+    // Now and then a step that isn't allowed: refused, nothing passes.
+    const [ax, ay] = DIRS[Math.floor(rng() * 8)];
+    if (canStep(W, from, ax, ay)) {
+      const t = game.time, r = worldStep(game, ax, ay, { confirm: true, drop: false });
+      if (r.ok || game.time !== t || game.trip.wx !== from.wx || game.trip.wy !== from.wy) problems.push(`${name} walk: a refused step (${ax}, ${ay}) from (${from.wx}, ${from.wy}) moved you or passed time`);
+      refused++;
+    }
+    const legal = DIRS.filter(([dx, dy]) => !canStep(W, from, dx, dy));
+    if (!legal.length) { problems.push(`${name} walk: stuck at (${from.wx}, ${from.wy})`); break; }
+    const [dx, dy] = legal[Math.floor(rng() * legal.length)];
+    if (!take(dx, dy, k)) break;
+  }
+  // Enough rolls on every terrain for ±2 points to mean something: n ≥ 40,000 · q(1 − q) for its lost chance and its
+  // encounter chance (q from the data, the night's share counted in), so 2 points are 4 standard deviations and the
+  // check doesn't fail by chance. A terrain the walk met fewer times is topped up by steps back and forth between
+  // one of its spans and a neighbour (in the stats).
+  const enough = (terrain) => {
+    const u = W.tiles.find((v) => v.terrain === terrain && v.travel === "yes") || W.tiles.find((v) => v.terrain === terrain);
+    const v = (q) => Math.min(0.25, q * (1 - q));
+    return Math.ceil(40000 * Math.max(v(Math.min(1, (u?.lostChance || 0) * 1.5)), v(Math.min(1, (u?.encounterRate || 0) * 1.25))));
+  };
+  const has = (terrain) => Math.min(per[terrain]?.n || 0, per[terrain]?.encN || 0);
+  const topped = {};
+  for (const terrain of new Set(W.tiles.filter((u) => u.travel !== "no").map((u) => u.terrain))) {
+    const need = enough(terrain);
+    if (has(terrain) >= need) continue;
+    let pair = null;
+    for (const u of W.tiles) {
+      if (u.terrain !== terrain || u.travel === "no" || u.travel === "drop") continue;
+      const v = W.neighbours(u.wx, u.wy).find((v) => W.tileAt(v.wx, v.wy).travel === "yes" && !canStep(W, v, u.wx - v.wx, u.wy - v.wy) && !canStep(W, u, v.wx - u.wx, v.wy - u.wy));
+      if (v) { pair = [u, v]; break; }
+    }
+    if (!pair) continue;   // (a drop terrain: no roll is made onto it)
+    const [u, v] = pair, n0 = per[terrain]?.n || 0;
+    game.trip.wx = v.wx; game.trip.wy = v.wy;   // (stood beside it, as the walk would have)
+    for (let k = 0; k < need && has(terrain) < need; k++) {
+      if (!take(u.wx - v.wx, u.wy - v.wy, `top-up ${k}`) || !take(v.wx - u.wx, v.wy - u.wy, `top-up ${k}`)) break;
+    }
+    topped[terrain] = `${n0} → ${per[terrain]?.n || 0} (${need} wanted)`;
   }
   offEnter();
   if (onNo) problems.push(`${name} walk: ${onNo} steps onto travel "no" spans`);
@@ -137,21 +171,21 @@ function walk(G, name, world, steps, problems, walkSeed = 0) {
   if (enters || game.zones.size !== zonesBefore || game.zone !== left) problems.push(`${name} walk: zones made or entered on the map (${enters} entries, ${game.zones.size - zonesBefore} made)`);
   const after = left.creatures.map((c) => `${c.id}:${c.x},${c.y},${c.hp}`).join("|");
   if (after !== before) problems.push(`${name} walk: the zone you left changed while you travelled`);
-  // The rates: per terrain with 500 rolls or more, within ±2 points of the chances rolled.
+  // The rates: per terrain (enough rolls each, after the top-ups), within ±2 points of the chances rolled.
   const rates = {};
   let encN = 0, enc = 0, expEnc = 0;
   for (const [terrain, s] of Object.entries(per)) {
     encN += s.encN; enc += s.enc; expEnc += s.expEnc;
     rates[terrain] = { n: s.n, lost: +(s.lost / s.n).toFixed(4), want: +(s.expLost / s.n).toFixed(4), data: s.data,
                        enc: +(s.enc / Math.max(1, s.encN)).toFixed(4), wantEnc: +(s.expEnc / Math.max(1, s.encN)).toFixed(4) };
-    if (s.n < 500) continue;
+    if (Math.min(s.n, s.encN) < enough(terrain)) { problems.push(`${name} walk: only ${s.n} rolls onto ${terrain}, ${enough(terrain)} wanted`); continue; }
     if (Math.abs(s.lost - s.expLost) / s.n > 0.02) problems.push(`${name} walk: lost in ${terrain} ${rates[terrain].lost}, the data says ${rates[terrain].want} (n ${s.n})`);
     if (Math.abs(s.enc - s.expEnc) / s.encN > 0.02) problems.push(`${name} walk: encounters in ${terrain} ${rates[terrain].enc}, the data says ${rates[terrain].wantEnc} (n ${s.encN})`);
   }
   if (Math.abs(enc - expEnc) / encN > 0.02) problems.push(`${name} walk: encounter rate ${(enc / encN).toFixed(4)}, the data says ${(expEnc / encN).toFixed(4)}`);
   void made; void madeBefore;
   return { steps, refused, hours: Math.round(hours), days: +(hours / 24).toFixed(1), encounterRate: +(enc / encN).toFixed(4), wantEncounter: +(expEnc / encN).toFixed(4),
-           kinds, prompts, travellers, terrains: rates };
+           kinds, prompts, travellers, topped, terrains: rates };
 }
 
 // --- 2. Fast travel --------------------------------------------------------------------------------------------
