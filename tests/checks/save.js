@@ -1282,13 +1282,26 @@ async function ws9Sections(ctx) {
     if (title.titleState().view !== "load" || !t.includes("seed 55") || !t.includes("seed 4242")) fail(`Load a save: ${t.replace(/\s+/g, " ").slice(0, 160)}`);
     key("KeyX", "x"); await tick(5);
     const exported = /Exported/.test(title.titleState().busy);
+    // Enter twice on the list: one load (the store holds its reads open a moment), and back on the title after it.
+    {
+      const loads = SAVE_STATS.loads, slow = { ...st, get: (s, k) => tick(20).then(() => st.get(s, k)) };
+      useStore(slow);
+      key("Enter"); key("Enter");
+      for (let k = 0; k < 100 && (game.mode === "title" || !game.zone); k++) await tick(5);
+      await tick(60);
+      const once = SAVE_STATS.loads - loads, err = title.titleState().error;
+      useStore(st);
+      if (once !== 1 || game.mode === "title" || err) fail(`Enter twice on Load a save: ${once} loads, mode ${game.mode}, error "${err}"`);
+      await title.openTitle(game);
+      pick("Load a save"); key("Enter");
+    }
     key("Delete"); const armed = text().includes("Delete again");
     key("ArrowDown"); const disarmed = !text().includes("Delete again");
     key("ArrowUp"); key("Delete"); key("Delete"); await tick(5); await tick(5);
     const left = (await listSlots({ store: st })).map((s) => s.seed);
     if (!exported || !armed || !disarmed || left.length !== 1) fail(`the Load list: exported ${exported}, armed ${armed}, disarmed by another key ${disarmed}, slots left ${left.join(" ")}`);
     key("Escape");
-    out.push(`the warnings (unclean twice, an older generator); Load a save: X exported, Delete once asked, another key kept it, twice deleted (seed ${left[0]} left)`);
+    out.push(`the warnings (unclean twice, an older generator); Load a save: X exported, Enter twice one load, Delete once asked, another key kept it, twice deleted (seed ${left[0]} left)`);
     // A slot as no export makes it (stored by hand: a character named 42, an unclean exit): the title still draws.
     {
       const odd = (await listSlots({ store: st }))[0];

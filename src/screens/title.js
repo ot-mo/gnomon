@@ -100,11 +100,14 @@ export function newGame(game, { seed = randomSeed(), mode = "oneWick" } = {}) {
   return game;
 }
 
+// One load at a time, however it was asked for (Enter, a digit, a click; the main menu or the Load list).
 function load(game, slot) {
+  if (menu.loading) return;
+  menu.loading = true;
   menu.busy = "Reading the save...";
   menu.error = "";
-  loadGame(slot.id, { game }).then(() => { menu.busy = ""; }, (e) => {
-    menu.busy = "";
+  loadGame(slot.id, { game }).then(() => { menu.busy = ""; menu.loading = false; }, (e) => {
+    menu.busy = ""; menu.loading = false;
     menu.error = e.code === "unclean" || e.code === "open" ? e.message : `That save couldn't be loaded: ${e.message}`;
     if (game.mode !== "title") setMode(game, "title", null, { pointer: false });
     refresh();
