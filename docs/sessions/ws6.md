@@ -278,3 +278,14 @@ The old game: run-all's golden (mechanics 86, frames 27, dungeons 95, 0 mismatch
 mismatched), legacy fights (map 1,359 steps, 3D 1,027, 0 differing), the bot (seeds 1234 and 7, both views),
 determinism, talk (2,406 service rows, 0 mismatched) and imports all PASS; `browser-0c` seeds 1234 and 7, and
 `browser-shell`, PASS (§2).
+
+## 6. The recheck and the tag
+
+- The coordinator agreed to integration request 1: `check-body`'s sample line (`4c35f3b`), and an assertion that a vial
+  never backs money (`9186378`).
+- `node tools/run-all.mjs` at `053549b`: **37 of 37** (133 s, 11 at a time). Timed ones in it: check-dungeons p95
+  26.6 ms; check-perf against `p0-0d1`: passTime ×0.90, mapStep ×0.97, refresh ×1.00, surface generation's max ×1.11
+  (139 ms, within 150), the outdoor frame over 17 ms in both trees (×0.98). Alone against `p0-done`: §3 (PASS twice).
+  No budget was loosened.
+- `browser-ws6` (1280×720, 600×330), `browser-0c` (seeds 1234 and 7) and `browser-shell` PASS on the fixed head (§2).
+- Tag `p1-ws6b` on `ws/ws6`, pushed. WS6 is done; the integrator merges it (`docs/ws6.md` "Handoff").
