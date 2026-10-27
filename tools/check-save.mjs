@@ -109,7 +109,7 @@ if (args.browser) {
       return connect.call(this, s, ...rest);
     };
   };
-  const problems = [], stats = {}, errors = [], notesB = [];
+  const problems = [], stats = {}, errors = [];
   const fail = (m) => problems.push(m);
   const browser = await chromium.launch();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gnomon-browser-"));
@@ -227,11 +227,12 @@ if (args.browser) {
     await press(page, "Escape");
     await page.bringToFront();
     await toLine(page, "import");
-    // (Headless Chromium once in three runs here didn't open the picker for the first Enter: one more try.)
-    let chooser = null, tries = 0;
-    for (; tries < 2 && !chooser; tries++) [chooser] = await Promise.all([page.waitForEvent("filechooser", { timeout: 5000 }).catch(() => null), press(page, "Enter")]);
-    if (!chooser) throw new Error("Import a save: no file picker for two presses of Enter");
-    if (tries > 1) notesB.push("the import's file picker opened on the second Enter");
+    // (The picker is watched for well before Enter: started in the same moment as the key, Playwright's watch sometimes
+    // wasn't on in time, one run in three.)
+    const picked = page.waitForEvent("filechooser", { timeout: 10000 });
+    await page.waitForTimeout(500);
+    await press(page, "Enter");
+    const chooser = await picked;
     await chooser.setFiles(file);
     await until(page, async (n) => (await (await import("/src/save/index.js")).listSlots()).length === n + 1, n0);
     const saved = JSON.parse(fs.readFileSync(file, "utf8"));
@@ -283,7 +284,7 @@ if (args.browser) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
   problems.push(...errors);
-  process.exit(report({ name: "save (browser)", ok: !problems.length, problems, stats, notes: notesB }));
+  process.exit(report({ name: "save (browser)", ok: !problems.length, problems, stats }));
 }
 
 // A child process of this tool, and its line starting with `tag`.
