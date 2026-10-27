@@ -17,7 +17,7 @@
 //   HOTBAR_KEYS                            1-9: player.hotbar's abilities (abilities.js useHotbar), both views
 import { keys, isLocked, lockPointer } from "../input.js";
 import { registerScreen, setMode, pushMode } from "../screens.js";
-import { bind, globalKey, dispatchKey, keyLabel } from "../keys.js";
+import { bind, globalKey, dispatchKey } from "../keys.js";
 import { at, hitLabel } from "../ui.js";
 import { changeZone, enterZone, zoneBelow, zoneAbove, dungeonOffset, tryWalkOff, ZONE_RULES } from "../zones.js";
 import { clampPitch, updatePlayer, takeImpact, hasFeatherFall, bonus, bodyCollides, RADIUS } from "../player.js";
@@ -400,10 +400,11 @@ bind("map", "KeyT", (game) => { if (throwAtNearest(game)) mapUseTime(game, THROW
 bind("map", "KeyF", (game) => { toggleTorch(game); refreshView(game); }, { help: "torch" });
 bind("map", "KeyR", (game) => { const t = swapWeapons(game); if (t) mapUseTime(game, t); }, { help: "swap weapons" });
 bind("map", HOTBAR_KEYS, (game, code) => { useHotbar(game, HOTBAR_KEYS.indexOf(code)); }, { help: "abilities (hotbar)" });
-// The legend beside the map (renderMap.js): shown by itself where it fits; G hides it, or shows it where it doesn't
-// (an 80-wide surface zone at 160 columns: the view then narrows and follows you). Its foot names the key.
-bind("map", "KeyG", (game) => { toggleMapLegend(game); }, { help: "map legend" });
-setLegendKeyHint(keyLabel("KeyG"));
+// The legend beside the map (renderMap.js): shown by itself where it fits; the comma hides it, or shows it where it
+// doesn't (an 80-wide surface zone at 160 columns: the view then narrows and follows you). Its foot names the key.
+// (TECH_DESIGN §4.3: G is WS5's pick-up; `,` is one of the keys kept for integration.)
+bind("map", "Comma", (game) => { toggleMapLegend(game); }, { help: "map legend" });
+setLegendKeyHint("comma");
 
 bind("explore", "Enter", (game) => { playerMelee(game); }, { when: canAct, help: "attack" });   // for when a mouse button isn't handy
 bind("explore", "KeyE", (game) => { interact(game); }, { when: canAct, help: "use / talk" });
