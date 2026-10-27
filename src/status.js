@@ -217,7 +217,7 @@ registerStatus("blinded", { color: [120, 120, 140], t: 10, hud: (s) => `BLIND ${
 // you move at RULES.drown.speed. A toggle: it ends when your feet leave deep water (updateDrowning), the same
 // rule in both views.
 export const airOf = (e) => RULES.drown.air * Math.max(0.1, 1 + bonus(e, "breath"));
-registerStatus("drowning", { color: [90, 150, 230], t: Infinity, cause: "drowning",
+registerStatus("drowning", { color: [90, 150, 230], t: 1e9, cause: "drowning",   // (until you surface; finite, so a save holds it: JSON has no Infinity)
   speed: RULES.drown.speed,
   tick(game, e, s, dt) {
     const air = airOf(e), per = 1 / RULES.drown.dps, before = s.acc;

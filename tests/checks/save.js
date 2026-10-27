@@ -43,7 +43,7 @@
 //   6. The title screen at 100×30, through the real input handlers: with nothing saved only "New quick game";
 //      with a slot "Continue" too; each by keys (Enter, ↓ Enter, 2) and by a click on its line; New starts a
 //      run at the intro, Continue loads the newest slot; M still switches the music there.
-import { canonicalJson, encodeZone, decodeZone, encodePlayer, jsonProblems, snapshotZone, trimCreature, CREATURE_FIELDS,
+import { canonicalJson, encodeZone, decodeZone, encodePlayer, decodePlayer, jsonProblems, snapshotZone, trimCreature, CREATURE_FIELDS,
          CODEC, DEFLATE_AVAILABLE, registerZoneField, packBytes, fromB64 } from "../../src/save/codec.js";
 import { memoryAdapter, idbAdapter } from "../../src/save/store.js";
 import { saveGame, loadGame, listSlots, deleteSlot, whenWritten, saveStatus, canSave, SAVE_RULES } from "../../src/save/save.js";
@@ -1787,6 +1787,12 @@ async function ws9Sections(ctx) {
     }
     if (under.length) fail(`no save is made under: ${under.join(", ")}`);
     out.push(`a save is made under char, abilities, examine, factions and journal`);
+    // A status that lasts until it is taken off (drowning: until you surface) comes back as it was: its t is finite
+    // (found at the WS9 merge: Infinity, which encodePlayer's JSON turned into null).
+    addStatusTo(game, game.player, "drowning");
+    const drownT = game.player.status.drowning?.t, backT = decodePlayer(encodePlayer(game.player)).status?.drowning?.t;
+    if (!(drownT > 0) || backT !== drownT) fail(`a drowning player's status: t ${drownT}, after a save ${backT}`);
+    out.push("a drowning player's status comes back whole");
     useStore(null);
     stats.phase1RoundTrip = out.join("; ");
   }
