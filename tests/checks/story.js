@@ -489,6 +489,21 @@ async function villages7b(env, { fail, stats, test, real, json, startRun, game }
     }
   }
   times.sort((a, b) => a - b);
+  // R6 between villages: with another village's site gone, a village keeps its culture, cast, art, government and
+  // abandonment (only what names a neighbour may change: a feud's text and hatred, a quest's target).
+  let pairs = 0;
+  for (let seed = 1; seed <= 6; seed++) {
+    const run = RUN.buildRun(seed, test), vs = [...run.sites.values()].filter((s) => s.kind === "village");
+    for (const gone of vs) {
+      const run2 = { ...run, sites: new Map([...run.sites].filter(([id]) => id !== gone.id)) };
+      for (const site of vs) {
+        if (site === gone) continue;
+        const keepK = (v) => json([v.culture, v.roles, v.history, v.government, v.abandoned, v.founding.map((f) => f.event), v.layout.rune]);
+        if (keepK(VIL.generateVillage(run2, site)) !== keepK(run.villages.get(site.id))) fail(`seed ${seed}: ${site.id} changed when ${gone.id} was taken away`);
+        pairs++;
+      }
+    }
+  }
   // No Math.random in the generation files (R6; check-determinism scans gen/ and world/, these are story/).
   for (const f of ["story/villages.js", "story/questplan.js", "story/village-site.js"]) {
     const text = await env.text(`src/${f}`);
@@ -496,7 +511,7 @@ async function villages7b(env, { fail, stats, test, real, json, startRun, game }
   }
   stats.villages = `${n} villages (test world ${counts.test}, real world ${counts.real}: no regions there before C1) on every village site of 20 seeds, ` +
     `${empty} abandoned; surfaces valid on ${attempts} attempts (p50 ${times[n >> 1]?.toFixed(1)} ms, max ${times[n - 1]?.toFixed(1)}); ${cast} villagers placed and reachable; ` +
-    `${maps} mosaic, ${lintels} lintel and ${runes} rune murals on their blocks; records alike made alone, ${twice} zones alike made twice; ` +
+    `${maps} mosaic, ${lintels} lintel and ${runes} rune murals on their blocks; records alike made alone and in ${pairs} pairs with another village taken away, ${twice} zones alike made twice; ` +
     `styles ${[...seen.styles].join(", ")}; shrines ${[...seen.shrines].join(", ")}; ${seen.templates.size} of 9 templates drawn`;
 
   // In play: a village of the test world with a rune, by the inspect paths.
@@ -616,6 +631,7 @@ async function quests7b(env, { fail, stats, test, json, startRun, game }) {
       const q = journal && game.quests.find((x) => x.id === VQ.villageQuestId(siteId));
       if (!q) throw new Error("not started");
       const s0 = q.stage;
+      if (/\{\w+\}/.test(q.title + q.text) || /\bat ([^,.]+), at \1\b/.test(q.text) || /\bOur the\b|[.!?] [a-z]/.test(q.text)) throw new Error(`the words: "${q.title}" / "${q.text}"`);
       events.emit(game, "secret", { id: "nothing", kind: "gossip" });
       events.emit(game, "inspect", { zone: game.zone, x: 1, y: 1, z: 2, open: true });
       tick();
@@ -631,6 +647,13 @@ async function quests7b(env, { fail, stats, test, json, startRun, game }) {
         }
         p.x = its[0].x; p.y = its[0].y; p.z = its[0].z;
         items.pickUpItems(game); tick();
+        if (q.stage !== "return") throw new Error(`the thing in the pack: stage ${q.stage}`);
+        // Dropped on the way back: fetching again, and no turn-in for it.
+        const held = p.inv.find((i) => i.uid === prm.itemUid);
+        p.inv = p.inv.filter((i) => i !== held); tick();
+        events.emit(game, "quest:turnIn", { q });
+        if (q.stage !== "fetch" || q.done) throw new Error(`the thing dropped: stage ${q.stage}, done ${q.done}`);
+        p.inv.push(held); tick();
       } else if (T === "carry") {
         enter(prm.target.key);
         const o = opt(who(prm.toUid), /bring word/);
@@ -648,12 +671,22 @@ async function quests7b(env, { fail, stats, test, json, startRun, game }) {
         game.view = s.view === "map" ? "map" : "3d"; game.mode = game.view === "map" ? "map" : "explore";
         p.torch = s.view !== "dark";
         if (s.view === "dark") game.time += 15 * 60;   // 21:00: night
+        events.emit(game, "inspect", { zone: z, x: s.x + 3, y: s.y + 2, z: s.z, open: true });
+        if (q.stage !== "pray") throw new Error("prayed at the wrong tile");
         events.emit(game, "inspect", { zone: z, x: s.x, y: s.y, z: s.z, open: true });
         game.view = "map"; game.mode = "map"; p.torch = true;
-      } else if (T === "find") enter(prm.target.key);
+      } else if (T === "find") {
+        const off = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [site.at.wx + dx, site.at.wy + dy])
+          .find(([x, y]) => run.world.tileAt(x, y)?.edges === "open" && `${x},${y},0` !== prm.target.key);
+        if (off) { enter(`${off[0]},${off[1]},0`); if (q.stage !== "go") throw new Error("another span found the place"); }
+        enter(prm.target.key);
+      }
       else if (T === "hunt") {
         const z = enter(prm.target.key), b = who(prm.beastUid);
         if (!b) throw new Error("no beast");
+        const decoy = (await env.src("creatures.js")).addCreature(z, (await env.src("creatures.js")).spawnCreature("rat", b.tx, b.ty, b.z, { rng: () => 0.5, level: 1 }));
+        mon.killMonster(game, decoy, "dies");
+        if (q.stage !== "hunt") throw new Error("another kill ended the hunt");
         mon.killMonster(game, b, "dies");
         if (zones.uidWhere(game, prm.beastUid) !== "dead") throw new Error("the beast's uid isn't dead");
         enter(home); enter(prm.target.key);
@@ -666,9 +699,20 @@ async function quests7b(env, { fail, stats, test, json, startRun, game }) {
         if (who(prm.lostUid) || zones.uidWhere(game, prm.lostUid) !== home) throw new Error("the lost one didn't leave for home");
       } else if (T === "chart") {
         const z = enter(prm.target.key);
+        z.seen.fill(0);
+        const { KIND } = await env.src("blocks.js");
+        // The goal: percent%, or 5 under what can be walked to (or stood beside) from where you came in.
+        if (!(q.vars.chartable > 0 && q.vars.chartable <= 100)) throw new Error(`the level's chartable share: ${q.vars.chartable}`);
+        const goal = Math.max(1, Math.min(prm.percent, q.vars.chartable - 5));
+        const open = []; for (let i = 0; i < z.w * z.d; i++) if (z.kind[i] !== KIND.WALL) open.push(i);
+        for (const i of open.slice(0, Math.floor(open.length * (goal - 1) / 100))) z.seen[i] = 1;   // (mapPercent rounds)
+        tick();
+        if (q.stage !== "chart") throw new Error(`under ${goal}% charted ended it`);
         z.seen.fill(1); tick();
       }
       if (q.stage !== "return") throw new Error(`stage ${q.stage}`);
+      events.emit(game, "quest:turnIn", { q: { ...q } });   // someone else's turn-in
+      if (q.done) throw new Error("another quest's turn-in finished it");
       enter(home);
       if (T === "rescue" && !who(prm.lostUid)) throw new Error("the lost one isn't home (the patch to the visited village)");
       const f0 = p.funds || 0, x0 = xpOf(p), r0 = F.repOf(game, v.factionId), inv0 = p.inv.length;
