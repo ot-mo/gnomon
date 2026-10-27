@@ -217,45 +217,50 @@ campaign.js) and `zone:prepare` (villagequests.js); the creature types of `conte
 
 ## Handoff
 
-**For WS7b (villages, quests, campaign), in this worktree on `ws/ws7`, from tag `p1-ws7a`.** 7a is done and tagged;
-nothing is half finished. `docs/sessions/ws7.md` "Part 7a" has the numbers; "Part 7b" is yours.
+**For the integrator, merging `p1-ws7b`** (on `ws/ws7`, above `p1-ws7a`; WS7 is done). Nothing is half finished. Gate
+numbers, deviations and the verification: `docs/sessions/ws7.md` "Part 7a" and "Part 7b". run-all at `f90753c`:
+37 of 37; `check-perf --against p0-done --rounds 2` alone: PASS.
 
-**Start:** `node tools/run-all.mjs` (37 of 37 at the tag; `check-perf` and the 50 ms history timing can read over
-under the user's training job: rerun alone, `check-perf --against p0-done`). Serve on 8647 (`node tools/serve.mjs
-8647`), `?silent=1`, close every tab and stop the server after.
+**If `p1-ws7a` isn't merged yet,** its Handoff items still stand: requests 1-8 (1 and 1b are P0 checks changed with
+the coordinator's approval, marked `// WS7`; 2 and 8 are frozen files).
 
-**What 7b builds on (7a's API above):**
-- `generateVillage(run, site)` (still P0's fixture record) and `makeVillages`: draw only from `runRng(run,
-  "villages")`. A village's `history: [eventId]` and `layout.murals: [eventId]` take ids from `run.history` (on the
-  test world, the fixture's five events). Its murals are `zone.murals` entries `{ x, y, z, view: "map", text:
-  e.text.gospel, secret: "hist:<eventId>:flat" }` laid by `SITE_BUILDERS.village` (a mosaic: set the floor block to a
-  `B.MOSAIC_*` under it; a 3- or 5-wide tablet reads from its edges too); a relief is `view: "3d"` with
-  `e.text.inscription` on a wall cell at `FLOOR_Z + 1`; bible §8.5: a Gloss too (`view: "dark"`) if one of the
-  village's events was cruel (`e.disagree`). They are learned through `inspect` with nothing more to do.
-- Village secrets: add `village:<siteId>:<n>` defs in `story/secrets.js makeSecrets` (kind `"village"`, a `reading`,
-  `value`, `text`); `learnSecret` files them; the journal has no Villages tab yet (the Locations tab or a new one).
-- Villagers (`content/creatures/villagers.js`): `talk: { dialogue, gossip: true }` turns on gossip; `c.faction` picks
-  rumours about Hours that faction feels for; `c.readings` (secret ids) for WS6b's "ask for a reading"
-  (`learnSecret(game, id, "ritual")`); leaders `named: true`, `c.opinions`, `c.teaches` (HANDOFF's WS6b #5/#6).
-- Quests: `startQuest(game, templateId, { id, title, text, vars, giver, target })` takes an instance id now; the
-  template `visit` exists (secrets.js: done on `zone:enter` at the span or `world:step` to it). ≥ 7 templates in
-  `content/quests.js`, one with its target in an already-visited zone (zone patches and uids); quest rep through
-  WS6a's `addRep(game, id, n, "quest")` (+100 village, +25 each faction that likes it), XP through WS4's
-  `gainXp(game, xpReward("quest", level), { source })` at the merge (HANDOFF "Carried integration requests", WS7).
-- Bible §8.7's Hour quests: learning an account that names a site or a relic could start *Visit* or *Recover*
-  (7a starts Visit only for location secrets; triangulation reveals a site's place or a relic's floor in Notes).
-- The campaign hooks (intro pages, start, main beats as data) are `story/campaign.js` (still a STUB; keep it in
-  `tests/checks/imports.js` FROZEN's shape).
+**7b's requests (above, 9-18), by what they change in play:**
+- **9** `run.js`'s factions step registers `villageFaction(v)` (a village under `bent` or `peoples`; until then it is
+  registered on entering, which is enough for attitude and rep).
+- **10** WS6a #1, mortal villagers: the types carry `hp`; your `spawnCreature` change gives it to the talker.
+- **11** `game.js startRun` opens `introPages(game.run)` (the same INTRO object on the test world).
+- **12** `items.js` emits `pickup` (the fetch quests also notice the pack on `clock:tick`, so nothing breaks without it).
+- **13** WS1's discovery XP should skip villages: their first visit pays here (source `"village"`).
+- **14** WS4 #11: quest, beat and village XP already go through `leveling.xpReward` by namespace import; the four powers
+  waiting on WS7 can lose their `needs`.
+- **15** WS6b: leaders are `named` with `readings`, `opinions`, `teaches`; villagers' dialogues are WS6a's ROLES. With
+  `social/builders.js` merged, its role dialogues replace the proverb fallback by themselves (they load first).
+- **16** content: Grey members in holy places, §9.4's heights, the dish and the shrine's rewards.
+- **17** the dependency table: after the merge, check a pray quest at a relief shrine by WS8's L in 3D, and one at a
+  rune shrine at night with the torch out (WS3's day and night); on this branch only a mosaic shrine's prayer works in
+  play.
+- **18** optional: `tests/checks/determinism.js` could scan the three new generation files.
 
-**Carried to 7b (HANDOFF):** WS6a #6 (village factions `parent: "bent" | "peoples"`, `bentVillages` second membership,
-Grey members hostile in holy places), WS6a #1 (villager types with `hp`; the integrator wires WS8's side), WS6b #5/#6
-(above), WS4 #11 (quest XP; the powers Hour script, Gossip, Triangulator, Vey's script).
+**Files outside §8.4's WS7 list:** none. `story/villagequests.js`, `story/village-site.js`, `story/questplan.js` and
+`story/campaign.js` are in `story/*`. No P0 check, fixture or recorded frame changed in 7b.
 
-**Surprises:**
-- Shell `sed`/node one-liners with backslashes inside template literals mangle them on this machine; the Edit tool is
-  safer. Files checked out by git here have CRLF in the working copy: normalise (`split("\r\n").join("\n")`) before
-  matching multi-line text.
-- `inDark` is always false with the torch lit, so a light test needs the torch out.
-- A text's uniqueness matters: a mural is matched to its account by text when it has no `secret`.
-- `tests/checks/hud.js` pins the map's describers exactly (`murals` is in it now); a new describer needs the
-  coordinator.
+**At the merge:**
+- **`story/index.js` registers `SITE_BUILDERS.village`.** WS10's `world/sites.js` registers every other kind, and
+  never `village`, so they join cleanly.
+- **The village builder assumes P0's 24 × 16 footprint** (`SITE_SHAPES.village`). If a later `placeSites` changes it,
+  `buildVillage` needs its slots moved.
+- **Rerun** check-story, check-social (WS6a's builders over the villagers, its witnesses on mortal villagers),
+  check-talk and check-determinism.
+- **Village sites appear on the real world** only once C1 gives it regions with a `sites.village` chance. Until then
+  check-story's 20 seeds are the test world's 152 villages.
+
+**Surprising:**
+- **The save codec keeps a whitelist of creature fields.** A new field on a creature needs `registerCreatureField`, or
+  a reload drops it silently (that was review #1).
+- **A dungeon level can be mostly unreachable** from where you come in (as little as 11% of its open tiles), so any
+  "map N%" goal must allow for it.
+- **Light:** `light.js daylight` is 1 at every hour on this branch, so the outdoors is never dark in Node before WS3.
+- **The pane:** the built-in browser pane throttles frames while it isn't focused (about 0.05 s of game time a second),
+  so a 0.5 s hover takes several real seconds there.
+- **Writing these files:** heredocs with apostrophes break in this shell tool. Python's `\b` and `\1` in a
+  non-raw string mangle regexes, so write them with the Write tool or a raw string.
