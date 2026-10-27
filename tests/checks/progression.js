@@ -929,8 +929,12 @@ export async function checkProgression(m) {
       st.invalidateStats(p);
       p.torch = false; step(1 / 60);
       if (!STS.hasStatus(p, "shaken") || st.bonus(p, "toHit") !== -2 || st.bonus(p, "dv") !== -1 || STS.hasStatus(p, "mobbed")) fail(`Dark-fear with the torch out: ${JSON.stringify(Object.keys(p.status))}, toHit ${st.bonus(p, "toHit")}, DV bonus ${st.bonus(p, "dv")}`);
+      // Through a long map action (5 s at once) Dark-fear holds: no frame runs inside it.
+      T.mapUseTime(game, 5);
+      if (!STS.hasStatus(p, "shaken") || st.bonus(p, "toHit") !== -2) fail(`Dark-fear after a 5 s map action: ${JSON.stringify(Object.keys(p.status))}, toHit ${st.bonus(p, "toHit")}`);
       p.torch = true; step(1 / 60);
       if (STS.hasStatus(p, "shaken") || !STS.hasStatus(p, "mobbed") || st.bonus(p, "stealth") !== -0.3) fail(`the torch lit: ${JSON.stringify(Object.keys(p.status))}, stealth ${st.bonus(p, "stealth")}`);
+      if (!m.pmut.lasting(p.status.mobbed) || JSON.stringify(codec.encodePlayer(p).status.mobbed) !== JSON.stringify(p.status.mobbed)) fail(`Moth-kissed's status doesn't last or doesn't save: ${JSON.stringify(p.status.mobbed)}`);
       // Lightsick: on the surface by day, 1 HP every 20 s; underground nothing.
       p.mutations = { lightsick: 1 }; st.invalidateStats(p);
       const s = game.run.world.start;
@@ -944,9 +948,32 @@ export async function checkProgression(m) {
       }
       step(1 / 60);
       const hp0 = p.hp, t0 = game.time, noRegen = rules.overrideRules("regen", { ...rules.RULES.regen, base: 1e9 });   // (regeneration would heal it back)
-      try { for (let k = 0; k < 400 && game.time - t0 < 60; k++) { T.mapWait(game); step(1 / 60); } } finally { noRegen(); }
-      if (sunny && hp0 - p.hp !== 3) fail(`Lightsick for 60 s on the surface: lost ${hp0 - p.hp} HP, want 3`);
-      out.defects = `shaken / mobbed by the torch; Lightsick on the surface: ${hp0 - p.hp} HP in ${Math.round(game.time - t0)} s${sunny ? "" : " (no sky here!)"}`;
+      // Played out by waits, skipped, and in 1-second map actions: the same 1 HP every 20 s (bible §13.5; TECH_DESIGN §2.7: a
+      // skip gives what playing the time out gives).
+      const lost = {};
+      try {
+        for (let k = 0; k < 400 && game.time - t0 < 60; k++) { T.mapWait(game); step(1 / 60); }
+        lost.waits = hp0 - p.hp;
+        let h = p.hp;
+        m.time.skipTime(game, 120, { interruptible: false });
+        lost.skip = h - p.hp; h = p.hp;
+        for (let k = 0; k < 60; k++) { T.mapUseTime(game, 1); step(1 / 60); }
+        lost.actions = h - p.hp; h = p.hp;
+        // 10 s in the sun, a long stretch under the temple's roof (no harm), 10 s more in the sun: the count carries over.
+        const sun = { x: p.x, y: p.y, z: p.z };
+        m.time.skipTime(game, 10, { interruptible: false });
+        Object.assign(p, game.zone.spawn, { x: game.zone.spawn.x + 0.5, y: game.zone.spawn.y + 0.5 });
+        const roofed = m.light.naturalLight(game, game.zone, p.x, p.y, p.z + 1.45) < 0.5;
+        m.time.skipTime(game, 90, { interruptible: false });
+        lost.shade = h - p.hp;
+        Object.assign(p, sun);
+        m.time.skipTime(game, 10, { interruptible: false });
+        lost.carried = h - p.hp - lost.shade;
+        if (roofed && lost.shade !== 0) fail(`Lightsick in the shade for 90 s: lost ${lost.shade} HP`);
+        if (roofed && lost.carried !== 1) fail(`Lightsick's count over a stretch of shade: 10 s + 10 s in the sun lost ${lost.carried} HP, want 1`);
+      } finally { noRegen(); }
+      if (sunny && (lost.waits !== 3 || lost.skip !== 6 || lost.actions !== 3)) fail(`Lightsick on the surface: ${JSON.stringify(lost)}, want 3 by waits (60 s), 6 by a 120 s skip, 3 by 60 actions of 1 s`);
+      out.defects = `shaken / mobbed by the torch, held through a 5 s action; Lightsick on the surface: ${JSON.stringify(lost)}${sunny ? "" : " (no sky here!)"}`;
       // Crooked Manner: −50 with every faction.
       C.beginRun(game, choicesFor("reedcutter", C.suggestSpread("bent", "reedcutter"), { mutations: ["crookedManner"] }), { seed: 4 });
       const reps = m.mutations.BIBLE_FACTIONS.map((f) => m.factions.repOf(game, f) - (BACKGROUNDS.reedcutter.rep[f] || 0));
@@ -1130,7 +1157,7 @@ export async function run(env) {
     implants: await src("content/items/implants.js"), mutations: await src("content/mutations.js"),
     pmut: await src("progression/mutations.js"), abilities: await src("abilities.js"), turns: await src("turns.js"),
     creatures: await src("creatures.js"), world: await src("world.js"), status: await src("status.js"), events: await src("events.js"),
-    factions: await src("factions.js"), charsheet: await src("screens/charsheet.js"), light: await src("light.js"),
+    factions: await src("factions.js"), charsheet: await src("screens/charsheet.js"), light: await src("light.js"), time: await src("time.js"),
     content: { ...genotypes, ...backgrounds, ...powers },
   });
 }

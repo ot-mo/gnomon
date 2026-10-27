@@ -28,7 +28,7 @@ import { MUTATIONS } from "../content/mutations.js";
 import { TREES } from "../content/powers.js";
 import { IMPLANTS } from "../content/items/implants.js";
 import { mutationOffers, offerRng, gainMutation, raiseMutation, canGain, canRaise, levelCap, mutationLevel, castOf,
-         wakeChance, isDefect } from "../progression/mutations.js";
+         wakeChance, isDefect, lasting } from "../progression/mutations.js";
 
 export const MODE = "char";
 const TABS = ["attributes", "track", "powers", "effects"];
@@ -228,7 +228,7 @@ function drawEffects(game, p, L, R) {
     if (r.status) {
       const def = STATUS_DEFS[r.status], s = p.status[r.status];
       S.text(x + 2, y, def.name.slice(0, rw - 10), ...(sel ? UI.sel : def.color));
-      S.text(x + rw - 7, y, Number.isFinite(s.t) ? `${Math.ceil(s.t)}s` : "", ...UI.dim);
+      S.text(x + rw - 7, y, Number.isFinite(s.t) && !lasting(s) ? `${Math.ceil(s.t)}s` : "", ...UI.dim);   // (a defect's lasts while its cause holds)
     } else {
       S.text(x + 2, y, `${ABILITIES[r.cooldown]?.name || r.cooldown} cools`.slice(0, rw - 10), ...(sel ? UI.sel : UI.dim));
       S.text(x + rw - 7, y, `${Math.ceil(p.cooldowns[r.cooldown])}s`, ...UI.dim);

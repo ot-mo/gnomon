@@ -35,8 +35,8 @@
 //     the cube's first turn and a forced flat aren't yours). game.state.cast = { turns, wakes: { zoneKey: [time] },
 //     pack: { zone, at, size, burnisher, great } | null } is saved with the state.
 //   - defects that come and go: Dark-fear "shaken" while your torch is out, Moth-kissed "mobbed" while it's lit,
-//     Lightsick "sunsick" under an open sky by day (1 HP every 20 s); each status lasts a second and is renewed
-//     while it holds.
+//     Lightsick "sunsick" (1 HP every 20 s you stand under an open sky by day, counted through map actions and skips);
+//     each status lasts until its cause goes (see "Defects that come and go" below).
 import { MUTATIONS, BIBLE_FACTIONS } from "../content/mutations.js";
 import { GENOTYPES } from "../content/genotypes.js";
 import { invalidateStats, mod, maxHp } from "../stats.js";
@@ -203,22 +203,36 @@ registerUpdate("mutations:turns", (game) => {
 }, { modes: ["play"] });
 
 // --- Defects that come and go ------------------------------------------------------------------------------------
-registerStatus("shaken", { color: [150, 130, 170], t: 1, bonus: () => ({ toHit: -2, dv: -1 }), hud: () => "SHAKEN" });
-registerStatus("mobbed", { color: [250, 240, 170], t: 1, bonus: () => ({ stealth: -0.3 }), hud: () => "MOTHS" });
-registerStatus("sunsick", { color: [255, 210, 120], t: 1, cause: "sunlight", period: () => RULES.mutations.sunsick.period,
-  hud: () => "SUNSICK" });
+// Their statuses last (LASTING: finite, so a save holds them; JSON has no Infinity) and the watch below puts them on
+// and takes them off as their cause comes and goes, so they hold through a long map action or a skip as through
+// frames. Dark-fear and Moth-kissed follow the torch (it can't change during a skip). Lightsick's stays on as long as
+// you have it and counts only while you stand in the sun: its tick runs in game time in both views, and skipTime steps
+// a status with a tick in short chunks with the clock moving (time.js), so a skip from day into dusk counts the day
+// part; the 20 s count carries over a stretch in the shade (stepping out of the sun doesn't start it again).
+const LASTING = 1e9;
+export const lasting = (s) => s.t >= LASTING / 2;
+registerStatus("shaken", { color: [150, 130, 170], t: LASTING, bonus: () => ({ toHit: -2, dv: -1 }), hud: () => "SHAKEN" });
+registerStatus("mobbed", { color: [250, 240, 170], t: LASTING, bonus: () => ({ stealth: -0.3 }), hud: () => "MOTHS" });
 const sunlit = (game, p) => !!game.zone?.hasSky && naturalLight(game, game.zone, p.x, p.y, p.z + 1.45) >= RULES.mutations.sunsick.light;
+registerStatus("sunsick", { color: [255, 210, 120], t: LASTING, cause: "sunlight",
+  hud: (s, game) => (game?.player && sunlit(game, game.player) ? "SUNSICK" : null),
+  tick(game, e, s, dt) {
+    if (!game || e !== game.player || !sunlit(game, e)) return;
+    const P = RULES.mutations.sunsick.period;
+    s.acc += dt;
+    while (s.acc >= P - 1e-9 && e.hp > 0 && game.mode !== "dead") { s.acc -= P; game.hurtPlayer(1, "sunlight", true); }
+  } });
 const DEFECT_WHEN = {
   shaken: (game, p) => !p.torch,
   mobbed: (game, p) => !!p.torch,
-  sunsick: sunlit,
+  sunsick: () => true,
 };
 export function watchDefects(game, p = game.player) {
   if (!p?.mutations) return;
   for (const id in p.mutations) {
     const status = MUTATIONS[id]?.status;
     if (!status) continue;
-    if (DEFECT_WHEN[status](game, p)) addStatus(game, p, status, { t: 1 });
+    if (DEFECT_WHEN[status](game, p)) { if (!hasStatus(p, status)) addStatus(game, p, status); }
     else if (hasStatus(p, status)) removeStatus(game, p, status);
   }
 }
