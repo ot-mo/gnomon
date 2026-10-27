@@ -105,6 +105,24 @@ export async function checkProgression(m) {
     }
     const plumb = { ...choicesFor("forgehandOfOrrum", C.suggestSpread("plumb", "forgehandOfOrrum")), mutations: ["x"] };
     if (!C.validateChoices(plumb).length) fail("validateChoices gave the Plumb a mutation");
+    // The Plumb's free implant: its Level's own (or none named: the same); nothing else while WS5's table is empty; with
+    // implants in the table, any costing at most 2, the background's own listed first.
+    const forge = choicesFor("forgehandOfOrrum", C.suggestSpread("plumb", "forgehandOfOrrum"));
+    for (const [implant, ok] of [[undefined, true], [null, true], ["truesteelKnuckles", true], ["tallyEye", false], ["noSuchImplant", false], [42, false], ["", false]]) {
+      const got = C.validateChoices({ ...forge, implant });
+      if (ok === !!got.length) fail(`validateChoices with implant ${JSON.stringify(implant)}: ${got.join("; ") || "taken"}`);
+      if (!ok && !got.some((x) => /free implant/.test(x))) fail(`implant ${JSON.stringify(implant)} refused for the wrong reason: ${got}`);
+    }
+    const IMPL = m.implants.IMPLANTS;
+    Object.assign(IMPL, { testEye: { name: "test eye", grade: 2, parts: ["face"] }, testHeavy: { name: "test heavy", grade: 3, parts: ["body"] },
+                          truesteelKnuckles: { name: "truesteel knuckles", grade: 1, parts: ["hands"] } });
+    try {
+      const free = C.freeImplants("forgehandOfOrrum");
+      if (free.join() !== "truesteelKnuckles,testEye") fail(`freeImplants with implants in the table: ${free}`);
+      if (C.validateChoices({ ...forge, implant: "testEye" }).length || !C.validateChoices({ ...forge, implant: "testHeavy" }).length)
+        fail("with implants in the table: a cost-2 implant refused, or a cost-3 one taken free");
+      if (C.freeImplants("archivistOfVey")[0] !== "tallyEye") fail(`an Archivist's free implants start ${C.freeImplants("archivistOfVey")[0]} (its own isn't in the table yet)`);
+    } finally { for (const id of ["testEye", "testHeavy", "truesteelKnuckles"]) delete IMPL[id]; }
     out.pointBuy = `${want.length} costs, ${refused + 1} wrong choices refused`;
   }
 
@@ -508,6 +526,7 @@ export async function run(env) {
     rules: await src("rules.js"), stats: await src("stats.js"), chargen: await src("progression/chargen.js"), leveling: await src("leveling.js"),
     levelup: await src("screens/levelup.js"), create: await src("screens/create.js"), keys: await src("keys.js"), screens: await src("screens.js"),
     codec: await src("save/codec.js"), rng: await src("rng.js"), items: await src("items.js"), playerMod: await src("player.js"),
+    implants: await src("content/items/implants.js"),
     content: { ...genotypes, ...backgrounds, ...powers },
   });
 }

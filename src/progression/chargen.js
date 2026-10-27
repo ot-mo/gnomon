@@ -11,6 +11,7 @@
 //                                      (progression/index.js), so nothing derived is baked in (R3): max HP, DV, AV
 //                                      and the rest come from stats.js under whichever formula set runs.
 //   validateChoices(choices) → [problem]   [] when makeCharacter will take them
+//   freeImplants(background) → ids     the implants a Plumb background may take free (its own first); implantCost(id)
 //   pointCost(genotype, score) → points    what a score costs from the genotype's base: 1 per +1 up to 18, then 2
 //   pointsSpent(genotype, attrs), pointsLeft(genotype, attrs)
 //   canRaise(genotype, attrs, k), canLower(genotype, attrs, k)   one step, within the base, the points and the cap of 22
@@ -102,12 +103,24 @@ export function validateChoices(c = {}) {
   if (muts.length && G.track !== "mutations") out.push(`${G.plural} take no mutations`);
   for (const id of muts) if (!MUTATIONS[id]) out.push(`no mutation ${id}`);
   if (c.implant != null && G.track !== "implants") out.push(`${G.plural} take no implants`);
+  else if (c.implant != null && bg && !freeImplants(c.background).includes(c.implant))
+    out.push(`${JSON.stringify(c.implant)} isn't a free implant for ${bg.name} (${freeImplants(c.background).join(", ") || "none"})`);
   const name = String(c.name ?? "").trim();
   if (!name) out.push("no name");
   else if ([...name].length > NAME_MAX) out.push(`the name is longer than ${NAME_MAX} letters`);
   if (!RUN_MODES.includes(c.mode)) out.push(`no run mode ${JSON.stringify(c.mode)} (${RUN_MODES.join(", ")})`);
   if (bg && bg.glim > (bg.purse || CURRENCY.startPurse)) out.push(`${bg.name}'s ${bg.glim} glim doesn't fit its purse`);
   return out;
+}
+
+// The implants a Plumb background may take free at creation (bible §10.3: one costing at most freeImplantCost): every
+// implant in WS5's table that cheap, its own first; until that table has its own, the one its Level sends it down with.
+export const implantCost = (id) => { const d = IMPLANTS[id]; return d ? d.grade ?? d.license ?? d.cost ?? 0 : Infinity; };
+export function freeImplants(background) {
+  const bg = BACKGROUNDS[background], max = GENOTYPES.plumb.freeImplantCost;
+  const ids = Object.keys(IMPLANTS).filter((id) => implantCost(id) <= max);
+  if (bg?.implant && !IMPLANTS[bg.implant]) return [bg.implant, ...ids];
+  return bg?.implant && ids.includes(bg.implant) ? [bg.implant, ...ids.filter((id) => id !== bg.implant)] : ids;
 }
 
 // --- The character ---------------------------------------------------------------------------------------------

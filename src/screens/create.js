@@ -32,7 +32,7 @@ import { TREES } from "../content/powers.js";
 import { FACTIONS } from "../factions.js";
 import { mutationOffers } from "../progression/mutations.js";
 import { RUN_MODES, NAME_MAX, beginRun, validateChoices, suggestSpread, suggestName, baseAttrs, pointsLeft,
-         canRaise, canLower } from "../progression/chargen.js";
+         canRaise, canLower, freeImplants } from "../progression/chargen.js";
 
 export const MODE = "create";
 
@@ -99,12 +99,7 @@ function offersFor(game) {
   const rng = makeRng(seedFor(wiz.seed, "creation", "mutations", wiz.mutations.length));
   return (mutationOffers(game, preview(game), rng) || []).filter((id) => MUTATIONS[id] && !wiz.mutations.includes(id));
 }
-function implantRows() {
-  const bg = BACKGROUNDS[wiz.background], max = GENOTYPES.plumb.freeImplantCost;
-  const ids = Object.keys(IMPLANTS).filter((id) => (IMPLANTS[id].grade ?? IMPLANTS[id].license ?? IMPLANTS[id].cost ?? 0) <= max);
-  if (!ids.length && bg?.implant) ids.push(bg.implant);   // until WS5's implants are in: the one your Level gives
-  return ids;
-}
+const implantRows = () => freeImplants(wiz.background);   // the one your Level gives first
 
 function rowsOf(game) {
   switch (stepId()) {
@@ -140,7 +135,7 @@ function leave(game) {
     }
     case "background": {
       const b = rows[sel];
-      if (b !== wiz.background) { wiz.background = b; wiz.attrs = suggestSpread(wiz.genotype, b); wiz.implant = null; wiz.reached = 1; }
+      if (b !== wiz.background) { wiz.background = b; wiz.attrs = suggestSpread(wiz.genotype, b); wiz.implant = null; wiz.lists.track.sel = 0; wiz.reached = 1; }
       return true;
     }
     case "attributes": {
