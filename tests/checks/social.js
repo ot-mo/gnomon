@@ -798,6 +798,22 @@ export async function run(env) {
     game.view = "map";
     if (!ritual.riteReady(game, ama, "tracing")) fail("the Tracing from 3 tiles away");
     Object.assign(ama, { x: p().x + 1, y: p().y });
+    // Not across a cliff (3 blocks up), not through a wall (a stone column between you, two tiles apart).
+    ama.z = p().z + 3;
+    if (!ritual.riteReady(game, ama, "tracing")) fail("the Tracing across a 3-block cliff");
+    ama.z = p().z;
+    {
+      const z = game.zone, wx = Math.floor(p().x) + 1, wy = Math.floor(p().y), z0 = Math.floor(p().z), saved = [];
+      for (let k = z0; k < Math.min(z.h, z0 + 4); k++) { saved.push(z.get(wx, wy, k)); z.set(wx, wy, k, world.B.STONE); }
+      Object.assign(ama, { x: p().x + 2, y: p().y });
+      game.view = "3d"; face(ama);
+      const lit = ritual.riteReady(game, ama, "lighting");
+      p().torch = false; const dark = ritual.riteReady(game, ama, "snuffing"); p().torch = true;
+      saved.forEach((b, k) => z.set(wx, wy, z0 + k, b));
+      if (!lit || !dark) fail(`through a stone wall: the Lighting ${lit ?? "ready"}, the Snuffing ${dark ?? "ready"}`);
+      if (ritual.riteReady(game, ama, "lighting")) fail(`the Lighting two tiles off with the wall gone: ${ritual.riteReady(game, ama, "lighting")}`);
+      Object.assign(ama, { x: p().x + 1, y: p().y });
+    }
     // In map view the talk option offers only the Tracing; in lit 3D only the Lighting.
     const riteOpts = () => (talk.talkTo(game, ama).options.find((o) => o.label === "Will you kindle with me?")?.go()?.options || []).map((o) => o.label).filter((l) => /^The /.test(l));
     game.view = "map"; const mapOpts = riteOpts().join();
@@ -1050,7 +1066,17 @@ export async function run(env) {
     p().inv = [{ kind: "vial", effect: "", count: 1 }];
     items.useItem(game, p(), p().inv[0]);
     if (!p().inv.some((i) => i.kind === "vial" && i.effect === "brine")) fail(`filling a vial beside brine: ${JSON.stringify(p().inv)}`);
-    z.set(x, y, wz, old); delete z.liquids;
+    z.set(x, y, wz, old);
+    // Water three blocks above your feet (a tank on a roof) is out of reach.
+    if (wz + 3 < z.h) {
+      const high = z.get(x, y, wz + 3);
+      z.set(x, y, wz + 3, world.B.WATER_SHALLOW);
+      p().inv = [{ kind: "vial", effect: "", count: 1 }];
+      items.useItem(game, p(), p().inv[0]);
+      if (p().inv[0]?.effect !== "") fail(`a vial filled from water 3 blocks up: ${JSON.stringify(p().inv)}`);
+      z.set(x, y, wz + 3, high);
+    } else fail(`no room above the start tile for the high water (feet at ${wz}, height ${z.h})`);
+    delete z.liquids;
     p().inv = [{ kind: "vial", effect: "", count: 1 }];
     if (items.useItem(game, p(), p().inv[0]) !== 0 || p().inv[0]?.effect !== "") fail("an empty vial filled with no water near");
     p().hp = 5;

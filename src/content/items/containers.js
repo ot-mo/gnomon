@@ -21,7 +21,8 @@ export const CONTAINERS = {
 const EMPTY_GLASS = [190, 205, 215];
 const liquidColor = (id) => liquidDef(id)?.color || EMPTY_GLASS;
 
-// Water within one tile of e, at any height: [x, y] of the nearest column, or null.
+// Water within one tile of e, from a block below its feet to its knees (not a pool at the foot of a cliff, nor a
+// tank on the roof): [x, y] of the nearest column, or null.
 function waterBeside(zone, e) {
   const x0 = Math.floor(e.x), y0 = Math.floor(e.y);
   let best = null;
@@ -29,7 +30,8 @@ function waterBeside(zone, e) {
     for (let dx = -1; dx <= 1; dx++) {
       const x = x0 + dx, y = y0 + dy;
       if (x < 0 || y < 0 || x >= zone.w || y >= zone.d) continue;
-      for (let z = 0; z < zone.h; z++) {
+      const feet = Math.floor(e.z);
+      for (let z = Math.max(0, feet - 1); z <= Math.min(zone.h - 1, feet); z++) {
         const b = zone.get(x, y, z);
         if (b === B.WATER_SHALLOW || b === B.WATER_DEEP) { if (!best || Math.abs(dx) + Math.abs(dy) < best.d) best = { x, y, d: Math.abs(dx) + Math.abs(dy) }; break; }
       }

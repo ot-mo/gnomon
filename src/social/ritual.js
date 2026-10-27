@@ -45,6 +45,7 @@ import { RULES, extendRules } from "../rules.js";
 import { on } from "../events.js";
 import { pushMode } from "../screens.js";
 import { inDark } from "../light.js";
+import { lineOfSight } from "../raycast.js";
 import { skipTime } from "../time.js";
 import { hasKey } from "../keyset.js";
 import { itemPrice, itemName, addToInventory, ITEM_KINDS, takeOne } from "../items.js";
@@ -119,25 +120,30 @@ const facing = (p, c) => {
 };
 const inkVial = (p) => (p.inv || []).find((it) => it.kind === "vial" && sameLiquid(it.effect, "ink"));
 
+// Each rite is done together: on one level (a step up or down at most) and in sight of each other, not through a
+// wall or across a cliff.
+const together = (game, p, c) => Math.abs((c.z || 0) - (p.z || 0)) <= 1 &&
+  lineOfSight(game.zone, p.x, p.y, p.z + 1.5, c.x, c.y, (c.z || 0) + 1.4);
+
 export function riteReady(game, c, rite) {
   const p = game.player, K = KINDLING;
   if (!ritesFor(c).includes(rite)) return `${FACTIONS[mainFaction(c)].name} don't take ${RITES[rite].name}.`;
   if (rite === "tracing") {
     if (game.view !== "map") return "The Tracing is drawn on the map.";
-    if (tileDist(p, c) > K.tracing.reach) return "Stand beside them to draw the line.";
+    if (tileDist(p, c) > K.tracing.reach || !together(game, p, c)) return "Stand beside them to draw the line.";
     if (!inkVial(p) && funds(p) < K.tracing.glim) return "You have neither ink nor glim to draw the line with.";
     return null;
   }
   if (game.view === "map") return `${cap(RITES[rite].name)} is done in the deep view, not on the map.`;
   if (rite === "lighting") {
     if (!p.torch) return "Your torch has to be lit.";
-    if (dist(p, c) > K.lighting.reach + 0.5) return "Come within two steps.";
+    if (dist(p, c) > K.lighting.reach + 0.5 || !together(game, p, c)) return "Come within two steps, where you can see each other.";
     if (!facing(p, c)) return "Face them.";
     return null;
   }
   if (p.torch) return "Your torch has to be out.";
   if (!inDark(game, game.zone, p.x, p.y, p.z + 0.5)) return "It has to be dark here.";
-  if (dist(p, c) > K.snuffing.reach + 0.5) return "Sit closer.";
+  if (dist(p, c) > K.snuffing.reach + 0.5 || !together(game, p, c)) return "Sit closer, on the same floor.";
   return null;
 }
 
