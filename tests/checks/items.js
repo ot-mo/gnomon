@@ -839,6 +839,19 @@ export function checkItems(m) {
       for (let k = 0; k < 6 && game.invFilter !== "potions"; k++) m.keys.dispatchKey(game, "KeyF", false, "f");
       t = text();
       if (game.invFilter !== "potions" || p.inv[game.invSel]?.kind !== "potion" || /dagger/.test(t.slice(0, t.indexOf("I close")))) fail(`${cols}×${rows}: the potions filter (${game.invFilter}) shows other things`);
+      // A click on a row under the filter selects that row's thing (the list's row index goes through the filter).
+      {
+        const shownIdx = p.inv.map((it, i) => (it.kind === "potion" ? i : -1)).filter((i) => i >= 0), want = shownIdx[3];
+        game.debug.draw();
+        let rowCell = null;   // (potions share names: find the list's 4th row by its hit rect, as a click would)
+        for (let y = 0; y < m.capture.rows && !rowCell; y++)
+          for (let x = 0; x < m.capture.cols && !rowCell; x++) { const h = m.ui.at({ x, y }); if (h?.list && h.index === 3) rowCell = { x, y }; }
+        if (!rowCell) fail(`${cols}×${rows}: no 4th row on the potions list to click`);
+        else {
+          m.inventory.inventoryClick(game, rowCell);
+          if (game.invSel !== want) fail(`${cols}×${rows}: a click on the potions list's 4th row selected pack index ${game.invSel}, want ${want}`);
+        }
+      }
       m.keys.dispatchKey(game, "KeyF", false, "f");
       while (game.invFilter !== "all") m.keys.dispatchKey(game, "KeyF", false, "f");
       // The Equipment tab.
@@ -964,7 +977,7 @@ export async function run(env) {
     load("events", "events.js"), load("renderMap", "renderMap.js"), load("interact", "interact.js"), load("talk", "talk.js"),
     load("currency", "currency.js"), load("creatures", "creatures.js"), load("world", "world.js"), load("rules", "rules.js"),
     load("status", "status.js"), load("abilities", "abilities.js"), load("codec", "save/codec.js"), load("rng", "rng.js"),
-    load("time", "time.js"), load("effects", "effects.js"), load("player", "player.js"), load("throwing", "throwing.js"),
+    load("time", "time.js"), load("effects", "effects.js"), load("player", "player.js"), load("throwing", "throwing.js"), load("ui", "ui.js"),
   ]);
   m.implantTable = (await env.src("content/items/implants.js")).IMPLANTS;
   m.artifactTable = (await env.src("content/items/artifacts.js")).ARTIFACTS;
