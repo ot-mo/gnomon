@@ -1,6 +1,6 @@
 // Everything drawn on top of the view: status bar, messages, crosshair, sword, overlays.
 import * as S from "./screen.js";
-import { sampleLight } from "./light.js";
+import { sampleLight, daylight } from "./light.js";
 import { armourValue } from "./player.js";
 import { WEAPONS, WEAPON_PALETTE, ELEMENTS, itemName, itemGlyph } from "./items.js";
 import { readyStack } from "./throwing.js";
@@ -344,14 +344,20 @@ function thrustPose(s) {
   return mix(SPEAR_OUT, SPEAR_IDLE, smooth((s - 0.5) / 0.5));
 }
 
+// The held weapon is lit like the world: your torch, or whatever light is around you; under the sky the sky's light is
+// the hour's (× daylight, WS3 #7 at the WS9 merge: it shone at night), underground the parent's (golden (b) holds it).
+export function heldLight(game) {
+  const p = game.player, zone = game.zone;
+  const lamp = sampleLight(zone, zone.lampLight, p.x, p.y, p.z + 1.2);
+  const sky = sampleLight(zone, zone.skyLight, p.x, p.y, p.z + 1.2) * (zone.hasSky ? daylight(game) : 1);
+  return Math.min(1.25, 0.22 + sky * 0.6 + lamp * 1.1 + (p.torch ? 0.75 : 0));
+}
+
 function drawSword(game) {
-  const p = game.player, zone = game.zone, inHand = wielded(p);
+  const p = game.player, inHand = wielded(p);
   const weapon = WEAPONS[inHand.id];
   const held = weapon.held;
-  // Lit like the world: your torch, or whatever light is around you.
-  const lamp = sampleLight(zone, zone.lampLight, p.x, p.y, p.z + 1.2);
-  const sky = sampleLight(zone, zone.skyLight, p.x, p.y, p.z + 1.2);
-  const light = Math.min(1.25, 0.22 + sky * 0.6 + lamp * 1.1 + (p.torch ? 0.75 : 0));
+  const light = heldLight(game);
   const pose = weapon.thrust ? thrustPose : swingPose;
   const [t0, t1] = weapon.thrust ? [0.25, 0.6] : [0.2, 0.75];   // when the motion trail shows
   // An element makes the metal glow its colour (flickering, for fire and storm) and colours the trail.

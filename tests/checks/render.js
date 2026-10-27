@@ -48,6 +48,8 @@
 //  14. The dressing's props (WS2b's zone.props, drawn since the WS2b merge): on a span near the start, every prop on a
 //      seen tile shows its glyph on the map (under items, creatures and you), none on a tile the map draws as wall; a
 //      prop three tiles ahead at noon changes the 3D frame, and only locally.
+//  15. The held weapon by the hour (WS3 #7, at the WS9 merge): under open sky with your torch out it is lit less at
+//      midnight than at noon (the sky's light × daylight; it shone at night); underground the same at both hours.
 import { checkGolden } from "./golden.js";
 
 export async function checkRender(m) {
@@ -824,6 +826,27 @@ export async function checkRender(m) {
     }
   }
 
+  // --- 15. The held weapon by the hour (WS3 #7, at the WS9 merge) ------------------------------------------------------
+  if (m.hud?.heldLight) {
+    fresh(4242);
+    const z = game.zone, out = {};
+    let spot = null;   // a floor under open sky (the start span's temple is roofed)
+    for (let i = 0; i < z.w * z.d && !spot && z.skyLight; i++) {
+      const x = i % z.w, y = Math.floor(i / z.w), h = z.stand[i];
+      if (h >= 0 && light.sampleLight(z, z.skyLight, x + 0.5, y + 0.5, h + 1.2) > 0.8) spot = { x, y, h };
+    }
+    if (expect(spot, "a floor under open sky on the start span")) {
+      Object.assign(p(), { x: spot.x + 0.5, y: spot.y + 0.5, z: spot.h, torch: false });
+      game.time = T(12); out.noon = m.hud.heldLight(game);
+      game.time = T(24); out.midnight = m.hud.heldLight(game);
+      zones.changeZone(game, "0,0,3", { how: "down", rng: Math.random }); p().torch = false;
+      game.time = T(12); out.underNoon = m.hud.heldLight(game);
+      game.time = T(24); out.underMidnight = m.hud.heldLight(game);
+      expect(out.midnight < out.noon - 0.1 && out.underNoon === out.underMidnight, `the held weapon's light by the hour: ${JSON.stringify(out)}`);
+    }
+    stats.heldLight = out;
+  }
+
   // --- 9. Golden (b) --------------------------------------------------------------------------------------------
   if (m.golden) {
     const g = checkGolden(m.golden.api, m.golden.fixtures, { only: ["frames"] });
@@ -838,14 +861,14 @@ export async function checkRender(m) {
 export async function run(env) {
   const scr = await env.screen({ cols: 180, rows: 56 });
   const load = (p) => env.src(p);
-  const [g, clock, light, raycast, render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, sfx, creatures, keys, biomes] = await Promise.all(
+  const [g, clock, light, raycast, render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, sfx, creatures, keys, biomes, hud] = await Promise.all(
     ["game.js", "clock.js", "light.js", "raycast.js", "render3d.js", "renderMap.js", "zones.js", "turns.js", "world.js", "rules.js", "music.js",
-     "content/moods.js", "content/liquids.js", "content/world/worldmap.js", "sfx.js", "creatures.js", "keys.js", "content/biomes.js"].map(load));
+     "content/moods.js", "content/liquids.js", "content/world/worldmap.js", "sfx.js", "creatures.js", "keys.js", "content/biomes.js", "hud.js"].map(load));
   const fixtures = { frames: await env.json("tests/fixtures/golden/frames.json") };
   const { currentApi } = await import("../golden/current-api.js");
   const S = await load("screen.js");
   const result = await checkRender({ game: g.game, startRun: g.startRun, S, capture: scr.capture, frameHash: scr.frameHash, clock, light, raycast,
-    render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, creatures, keys, biomes, golden: null, seedRandom: env.seedRandom, resize: scr.resize, sfx });
+    render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, creatures, keys, biomes, hud, golden: null, seedRandom: env.seedRandom, resize: scr.resize, sfx });
   // Golden (b) last: its api reseeds Math.random and replaces the run.
   const api = await currentApi({ load, capture: scr.capture, frameHash: scr.frameHash }, env.seedRandom);
   const gold = checkGolden(api, fixtures, { only: ["frames"] });
