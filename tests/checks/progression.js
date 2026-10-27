@@ -416,7 +416,8 @@ export async function checkProgression(m) {
     game.state.mode = "oneWick"; p.xp = 0;
     L.gainXp(game, 10);
     if (p.xp !== 10) fail(`One Wick: a kill of 10 gave ${p.xp}`);
-    if (L.xpReward("landmark", 2) !== 15 || L.xpReward("beat", 10) !== 758) fail(`xpReward: landmark at 2 ${L.xpReward("landmark", 2)}, beat at 10 ${L.xpReward("beat", 10)}`);
+    if (L.xpReward("landmark", 2) !== 15 || L.xpReward("beat", 10) !== 758 || L.xpReward("site", 2) !== 5)   // (site: WS1 #4, at its merge)
+      fail(`xpReward: landmark at 2 ${L.xpReward("landmark", 2)}, beat at 10 ${L.xpReward("beat", 10)}, site at 2 ${L.xpReward("site", 2)}`);
     // WS1's powers are offered since its merge (WS1 #3): their effects read them (encounters, travel, lost).
     const waiting = ["keenEyeSites", "pathfinder", "terrainLore", "homingSense"].filter((id) => m.content.POWERS[id]?.needs);
     if (waiting.length) fail(`WS1's powers still wait on their needs: ${waiting}`);

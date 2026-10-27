@@ -36,7 +36,7 @@ extendRules("progression", {
     killShare: 0.01, elite: 2.5, legendary: 10,            // a kill: max(1, round(killShare × lvlXP(Lc))) × elite / legendary
     tiersBelow: { 2: 0.25, 3: 0 },                         // a creature 2 tiers below yours gives 25%; 3 or more, nothing
     pilgrimKill: 0, pilgrimOther: 2.2,                     // Pilgrim mode (bible §10.1)
-    rewards: { landmark: 0.3, village: 0.2, siteBottom: 0.4, villageQuest: 0.6, triangulation: 0.15, kindling: 0.08, beat: 0.75 },
+    rewards: { landmark: 0.3, site: 0.1, village: 0.2, siteBottom: 0.4, villageQuest: 0.6, triangulation: 0.15, kindling: 0.08, beat: 0.75 },   // (site: WS1's discovery, at its merge)
     beatEarly: 1.5,                                        // a beat begun below its band
   },
   level: { attrPointEvery: 4, milestoneEvery: 5, offers: 3, offersHighInt: 4, highInt: 18 },
