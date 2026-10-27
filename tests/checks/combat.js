@@ -1307,7 +1307,9 @@ export async function checkAiDepth(ctx) {
     {
       run = fresh(ctx, 4242);
       const p = game.player;
-      // Write-behind: the record written for the zone you left over an edge doesn't hold your follower.
+      // Write-behind: the record written for the zone you left over an edge doesn't hold your follower. (Since WS9's
+      // saves, at the WS9 merge, the zone you leave is written with the next slot record, so the store never holds a
+      // zone newer than its slot: that save is made here.)
       changeZone(game, "0,0,0", { how: "travel" });
       const z0 = game.zone;
       let y = -1;
@@ -1319,6 +1321,7 @@ export async function checkAiDepth(ctx) {
       const store = memoryAdapter();
       const slot = await saveGame(game, { store });
       mapStep(game, 1, 0, { force: false });
+      await saveGame(game, { store });
       await whenWritten(game);
       const rec = await store.get("zones", [slot.id, "0,0,0"]);
       expect(game.zone.key === "1,0,0" && rec && !rec.creatures.some((c) => c.id === f.id), `write-behind: the record of 0,0,0 ${rec ? (rec.creatures.some((c) => c.id === f.id) ? "holds the follower that left" : "is without it") : "wasn't written"}`);
