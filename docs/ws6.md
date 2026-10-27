@@ -150,6 +150,27 @@ their reasons.
 9. **Not built (content):** the Lantern Moths "like you while your torch is lit" (`likesToo` text only); the
    Smoothers belong to no faction and are always hostile (bible §3.5): give them no membership (the parent rule
    makes them hostile). The Hour cults (generated factions, §6.3) need `pilgrimFloor: false`.
+10. **`tools/browser-0d1.mjs` (P0's; the integrator):** its mode tour fails on any registered screen it can't reach,
+    so on this branch it would fail "modes never reached: factions" (nothing in `browser-shell` presses P). After
+    the target block (the map reached), add:
+    ```js
+    // The factions screen (WS6a's): P on the map opens it; Esc closes it, and again by a click on "Esc close".
+    if ((await mode()) === "map") for (const how of ["keys", "mouse"]) {
+      await page.keyboard.press("KeyP");
+      await frames(page, 2);
+      const opened = await mode();
+      if (opened !== "factions") { problems.push(`factions by ${how}: P on the map led to ${opened}`); break; }
+      reached.add("factions");
+      if (how === "keys") await page.keyboard.press("Escape"); else await click("Esc close");
+      await frames(page, 2);
+      const closed = await mode();
+      if (closed !== "map") problems.push(`factions by ${how}: ${how === "keys" ? "Esc" : "a click on Esc close"} led to ${closed}`);
+    }
+    ```
+    (`tools/browser-ws6.mjs` does the same by keys and mouse at 1280×720 and 600×330, and passes.)
+11. **§8.4 (the integrator):** `tools/browser-ws6.mjs` as WS6's, and a `tools/README.md` row for it ("serve with
+    `node tools/serve.mjs 8646`; the factions screen in both views, a villager struck with witnesses, a builder's
+    priest").
 
 ## Handoff
 
