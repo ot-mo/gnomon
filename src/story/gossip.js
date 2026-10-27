@@ -3,7 +3,9 @@
 //
 //   gossipFor(game, c) → text | null     the rumour this talker would tell now, or null: only talkers that gossip
 //                                        (their own or their type's talk.gossip; 7b's villagers), and only one you
-//                                        haven't heard; the same talker tells the same one all day
+//                                        haven't heard; the same talker tells the same one all day. A talker
+//                                        of a faction (c.faction: an id, or WS6a's { id: weight }) prefers
+//                                        rumours of the Hours that faction feels for
 //   gossipDef(game, c) → SecretDef | null   the same, as the secret
 // Registered as the talk option "gossip" ("Heard anything lately?"): telling it files it in the journal.
 import { registerTalkOptions, node, bye } from "../talk.js";
@@ -19,7 +21,8 @@ export function gossipDef(game, c) {
   if (!gossips(c) || !game.run) return null;
   const all = [...secretsOf(game.run).values()].filter((d) => d.kind === "gossip" && !knows(game, d.id));
   if (!all.length) return null;
-  const mine = all.filter((d) => c.faction && d.tags.includes(c.faction));
+  const own = typeof c.faction === "string" ? [c.faction] : Object.keys(c.faction || {});
+  const mine = all.filter((d) => own.some((f) => d.tags.includes(f)));
   const pool = mine.length ? mine : all;
   const who = typeof c.uid === "string" ? [...c.uid].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) | 0, 7) : c.id | 0;
   return pool[Math.floor(hash(who, Math.floor((game.time || 0) / DAY), 17) * pool.length)];

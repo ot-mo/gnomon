@@ -18,9 +18,15 @@ import "./campaign.js";
 import "./secrets.js";
 import "./murals.js";
 import "./gossip.js";
+import "../content/creatures/villagers.js";
+import { registerSiteBuilder } from "../world/sites.js";
+import { buildVillage } from "./village-site.js";
+import "./villagequests.js";
 export { generateHistory } from "./history.js";
 export { generateVillage } from "./villages.js";
 export { startQuest } from "./quests.js";
 export { learnSecret, makeSecrets, readings, markSold } from "./secrets.js";
 export { gossipFor } from "./gossip.js";
 export { expand } from "./grammar.js";
+
+registerSiteBuilder("village", buildVillage);   // (here, not in village-site.js: world/run.js imports villages.js early)
