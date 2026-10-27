@@ -537,6 +537,29 @@ export function checkItems(m) {
       if (bad.length) fail(`${view}: ${bad.join(", ")} didn't do what it says: ${JSON.stringify(r)}`);
     }
     stats.artifacts = out;
+    // A running lantern-mote that leaves the pack takes its light with it: dropped (X), at once; gone another way
+    // (sold, say), by the next tick of the clock. A save of the player with it running is plain JSON.
+    {
+      const p = fresh({ depth: 4 });
+      const mote = known("lanternMote", 500), torch0 = St.bonus(p, "torch");
+      p.inv.push(mote);
+      AR.useArtifact(game, p, mote);
+      if (m.codec.jsonProblems(m.codec.encodePlayer(p), "player").length) fail("a player with a lantern-mote running doesn't save as JSON");
+      try {   // (the stat cache unverified here: a stale one shows as the old bonus)
+        St.bonus(p, "torch");
+        game.debug.openInv(); game.invSel = p.inv.indexOf(mote);
+        m.inventory.inventoryKey(game, "KeyX");
+        const dropped = game.zone.items.find((x) => x.kind === "artifact" && x.id === "lanternMote");
+        if (St.bonus(p, "torch") !== torch0 || dropped?.on) fail(`a dropped lantern-mote: torch bonus ${St.bonus(p, "torch")} (want ${torch0}), on the floor ${dropped?.on ? "still on" : "off"}`);
+        m.keys.dispatchKey(game, "Escape", false, "");
+        const mote2 = known("lanternMote", 500);
+        p.inv.push(mote2);
+        AR.useArtifact(game, p, mote2);
+        p.inv.splice(p.inv.indexOf(mote2), 1);
+        m.time.skipTime(game, 1, { interruptible: false });
+        if (St.bonus(p, "torch") !== torch0) fail(`a lantern-mote taken out of the pack still lights you a tick later (torch bonus ${St.bonus(p, "torch")})`);
+      } catch (err) { fail(`a lantern-mote leaving the pack: ${err.message}`); }
+    }
     // Cells: loaded from the pack, filled from the purse, sun and dark recharging exactly over any split.
     let p = fresh({ depth: 4 });
     const bell = { kind: "artifact", id: "echoBell", known: true, cell: { id: "glim", charge: 20 } };

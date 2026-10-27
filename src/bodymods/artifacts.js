@@ -24,8 +24,8 @@ import { ARTIFACTS, CELLS } from "../content/items/artifacts.js";
 import { IMPLANTS } from "../content/items/implants.js";
 import { registerItemKind, takeOne, addToInventory } from "../items.js";
 import { carried } from "../body.js";
-import { mod, bonus, invalidateStats, registerBonusSource } from "../stats.js";
-import { addStatus } from "../status.js";
+import { mod, bonus, invalidateStats } from "../stats.js";
+import { addStatus, removeStatus, hasStatus, registerStatus } from "../status.js";
 import { pay, funds, formatPrice } from "../currency.js";
 import { requestTarget } from "../abilities.js";
 import { mapUseTime } from "../turns.js";
@@ -132,14 +132,30 @@ function drainRunning(game, p, t0, t1) {
     if (cell && cell.charge >= cost) { cell.charge -= cost; continue; }
     if (cell) cell.charge = 0;
     it.on = false;
-    invalidateStats(p);
     game.log(`The ${artifactName(it)} flickers and goes out: its cell is empty.`, [170, 170, 170]);
   }
+  syncRunning(game, p);
 }
 on("clock:tick", (game, { t0, t1 }) => { rechargeCells(game, game.player, t0, t1); drainRunning(game, game.player, t0, t1); });
 
-// What runs gives its bonuses (the lantern-mote's light) from the pack: a source of its own on the stat bus.
-registerBonusSource("artifacts", (e) => (e.inv || []).filter((it) => it.kind === "artifact" && it.on && ARTIFACTS[it.id]?.bonus).map((it) => ARTIFACTS[it.id].bonus));
+// What runs lends its bonuses (the lantern-mote's light) as a status of its own, "running:<id>": a status keeps the stat
+// cache right by itself, and the HUD shows it in either view. syncRunning puts the statuses in line with the pack: one
+// per artifact switched on in it with charge; anything that left the pack (dropped: at once, through the bus's
+// "drop"; sold or taken: by the next tick of the clock) is switched off.
+const RUNNING = Object.keys(ARTIFACTS).filter((id) => ARTIFACTS[id].per && ARTIFACTS[id].bonus);
+const RUN_T = 1e9;   // (finite: a save holds plain JSON, and Infinity isn't)
+for (const id of RUNNING) registerStatus(`running:${id}`, { color: [255, 230, 160], kind: "good", t: RUN_T, stack: "refresh",
+  bonus: () => ({ ...ARTIFACTS[id].bonus }), hud: () => ARTIFACTS[id].name.toUpperCase() });
+export function syncRunning(game, p) {
+  if (!p) return;
+  for (const id of RUNNING) {
+    const on = (p.inv || []).some((it) => it.kind === "artifact" && it.id === id && it.on && !it.broken && chargeOf(it) > 0);
+    const sid = `running:${id}`;
+    if (on && !hasStatus(p, sid)) addStatus(game, p, sid, { t: RUN_T });
+    else if (!on && hasStatus(p, sid)) removeStatus(game, p, sid);
+  }
+}
+on("drop", (game, { e, item }) => { if (item?.kind === "artifact" && item.on) item.on = false; syncRunning(game, e); });
 
 // --- Names --------------------------------------------------------------------------------------------
 export function artifactName(it) {
@@ -179,7 +195,7 @@ function toggle(game, p, it) {
   const def = ARTIFACTS[it.id];
   if (!it.on && !loadCell(game, p, it)) { game.log(`The ${def.name} needs a charged cell.`, [255, 150, 120]); return 0; }
   it.on = !it.on;
-  invalidateStats(p);
+  syncRunning(game, p);
   game.log(it.on ? `The ${def.name} wakes and rises beside you.` : `You put the ${def.name} out.`, [255, 230, 160]);
   return USE_TIME;
 }

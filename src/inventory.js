@@ -21,6 +21,7 @@
 //   drawInventory(game)
 import * as S from "./screen.js";
 import { pushMode, popMode } from "./screens.js";
+import { emit } from "./events.js";
 import { UI, hit, at, hitLabel, list, listKey, listWheel, tabs, tabsKey, wrap } from "./ui.js";
 import { WEAPONS, ARMOURS, ELEMENTS, ITEM_KINDS, itemName, itemInfo, itemGlyph, itemAura, itemWeight, makeItem, isGear, strNeeded, takeOne,
   registerItemAction, useItem, canUse, RELIC_COLOR } from "./items.js";
@@ -292,6 +293,7 @@ function dropSelected(game) {
   const item = makeItem(one, p.x, p.y, p.z);
   item.dropped = true;   // don't pick it straight back up
   game.zone.items.push(item);
+  emit(game, "drop", { e: p, item });   // (bodymods: what ran in the pack stops)
   game.log(`You drop the ${itemName(game, one)}.`, DIM);
   game.invSel = Math.min(game.invSel, Math.max(0, p.inv.length - 1));
   if (!visible(game).includes(game.invSel)) game.invSel = visible(game)[0] ?? game.invSel;
