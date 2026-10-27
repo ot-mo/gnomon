@@ -3,7 +3,9 @@
 //   generateSurface(run, wx, wy) → Zone the span's surface zone (unsealed), validated, up to 10 attempts
 //   surfaceSteps(run, wx, wy) → iterator   the same work in stages (0D1): each next() does one stage
 //                                       (a few ms) and the last returns { done: true, value: Zone }, so
-//                                       3D prefetch can spread a zone over frames; same zone, same bits
+//                                       3D prefetch can spread a zone over frames; same zone, same bits.
+//                                       Each stage also builds one world-function band of the zone's
+//                                       apron ahead of the swap (gen/apron.js, WS3 #6)
 //   validateSurface(zone) → string[]    the §5.3 item 9 rules (empty: fine)
 //   dungeonRectFor(entrance) → rect     where the dungeon's 48×48 levels sit under the surface (§5.5)
 //   BIOME_BUILDERS, SITE_BUILDERS       TECH_DESIGN §1.4's registries, re-exported: biome id → (ctx) => void from
@@ -32,7 +34,7 @@ import { zoneSeed } from "../world/run.js";
 import { stampVault } from "./vaults.js";
 import { worldFns, heightAt, treeAt, SURFACE_RULES } from "./terrain.js";
 import { portsOf } from "./ports.js";
-import { buildApronBand } from "./apron.js";
+import { buildApronBand, apronBandSteps } from "./apron.js";
 export { SITE_BUILDERS } from "../world/sites.js";
 export { BIOME_BUILDERS } from "./biomes/index.js";
 export { worldFns, heightAt, treeAt, SURFACE_RULES, portsOf, buildApronBand };
@@ -62,12 +64,25 @@ function sitesOf(run, wx, wy) {
 }
 
 export function generateSurface(run, wx, wy) {
-  const it = surfaceSteps(run, wx, wy);
+  const it = zoneSteps(run, wx, wy);
   for (;;) { const r = it.next(); if (r.done) return r.value; }
 }
 
-// The stages: the world layer, then buildSurface's (yields between its numbered steps), then validation.
+// The staged make (3D prefetch): the zone's stages, each also building one of the world-function bands its
+// apron will want (gen/apron.js apronBandSteps), so the frame that swaps into it finds them made (WS3 #6);
+// bands left over when the zone is done take a stage each. The zone is generateSurface's, bit for bit.
 export function* surfaceSteps(run, wx, wy) {
+  const inner = zoneSteps(run, wx, wy);
+  let r = inner.next();
+  if (r.done) return r.value;
+  const bands = apronBandSteps(run, wx, wy);
+  for (; !r.done; r = inner.next()) { bands.next(); yield r.value; }
+  for (const side of bands) yield `apron ${side}`;
+  return r.value;
+}
+
+// The stages: the world layer, then buildSurface's (yields between its numbered steps), then validation.
+function* zoneSteps(run, wx, wy) {
   const world = run.world, tile = world.tileAt(wx, wy);
   if (!tile) return null;
   const W = worldFns(world, run.seed), seed = zoneSeed(run, wx, wy, 0);
