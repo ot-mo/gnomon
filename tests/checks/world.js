@@ -23,6 +23,7 @@ import { CURRENCY } from "../../src/content/currency.js";
 import { distance } from "../../src/rng.js";
 import { GEN_CALLS } from "../../src/world/genstats.js";
 import { SURFACE } from "../../src/world.js";
+import { fixtureHistory, validateHistory } from "../../src/story/history.js";   // WS7
 
 // Deep equality that understands Maps (by entries, in order) and plain data.
 export function deepEqual(a, b, path = "run", out = []) {
@@ -319,7 +320,7 @@ function siteRules(name, seed, run) {
     if (!run.factions.has(v.factionId)) out.push(`${at}: village ${v.id} has no faction`);
   }
   if (run.villages.size !== [...run.sites.values()].filter((s) => s.kind === "village").length) out.push(`${at}: a village site without village data`);
-  if (run.history?.rulers?.length !== 2 || run.history.siteRequests.length !== 2 || run.history.relics.length !== 1) out.push(`${at}: the history is not the fixture`);
+  if (run.world.id === "test" ? run.history?.rulers?.length !== 2 || run.history.siteRequests.length !== 2 || run.history.relics.length !== 1 || JSON.stringify(run.history) !== JSON.stringify(fixtureHistory()) : validateHistory(run.history, { world: run.world }).length) out.push(`${at}: ${run.world.id === "test" ? "the history is not the fixture" : `the history fails validateHistory: ${validateHistory(run.history, { world: run.world })[0]}`}`);   // WS7: the fixture on the test world, the generator's validated History elsewhere
   return out;
 }
 
