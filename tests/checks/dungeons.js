@@ -474,6 +474,60 @@ export async function checkLegends({ seed = 7 } = {}) {
   return { name: "legends", ok: problems.length === 0, problems, stats };
 }
 
+// --- Spikes: a flat you is spared (WS8 #3), a creature's spike wound is nobody's (WS6a #2) ------------------
+export async function checkTraps() {
+  const problems = [], stats = {};
+  const { game, startRun } = await import("../../src/game.js");
+  const { updateSpikes, spikeState, TICK, BEAT_SIGHT, spikeSprites } = await import("../../src/traps.js");
+  const { addStatus, removeStatus } = await import("../../src/status.js");
+  const { on } = await import("../../src/events.js");
+  const { spawnCreature, addCreature } = await import("../../src/creatures.js");
+  startRun(1234, TEST_WORLD);
+  game.debug.enterZone("0,0,1");
+  const zone = game.zone, p = game.player;
+  const tx = Math.floor(p.x), ty = Math.floor(p.y), period = 4;
+  const upHere = (x, y) => zone.spikes.set(x + y * zone.w, { phase: ((Math.floor(game.time / TICK) % period) + period) % period, period, up: 1, pattern: "test" });
+  upHere(tx, ty);
+  if (spikeState(zone, tx + ty * zone.w, game.time) !== "up") problems.push("the test spike isn't up");
+  Object.assign(p, { z: FLOOR_Z, onGround: true, spikeBeat: undefined });
+  const hp0 = p.hp;
+  addStatus(game, p, "flat");
+  updateSpikes(game);
+  stats.flat = `${hp0} → ${p.hp}`;
+  if (p.hp !== hp0) problems.push(`flat: the spikes hurt you (${hp0} → ${p.hp})`);
+  removeStatus(game, p, "flat");
+  p.spikeBeat = undefined;
+  updateSpikes(game);
+  stats.deep = `${hp0} → ${p.hp}`;
+  if (!(p.hp < hp0)) problems.push("deep: the spikes didn't hurt you");
+  // A goblin on a spike beside you: hurt by nobody, and its death is nobody's kill.
+  const spot = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [tx + dx, ty + dy]).find(([x, y]) => zone.stand[x + y * zone.w] === FLOOR_Z);
+  if (spot) {
+    const m = addCreature(zone, spawnCreature("goblin", spot[0], spot[1], FLOOR_Z, { rng: Math.random, state: "idle", level: 1 }));
+    upHere(spot[0], spot[1]);
+    const srcs = [];
+    const off = on("hurt", (g, e) => { if (e.tgt === m) srcs.push(e.src ?? null); });
+    m.hp = 1;
+    const xp0 = p.xp;
+    updateSpikes(game);
+    off?.();
+    stats.goblin = { dead: !zone.creatures.includes(m), srcs: srcs.map((x) => (x === null ? "nobody" : x === game.player ? "you" : String(x?.type))), xp: `${xp0} → ${p.xp}` };
+    if (zone.creatures.includes(m)) problems.push("the goblin on a spike didn't die");
+    if (!srcs.length || srcs.some((s) => s !== null)) problems.push(`a spike's wound came from [${srcs}] (want one wound from nobody)`);
+    if (p.xp !== xp0) problems.push(`a spike kill gave you experience (${xp0} → ${p.xp})`);
+  } else problems.push("no floor beside you for the goblin");
+  // The beat in 3D: with BEAT_SIGHT on, a spike about to rise shows; off, it doesn't.
+  zone.spikes.set(tx + ty * zone.w, { phase: ((Math.floor(game.time / TICK) + 1) % period + period) % period, period, up: 1, pattern: "test" });
+  if (spikeState(zone, tx + ty * zone.w, game.time) !== "warn") problems.push("the test spike isn't about to rise");
+  const off3d = spikeSprites(game).length, has = BEAT_SIGHT.has;
+  BEAT_SIGHT.has = () => true;
+  const on3d = spikeSprites(game).length;
+  BEAT_SIGHT.has = has;
+  stats.beatSight = `${off3d} sprites without, ${on3d} with`;
+  if (on3d <= off3d) problems.push("beat sight shows no warning sprite");
+  return { name: "traps", ok: problems.length === 0, problems, stats };
+}
+
 // tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
 // inputs tools/check-dungeons.mjs and tools/check-sites.mjs give.
 export async function run(env) {
@@ -482,5 +536,5 @@ export async function run(env) {
   return [checkVaultOptions(), checkDungeonParams(),
     checkDungeons({ seeds: Number(env.args.seeds) || 50, p95Budget: Number(env.args.budget) || 40 }),
     checkRandomLevels({ count: Number(env.args.random) || 1000, p95Budget: Number(env.args.budget) || 40 }),
-    checkSites({ seeds }), checkHistoric({ seeds }), await checkLegends()];
+    checkSites({ seeds }), checkHistoric({ seeds }), await checkLegends(), await checkTraps()];
 }

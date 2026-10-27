@@ -7,9 +7,10 @@ import { report } from "./report.mjs";
 
 const args = parseArgs();
 await installNodeEnv();
-const { checkSites, checkHistoric, checkLegends } = await import("../tests/checks/dungeons.js");
+const { checkSites, checkHistoric, checkLegends, checkTraps } = await import("../tests/checks/dungeons.js");
 const seeds = args.seeds ? String(args.seeds).split(",").map(Number) : undefined;
 const a = report(checkSites({ seeds }));
 const b = report(checkHistoric({ seeds }));
 const c = report(await checkLegends());
-process.exit(a || b || c);
+const d = report(await checkTraps());
+process.exit(a || b || c || d);

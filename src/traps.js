@@ -11,7 +11,7 @@
 // (In 3D you can also jump over a row. The map can't jump.)
 import { B, FLOOR_Z } from "./world.js";
 import { distance } from "./rng.js";
-import { damageMonster } from "./combat.js";
+import { applyDamage } from "./combat.js";
 import * as creatures from "./creatures.js";
 import { statusFlag, hasStatus } from "./status.js";
 
@@ -69,7 +69,8 @@ export function updateSpikes(game) {
     const t = creatures.CREATURE_TYPES[m.type];
     if (creatures.canTalk(m) || m.vis.statue || t.hover || t.flat || t.boss || !hits(m.x, m.y, m.z, m.spikeBeat)) continue;
     m.spikeBeat = beat;
-    damageMonster(game, m, 3 + Math.floor(Math.random() * 3), [200, 200, 210], `The ${m.name} is skewered by the spikes.`);
+    // Nobody's harm (WS6a request 2): no grudge, no reputation, and a kill that isn't yours (no experience).
+    applyDamage(game, m, 3 + Math.floor(Math.random() * 3), { src: null, color: [200, 200, 210], deathText: `The ${m.name} is skewered by the spikes.` });
   }
 }
 
