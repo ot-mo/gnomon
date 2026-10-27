@@ -35,6 +35,8 @@ import * as powers from "../content/powers.js";
 import * as leveling from "../leveling.js";
 import { VILLAGES } from "../content/villages.js";
 import { villageOf, villageFaction, eventById } from "./villages.js";
+import { registerDialogue, dialogueIds, node, bye } from "../talk.js";
+import { VILLAGERS } from "../content/creatures/villagers.js";
 
 const W = 24, D = 16;               // the village footprint (world/sites.js SITE_SHAPES.village)
 const WALL_H = 3;                   // walls 3 blocks high, the roof slab on top (z = FLOOR_Z + 3)
@@ -233,6 +235,16 @@ on("zone:enter", (game, ev) => {
     : `You come to ${v.name}. Everyone here seems to be ${v.culture.activity}. (+${xp} XP)`, [200, 230, 160]);
   if (game.player) leveling.gainXp(game, xp, { source: "village" });
 });
+
+// What a villager says when no one has written its conversation (talk.js dispatches on c.talk.dialogue, the type's id
+// by default): WS6a's role dialogues (social/builders.js ROLES) when they are registered, which they are before this
+// file loads (features.js: social before story); otherwise its village's proverb. Registered only where nothing is.
+const sayProverb = (game, c) => {
+  const v = c.village && villageOf(game.run, c.village);
+  return node(v ? `"${v.culture.proverb}" ${c.name} says it the way everyone in ${v.name} does.` : `${c.name} nods to you.`, [bye()]);
+};
+for (const id of [...Object.keys(VILLAGERS), "villager", "priest", "guard", "wanderer", "merchant"])
+  if (!dialogueIds().includes(id)) registerDialogue(id, sayProverb);
 
 // Who can reach whom: every cast member's tile from the zone's anchor, doors open (check-story).
 export function castReachable(zone) {
