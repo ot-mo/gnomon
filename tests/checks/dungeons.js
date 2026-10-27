@@ -324,12 +324,15 @@ export function checkRandomLevels({ count = 1000, p95Budget = 40, from = 0 } = {
 
 // --- Every site of both worlds, every level, 5 seeds --------------------------------------------------------
 const WORLDS = [["test", TEST_WORLD], ["real", REAL_WORLD]];
+// Neither world's regions roll stations yet (C1's data will): checkSites also builds the test world with a station
+// chance in every region, so the stations' builder, Cradle and rules are exercised.
+const withStations = (def) => ({ ...def, regions: Object.fromEntries(Object.entries(def.regions).map(([id, r]) => [id, { ...r, sites: { ...r.sites, station: 0.05 } }])) });
 const SEEDS = [1, 7, 42, 1234, 31337];
 
 export function checkSites({ seeds = SEEDS } = {}) {
   const problems = [], stats = { sites: 0, levels: 0, surfaces: 0, kinds: {}, bottoms: {}, legends: 0 };
   const t0 = performance.now();
-  for (const [name, def] of WORLDS) {
+  for (const [name, def] of [...WORLDS, ["test with stations", withStations(TEST_WORLD)]]) {
     const W = compileWorld(def);
     for (const seed of seeds) {
       const run = buildRun(seed, W), at = `${name} seed ${seed}`, uids = new Set();
@@ -376,6 +379,7 @@ export function checkSites({ seeds = SEEDS } = {}) {
       }
     }
   }
+  if (!stats.kinds.station) problems.push("no station was built (the stations' world rolls none)");
   // 20,000 legends' names: none holds a term of bible §15.11 (tests/checks/names.js DENY), even inside a word.
   const terms = DENY.filter((d) => d.from === "§15.11").map((d) => d.term.toLowerCase().replace(/[^a-z]/g, "")).filter((t) => t.length >= 3);
   const nrng = makeRng(seedFor(77, "legend names")), bad = new Set();
