@@ -1154,7 +1154,7 @@ export async function checkProgression(m) {
         out.hooks = JSON.stringify(got);
         if (got.cassin !== -0.5 || got.lampskin !== -1 || got.thrifty !== -0.5 || got.steady !== 2 || got.keen !== 3 || plain !== game.player)
           fail(`the torch, missile and examine hooks: ${out.hooks} (want Cassin -0.5, Lampskin -1, Thrifty wick -0.5, Steady hand 2, Keen fingers 3)`);
-        const waiting = ["haggler", "steadyHand", "thriftyWick", "keenFingers"].filter((id) => POWERS[id].needs);
+        const waiting = ["haggler", "steadyHand", "thriftyWick", "keenFingers", "warmHands"].filter((id) => POWERS[id].needs);
         if (waiting.length) fail(`still waiting (needs), so never offered: ${waiting.join(", ")}`);
       }
     }

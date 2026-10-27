@@ -89,7 +89,7 @@ export const POWERS = {
   pathfinder:   { tree: "pathcraft", name: "Pathfinder",    info: "You travel half again as far in an hour.", bonus: () => ({ travel: 0.5 }), needs: "WS1" },
   terrainLore:  { tree: "pathcraft", name: "Terrain lore",  info: "Three quarters less likely to get lost in one terrain (once for each terrain).", needs: "WS1" },
   homingSense:  { tree: "pathcraft", name: "Homing sense",  info: "Half the time you find your way again at once when lost.", needs: "WS1" },
-  warmHands:    { tree: "parley",    name: "Warm Hands",    info: "Later Kindlings go 20 further.", needs: "WS6b" },
+  warmHands:    { tree: "parley",    name: "Warm Hands",    info: "Later Kindlings go 20 further." },   // (social/ritual.js reads it)
   intimidate:   { tree: "parley",    name: "Intimidate",    info: "Make the weak think twice.", needs: "WS6a" },
   chime:        { tree: "parley",    name: "Chime",         info: "Recruit by preaching.", needs: "WS6b" },
 };
