@@ -795,11 +795,13 @@ async function ws9Sections(ctx) {
       await loadGame(fx.slotId, { store: memoryAdapter({ from: fx.dump }) });
       compare("p0-done's v1 save, loaded here", fx.digest, await digestGame(game, fx.keys));
       const asIs = problems.length === n0;
-      const M = { 1: { slot: (r) => ({ ...r, state: { ...r.state, migratedFrom: r.version } }), zone: (z) => ({ ...z, migratedZone: z.v ?? 1 }) } };
+      let zoneRuns = 0;
+      const M = { 1: { slot: (r) => ({ ...r, state: { ...r.state, migratedFrom: r.version } }), zone: (z) => { zoneRuns++; return { ...z, migratedZone: z.v ?? 1 }; } } };
       startRun(4321); game.pages = null;
       await loadGame(fx.slotId, { store: memoryAdapter({ from: fx.dump }), version: 2, migrations: M });
       const got = await digestGame(game, fx.keys);
       if (game.state.migratedFrom !== 1) fail(`v1 → v2: state.migratedFrom ${game.state.migratedFrom}`);
+      if (zoneRuns !== fx.keys.length) fail(`v1 → v2: the zone migration ran ${zoneRuns} times for ${fx.keys.length} zones read (once each, as each is read)`);
       const unmigrated = { ...got, state: strip(got.state, (v) => delete v.migratedFrom), zones: {} };
       for (const [k, z] of Object.entries(got.zones)) {
         if (JSON.parse(z).migratedZone !== 1) fail(`v1 → v2: zone ${k} wasn't migrated as it was read`);
@@ -816,7 +818,7 @@ async function ws9Sections(ctx) {
         fail("a chain with a step missing wasn't refused");
       if (!/newer/.test(refused(() => migrate({ id: "c", version: 3 }, [], { to: 2 })))) fail("a save from a newer game wasn't refused");
       stats.migration = `p0-done's v1 save (${fx.keys.join(" ")}; made by that tree's code) loads here ${asIs ? "identical" : "DIFFERENT"}; ` +
-        `v1 → v2 (state and every zone record, each as read) ${problems.length === n1 ? "identical but for the change" : "DIFFERS"}; a v1 → v3 chain in order; a missing step and a newer save refused`;
+        `v1 → v2 (state and every zone record, each once, as read: ${zoneRuns} for ${fx.keys.length}) ${problems.length === n1 ? "identical but for the change" : "DIFFERS"}; a v1 → v3 chain in order; a missing step and a newer save refused`;
     }
   }
 

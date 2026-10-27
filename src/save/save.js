@@ -582,7 +582,9 @@ export async function loadGame(slotId, { game = theGame, store, version = VERSIO
   const st = storeFor(store);
   const stored = await st.get("slots", slotId);
   checkSlot(stored, slotId);
-  const { slot, zones } = migrate(stored, await st.list("zones", { slot: slotId }), { to: version, migrations });
+  // The slot migrated now; each zone record when it is read (ZONE_LOADER.load): the list here is only their keys,
+  // times and id counters.
+  const { slot } = migrate(stored, [], { to: version, migrations }), zones = await st.list("zones", { slot: slotId });
   const where = slot.where?.zoneKey;
   if (!zones.some((r) => r.key === where)) throw new Error(`loadGame: ${slotId} holds no record of ${where}, the zone you were in`);
   const def = await worldFor(slot.state?.world?.id ?? slot.run?.world?.id);
