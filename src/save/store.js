@@ -186,6 +186,10 @@ export function idbAdapter(name = `${GAME_ID}-saves`, { indexedDB: idb = globalT
       let tr;
       try { tr = db.transaction(names, "readwrite"); } catch (e) { return Promise.reject(e); }
       const done = committed(tr);
+      // Committed as soon as every request is made, not when the task ends: a page that is going (the unload save) is
+      // torn down before that, and its transaction with it. A keep's last request comes in its reads' callbacks.
+      let reads = 0;
+      const read = () => { if (--reads === 0) tr.commit?.(); };
       try {
         for (const o of ops) {
           if (o.op === "put") tr.objectStore(o.store).put(o.value);
@@ -194,18 +198,17 @@ export function idbAdapter(name = `${GAME_ID}-saves`, { indexedDB: idb = globalT
           else if (o.op === "clear") tr.objectStore(o.store).delete(IDBKeyRange.bound([o.slot], [o.slot, []]));
           else if (o.op === "keep") {
             // Requests run in the order made: this read sees the row before the put that follows it.
+            reads++;
             const zr = tr.objectStore("zones").get(o.key);
             zr.onsuccess = () => {
-              if (!keepsOld(zr.result, o.epoch)) return;
+              if (!keepsOld(zr.result, o.epoch)) { read(); return; }
               const cr = tr.objectStore("checkpointZones").get(o.key);
-              cr.onsuccess = () => { if (!cr.result) tr.objectStore("checkpointZones").put(zr.result); };
+              cr.onsuccess = () => { if (!cr.result) tr.objectStore("checkpointZones").put(zr.result); read(); };
             };
           } else throw new Error(`writeNow: no op ${o.op}`);
         }
       } catch (e) { try { tr.abort(); } catch { /* finished */ } done.catch(() => {}); return Promise.reject(e); }
-      // Committed now, not when the task ends: a page that is going (the unload save) is torn down before that, and
-      // its transaction with it. (A keep still has its read's requests to make, so that batch commits by itself.)
-      if (!ops.some((o) => o.op === "keep")) tr.commit?.();
+      if (!reads) tr.commit?.();
       return done;
     },
     close() { db?.close(); db = null; },
