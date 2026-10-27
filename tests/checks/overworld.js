@@ -31,7 +31,7 @@ import { makeRng, distance } from "../../src/rng.js";
 import { on } from "../../src/events.js";
 import { setMode, SCREENS } from "../../src/screens.js";
 import { dispatchKey } from "../../src/keys.js";
-import { changeZone, zoneKey, uidWhere, claimUid, killUid, PATCH_OPS, arrivalPoint } from "../../src/zones.js";
+import { changeZone, zoneKey, uidWhere, claimUid, killUid, PATCH_OPS, ZONE_LOADER, ZONE_GENERATORS } from "../../src/zones.js";
 import { overrideRules, RULES } from "../../src/rules.js";
 import { isNight, hourOf, secondsUntil } from "../../src/clock.js";
 import { addStatus, hasStatus, statusLine, startCooldown, cooldownLeft, STATUS_DEFS } from "../../src/status.js";
@@ -552,6 +552,32 @@ function lost(G, problems) {
   return out;
 }
 
+// --- 6b. A zone read back from the save (WS9's ZONE_LOADER) ---------------------------------------------------------
+async function stored(G, problems) {
+  const game = fresh(G, 65, G.game.world), was = { ...ZONE_LOADER };
+  goTo(game, 3, 3); enterWorldMap(game);
+  worldStep(game, 1, 0, { confirm: true, drop: false });
+  if (game.trip.prompt) answer(game, false);
+  const errors = console.error;
+  const out = {};
+  try {
+    // A read that fails: the screen lets you go again (not busy), you stay on the world map, nothing thrown.
+    Object.assign(ZONE_LOADER, { has: (g, k) => k === "4,3,0", load: async () => { throw new Error("a broken record"); } });
+    console.error = () => {};
+    let threw = false;
+    try { await leaveWorldMap(game, { at: "edge" }); } catch { threw = true; }
+    out.failed = { mode: game.mode, busy: !!game.trip?.busy, threw };
+    if (threw || game.mode !== "world" || game.trip?.busy) problems.push(`stored zone: a failed read left ${JSON.stringify(out.failed)}`);
+    // A read that works: down into it, as from memory.
+    // (a zone the way the save's loader hands one back: generated, sealed, not yet in game.zones)
+    Object.assign(ZONE_LOADER, { load: async (g, key) => { const [wx, wy, z] = key.split(",").map(Number); const zone = ZONE_GENERATORS.surface(g, { wx, wy, z, key }); zone.seal(); return zone; } });
+    const r = await leaveWorldMap(game, { at: "edge" });
+    out.read = { ok: r, zone: game.zone.key, mode: game.mode };
+    if (r !== true || game.zone.key !== "4,3,0" || game.mode !== "map") problems.push(`stored zone: a read that works didn't take you down (${JSON.stringify(out.read)})`);
+  } finally { Object.assign(ZONE_LOADER, was); console.error = errors; }
+  return out;
+}
+
 // --- 7. Discovery ------------------------------------------------------------------------------------------------
 function discovery(G, problems) {
   const out = {};
@@ -725,6 +751,8 @@ export async function run(env) {
   section("encounter bands", (pr) => Object.fromEntries(WORLDS(G.game).map(([n, w]) => [n, bands(G, n, w, pr)])));
   section("rest", (pr) => resting(G, pr));
   section("lost", (pr) => lost(G, pr));
+  { const problems = []; let stats = {}; try { stats = await stored(G, problems); } catch (e) { problems.push(`threw: ${e?.stack || e}`); }
+    results.push({ name: "overworld: a zone from the save", ok: !problems.length, problems, stats }); }
   section("discovery", (pr) => discovery(G, pr));
   section("screen", (pr) => screen(G, scr, pr));
   return results;

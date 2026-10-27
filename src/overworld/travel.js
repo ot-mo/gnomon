@@ -260,7 +260,15 @@ export function leaveWorldMap(game, { at = "edge", siteId = null } = {}) {
   };
   const cached = cachedZone(game, key);
   if (cached) return go(cached);
-  if (ZONE_LOADER.has?.(game, key)) { trip.busy = true; return getZone(game, key).then(go); }
+  if (ZONE_LOADER.has?.(game, key)) {   // read back from the save (WS9): the screen waits, and a failed read lets you go
+    trip.busy = true;
+    return getZone(game, key).then(go, (e) => {
+      console.error(`reading zone ${key} from the save:`, e);
+      trip.busy = false;
+      say(game, "The way down won't come clear. Try another span, or again.", [255, 150, 120]);
+      return false;
+    });
+  }
   return go(makeZone(game, key));
 }
 
