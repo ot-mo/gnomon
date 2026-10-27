@@ -1220,6 +1220,27 @@ async function ws9Sections(ctx) {
       compare("a save to another store with a copy on write in flight in the old one: woken there", { ...atCp, state: "", player: "", run: "", ids: "" }, { ...(await digestGame(game, ["0,0,2"])), state: "", player: "", run: "", ids: "" });
       res.push(`a save to another store with the old store's copy of 0,0,2 in flight: the new one's copies ${copiesB.join(" ")}, woken ${problems.length === n3 ? "with 0,0,2 as at the checkpoint" : "CHANGED"}`);
     }
+    // The same with the copy still to come in a zone left and held for the next slot record (its keep never ran in the
+    // old store): the new slot makes it.
+    {
+      const A = memoryAdapter(), B = memoryAdapter();
+      freshRun(1234, { store: A, mode: "commonsLamp" });
+      await settle();
+      for (const [key, how] of [["0,0,1", "down"], ["0,0,2", "down"], ["0,0,3", "down"]]) { game.debug.enterZone(key, how); playing(game, "map"); await settle(); }
+      await checkpoint(game); await whenWritten(game);
+      const atCp = await digestGame(game, ["0,0,2"]);
+      game.debug.enterZone("0,0,2", "up"); playing(game, "map");
+      game.zone.items.push({ kind: "bomb", count: 9, x: 4, y: 4, z: 0 });
+      game.debug.enterZone("0,0,3", "down"); playing(game, "map");   // 0,0,2 left: held, its keep to come
+      await saveGame(game, { store: B });
+      useStore(B);
+      game.hurtPlayer(99999, "a test");
+      await game.saving.restoring;
+      await wakeAtCheckpoint(game);
+      const n4 = problems.length;
+      compare("a save to another store with a held zone's copy to come: woken there", { ...atCp, state: "", player: "", run: "", ids: "" }, { ...(await digestGame(game, ["0,0,2"])), state: "", player: "", run: "", ids: "" });
+      res.push(`a save to another store with 0,0,2 left and held (its copy to come): woken ${problems.length === n4 ? "with 0,0,2 as at the checkpoint" : "CHANGED"}`);
+    }
     RULES.auto = false;
     // A run on the real world, loaded while new runs are built on the test world.
     const { REAL_WORLD } = await import("../../src/content/world/worldmap.js");

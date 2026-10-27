@@ -336,6 +336,9 @@ function writeSave(game, { reason = "manual", store, slotId, clean = false, chec
   // The snapshot: everything live is read in these lines, and nothing after them. A checkpoint's rows are its
   // baseline (cp: the last checkpoint's number, so the first overwrite after it keeps them).
   const zones = [...game.zones.values()].filter((z) => visited(game, z) && (z === game.zone || moved || (!sv.committed.has(z.key) && !sv.pending.has(z.key))));
+  // Saved to another slot: the zones left since the old slot's last save are snapshotted afresh below, and the keeps
+  // their held rows would have made never happened (so they are made in the new slot).
+  if (moved) for (const r of old.held.splice(0)) { unpend(old, r.zone); if (r.keep) old.kept?.delete(r.zone); }
   if (moved && sv.cp) sv.kept = new Set(old.kept || []);   // (the copies come over below, and the rows as they stand)
   const prev = cpSave ? { cp: sv.cp, cpRecord: sv.cpRecord, kept: new Set(sv.kept || []) } : null;   // (if this one fails)
   if (cpSave) sv.kept = new Set();   // (the last checkpoint's copies go: this one keeps its own)
@@ -352,7 +355,6 @@ function writeSave(game, { reason = "manual", store, slotId, clean = false, chec
   }
   // The zones you left since the last save, written behind with this slot record (writeZone): with a checkpoint,
   // part of its baseline. (Saved to another slot, they are snapshotted afresh above.)
-  if (moved) for (const r of old.held.splice(0)) unpend(old, r.zone);
   const held = sv.held.splice(0);
   if (cpSave) for (const r of held) { r.keep = false; r.copy = true; sv.kept.add(r.zone); }
   const n = cpSave ? Math.max(sv.cp, sv.cpTop || 0) + 1 : sv.cp;   // (a number is never used twice, a failed one included)
