@@ -14,7 +14,7 @@ import { registerScreen, pushMode, popMode } from "../screens.js";
 import { offerPerks, offerPowers, takePerk, PERKS, perkLabel } from "../leveling.js";
 import { drawLevelUp, levelUpClick } from "../hud.js";
 import { RULES } from "../rules.js";
-import { attr, mod, raiseAttr, ATTRS } from "../stats.js";
+import { attr, mod, raiseAttr, maxHp, ATTRS } from "../stats.js";
 import { GENOTYPES } from "../content/genotypes.js";
 import { TREES } from "../content/powers.js";
 import { UI, modal, box, listKey, listAt, listWheel, wrap, keyHelp, hit } from "../ui.js";
@@ -44,7 +44,7 @@ export function choosePerk(game, k) {
 
 // --- The attribute set's card ----------------------------------------------------------------------------------
 // Levels are resolved in the order they came (two at once: level 9, then 10), each with its own offers.
-const card = { level: 0, gift: false, milestone: false, step: "power", sel: 0, top: 0, gains: [] };
+const card = { level: 0, gift: false, milestone: false, draw: 0, step: "power", sel: 0, top: 0, gains: [] };
 export const levelCard = (game) => ({ ...card, rows: rowsOf(game) });
 
 function openCard(game, p) {
@@ -53,15 +53,20 @@ function openCard(game, p) {
   if (gift) p.bonusPerks--; else p.pendingLevels--;
   const milestone = !gift && level % RULES.progression.level.milestoneEvery === 0;
   const draw = gift ? (p.giftDraws = (p.giftDraws || 0) + 1) : 0;
-  game.perkChoices = offerPowers(game, p, { level, milestone, draw });
+  Object.assign(card, { level, gift, milestone, draw });
+  offer(game);
   const G = GENOTYPES[p.genotype];
   const gains = gift ? [] : [`+${Math.max(RULES.hp.perLevelMin, RULES.hp.perLevel + mod(p, "tou"))} max HP`,
     G?.creasesPerLevel && `+${G.creasesPerLevel} crease`, level % RULES.progression.level.attrPointEvery === 0 && "an attribute point"].filter(Boolean);
-  Object.assign(card, { level, gift, milestone, gains, sel: 0, top: 0, step: p.attrPoints > 0 ? "attr" : "power" });
+  Object.assign(card, { gains, sel: 0, top: 0, step: p.attrPoints > 0 ? "attr" : "power" });
   if (card.step === "power" && !game.perkChoices.length) return;   // nothing left to learn and no point to spend
   game.travel = null;
   pushMode(game, "levelup");
 }
+
+// The powers this card offers, drawn again once its attribute points are spent: INT raised to 18 there makes 4
+// (the same seed, level and draw: the same powers, and one more).
+function offer(game) { game.perkChoices = offerPowers(game, game.player, { level: card.level, milestone: card.milestone, draw: card.draw }); }
 
 // The rows of the step on show: an attribute and what it would become, or a power.
 function rowsOf(game) {
@@ -74,8 +79,14 @@ function take(game, row) {
   const p = game.player;
   if (!row) return;
   if (row.attr || row.later) {
-    if (row.attr) { raiseAttr(p, row.attr, 1); p.attrPoints--; game.log(`You raise your ${row.attr.toUpperCase()} to ${attr(p, row.attr)}.`, [255, 230, 120]); }
-    if (row.later || !(p.attrPoints > 0)) Object.assign(card, { step: "power", sel: 0, top: 0 });
+    if (row.attr) {
+      const before = maxHp(p);
+      raiseAttr(p, row.attr, 1);
+      p.attrPoints--;
+      p.hp += Math.max(0, maxHp(p) - before);   // more TOU: the HP it adds (to every level so far) you have at once
+      game.log(`You raise your ${row.attr.toUpperCase()} to ${attr(p, row.attr)}.`, [255, 230, 120]);
+    }
+    if (row.later || !(p.attrPoints > 0)) { Object.assign(card, { step: "power", sel: 0, top: 0 }); offer(game); }
     if (card.step === "power" && !game.perkChoices.length) popMode(game);
     return;
   }
