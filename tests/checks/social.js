@@ -847,6 +847,10 @@ export async function run(env) {
     const wh2 = bond("tracing", t1, { ego: 24 }), wh3 = bond("tracing", t1, { ego: 24 });
     if (wh2.moved.hollowmere !== 10 || wh3.moved.hollowmere || ritual.kin(game, t1).net !== 120) fail(`Warm Hands at net 110, EGO 24: +${wh2.moved.hollowmere} then +${wh3.moved.hollowmere || 0}, net ${ritual.kin(game, t1).net}; want +10, then 0, net 120`);
     p().perks = {}; setEgo(16);
+    // A later Kindling leaves a sacrament in your pack (nothing would come of pouring it).
+    p().inv = [{ kind: "vial", effect: "glim", count: 1 }];
+    bond("tracing", t1);
+    if (!p().inv.some((i) => i.kind === "vial" && i.effect === "glim")) fail(`a later Kindling poured the sacrament: ${JSON.stringify(p().inv)}`);
     // The Tracing with a vial of ink: the ink is spent, not glim.
     setup();
     const t1b = named("mira", "villager", "flatfolk", { near: [1, 0], name: "Ink" });

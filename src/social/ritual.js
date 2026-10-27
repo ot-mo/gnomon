@@ -191,12 +191,12 @@ export function performRite(game, c, rite) {
     const r = skipTime(game, K.snuffing.hours * worldHour(), { reason: "kindling" });
     if (r.interrupted) return { ok: false, text: "Something moves in the dark, and the hour breaks before it's out.", changes: {} };
   }
-  const sac = sacramentVial(game, c);
+  const ks = kstate(game), key = kinKey(game, c), was = ks.kin[key];
+  const sac = was ? null : sacramentVial(game, c);   // poured at the bond only: later, it would earn nothing
   const poured = sac?.effect ?? null;
   if (sac) { takeOne(p, sac); addToInventory(p, { kind: "vial", effect: "" }); }
   const changes = {}, ego = egoFactor(game);
   const gain = (id, n) => { const m = n > 0 ? Math.round(n * ego) : n; if (m) { changes[id] = (changes[id] || 0) + m; } };
-  const ks = kstate(game), key = kinKey(game, c), was = ks.kin[key];
   if (was) {   // a later Kindling: Warm Hands' +20 (EGO's share first), within the cap
     const room = K.cap - (was.net || 0), n = hasKey(p.perks, "warmHands") ? Math.min(Math.round(K.warmHands * ego), room) : 0;
     if (n > 0) { changes[f] = n; was.net = (was.net || 0) + n; }
