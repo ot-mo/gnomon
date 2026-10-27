@@ -49,7 +49,7 @@ import { buildApronBand, apronBandSteps, forgetBands } from "./apron.js";
 import { builderFor, LANDMARK_BUILDERS } from "./biomes/index.js";
 import { withHelpers, populate } from "./biomes/common.js";
 import { TREE_TRUNK } from "./biomes/legend.js";
-import { biomeFor } from "../content/biomes.js";
+import { biomeFor, SETTLED_KINDS } from "../content/biomes.js";
 export { SITE_BUILDERS } from "../world/sites.js";
 export { BIOME_BUILDERS, TEST_BUILDERS, builderFor } from "./biomes/index.js";
 export { worldFns, heightAt, treeAt, SURFACE_RULES, portsOf, buildApronBand };
@@ -116,9 +116,9 @@ function* zoneSteps(run, wx, wy) {
   }
   zone.problems = problems;   // empty unless every attempt failed (check-landmarks reports it)
   // The wildlife, once the zone stands: the biome's spawn table, on map ground the anchor reaches (the reach
-  // validateSurface measured; creatures change no block, so the verdict holds).
+  // validateSurface measured; creatures change no block, so the verdict holds). None in a settlement's span.
   const { dress, mapReach } = zone.gen;
-  if (dress.biome.spawns?.length) populate(dress, mapReach);
+  if (dress.biome.spawns?.length && !dress.settled) populate(dress, mapReach);
   delete zone.gen.dress; delete zone.gen.mapReach;
   return zone;
 }
@@ -350,6 +350,7 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
   const ctx = withHelpers({
     run, zone, tile, site, rng, level: zone.level, biome: bio, ports: base.ports, margin: R.siteMargin, hub,
     H, water, road, cliff: base.cliff, base, busy, local, scenery, footprint: reserved, clearings,
+    settled: (!!L && SETTLED_KINDS.includes(L.kind)) || sites.some((s) => s.kind === "village"),
     planned: new Uint8Array(n), jump: new Uint8Array(n), walls: new Uint8Array(n),
     made: { plateaus: [], ramps: [], caches: [], ponds: [] }, cosmetic: makeRng(seedFor(seed, "cosmetic")),
   });

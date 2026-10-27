@@ -50,7 +50,7 @@ import { generateSurface, surfaceSteps, validateSurface, worldFns, buildApronBan
          BIOME_BUILDERS, TEST_BUILDERS } from "../../src/gen/surface.js";
 import { edgePorts, portsOf, portTable } from "../../src/gen/ports.js";
 import { apronBandSteps } from "../../src/gen/apron.js";
-import { biomeFor, BIOMES, DEFAULT_BIOME, PROPS } from "../../src/content/biomes.js";
+import { biomeFor, BIOMES, DEFAULT_BIOME, PROPS, SETTLED_KINDS } from "../../src/content/biomes.js";
 import { WILDLIFE } from "../../src/content/creatures/wildlife.js";
 import { TERRAINS } from "../../src/content/world/terrains.js";
 import { TEST_TERRAINS } from "../../src/content/world/test-world.js";
@@ -531,6 +531,22 @@ function builders(fail, out) {
     for (const [id, ok] of want) if (!ok) fail(`legend "${id}" didn't build what it says`);
     out.legend = want.length;
   }
+  // Settlements hold no wildlife: every span of a settled landmark, on 5 seeds.
+  {
+    let spans = 0;
+    for (const seed of [1, 7, 42, 1234, 31337]) {
+      const run = buildRun(seed, REAL_WORLD);
+      for (const L of run.world.landmarks.values()) {
+        if (!SETTLED_KINDS.includes(L.kind)) continue;
+        for (const [wx, wy] of L.spans || [[L.wx, L.wy]]) {
+          spans++;
+          const wild = generateSurface(run, wx, wy).creatures.filter((c) => WILDLIFE[c.type]);
+          if (wild.length) fail(`seed ${seed}: ${L.name} (${wx}, ${wy}) holds ${wild.length} wildlife (${wild[0].type})`);
+        }
+      }
+    }
+    out.settled = spans;
+  }
   // 14. The Gnomon's foot.
   let feet = 0;
   for (const seed of [1, 7, 42, 1234, 31337]) {
@@ -542,7 +558,7 @@ function builders(fail, out) {
     else feet++;
   }
   out.builders = `${Object.keys(BIOME_BUILDERS).length} real biome builders, ${Object.keys(TEST_BUILDERS).length} test; ${Object.keys(WILDLIFE).length} wildlife types; ` +
-    `${WS2_LEGEND.length} legend handlers, ${out.legend} built right; the Gnomon's 14-block foot on ${feet} seeds; ${out.sub} raised columns of their sub-ground`;
+    `${WS2_LEGEND.length} legend handlers, ${out.legend} built right; the Gnomon's 14-block foot on ${feet} seeds; no wildlife in ${out.settled} settlement spans; ${out.sub} raised columns of their sub-ground`;
 }
 
 // tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser).

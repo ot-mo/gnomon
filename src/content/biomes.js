@@ -193,6 +193,10 @@ export const BIOMES = {
   },
 };
 
+// The landmark kinds that are settlements (bible §5: Hollowmere, Benchmark, Molar, Folio, Halfnight, Saltpage,
+// Foldmother): their spans, and a per-run village's, have no wildlife (people live there; a run starts in one).
+export const SETTLED_KINDS = ["startVillage", "hub", "passTown", "flatTown", "holyCity", "monastery", "treeVillage"];
+
 export const biomeOf = (id) => ({ ...DEFAULT_BIOME, ...(BIOMES[id] || {}) });
 // The biome data of a world's span: its biome's when its terrain is the real world's, else the defaults.
 export const biomeFor = (world, tile) => (world.terrains[tile.terrain] === TERRAINS[tile.terrain] ? biomeOf(tile.biome) : { ...DEFAULT_BIOME });
