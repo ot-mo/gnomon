@@ -44,6 +44,7 @@ function samples() {
   out.push({ kind: "knife", count: 3 }, { kind: "bomb", count: 1 }, { kind: "key" }, { kind: "heart" }, { kind: "strength" },
     { kind: "gold", amount: 7 }, { kind: "cash", amount: 7 }, { kind: "cube" },
     { kind: "quest", id: "skull", name: "Brann's skull", info: "A ghost wants this back." }, { kind: "relic?" });
+  out.push({ kind: "vial", effect: "brine", count: 1 }, { kind: "coinage", effect: "glim", count: 3 });   // WS6b
   return out;
 }
 
