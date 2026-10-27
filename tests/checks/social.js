@@ -999,6 +999,10 @@ export async function run(env) {
     const s0 = F.repOf(game, "survey");
     events.emit(game, "kill", { c: v2, src: null });
     if (F.repOf(game, "survey") !== s0 || merchants.snuffed(game)) fail("an accidental death counted as oathbreaking");
+    const v3 = named("mira", "villager", "clatter", { near: [0, 1], name: "Ivy" });
+    ritual.performRite(game, v3, "tracing");
+    events.emit(game, "kill", { c: v3, src: p(), splash: true });   // a lightning arc, thorns
+    if (F.repOf(game, "survey") !== s0 || merchants.snuffed(game)) fail("a splash kill counted as oathbreaking");
   }
 
   // --- 12. Restock on zone:enter after two world days ------------------------------------------------------------------

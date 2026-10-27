@@ -25,7 +25,7 @@
 // workstream's rule: below that it wouldn't kindle with you).
 // A later rite with flame-kin gives nothing, or +20 with the Warm Hands power, within the cap.
 //
-// Oathbreaking: killing a flame-kin yourself ("kill" with you as the source; falls and your followers don't count)
+// Oathbreaking: killing a flame-kin yourself ("kill" with you as the source; falls, splash and your followers don't count)
 // costs −120 with every faction and marks you the Snuffer: the Lantern Moths drop to −600, and for 7 world days
 // prices are +20% (social/merchants.js) and nobody will kindle with you. (Your torch's radius −1 and no shadow in 3D
 // are the renderer's: integration request.)
@@ -354,8 +354,10 @@ export function openRitual(game, c, { onPop } = {}) {
 }
 
 // --- Oathbreaking ------------------------------------------------------------------------------------------------------
-on("kill", (game, { c, src }) => {
-  if (!c || !game.state?.kindling || src !== game.player) return;
+// Not on purpose: a kill with no source (a fall), by a follower, or marked splash (thorns, a lightning arc: combat.js
+// marks them { splash: true }, integration request) is no oath broken (bible §3.3).
+on("kill", (game, { c, src, splash }) => {
+  if (!c || !game.state?.kindling || src !== game.player || splash) return;
   const ks = game.state.kindling, key = kinKey(game, c);
   if (!ks.kin[key]) return;
   ks.followers = (ks.followers || []).filter((x) => x !== key);
