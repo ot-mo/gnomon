@@ -19,13 +19,13 @@ export const IMPLANTS = {
     info: "A ground lens over one eye. You read a creature's exact health, armour, defence and weaknesses." },
   tallyEye: { name: "tally-eye", parts: ["face"], grade: 1, effect: "readsArtifacts", bonus: { examine: 2 },
     info: "Counts what it sees. Shows an artifact's complexity and a cell's charge; +2 to examine." },
-  darkLens: { name: "dark lens", parts: ["face"], grade: 2, bonus: { darkSight: 2 }, effect: "darkLens",
+  darkLens: { name: "dark lens", parts: ["face"], grade: 2, bonus: { darkSight: 3 }, effect: "darkLens",   // 4 tiles (player.js torchRange: darkSight × 1.5, at most 4)
     info: "A smoked lens that drinks the dark. With your torch out you still see a little way." },
   plumbEar: { name: "plumb-line ear", parts: ["head"], grade: 2, effect: "plumbEar",
     info: "A weighted thread in the inner ear. Pits and chasms within 6 tiles mark themselves on your map." },
   surveyLens: { name: "survey lens", parts: ["head"], grade: 3, effect: "surveyLens",
     info: "The Survey's own lens. What you see in 3D goes onto your map from twice as far." },
-  lampCrown: { name: "lamp crown", parts: ["head"], grade: 2, bonus: { torch: 0.3 },
+  lampCrown: { name: "lamp crown", parts: ["head"], grade: 2, bonus: { torch: 1 / 3 },   // +2 tiles on the torch's 6
     info: "A ring of oil-lit wicks set in the scalp. Your torch reaches further, and your hands stay free." },
   planeShunt: { name: "plane-shunt", parts: ["head"], grade: 6, ability: "planeShunt",
     info: "A switch behind the ear that folds you down into the Plane: Flat for 4 s." },

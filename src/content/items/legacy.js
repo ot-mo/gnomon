@@ -127,7 +127,7 @@ export const ARMOURS = {
   reedHat:   { name: "reed hat",     armour: 0, str: 0,  tier: 1, metal: false, slot: "head" },
   copperCap: { name: "copper cap",   armour: 1, str: 8,  tier: 1, metal: true,  slot: "head" },
   ironHelm:  { name: "iron helm",    armour: 2, str: 12, tier: 2, metal: true,  slot: "head" },
-  goggles:   { name: "dark goggles", armour: 0, str: 0,  tier: 2, metal: false, slot: "face", bonus: { darkSight: 1 } },
+  goggles:   { name: "dark goggles", armour: 0, str: 0,  tier: 2, metal: false, slot: "face", bonus: { darkSight: 4 / 3 } },   // 2 tiles with the torch out
   cloak:     { name: "cloak",        armour: 0, str: 0,  tier: 1, metal: false, slot: "back", bonus: { stealth: 0.1 } },
   bracers:   { name: "bracers",      armour: 1, str: 9,  tier: 1, metal: false, slot: "arm" },
   gloves:    { name: "gloves",       armour: 0, str: 0,  tier: 1, metal: false, slot: "gloves" },

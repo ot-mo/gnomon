@@ -208,7 +208,7 @@ export function checkItems(m) {
       if (IM.gradeUsed(p) !== 2 || IM.gradeFree(p) !== 0) fail(`${view}: grade ${IM.gradeUsed(p)} used, ${IM.gradeFree(p)} free (want 2, 0)`);
       want(`${view}: a second implant over the grade`, withC(() => IM.canInstall(game, p, { kind: "implant", id: "tallyEye" }, "face")), "grade");
     }
-    if (!same(fit.map, fit["3d"]) || fit.map.dt !== IM.FITTING_TIME || fit.map.fee !== 50 || fit.map.torch !== 0.3) fail(`fitting: map ${JSON.stringify(fit.map)}, 3D ${JSON.stringify(fit["3d"])} (want 60 s, 50 glim, torch +0.3 in both)`);
+    if (!same(fit.map, fit["3d"]) || fit.map.dt !== IM.FITTING_TIME || fit.map.fee !== 50 || fit.map.torch !== 0.333) fail(`fitting: map ${JSON.stringify(fit.map)}, 3D ${JSON.stringify(fit["3d"])} (want 60 s, 50 glim, torch +1/3 in both)`);
     stats.fitting = fit;
     // Refusals that cost nothing: no purse, a hunt.
     p = fresh();
@@ -278,6 +278,18 @@ export function checkItems(m) {
     const ab = m.abilities.abilitiesOf(p).find((a) => a.id === "planeShunt");
     if (ab?.source !== "implant" || ab.item !== shunt) fail(`the plane-shunt's ability: ${JSON.stringify(ab)}`);
     if (!m.abilities.activate(game, p, "planeShunt", null) || !m.status.hasStatus(p, "flat")) fail("the plane-shunt didn't make you Flat");
+    // The bible's tile counts (§13.3, §13.6) through player.js torchRange: the dark lens 4 tiles and dark goggles 2 with the
+    // torch out; the lamp crown +2 on a lit torch's 6.
+    {
+      const sight = {};
+      for (const [what, put] of [["lens", (q) => IM.grantImplant(q, "darkLens")], ["goggles", (q) => Bd.equip(game, q, { kind: "armour", id: "goggles", ench: 0, known: true }, "face")],
+                                 ["crown", (q) => IM.grantImplant(q, "lampCrown")]]) {
+        const q = fresh(); put(q); q.torch = what === "crown";
+        sight[what] = +m.player.torchRange(q).toFixed(3);
+      }
+      if (sight.lens !== 4 || sight.goggles !== 2 || sight.crown !== 8) fail(`sight: dark lens ${sight.lens} tiles (4), goggles ${sight.goggles} (2), lamp crown's torch ${sight.crown} (8)`);
+      stats.sight = sight;
+    }
     // The dial spine: once a world day (1,440 s of game time) at any WIL.
     const spineAt = {};
     for (const wil of [10, 24]) {
