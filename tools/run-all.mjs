@@ -10,7 +10,7 @@ import { spawn } from "node:child_process";
 import { ROOT, parseArgs } from "./node-env.mjs";
 
 // p95 generation budget; skipTime budget (check-stats replays check-status, its 60 ms skip included); §6.7's budgets
-const TIMED = new Set(["check-dungeons.mjs", "check-status.mjs", "check-stats.mjs", "check-perf.mjs"]);
+const TIMED = new Set(["check-dungeons.mjs", "check-status.mjs", "check-stats.mjs", "check-story.mjs", "check-perf.mjs"]);   // (check-story: the history's 50 ms a seed, WS7a #8)
 const SLOW = ["check-edges.mjs", "check-bot.mjs", "check-landmarks.mjs", "check-determinism.mjs", "check-hud.mjs"];   // started first
 
 const args = parseArgs();
