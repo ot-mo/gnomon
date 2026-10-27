@@ -119,13 +119,14 @@ try {
     });
     if (!set) { problems.push(`${w}: no room for the villagers`); await page.close(); continue; }
     const key = { "1,0": "ArrowRight", "-1,0": "ArrowLeft", "0,1": "ArrowDown", "0,-1": "ArrowUp" }[set.side.join()];
-    await page.keyboard.press(key); await frames(4);
+    // Shift + the direction: on the map a creature not out for you is in the way, and Shift strikes it (WS8's turns.js).
+    await page.keyboard.down("Shift"); await page.keyboard.press(key); await page.keyboard.up("Shift"); await frames(4);
     const after = await page.evaluate(async () => {
       const F = await import("/src/factions.js"), g = window.game, { v, w } = window.__ws6;
       return { rep: F.repOf(g, "hollowmere"), att: [v, ...w].map((c) => F.attitude(g, c, g.player)), alive: g.zone.creatures.includes(v), log: (g.messages || g.logLines || []).slice?.(-4) };
     });
     const t = await frameText();
-    log(`  struck the reed-cutter on the map (${key}): Hollowmere ${set.rep} → ${after.rep}; attitudes ${set.att.join("/")} → ${after.att.join("/")}`);
+    log(`  struck the reed-cutter on the map (Shift+${key}): Hollowmere ${set.rep} → ${after.rep}; attitudes ${set.att.join("/")} → ${after.att.join("/")}`);
     if (after.rep !== set.rep - 10) problems.push(`${w}: Hollowmere ${set.rep} → ${after.rep}, want −10`);
     if (after.att.some((a) => a !== "hostile")) problems.push(`${w}: after the blow ${after.att.join(", ")}`);
     const saw = await page.evaluate(() => window.game.messages.map((m) => m.text).filter((t) => /saw you strike/.test(t)));
