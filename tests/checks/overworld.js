@@ -49,7 +49,7 @@ import { ENCOUNTERS } from "../../src/content/encounters.js";
 import { enterWorldMap, worldStep, fastTravel, leaveWorldMap, travelPath, answer } from "../../src/overworld/travel.js";
 import { rest } from "../../src/overworld/rest.js";
 import { reveal, isKnown, pin, pinsAt, knownSites, discoveryXp, sight } from "../../src/overworld/discovery.js";
-import { encounterChance, rollEncounter, placeEncounter, legendsFor } from "../../src/overworld/encounters.js";
+import { encounterChance, rollEncounter, placeEncounter, legendsFor, hiddenSiteRoll } from "../../src/overworld/encounters.js";
 import { atlas, canStep, edgeBetween, spanKey, OW } from "../../src/overworld/state.js";
 import { isLost } from "../../src/overworld/lost.js";
 import { worldView } from "../../src/overworld/renderWorld.js";
@@ -715,6 +715,19 @@ function discovery(G, scr, problems) {
       if (!isKnown(g4, L4.wx, L4.wy)) problems.push("discovery: Halfnight with visibleFrom 2 not seen from 2 spans east of its east end");
       out.sight = true;
     }
+  }
+  // The hidden-site rate: 4,000 rolls on a span with one site you don't know: the bible's 10%, 20% with Keen Eye
+  // (§4.9, §15.6; ±2 points).
+  {
+    const g8 = fresh(G, 78, G.game.world), A8 = atlas(g8);
+    const s8 = [...g8.run.sites.values()].find((x) => x.kind !== "landmark" && !A8.found[x.id] && (g8.run.sitesAt.get(spanKey(x.at.wx, x.at.wy)) || []).length === 1);
+    const rate = () => { let n = 0; for (let k = 0; k < 4000; k++) if (hiddenSiteRoll(g8, s8.at)) n++; return n / 4000; };
+    const plain = rate();
+    g8.player.perkRank = { ...(g8.player.perkRank || {}), keenEyeSites: 1 };
+    const keen = rate();
+    delete g8.player.perkRank.keenEyeSites;
+    out.hiddenRate = { plain, keen };
+    if (Math.abs(plain - 0.1) > 0.02 || Math.abs(keen - 0.2) > 0.02) problems.push(`discovery: hidden sites found ${plain} (want 0.1), ${keen} with Keen Eye (want 0.2)`);
   }
   // Fast travel asks about no hidden site: a journey onto a span counted visited whose site isn't found, at a
   // hidden-site chance of 1, arrives without a prompt and records nothing.
