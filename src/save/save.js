@@ -313,9 +313,18 @@ function writeSave(game, { reason = "manual", store, slotId, clean = false, chec
     json = JSON.stringify(rec);
   }
   sv.live = clean ? null : SESSION;
+  // A session ending here (save and quit): no save asked for before it may land after it with live set again. The
+  // automatic ones stop for this slot, and the waiting ones are answered by this one.
+  sv.quitting = clean;
+  const answered = [];
+  if (clean) {
+    autoFor(game).want = null;
+    for (const w of waiting.splice(0)) (w.game === game ? answered : waiting).push(w);
+  }
   const job = { rows: [...(cpSave ? [{ op: { op: "clear", store: "checkpointZones", slot: sv.slotId } }] : []), ...carry, ...held, ...rows, { slot: json }],
                 checkpoint: cpSave ? n : 0, before: moved ? old.queue : null };
   job.after = (e) => {
+    if (e && clean) { sv.quitting = false; waiting.push(...answered); }   // (the session goes on: so do they)
     for (const c of carry) if (c.carry.into === "zones") { unpend(sv, c.carry.key); if (!e) sv.committed.add(c.carry.key); }
     sv.last = { reason, at: Date.now(), ok: !e };
     if (e) { failed(game, sv, `saving slot ${sv.slotId}`, e); return; }
@@ -325,7 +334,9 @@ function writeSave(game, { reason = "manual", store, slotId, clean = false, chec
   };
   const done = submit(game, sv, job);
   for (const r of rows) sv.stored.set(r.zone, now);
-  return done.then(() => ({ id: sv.slotId, updated: now, zones: keys.size, reason, ...(cpSave ? { checkpoint: n } : {}) }));
+  const meta = done.then(() => ({ id: sv.slotId, updated: now, zones: keys.size, reason, ...(cpSave ? { checkpoint: n } : {}) }));
+  meta.then((m) => { for (const w of answered) w.resolve(m); }, () => {});
+  return meta;
 }
 
 // Write-behind: the zone you leave, after every other zone:leave handler (the clock catches up first), snapshotted
@@ -352,7 +363,7 @@ function autoFor(game) {
   if (!a) AUTO.set(key, (a = { play: 0, travel: 0, want: null, hidden: false }));
   return a;
 }
-const autoOn = (game) => SAVE_RULES.auto && !!(game.run && game.state && game.player) && !game.saving?.dead && !!(game.saving || currentStore());
+const autoOn = (game) => SAVE_RULES.auto && !!(game.run && game.state && game.player) && !game.saving?.dead && !game.saving?.quitting && !!(game.saving || currentStore());
 export function requestSave(game, reason, { delay = 0, checkpoint: cp = false } = {}) {
   const a = autoFor(game), at = (game.uiTime || 0) + delay;
   a.want = { reason: a.want ? `${a.want.reason}+${reason}` : reason, at: a.want ? Math.max(a.want.at, at) : at, checkpoint: !!(a.want?.checkpoint || cp) };
@@ -438,7 +449,7 @@ export function pageShown(game) {
   const a = game.run && AUTO.get(game.run);
   if (!a?.hidden) return;
   a.hidden = false;
-  if (game.saving && !game.saving.dead) requestSave(game, "back");   // live again
+  if (game.saving && !game.saving.dead && !game.saving.quitting) requestSave(game, "back");   // live again
 }
 export function listenPage(doc, win, game = null) {
   const g = () => game || theGame;   // (save/index.js listens while game.js is still loading)

@@ -1011,7 +1011,28 @@ async function ws9Sections(ctx) {
     RULES.oneWick.unclean = "warn";
     if (code !== "unclean" || !gone || graves.length !== g0 + 1 || !/without a save/.test(graves[graves.length - 1]?.cause) || lamp !== "loaded")
       fail(`One Wick's unclean death: ${code}, slot gone ${gone}, graves ${g0} → ${graves.length} (${graves[graves.length - 1]?.cause}); a Commons Lamp slot ${lamp}`);
+    // Save and quit while a zone change's save is still to come (Esc twice within its half second): nothing lands after
+    // the clean save, so the slot stays clean.
+    {
+      RULES.auto = true;
+      const { optionItems } = await import("../../src/screens/options.js");
+      const qs = memoryAdapter({ latency: 600 });   // (the clean save still in flight when the change's save falls due)
+      freshRun(1234, { store: qs, view: "3d" });
+      await settle();
+      game.debug.enterZone("0,0,1", "down"); playing(game, "3d");   // (its save half a second on)
+      inputHandlers.onLockChange(false);                            // Esc under the lock: the pause card
+      inputHandlers.onKeyDown("Escape", false, "Escape");           // Esc on it: the options
+      const k = optionItems(game).findIndex((it) => it.id === "quit");
+      for (let j = 0; j < k; j++) inputHandlers.onKeyDown("ArrowDown", false, "ArrowDown");
+      inputHandlers.onKeyDown("Enter", false, "Enter");
+      for (let j = 0; j < 90; j++) { game.debug.step(1 / 60); await tick(8); }
+      await whenWritten(game); await tick(40); await whenWritten(game);
+      const quit = await slotOf(qs, game.saving.slotId);
+      if (game.mode !== "title" || quit.live !== null || quit.where.zoneKey !== "0,0,1") fail(`save and quit with a zone change's save to come: mode ${game.mode}, live ${quit.live}, in ${quit.where.zoneKey} (${game.saving.last?.reason})`);
+      RULES.auto = false;
+    }
     stats.unclean = "a load after a session with no clean save counts 1 (written back at once, live this session's); a clean save clears live and the next load counts nothing; " +
+      "save and quit within a zone change's half second leaves the slot clean (the change's save answered by it); " +
       `One Wick's "death" rule: the load refused (code unclean), the slot gone, a grave ("${graves[graves.length - 1]?.cause}"); a Commons Lamp life loads under it`;
   }
 
