@@ -56,6 +56,7 @@ import { TERRAINS } from "../../src/content/world/terrains.js";
 import { TEST_TERRAINS } from "../../src/content/world/test-world.js";
 import { legendHandlers } from "../../src/gen/vaults.js";
 import { WS2_LEGEND } from "../../src/gen/biomes/legend.js";
+import { CRYSTAL_SHARE } from "../../src/gen/biomes/common.js";
 import { CREATURE_TYPES } from "../../src/creatures.js";
 import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../../src/pathing.js";
 import { FAMILY_GLYPHS } from "./creatures.js";
@@ -80,7 +81,7 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
   const apron = { pairs: 0, columns: 0, left: 0, leftDiffer: 0, voxels: 0, corners: 0, decoys: 0, told: 0 };
   const liquids = { zones: 0, rivers: 0, byLiquid: {} };
   const swap = { cold: [], warm: [], same: 0 };
-  const dressed = { byBiome: {}, plateaus: 0, ramps: 0, caches: 0, creatures: 0, props: 0, tops: 0, topsReached: 0, sub: 0, localColumns: 0, overMarked: 0 };
+  const dressed = { byBiome: {}, plateaus: 0, ramps: 0, caches: 0, creatures: 0, props: 0, tops: 0, topsReached: 0, sub: 0, localColumns: 0, overMarked: 0, rewards: 0, crystals: 0 };
 
   for (const seed of seeds) {
     const run = buildRun(seed, REAL_WORLD), world = run.world, W = worldFns(world, run.seed);
@@ -334,6 +335,11 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
     if (data.ramps?.[1] > 0 && !b.ramps) fail(`biome ${id}: no ramp in ${b.n} zones`);
   }
 
+  // 10d. Rewards stay prizes (the user's taste: meaningful to the end): crystals at most twice CRYSTAL_SHARE of the
+  // plateaus' and caches' rewards, once there are 100 of them.
+  if (dressed.rewards >= 100 && dressed.crystals > 2 * CRYSTAL_SHARE * dressed.rewards)
+    fail(`${dressed.crystals} of ${dressed.rewards} plateau and cache rewards are crystals (want at most ${(200 * CRYSTAL_SHARE).toFixed(0)}%)`);
+
   // 11-14.
   builders(fail, dressed);
 
@@ -347,7 +353,7 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
   if (apron.pairs < pairs * seeds.length) fail(`only ${apron.pairs} apron pairs found`);
   stats.spans = `${zones} zones (${spans} a seed × ${seeds.length} seeds, the real world), ${retried} needed a retry, ${twice} made twice the same`;
   stats.navigability = `map: min ${(100 * navs[0]).toFixed(1)}%, p5 ${(100 * q(navs, 0.05)).toFixed(1)}%, mean ${(100 * navs.reduce((a, b) => a + b, 0) / navs.length).toFixed(1)}%; ground the map doesn't walk (cliff tops, plateaus) ${(ground3d / zones).toFixed(0)} columns a zone, ${(100 * dressed.topsReached / Math.max(1, dressed.tops)).toFixed(0)}% of the cliff tops reached in 3D`;
-  stats.dressing = `${dressed.localColumns} columns marked local away from footprints and canopies, ${dressed.overMarked} of them the world function's; ${dressed.plateaus} plateaus, ${dressed.ramps} ramps, ${dressed.caches} caches, ${dressed.creatures} creatures, ${dressed.props} props over ${zones} zones; ` +
+  stats.dressing = `${dressed.rewards} plateau and cache rewards, ${dressed.crystals} crystals; ${dressed.localColumns} columns marked local away from footprints and canopies, ${dressed.overMarked} of them the world function's; ${dressed.plateaus} plateaus, ${dressed.ramps} ramps, ${dressed.caches} caches, ${dressed.creatures} creatures, ${dressed.props} props over ${zones} zones; ` +
     Object.entries(dressed.byBiome).map(([k, v]) => `${k} ${v.n}: ${v.plateaus}/${v.ramps}/${v.caches}/${v.creatures}/${v.props}`).join(", ") + " (plateaus/ramps/caches/creatures/props)";
   stats.builders = dressed.builders;
   stats.ms = `generateSurface p50 ${ms(q(times, 0.5))}, p95 ${ms(p95)}, max ${ms(max)}${budget ? " (budget held)" : " (budget: --budget, alone)"}`;
@@ -407,7 +413,9 @@ function dressing(z, t, out, fail, at, W) {
         if (onMap(x, y)) fail(`${at}: the plateau at (${p.x}, ${p.y}) is walked onto on the map at (${x}, ${y})`);
         if (!in3d(x, y)) fail(`${at}: the plateau at (${p.x}, ${p.y}) can't be reached in 3D at (${x}, ${y})`);
       }
-    if (!z.items.some((it) => Math.floor(it.x) === p.reward.x && Math.floor(it.y) === p.reward.y && it.z === p.z)) fail(`${at}: the plateau at (${p.x}, ${p.y}) has no reward`);
+    const it = z.items.find((i) => Math.floor(i.x) === p.reward.x && Math.floor(i.y) === p.reward.y && i.z === p.z);
+    if (!it) fail(`${at}: the plateau at (${p.x}, ${p.y}) has no reward`);
+    else { out.rewards++; if (it.kind === "heart" || it.kind === "strength") out.crystals++; if (it.kind === "cash" || it.kind === "relic?") fail(`${at}: a plateau's reward is ${it.kind}`); }
   }
   for (const r of g.ramps) {
     out.ramps++; b.ramps++;
@@ -417,7 +425,9 @@ function dressing(z, t, out, fail, at, W) {
   for (const c of g.caches) {
     out.caches++; b.caches++;
     if (onMap(c.x, c.y)) fail(`${at}: the cache at (${c.x}, ${c.y}) is on map ground`);
-    if (!z.items.some((it) => Math.floor(it.x) === c.x && Math.floor(it.y) === c.y)) fail(`${at}: the cache at (${c.x}, ${c.y}) holds nothing`);
+    const it = z.items.find((i) => Math.floor(i.x) === c.x && Math.floor(i.y) === c.y);
+    if (!it) fail(`${at}: the cache at (${c.x}, ${c.y}) holds nothing`);
+    else { out.rewards++; if (it.kind === "heart" || it.kind === "strength") out.crystals++; if (it.kind === "cash" || it.kind === "relic?") fail(`${at}: a cache's reward is ${it.kind}`); }
   }
   for (const c of z.creatures) {
     if (!WILDLIFE[c.type] && !(biomeFor({ terrains: TERRAINS }, t).spawns || []).some(([id]) => id === c.type)) continue;

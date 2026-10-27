@@ -25,7 +25,7 @@
 import { B, FLOOR_Z } from "../../world.js";
 import { distance } from "../../rng.js";
 import { spawnCreature, addCreature, CREATURE_TYPES } from "../../creatures.js";
-import { makeItem, randomTreasure } from "../../items.js";
+import { makeItem, randomEquipment, randomJewel, randomScroll, randomPotion } from "../../items.js";
 import { contentLevel } from "../../stats.js";
 import { SURFACE_RULES as R } from "../terrain.js";
 import { PROPS } from "../../content/biomes.js";
@@ -214,10 +214,21 @@ export function props(ctx, spec) {
   }
 }
 
-// A reward: the parent's treasure table (gear, a scroll, now and then a crystal; never a pile of glim) at the
-// zone's level.
+// A reward (a plateau's, a cache's): gear suited to the zone's level (as the parent's treasure, a little luckier),
+// a ring or an amulet, a scroll or a potion; a crystal only now and then (CRYSTAL_SHARE: there are hundreds of
+// plateaus and caches in a world, and a crystal must stay a prize to the end); never glim (money is never
+// plentiful), and no relic (those are the dungeons').
+export const CRYSTAL_SHARE = 0.03;
+export function surfaceReward(rng, level) {
+  const depth = contentLevel(level), roll = rng();
+  if (roll < CRYSTAL_SHARE) return { kind: rng() < 0.5 ? "heart" : "strength" };
+  if (roll < 0.5) return randomEquipment(rng, depth + 1, 0.15);
+  if (roll < 0.65 && depth >= 3) return randomJewel(rng, depth + 1, 0.1);
+  if (roll < 0.85) return randomScroll(rng);
+  return randomPotion(rng);
+}
 export function placeTreasure(ctx, x, y) {
-  return ctx.placeItem(randomTreasure(ctx.rng, contentLevel(ctx.level)), x, y);
+  return ctx.placeItem(surfaceReward(ctx.rng, ctx.level), x, y);
 }
 
 // --- Plateaus (§5.3 item 8): the outdoor climb room -------------------------------------------------------
