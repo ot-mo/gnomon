@@ -9,11 +9,12 @@
 //            generateDungeonLevel(zoneSeed(run, wx, wy, z), dungeonParams(run, site, z)).
 //
 //   apron    APRON_BUILDERS.surface = gen/surface.js buildApronBand (the neighbour's blocks, or the world
-//            functions)
+//            functions); APRON_STEPS.surface = gen/apron.js apronBandSteps (a neighbour read from the save)
 //
 //   siteWithDungeon(run, wx, wy) → Site | null    the span's site that has a dungeon below it
 //   dungeonParams(run, site, z) → p               generateDungeonLevel's parameters for its level z
-import { ZONE_GENERATORS, ZONE_STAGED, APRON_BUILDERS } from "../zones.js";
+import { ZONE_GENERATORS, ZONE_STAGED, APRON_BUILDERS, APRON_STEPS } from "../zones.js";
+import { apronBandSteps } from "../gen/apron.js";
 import { generateSurface, surfaceSteps, buildApronBand } from "../gen/surface.js";
 import { generateDungeonLevel } from "../gen/dungeon.js";
 import { legacyZone } from "./legacy.js";
@@ -50,3 +51,4 @@ ZONE_GENERATORS.surface = surfaceZone;
 ZONE_STAGED.surface = surfaceStaged;
 ZONE_GENERATORS.dungeon = dungeonZone;
 APRON_BUILDERS.surface = buildApronBand;
+APRON_STEPS.surface = apronBandSteps;   // (a neighbour read from the save: its far bands, one a frame)

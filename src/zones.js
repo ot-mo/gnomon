@@ -38,6 +38,10 @@ export const ZONE_STAGED = { surface: null, dungeon: null };
 // (run, zone, side, neighbour | null) → the band for zone.apron[side] (world.js; gen/surface.js
 // buildApronBand, registered by world/zonegen.js).
 export const APRON_BUILDERS = { surface: null };
+// (run, wx, wy) → an iterator that builds and keeps the world-function bands span (wx, wy)'s apron will want, one per
+// next() (gen/apron.js apronBandSteps, registered by world/zonegen.js): a neighbour read from the save gets them a
+// band a frame (game.bandJobs, prefetchNeighbours), as a staged make does with its stages (WS2a #3, at the WS9 merge).
+export const APRON_STEPS = { surface: null };
 // The save's seam (save/save.js; WS9 keeps it):
 //   has(game, key) → bool          the store holds this zone (so it is read back, never generated again)
 //   load(game, key) → Promise<Zone | null>   read and decode it (not yet in game.zones)
@@ -142,7 +146,9 @@ export function readZone(game, key) {
   return done;
 }
 const readAhead = (game, key) => readZone(game, key).then((zone) => {
-  if (zone && zone !== game.zone && game.zone?.z === 0 && zone.z === 0) zone.ensureDerived();   // a neighbour: ready to cross into
+  if (!zone || zone === game.zone || game.zone?.z !== 0 || zone.z !== 0) return;
+  zone.ensureDerived();   // a neighbour: ready to cross into, its far bands built ahead (one a frame)
+  if (APRON_STEPS.surface) (game.bandJobs ||= []).push({ run: game.run, key, it: APRON_STEPS.surface(game.run, zone.wx, zone.wy) });
 }).catch((e) => console.error(`reading zone ${key} from the save:`, e));
 
 // A dormant zone leaves memory (§2.2). Refused for the zone you are in, and unless the save says it may
@@ -334,6 +340,11 @@ export function prefetchNeighbours(game) {
   const p = game.player, near = ZONE_RULES.prefetchNear, map = game.mode === "map";
   if (!map && game.prefetchJob && game.prefetchJob.run === game.run && !cachedZone(game, game.prefetchJob.key))
     return stepZone(game, game.prefetchJob.key) ? 1 : 0;   // the zone under way first
+  if (!map && game.bandJobs?.length) {   // then the far bands of a neighbour read from the save, one a frame
+    const job = game.bandJobs[0];
+    if (job.run !== game.run || job.it.next().done) game.bandJobs.shift();
+    return 0;
+  }
   let made = 0;
   for (const side of ["n", "e", "s", "w"]) {
     const addr = neighbourAddr(game, zone, side);

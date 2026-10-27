@@ -200,6 +200,7 @@ export function resetRuntime(game) {
   game.pendingPages = null;
   game.toasts = [];
   game.prefetchJob = null;   // zones.js: a staged prefetch under way, and the zone it last saw
+  game.bandJobs = [];   // zones.js: the far apron bands of neighbours read from the save, built one a frame
   game.prefetchSeen = null;
   game.modeStack = [];
 }

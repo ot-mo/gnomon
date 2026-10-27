@@ -7,6 +7,7 @@
 //   apronBandSteps(run, wx, wy) → iterator   builds and keeps the world-function bands span (wx, wy)'s apron
 //        will want, one band per next(); gen/surface.js surfaceSteps runs one with each of its stages
 //   APRON_KEEP                               how many world-function bands are kept (the most recent)
+//   bandKept(run, wx, wy, side) → bool       whether that world-function band is kept (checks)
 //
 // One band of zone.apron (world.js apronRect gives its place). With the neighbour zone in memory (neighbour,
 // the span that way) the band is a copy of its blocks, so you walk onto exactly the ground you will stand on;
@@ -47,6 +48,7 @@ export function buildApronBand(run, zone, side, neighbour = null, { fresh = fals
 }
 
 export function forgetBands(world) { kept.delete(world); }   // gen/surface.js forgetWorld
+export const bandKept = (run, wx, wy, side) => !!kept.get(run.world)?.has(`${run.seed >>> 0}:${wx},${wy}:${side}`);
 
 // The bands span (wx, wy)'s apron will want from the world functions (its open sides, and the open corners
 // zones.js neighbourAddr would fill), built and kept one per next().

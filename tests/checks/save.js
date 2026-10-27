@@ -953,12 +953,20 @@ async function ws9Sections(ctx) {
       ZONE_GENERATORS.surface = (g, a) => { gens.push(a.key); return real(g, a); };
       const p = game.player;
       if (view === "3d") Object.assign(p, { x: game.zone.w - 3.5, y: 24.5 });   // near the east edge
+      // In 3D its far bands are built ahead, one a frame, so the swap into it finds them (WS2a #3, at the WS9 merge;
+      // the bands kept so far are dropped first, so none is there by chance).
+      const AP = await import("../../src/gen/apron.js"), SU = await import("../../src/gen/surface.js");
+      SU.forgetWorld(game.run.world);
+      let frames = 0;
       try {
         for (let k = 0; k < 6 && !cachedZone(game, "1,0,0"); k++) { prefetchNeighbours(game); await tick(5); }
+        if (view === "3d") for (; frames < 40 && game.bandJobs?.length; frames++) prefetchNeighbours(game);
       } finally { ZONE_GENERATORS.surface = real; }
       const read = !!cachedZone(game, "1,0,0");
       if (!read || gens.includes("1,0,0")) fail(`prefetch (${view}): the stored 1,0,0 ${read ? "read" : "not read"}, generated ${gens.includes("1,0,0")}`);
-      res.push(`${view}: read back, ${gens.length} other neighbour(s) made`);
+      const sides = ["n", "e", "s", "w"].filter((s) => game.run.world.edgeOpen(1, 0, s)), kept = sides.filter((s) => AP.bandKept(game.run, 1, 0, s));
+      if (view === "3d" && (!sides.length || kept.length !== sides.length)) fail(`prefetch (3d): 1,0,0's far bands kept on ${kept.length} of its ${sides.length} open sides after ${frames} frames`);
+      res.push(`${view}: read back, ${gens.length} other neighbour(s) made${view === "3d" ? `, its bands on ${kept.length} of ${sides.length} open sides built in ${frames} frames` : ""}`);
     }
     stats.prefetch = `a loaded game's stored neighbour 1,0,0 through the loader (ZONE_LOADER.load): ${res.join("; ")}; 1,0,0 never generated`;
   }
