@@ -31,7 +31,7 @@
 // over, it is counted into p.credits) are registered here; so are the implant abilities (plane-shunt,
 // jump-back node, dial spine), the "implant" ability source and the "stilled" status.
 import { IMPLANTS, IMPLANT_VALUE } from "../content/items/implants.js";
-import { registerItemKind, takeOne, addToInventory } from "../items.js";
+import { registerItemKind, takeOne } from "../items.js";
 import { addPart, removePart } from "../body.js";
 import { invalidateStats, clampHp } from "../stats.js";
 import { registerAbility, registerAbilitySource } from "../abilities.js";
@@ -138,7 +138,7 @@ export function uninstall(game, p, partId) {
     dropped = removePart(p, def.addsPart.id) || [];
   for (const d of dropped) (p.inv ||= []).push(d);
   const destroyed = !!def.destroyOnRemove;
-  if (!destroyed) addToInventory(p, item);
+  if (!destroyed) (p.inv ||= []).push(item);   // (the item itself: it was never on the floor)
   invalidateStats(p);
   clampHp(p);
   emit(game, "uninstall", { e: p, item, partId, destroyed });
