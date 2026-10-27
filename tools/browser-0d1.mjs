@@ -208,6 +208,23 @@ try {
       const closed = await mode();
       if (closed !== "map") problems.push(`target by ${how}: ${how === "keys" ? "Esc" : "a right click"} led to ${closed}, not back to the map`);
     }
+    // The world map and the wait menu (WS1's, merged at p2-ws1; its request 5): O on the map opens the world map, Esc
+    // closes it, and again a click on its "Esc: back"; Z opens the wait menu, Esc closes it, and again a right click.
+    if ((await mode()) === "map") for (const how of ["keys", "mouse"]) {
+      for (const [code, want, close] of [["KeyO", "world", "Esc: back"], ["KeyZ", "wait", null]]) {
+        await page.keyboard.press(code);
+        await frames(page, 2);
+        const opened = await mode();
+        if (opened !== want) { problems.push(`${want} by ${how}: ${code.slice(3)} on the map led to ${opened}, not ${want}`); continue; }
+        reached.add(want);
+        if (how === "keys") await page.keyboard.press("Escape");
+        else if (close) await click(close);
+        else { const c = await page.evaluate(() => { const r = document.getElementById("screen").getBoundingClientRect(); return { x: r.left + 5, y: r.top + 5 }; }); await page.mouse.click(c.x, c.y, { button: "right" }); }
+        await frames(page, 2);
+        const closed = await mode();
+        if (closed !== "map") problems.push(`${want} by ${how}: ${how === "keys" ? "Esc" : close ? `a click on ${close}` : "a right click"} led to ${closed}, not back to the map`);
+      }
+    }
     // The factions screen (WS6a's, merged at p2-ws6a): P on the map opens it; Esc closes it, and again by a click on
     // its "Esc close".
     if ((await mode()) === "map") for (const how of ["keys", "mouse"]) {
