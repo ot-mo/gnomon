@@ -44,6 +44,7 @@ options.js: MODE "options" · openOptions(game, { from }) · optionItems(game) �
 log.js:     MODE "log" · openLog(game) · logHistory(game) · LOG_LINES = 500     (H in both views)
 dead.js:    recapOf(game) · RECAP_AFTER = 1                                  (C wakes, R a new run in the same mode, T the title)
 pause.js:   HINT_AFTER = 0.75                                                 (Esc on the card: the options)
+// hud.js pauseLines(game) → the card's lines: L look, V fire, 1-9 the hotbar (its first ability by name), G the legend
 // hud.js
 HOTBAR_NEAR = 10 · segment "hotbar" (priority 70) · segment "debug" (?debug=1 only) · drawPause() → the card's box { x0, y0, w, h }
 ```
@@ -105,6 +106,17 @@ changes when it lands.
     lock let go → `pause`, Esc → `options`, Esc → `pause`; and by clicks: a click in the log closes it, a click on the
     pause card's "Esc: options" line (it appears 0.75 s after the card) → `options`. `check-save --browser` step 6b
     plays exactly these in a real page and they pass.
+12. **`tests/checks/screen-frames.js`** (P0's; applied on `ws/ws9` in its own commit `cce9477`, marked `// WS9`, to
+    confirm at the merge): `NOT_COMPARED` (WS3's shape) leaves out the four frames "seed 99 depth 3 3d pause card",
+    "seed 99 depth 11 3d pause card", "seed 31 depth 3 3d pause card" and "seed 31 depth 11 3d pause card", each with its
+    reason: the pause card names the keys the map header can't (the user's decision, 2026-10-27). `tests/fixtures/*`
+    and golden (b) untouched; the 43 other frames still compared and matching. `tests/checks/save.js` section 20 holds
+    the card in those four states (every cell outside it as without it, each line centred in its colour). Join the list
+    with WS3's ("victory card") and WS5's (its inventory frames).
+13. **The pause card's keys come true at the merge**: it names L look and V fire (WS8: `screens/target.js`,
+    `missiles.js`, on `main` at `p2-ws8`) and G the map's legend (WS3: `screens/play.js`'s binding, on `main` at
+    `p2-ws3`); on `ws/ws9` alone (from `p0-done`) only the hotbar's 1 is bound. If either merge changes those keys,
+    the card's line in `hud.js pauseLines` changes with it.
 
 ## Handoff
 

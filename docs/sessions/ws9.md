@@ -83,9 +83,12 @@ step 6b) the log and the options are reached by keys and by clicks.
 6. **Saves are made under the screens that hold nothing they would lose** (the pause card, options, the log, the
    inventory, a screen's `saveThrough`), not only in the views (§7.3): otherwise the normal way out of 3D (Esc, then
    closing the tab) lost the last minutes and counted an unclean exit.
-7. **The death recap and the pause card's line come a beat after their cards** (1 s, 0.75 s), and the hotbar segment
-   only while something hunts you: the recorded frames (`check-screen-frames`, golden) and `check-hud`'s 180×56 row
-   stay as they were.
+7. **The death recap and the pause card's options line come a beat after their cards** (1 s, 0.75 s), and the hotbar
+   segment only while something hunts you: those recorded frames (`check-screen-frames`, golden) and `check-hud`'s
+   180×56 row stay as they were. **The pause card itself names L look, V fire, the hotbar and G the legend** (the
+   user's decision, 2026-10-27, relayed by the coordinator: the map header, which golden (b) holds, can't): the four
+   "… 3d pause card" frames are left out by exact name (`NOT_COMPARED`, integration request 12) and check-save
+   section 20 holds the card in their states. L and V come with WS8, G with WS3 (integration request 13).
 8. **The options open from the title and from the pause card (Esc), not from the map**: Esc on the map is P0's "to 3D"
    (`screens/play.js`). Integration request 5.
 9. **`?quick=1` games keep their saves in memory** (`main.js` sets the memory store); the title opens IndexedDB and moves
