@@ -71,6 +71,14 @@ export async function run(env) {
       if (seed <= 3 && json(RUN.buildRun(seed, real).history) !== json(h)) fail(`history seed ${seed}: buildRun's isn't generateHistory's`);
     }
     if (json(H.generateHistory(1, real)) === json(H.generateHistory(2, real))) fail("seeds 1 and 2 make the same history");
+    // A wider sweep, validity only: seeds 101-600 and 615 (whose Hour once hated every faction it could have favoured,
+    // and the padding of its favoured never ended).
+    let sweptBad = 0;
+    for (const seed of [...Array.from({ length: 500 }, (_, k) => 101 + k), 615]) {
+      const p = H.validateHistory(H.generateHistory(seed, real), { world: real });
+      if (p.length && ++sweptBad <= 3) fail(`history seed ${seed}: ${p[0]}`);
+    }
+    counts.swept = `seeds 101-600 and 615: ${501 - sweptBad} of 501 valid`;
     const sorted = [...times].sort((a, b) => a - b), max = sorted[sorted.length - 1];
     if (max > 50) fail(`a history took ${max.toFixed(1)} ms (budget 50)`);
     for (const seed of [1, 7, 1234]) {
@@ -99,7 +107,7 @@ export async function run(env) {
     stats.history = `100 real-world seeds, ${100 - bad} valid; ms (best of 3) p50 ${sorted[50].toFixed(2)}, p95 ${sorted[95].toFixed(2)}, max ${max.toFixed(2)}; ` +
       `events per Hour ${counts.events.join("-")}, relics ${counts.relics.join("-")}, ${counts.requests} site requests; ` +
       `${counts.child} child-age and ${counts.old} old-age events, ${counts.falseDeaths} false deaths, ${counts.lostRelics} lost relics, ` +
-      `${counts.disagree} disagreeing; ${Object.keys(mutants).length} broken histories refused`;
+      `${counts.disagree} disagreeing; ${counts.swept}; ${Object.keys(mutants).length} broken histories refused`;
   }
 
   // --- 2. Names ---------------------------------------------------------------------------------------------------

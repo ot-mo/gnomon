@@ -230,8 +230,11 @@ function befriend(rng, H) {
   if (f) H.favoured.push(f);
   return f;
 }
+// A hated faction, but never one of the last the Hour still needs to reach 3 favoured (bible §8.3's step 6 pads them:
+// four rampages once hated every faction left, and the padding looked for a friend for ever).
 function makeEnemy(rng, H) {
   const all = Object.keys(GRAMMAR.factions).filter((f) => notMine(H, f));
+  if (all.length <= Math.max(0, 3 - H.favoured.length)) return undefined;
   const f = rng.pick(all);
   if (f) H.hated.push(f);
   return f;
