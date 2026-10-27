@@ -2,14 +2,17 @@
 //
 //   registerAbility(id, def) → def          def = AbilityDef below; content and workstreams add more
 //   registerAbilitySource(name, fn)          fn(e) → [{ id, lvl, item? }]: where an entity's abilities come
-//                                            from ("innate" and "item" here; WS4 adds mutations and powers,
-//                                            WS5 implants)
+//                                            from: "innate", "item", "mutations" (content/mutations.js
+//                                            `ability`, at progression/mutations.js mutationLevel) and "powers"
+//                                            (content/powers.js `ability`, at its rank) here; WS5 adds implants
 //   abilitiesOf(e) → [{ id, lvl, source, item }]   computed from the sources on every call, never stored
 //   abilityOf(e, id) → that entry | null
 //   cooldownLeft(e, id) · startCooldown(e, id, seconds)    (status.js) e.cooldowns, ticked with the
 //                                            statuses: real seconds in 3D, action seconds on the map, exact
 //                                            catch-up in skipTime (R10)
 //   abilityCooldown(e, id, lvl) → seconds   def.cooldown(lvl, e) × cooldownMul(e) (WIL)
+//   abilityRange(e, id, lvl) → tiles        def.rangeFor(lvl, e) if it has one (it grows with the level), else
+//                                            def.range: what aimTarget and requestTarget are given
 //   activate(game, e, id, target) → bool     the ability's use() with its cost and cooldown, no view logic
 //   useAbility(game, e, id) → bool           what a hotbar key does, in either view: refused (and told) when
 //                                            it isn't yours, cools down, or you can't act; else the target
@@ -27,20 +30,22 @@
 //                                            with the target screen.
 //
 // AbilityDef = { name, source: "mutation" | "implant" | "item" | "power" | "innate",
-//   target: "self" | "dir" | "creature" | "tile" | "area", range, radius,
+//   target: "self" | "dir" | "creature" | "tile" | "area", range, rangeFor?(lvl, e) → tiles, radius,
 //   cooldown(lvl, e) → seconds, cost?: { charge, funds, hp }, mapTime (seconds on the map),
-//   use(game, e, lvl, target) → bool (false: nothing happened, no cost, no cooldown), info(lvl) → string,
+//   use(game, e, lvl, target) → bool (false: nothing happened, no cost, no cooldown), info(lvl, e) → string,
 //   ai?: { when(game, c, target) → bool } }
 // cost: paid only when use() did something, refused (nothing happens) when it can't be: charge from the item
 // that gives the ability (abilitiesOf's item: item.charge, §2.9; an ability no item gives can't pay it), funds
 // through currency.pay, hp (you need more than it).
 //
-// The sample (P0): Fold Step, a short teleport every player has (innate) on hotbar key 1, the same
-// cooldown seconds in both views. In 3D you step up to 4 tiles along your aim, on the map toward the
-// target requestTarget gives (stopping a tile short of it) or else the way you face. You land through
-// zones.arrivalPoint(zone, "teleport"): the standable tile nearest the point that you could walk to from
-// where you stand (so never into a locked or sealed room, onto stairs or onto a creature). WS4 turns it
-// into the Bent's mutation of that name (bible §15) and drops the innate grant.
+// Fold Step: the P0 sample, now the Bent's mental mutation (bible §13.5; content/mutations.js), on hotbar key 1, the
+// same cooldown seconds in both views. In 3D you step along your aim, on the map toward the target requestTarget
+// gives (stopping a tile short of a creature; onto a tile WS8's target screen picks) or else the way you face. You
+// land through zones.arrivalPoint(zone, "teleport"): the standable tile nearest the point that you could walk to from
+// where you stand (so never into a locked or sealed room, onto stairs or onto a creature). The mutation reaches 4 +
+// its level (EGO's included); the quick start keeps P0's innate grant and its 4 tiles (its hotbar is in recorded
+// frames), and a made character has no innate grant: the Bent who take the mutation have it, nobody else.
+// The mutations' other abilities are progression/abilities.js.
 import { ITEM_KINDS } from "./items.js";
 import { worn } from "./body.js";
 import { cooldownMul } from "./stats.js";
@@ -52,6 +57,11 @@ import { arrivalPoint } from "./zones.js";
 import { mapUseTime, refreshView } from "./turns.js";
 import { EYE } from "./player.js";
 import { distance } from "./rng.js";
+import { MUTATIONS } from "./content/mutations.js";
+import { POWERS } from "./content/powers.js";
+import { mutationLevel } from "./progression/mutations.js";
+import { keysOf } from "./keyset.js";
+import { perkRank } from "./leveling.js";
 
 export { cooldownLeft, startCooldown };
 
@@ -67,10 +77,16 @@ export function registerAbilitySource(name, fn) {
   if (SOURCES.some((s) => s.name === name)) throw new Error(`registerAbilitySource: ${name} is already registered`);
   SOURCES.push({ name, fn });
 }
-// Born with: e.innate, a list of ability ids (the player's Fold Step until WS4's character creation).
+// Born with: e.innate, a list of ability ids (the quick start's Fold Step; a made character has none).
 registerAbilitySource("innate", (e) => (e.innate || []).map((id) => ({ id, lvl: 1 })));
 // Gear you wear or wield whose kind lists abilities (ItemKindDef.abilities, §2.9).
 registerAbilitySource("item", (e) => worn(e).flatMap((it) => (ITEM_KINDS[it.kind]?.abilities?.(it) || []).map((id) => ({ id, lvl: 1, item: it }))));
+// Mutations with an ability (content/mutations.js), at the level they work at (a mental one with EGO's levels).
+registerAbilitySource("mutations", (e) => Object.keys(e.mutations || {}).filter((id) => MUTATIONS[id]?.ability)
+  .map((id) => ({ id: MUTATIONS[id].ability, lvl: mutationLevel(e, id) })));
+// Powers with an ability (content/powers.js `ability`; none yet: Roll and the like wait for WS8), at their rank.
+registerAbilitySource("powers", (e) => (e.perks ? keysOf(e.perks) : []).filter((k) => POWERS[k]?.ability)
+  .map((k) => ({ id: POWERS[k].ability, lvl: perkRank(e, k) })));
 
 export const abilitySources = () => SOURCES.map((s) => s.name);   // what is registered (for checks)
 
@@ -87,6 +103,10 @@ export function abilitiesOf(e) {
 }
 export const abilityOf = (e, id) => abilitiesOf(e).find((a) => a.id === id) || null;
 export const abilityCooldown = (e, id, lvl = 1) => (ABILITIES[id]?.cooldown(lvl, e) || 0) * cooldownMul(e);
+export function abilityRange(e, id, lvl = 1) {
+  const def = ABILITIES[id];
+  return def?.rangeFor ? def.rangeFor(lvl, e) : def?.range || 0;
+}
 
 const chargeOf = (a) => (Number.isFinite(a?.item?.charge) ? a.item.charge : 0);
 
@@ -156,7 +176,7 @@ export function useAbility(game, e, id) {
   if (def.cost?.funds && funds(e) < def.cost.funds) { say(game, e, `${def.name} costs ${formatPrice(def.cost.funds)}.`); return false; }
   const onMap = game.mode === "map";
   let target = null;
-  if (def.target !== "self") requestTarget(game, def, (t) => { target = t; });
+  if (def.target !== "self") requestTarget(game, def.rangeFor ? { ...def, range: abilityRange(e, id, a.lvl) } : def, (t) => { target = t; });
   if (!activate(game, e, id, target)) return false;
   if (onMap && def.mapTime > 0) mapUseTime(game, def.mapTime);
   return true;
@@ -185,6 +205,9 @@ function stepGoal(game, e, range, target) {
   if (target?.creature) {
     const c = target.creature, d = distance(c.x - sx, c.y - sy);
     if (d - 1 >= 1) { const k = Math.min(range, d - 1) / d; return { x: sx + (c.x - sx) * k, y: sy + (c.y - sy) * k }; }
+  } else if (target?.tile) {   // a tile picked on the map (WS8's target screen): onto it, or as far as you reach
+    const gx = target.tile.x + 0.5, gy = target.tile.y + 0.5, d = distance(gx - sx, gy - sy);
+    if (d >= 1) { const k = Math.min(range, d) / d; return { x: sx + (gx - sx) * k, y: sy + (gy - sy) * k }; }
   }
   return { x: sx + Math.cos(e.yaw) * range, y: sy + Math.sin(e.yaw) * range };
 }
@@ -200,12 +223,14 @@ export function foldStep(game, e, range, target) {
   return at;
 }
 
+// The mutation's reach: 4 + its level; anyone else who has it (the quick start's innate grant, a test source) 4.
+const foldRange = (lvl, e) => (e?.mutations?.foldStep ? 4 + lvl : 4);
 registerAbility("foldStep", {
-  name: "Fold Step", source: "innate", target: "tile", range: 4, mapTime: 0.5,
+  name: "Fold Step", source: "mutation", target: "tile", range: 4, rangeFor: foldRange, mapTime: 0.5,
   cooldown: () => 12,
-  info: () => "Step through a fold in the world, up to 4 tiles: where you aim in 3D; on the map toward the nearest monster you see, or the way you face.",
+  info: (lvl, e) => `Step through a fold in the world, up to ${foldRange(lvl, e)} tiles: where you aim in 3D; on the map toward the nearest monster you see, or the way you face.`,
   use(game, e, lvl, target) {
-    const at = foldStep(game, e, ABILITIES.foldStep.range, target);
+    const at = foldStep(game, e, foldRange(lvl, e), target);
     if (!at) { say(game, e, "There's no room to step through to."); return false; }
     Object.assign(e, { x: at.x, y: at.y, z: at.z, vz: 0 });
     if (e === game.player) {
