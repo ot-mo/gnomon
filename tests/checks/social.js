@@ -48,7 +48,7 @@ export async function run(env) {
   const { game, startRun } = await m("game.js");
   const F = await m("factions.js"), creatures = await m("creatures.js"), talk = await m("talk.js"), events = await m("events.js");
   const rep = await m("social/reputation.js"), builders = await m("social/builders.js"), combat = await m("combat.js");
-  const turns = await m("turns.js"), ai = await m("ai.js"), monsters = await m("monsters.js"), rng = await m("rng.js");
+  const zones = await m("zones.js"), turns = await m("turns.js"), ai = await m("ai.js"), monsters = await m("monsters.js"), rng = await m("rng.js");
   const codec = await m("save/codec.js"), keys = await m("keys.js"), screens = await m("screens.js"), scrF = await m("screens/factions.js");
   const S = await m("screen.js"), { lineOfSight } = await m("raycast.js");
   const problems = [], stats = {};
@@ -247,12 +247,16 @@ export async function run(env) {
     const tx = Math.floor(P.x), ty = Math.floor(P.y);
     const floorAt = (x, y) => x >= 0 && y >= 0 && x < zone.w && y < zone.d && zone.stand[x + y * zone.w] >= 0 && Math.abs(zone.stand[x + y * zone.w] - P.z) < 1;
     // Tiles in sight within 6, one out of range (over 13 tiles off), the victim beside you.
-    const near = [], far = [];
+    const near = [], far = [], hidden = [], edgeIn = [], edgeOut = [];
     for (let y = 0; y < zone.d; y++) for (let x = 0; x < zone.w; x++) {
       if ((x === tx && y === ty) || !floorAt(x, y)) continue;
-      const d = Math.hypot(x - tx, y - ty);
-      if (d < 6 && d >= 2 && lineOfSight(zone, x + 0.5, y + 0.5, zone.stand[x + y * zone.w] + 1.4, P.x, P.y, P.z + 1.5)) near.push([x, y]);
+      const d = Math.hypot(x + 0.5 - P.x, y + 0.5 - P.y);
+      const sight = lineOfSight(zone, x + 0.5, y + 0.5, zone.stand[x + y * zone.w] + 1.4, P.x, P.y, P.z + 1.5);
+      if (d < 6 && d >= 2 && sight) near.push([x, y]);
       else if (d > 14 && d < 30) far.push([x, y]);
+      if (d >= 2 && d < 10 && !sight) hidden.push([x, y]);   // a fellow within range behind a wall: not a witness
+      if (sight && d > 10.5 && d < 11.8) edgeIn.push([x, y]);   // just inside witnessRange (12)
+      if (sight && d > 12.3 && d < 13.8) edgeOut.push([x, y]);  // just outside it
     }
     const side = [[1, 0], [0, 1], [-1, 0], [0, -1]].find(([dx, dy]) => floorAt(tx + dx, ty + dy));
     if (!side || near.length < 3 || !far.length) { fail(`${view}: no room around the start for the bot (${near.length} near, ${far.length} far)`); return null; }
@@ -268,6 +272,9 @@ export async function run(env) {
     const other = put(...pickNear(), "clatter", "shell-trader");
     const away = put(...far[0], "hollowmere", "far reed-cutter");
     const all = [victim, w1, w2, other, away];
+    // The edges, where this spot has them (stats say which): behind a wall, just inside and just outside 12 tiles.
+    const extra = [[hidden, "neutral", "behind a wall"], [edgeIn, "hostile", "in sight 11 tiles off"], [edgeOut, "neutral", "in sight 13 tiles off"]]
+      .filter(([spots]) => spots.length).map(([spots, want, what]) => ({ c: put(...spots[0], "hollowmere", what), want, what }));
     const before = all.map((c) => F.attitude(game, c, P));
     if (before.some((a) => a !== "neutral")) fail(`${view}: before the blow: ${before.join(", ")}`);
     const r0 = F.repOf(game, "hollowmere");
@@ -285,13 +292,18 @@ export async function run(env) {
     };
     while (zone.creatures.includes(victim) && blows < 40) {
       swing();
-      if (first === null && victim.brain?.grudges?.player) first = { rep: F.repOf(game, "hollowmere"), att: all.map((c) => F.attitude(game, c, P)), blows };
+      if (first === null && victim.brain?.grudges?.player) {
+        first = { rep: F.repOf(game, "hollowmere"), att: all.map((c) => F.attitude(game, c, P)), blows };
+        for (const e of extra) e.first = F.attitude(game, e.c, P);
+      }
     }
     const out = { view, blows, first, r0, killed: !zone.creatures.includes(victim) };
     if (!first) { fail(`${view}: ${blows} blows and the villager bears no grudge`); return out; }
     const [av, a1, a2, ao, aa] = first.att;
     if (av !== "hostile" || a1 !== "hostile" || a2 !== "hostile") fail(`${view}: after the first blow the villager and the two who saw it: ${av}, ${a1}, ${a2}`);
     if (ao !== "neutral" || aa !== "neutral") fail(`${view}: the Clatter trader and the far villager: ${ao}, ${aa} (want neutral, neutral)`);
+    for (const e of extra) if (e.first !== e.want) fail(`${view}: a fellow ${e.what}: ${e.first}, want ${e.want}`);
+    out.edges = extra.map((e) => e.what).join(", ") || "none here";
     if (first.rep !== r0 + rep.REP_RULES.attackPenalty) fail(`${view}: Hollowmere ${r0} → ${first.rep} after the first blow, want ${r0 + rep.REP_RULES.attackPenalty}`);
     out.afterBlows = F.repOf(game, "hollowmere");
     if (out.afterBlows !== first.rep && !out.killed) fail(`${view}: later blows moved rep again: ${first.rep} → ${out.afterBlows}`);
@@ -312,7 +324,7 @@ export async function run(env) {
   };
   {
     const runs = [bot("map"), bot("3d")].filter(Boolean);
-    stats.bot = runs.map((r) => `${r.view}: rep ${r.r0} → ${r.first?.rep} at blow ${r.first?.blows} → ${r.rep} killed in ${r.blows}, ${r.hunting} witnesses hunting`).join("; ");
+    stats.bot = runs.map((r) => `${r.view}: rep ${r.r0} → ${r.first?.rep} at blow ${r.first?.blows} → ${r.rep} killed in ${r.blows}, ${r.hunting} witnesses hunting; edges tried: ${r.edges}`).join("; ");
   }
   {
     // A follower's blow counts; a blow at someone already out for you, or seen by nobody, costs no rep.
@@ -337,6 +349,30 @@ export async function run(env) {
     const d0 = F.repOf(game, "drovers");
     rep.offend(game, P, lone);
     if (F.repOf(game, "drovers") !== d0 || !lone.brain.grudges?.player) fail(`an unseen blow: drovers ${d0} → ${F.repOf(game, "drovers")}, grudge ${JSON.stringify(lone.brain.grudges)}`);
+    // The witness range's edge, on an open span: a fellow in sight 11 tiles off saw it, one 13 tiles off didn't.
+    {
+      zones.changeZone(game, "1,0,0", { how: "start", rng: R });
+      for (const o of [...game.zone.creatures]) creatures.removeCreature(game.zone, o);
+      const z2 = game.zone, P2 = p();
+      const seeAt = (d) => {
+        for (let k = 0; k < 64; k++) {
+          const ang = (k / 64) * Math.PI * 2, x = Math.floor(P2.x + Math.cos(ang) * d), y = Math.floor(P2.y + Math.sin(ang) * d);
+          if (x < 0 || y < 0 || x >= z2.w || y >= z2.d || z2.stand[x + y * z2.w] < 0) continue;
+          const dd = Math.hypot(x + 0.5 - P2.x, y + 0.5 - P2.y);
+          if (Math.abs(dd - d) < 0.4 && lineOfSight(z2, x + 0.5, y + 0.5, z2.stand[x + y * z2.w] + 1.4, P2.x, P2.y, P2.z + 1.5)) return [x, y];
+        }
+        return null;
+      };
+      const i11 = seeAt(11), o13 = seeAt(13);
+      if (!i11 || !o13) fail(`the range edge: no open tile in sight at 11 (${i11}) or 13 (${o13}) tiles on 1,0,0`);
+      else {
+        const put2 = ([x, y]) => { const c = mob("survey", "neutral", { x, y, z: z2.stand[x + y * z2.w] }); return creatures.addCreature(z2, c); };
+        const v2 = mob("survey", "neutral"); Object.assign(v2, { x: P2.x + 0.6, y: P2.y, z: P2.z }); creatures.addCreature(z2, v2);
+        const near11 = put2(i11), far13 = put2(o13);
+        const seen = rep.witnessesOf(game, P2, v2);
+        if (!seen.includes(near11) || seen.includes(far13)) fail(`the range edge: 11 tiles off a witness ${seen.includes(near11)}, 13 tiles off ${seen.includes(far13)}`);
+      }
+    }
     stats.offend = `follower's blow ${rep.REP_RULES.attackPenalty}, at the hostile 0, unseen 0`;
   }
 
