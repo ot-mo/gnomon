@@ -59,11 +59,109 @@ and the map's `requestTarget` in Node; abilities in both views with the same coo
 
 ## Public API
 
-(Filled in as 4a is built.)
+```js
+// progression/chargen.js (re-exported by progression/index.js: makeCharacter)
+makeCharacter(choices) → player   // choices = { genotype: "bent" | "plumb", background, attrs: { str, agi, tou, int, wil, ego }
+                                  //   (bought, before the background's bonus), mutations: [id], implant: id, name, mode }
+                                  // throws "makeCharacter: <problems>" when validateChoices refuses them
+validateChoices(choices) → [problem]
+beginRun(game, choices, { seed }) → player   // a new run with the made character: game.js startRun(seed) (the start landmark,
+                                  //   the intro), state.mode = choices.mode, the background's reputation changes (addRep)
+pointCost(genotype, score) · pointsSpent(genotype, attrs) · pointsLeft(genotype, attrs) · baseAttrs(genotype)
+canRaise(genotype, attrs, k) · canLower(genotype, attrs, k) · suggestSpread(genotype, background) → attrs
+suggestName(genotype, background, rng) → name · originBonuses(e) (the "origin" bonus source) · treeNames(p)
+RUN_MODES = ["oneWick", "commonsLamp", "pilgrim"] · NAME_MAX = 24
+// a made player, besides makePlayer()'s fields: name, genotype, background, trees, attrPoints, mutations: {},
+//   origin: { level, implant, fitted }, and creases (Bent) or grade (Plumb). Plain JSON (the save codec takes it as is).
+
+// player.js
+makePlayer() → player             // the quick start's, unless beginRun handed a character over (once)
+quickPlayer() → player            // the quick start's, always · nextRunPlayer(p | null)   (beginRun's seam into startRun)
+
+// leveling.js (PERKS is content/powers.js POWERS; every name P0 exported is kept)
+xpToNext(level) = lvlXP(level) = 10L² + 10 · tierOf(level) = min(8, ceil((level + 1) / 3))
+killXp(game, c, { legendary }) → n   // max(1, round(0.01 × lvlXP(c.level))), elites ×2.5, legendaries ×10; 2 tiers below 25%, 3+ 0
+xpReward(kind, level) → n         // RULES.progression.xp.rewards: landmark 0.3, village 0.2, siteBottom 0.4, villageQuest 0.6,
+                                  //   triangulation 0.15, kindling 0.08, beat 0.75 (× beatEarly 1.5 is the caller's) × lvlXP(level)
+modeXp(game, amount, source) · gainXp(game, amount, { source = "kill" })   // Pilgrim: kills 0, every other source ×2.2
+offerPerks(p, milestone)          // the legacy set's (Math.random, the parent's 25)
+offerPowers(game, p, { level, milestone, draw }) → ids   // the attribute set's: seeded (seed, level, draw)
+takePerk(game, id) · perkRank(p, id) · perkLabel(p, id)
+// RULES.progression = { xp: { killShare, elite, legendary, tiersBelow, pilgrimKill, pilgrimOther, rewards, beatEarly },
+//                       level: { attrPointEvery: 4, milestoneEvery: 5, offers: 3, offersHighInt: 4, highInt: 18 } }
+
+// screens/levelup.js:  checkLevelUp(game) · choosePerk(game, k) · levelCard(game) → { level, gift, milestone, draw, step, sel, rows }
+// screens/create.js:   MODE "create" (pushed with { seed, mode }) · openCreate(game, { seed, mode }) · wizard() · wizardChoices()
+
+// content
+GENOTYPES[id] = { name, plural, info, base, points, perPoint, steepAt, steepCost, maxAtCreation, track, creases?,
+                  creasesPerLevel?, grade?, freeImplantCost?, names, tonics }
+BACKGROUNDS[id] = { name, genotype, info, bonus, trees, glim, purse?, rep, villageRep?, kit: { equip, belt?, pack, wants }, level?, implant? }
+LEVELS[id] = { name, info, bonus?, torchCost?, script? } · backgroundsOf(genotype) → ids
+POWERS[id] = { name, info, tree, general?, major?, max?, bonus?(rank), needs? } · TREES[id] = { name } · LEGACY_PERKS · powersOfTree(tree)
+```
+
+- **Under the legacy set nothing changes:** a quick game's player, its +3 HP a level, the parent's card, perks offered
+  from the parent's 25 with `Math.random`. Everything above that changes numbers reads `RULES.stats`.
+- **Offers are seeded** by the run's seed, the level and a draw (0 for a level; gifts count their own). A card whose
+  attribute point lifts INT to 18 draws again: the same three and a fourth.
+- **Powers that wait** (`needs`) are listed so the trees are whole, and are never offered; while the open trees are
+  thin, the offers are filled from the other trees (until teachers open more, WS6b, and C4 fills them).
+- **The run modes' names and notes** are in `screens/create.js` (`MODE_TEXT`) as well as in WS9's `save.js RUN_MODES`,
+  which this tree doesn't have yet.
 
 ## Integration requests
 
-(Filled in as 4a is built; WS8's requests 1, 8 and 11 are WS4's.)
+Changes to files that aren't WS4's, for the integrator (or their owners). 4a works without them; each says what changes
+when it lands. 1-3 are WS8's requests 1, 8 and 11 (`git show p1-ws8:docs/ws8.md`).
+
+1. **`abilities.js` (WS4, for 4b), WS8's request 1:** route the map's `requestTarget` through `screens/target.js`
+   (`requestTarget as targetScreen`): in 3D `done(aimTarget(...))` at once, on the map the target screen answers later,
+   and `useAbility` goes on in the callback (`def.target === "self"` at once; on the map `return false` and act when the
+   screen confirms). `check-abilities` §5 then drives the screen with Enter. 4b does it once `ws/ws8` is merged (its
+   `screens/target.js` isn't in this tree).
+2. **`stats.js` `BONUS_KEYS` (the integrator), WS8's request 8:** a `missileAcc` key, which WS8's `missileSpec` adds to
+   `acc`. Then in `content/powers.js` `steadyHand` gets `bonus: () => ({ missileAcc: 2 })` and loses its `needs`.
+3. **`stats.js` (the integrator), WS8's request 11:** `innate` has two meanings in P0: `stats.js` reads a creature's
+   `innate` as a bonus table, `abilities.js` (and WS8's `ai.js`) as a list of ability ids, so the player's
+   `["foldStep"]` adds a stray key `"0"` to its bonus table. Proposed, one line, leaving abilities.js and ai.js as they
+   are: `registerBonusSource("innate", (e) => (e.innate && !Array.isArray(e.innate) ? [e.innate] : []))`.
+4. **`game.js` `startRun(seed, world, { mode, player })` (the integrator; with WS9's request 2):** take the made
+   character and the mode there. Then `chargen.js beginRun` calls it so, and `player.js` drops `nextRunPlayer` (the
+   seam that hands the character to `startRun`'s `makePlayer()` today).
+5. **`monsters.js` `killMonster` (the integrator; §8.4 names no owner):** under the attribute set a kill's XP is the
+   bible's: `gainXp(game, RULES.stats === "legacy" ? m.xp : killXp(game, m, { legendary: !!typeOf(m).boss }), { source: "kill" })`,
+   and the floating "+N XP" shows the same number. Today a kill gives the parent's `m.xp` under both sets (Pilgrim's
+   zero applies through `gainXp`'s default source).
+6. **`torch.js` (the integrator, `0D2.md` §6):** a hook `burnTorch` reads for a cheaper torch, say a bonus key
+   `torchCost` (−0.5 = half): Cassin's Level (`LEVELS.cassin.torchCost`, then `bonus: { torchCost: -0.5 }`), the
+   Thrifty wick power (drop its `needs`), and later Lampskin (4b) and the glim heart (WS5).
+7. **`stats.js` `priceMul` (the integrator):** the attribute set ignores the Haggler (the legacy set's ×0.8 reads
+   `hasKey(e.perks, "haggler")`); give the attribute set the same ×0.8 on buying (bible: "prices a fifth better"), then
+   `haggler` loses its `needs` and is offered again.
+8. **WS6a (`factions.js`, `content/factions.js`):** the starting reputation by genotype (bible §15.4's "Start (Bent /
+   Plumb)": the Assize −700 or −100, the Plan −100 or +100), read from `game.player.genotype`; Pilgrim's "most factions
+   start at 0 or above" (bible §10.1). `beginRun` adds each background's changes on top with `addRep`. The Aspirant's
+   −50 with the Bent villages is `BACKGROUNDS.aspirantOfTheRule.villageRep` (WS6a or WS7, once villages have factions).
+9. **WS5 (`content/items/implants.js`, `bodymods/implants.js`):** the six free implants the Plumb backgrounds name
+   (`tallyEye`, `plumbLineEar`, `truesteelKnuckles`, `levelEye`, `lampCrown`, `darkLens`), each costing at most 2, with
+   `parts`; `makeCharacter` fits one with `canInstall(null, p, item, part)` and `install(null, p, item, part)` (no game
+   yet at creation), and the wizard lists every implant costing at most 2 (it reads the cost as `grade`, `license` or
+   `cost`). The kits' wants: materials (copper, iron, bone: bible §13.1), a reed cloak, an examining kit (+2), stilt
+   sandals (+0.5 jump), a theodolite, a snuffer, a map case, ink pots, marker chalk, an Assize writ; a spare 200-glim
+   flask (WS6b).
+10. **WS8:** a glimgun for the Lamplighter of Cassin's kit (and the Glimgunner power). The sling and the bolt-bow with
+    20 bolts are in the kits already, given once `missile` and `ammo` are registered kinds.
+11. **WS1, WS7, WS6b:** discoveries, quests, triangulations and Kindlings give XP through
+    `gainXp(game, xpReward(kind, level), { source: kind })`, so Pilgrim's ×2.2 applies. Powers waiting on them: Keen Eye
+    (sites), Pathfinder (`bonus(travel)`), Terrain lore, Homing sense (WS1); Hour script, Gossip, Triangulator, and Vey's
+    Deepwright script (`LEVELS.vey.script`) (WS7); Oil fire, Brew, Warm Hands, Chime (WS6b); teachers opening a tree
+    (`p.trees`; bible §10.8: −50 reputation for a rank-1 power).
+12. **WS9:** the title already pushes `"create"` with `{ seed, mode }` once it is registered, and the wizard begins the
+    run as `newGame` does (startRun, then `state.mode`). The wizard keeps its own copy of the modes' names and notes;
+    at the merge it can read `save.js RUN_MODES` instead.
+13. **`tools/README.md` (frozen) and §8.4:** `check-progression.mjs`'s sections (the header of
+    `tests/checks/progression.js`); `tools/browser-ws4.mjs` (serve with `node tools/serve.mjs 8644`) as WS4's.
 
 ## Handoff
 
