@@ -249,6 +249,7 @@ function drawEffects(game, p, L, R) {
 }
 
 registerScreen(MODE, {
+  saveThrough: true,   // (it holds nothing a save would lose: saves go on under it; WS9 #9, at the WS9 merge)
   draw,
   key(game, code, repeat) {
     if (code === "Escape" || code === "KeyK") { if (!repeat) popMode(game); return true; }

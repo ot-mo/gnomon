@@ -129,6 +129,7 @@ function journalKey(game, code) {
 }
 
 registerScreen("journal", {
+  saveThrough: true,   // (it holds nothing a save would lose: saves go on under it; WS9 #9, at the WS9 merge)
   draw: drawJournal,
   key(game, code, repeat) {
     if (repeat && (code === "KeyJ" || code === "Escape")) return false;

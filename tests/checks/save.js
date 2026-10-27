@@ -1776,6 +1776,17 @@ async function ws9Sections(ctx) {
       for (const k of Object.keys(n0)) if (n0[k] !== n1[k]) fail(`${genotype}: ${k} ${n0[k]} → ${n1[k]} after the load`);
       out.push(`${genotype} (${genotype === "plumb" ? choices.implant : choices.mutations.join(" + ")}; ${keys.length} zones): the same`);
     }
+    // Phase 1's screens that hold nothing a save would lose say saveThrough (WS9 #9, at the WS9 merge): a save is made
+    // under each, open over the map.
+    const under = [];
+    for (const m of ["char", "abilities", "examine", "factions", "journal"]) {
+      playing(game, "map");
+      pushMode(game, m, m === "examine" ? { item: { kind: "potion", effect: "healing" }, from: "pack" } : null, { pointer: false });
+      if (game.mode !== m || !canSave(game)) under.push(`${m} (${game.mode})`);
+      playing(game, "map");
+    }
+    if (under.length) fail(`no save is made under: ${under.join(", ")}`);
+    out.push(`a save is made under char, abilities, examine, factions and journal`);
     useStore(null);
     stats.phase1RoundTrip = out.join("; ");
   }

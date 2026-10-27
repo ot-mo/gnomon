@@ -117,6 +117,7 @@ function draw(game) {
 const DIGIT = (code) => (/^(Digit|Numpad)[1-9]$/.test(code) ? Number(code.slice(-1)) - 1 : -1);
 
 registerScreen(MODE, {
+  saveThrough: true,   // (it holds nothing a save would lose: saves go on under it; WS9 #9, at the WS9 merge)
   draw,
   key(game, code, repeat) {
     const rows = rowsOf(game), r = rows[view.sel];

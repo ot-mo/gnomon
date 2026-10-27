@@ -91,6 +91,7 @@ export function drawFactions(game) {
 function close(game) { if (game.mode === MODE) popMode(game); game.factionsView = null; }
 
 registerScreen(MODE, {
+  saveThrough: true,   // (it holds nothing a save would lose: saves go on under it; WS9 #9, at the WS9 merge)
   draw: drawFactions,
   // Its own keys only (held keys don't repeat a close): anything else goes on to the "*" bindings (M, N).
   key(game, code, repeat) {

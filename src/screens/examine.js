@@ -146,6 +146,7 @@ function drawExamine(game) {
 }
 
 registerScreen(MODE, {
+  saveThrough: true,   // (it holds nothing a save would lose: saves go on under it; WS9 #9, at the WS9 merge)
   draw: drawExamine,
   key(game, code) {
     const data = modeData(game) || {};
