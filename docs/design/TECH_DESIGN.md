@@ -1951,7 +1951,7 @@ workstream when both are merged.
 | `overworld/*`, `screens/worldmap.js`, `content/encounters.js`, `check-world`, `check-overworld`, `tests/checks/overworld.js` | WS1 |
 | `gen/surface.js terrain.js ports.js apron.js biomes/*`, `content/biomes.js`, `content/creatures/wildlife.js`, `check-edges/surface/landmarks`, `tests/checks/surface.js` | WS2 |
 | `render3d.js raycast.js light.js materials.js renderMap.js clock.js screen-canvas.js music.js sfx.js`, `content/moods.js`, `check-perf`, `tests/checks/render.js` | WS3 |
-| `progression/*`, `abilities.js`, `player.js`, `leveling.js`, `screens/create charsheet abilities levelup`, `content/genotypes backgrounds mutations powers`, `check-progression`, `tests/checks/progression.js` | WS4 |
+| `progression/*`, `abilities.js`, `player.js`, `leveling.js`, `screens/create charsheet abilities levelup`, `content/genotypes backgrounds mutations powers`, `check-progression`, `browser-ws4`, `tests/checks/progression.js` | WS4 |
 | `items.js inventory.js effects.js body.js`, `bodymods/*`, `screens/equipment examine`, `content/items/legacy artifacts implants`, `check-items`, `tests/checks/items.js` | WS5 |
 | `factions.js talk.js`, `social/index reputation builders`, `screens/factions`, `content/factions`, `check-social`, `tests/checks/social.js` | WS6a |
 | `dialogue.js`, `social/merchants ritual voices shrines backings liquids`, `screens/trade ritual`, `content/liquids items/containers` | WS6b (same agent as 6a) |
