@@ -1,4 +1,4 @@
-// WS6a's check (TECH_DESIGN §8.3 "WS6a" acceptance; owner WS6a; WS6b adds its cases after these): factions,
+// WS6's check (TECH_DESIGN §8.3 "WS6a" and "WS6b" acceptance; owner WS6a, then WS6b after its cases): factions,
 // reputation, witnesses and the dialogue builders.
 //
 //   1. factions   the 21 factions of bible §15.4 and the Bent villages are registered, each start (Bent / Plumb)
@@ -28,6 +28,26 @@
 //                 save codec's round trip (save/codec.js)
 //   7. screen     P opens the factions screen in both views, it lists what you know with the band's light word,
 //                 the selection moves, P and Esc close it
+//
+// Part 6b (WS6b; TECH_DESIGN §8.3 "WS6b" with DECISIONS):
+//   8. prices     priceOf against bible §3.1 for EGO 10-24 × Cold, Grey, Warm, Bright (buy × (1.5 − 0.1·EGO mod −
+//                 step), sell × (0.3 + 0.05·EGO mod + step/2)); the note the trade screen shows; buying always
+//                 dearer than selling; the Snuffer's +20%; a trader with no faction; the level factor; the legacy set
+//   9. backing    the item backing: receive, pay, a payment too big refused whole, the smallest stack first, the
+//                 overflow of a full pack; no liquid backing; the counter: a sale into a full purse becomes credit
+//  10. Pell       his six services, each listed on the trade screen through registerService, paid and run
+//  11. Kindling   each rite ready only in its view (the Tracing on the map, the Lighting in lit 3D facing them, the
+//                 Snuffing in the dark), and offered so in talk; "only" factions; the bond's numbers (opinions,
+//                 own reading, the sacrament poured, EGO); ink for the line; the hour of the Snuffing; the menu
+//                 (readings and rumours, the +120 cap, powers by rank, recruiting and its follower limit, the best
+//                 item, the −250 floor); the ritual screen; oathbreaking and the Snuffer, not for an accident
+//  12. restock    on zone:enter after two world days away, not before nor on a load; the same goods for the same
+//                 day; Pell too; the sacrament on sale; the back shelf only at Bright
+//  13. voices     the legacy people keep theirs; a faction's (Hz, wave, flags); the heaviest membership; the talk screen
+//  14. liquids    liquidAt by column; a vial filled beside water, drunk; ink makes you Flat; every sacrament exists
+//  15. shrines    the component on a statue; donations (the Vigil's cap, the Lampless only in the dark)
+//  16. trade      the screen by keys: from talk, a buy, Tab, Esc back to the talker's first words
+//  17. JSON       the Kindling's, the Snuffer's and the donations' state
 export const BIBLE_START = {   // bible §15.4 "Start (Bent / Plumb)"
   hollowmere: [100, 100], noonVigil: [50, 50], survey: [0, 0], assize: [-700, -100], horary: [0, 0], pressed: [-50, -50],
   lampless: [-100, -100], drovers: [0, 0], chandlers: [-50, -50], rustbacks: [-450, -450], flatfolk: [0, 0], unlit: [0, 0],
@@ -575,6 +595,502 @@ export async function run(env) {
       if (ids.includes("peoples")) fail("a hidden group is listed because its rep moved");
     }
     stats.screen = `opened and closed in map and 3D; known at the start: ${scrF.knownFactions(game).length}`;
+  }
+
+  // ===== Part 6b (WS6b): trade, the Kindling, the item backing, voices, liquids, shrines ==================================
+  const merchants = await m("social/merchants.js"), ritual = await m("social/ritual.js"), voices = await m("social/voices.js");
+  const liquids = await m("social/liquids.js"), shrines = await m("social/shrines.js"), backings = await m("social/backings.js");
+  const currency = await m("currency.js"), rules = await m("rules.js"), items = await m("items.js"), stats6 = await m("stats.js");
+  const scrTrade = await m("screens/trade.js"), world = await m("world.js"), dl = await m("dialogue.js");
+  const leveling = await m("leveling.js"), body = await m("body.js");
+  const { RULES, overrideRules } = rules;
+  const named = (type, dialogue, faction, at = {}) => {
+    const c = creatures.spawnCreature(type, at.x ?? 3, at.y ?? 3, 0, { level: at.level ?? 5, talk: { dialogue, state: {} } });
+    if (faction) c.faction = typeof faction === "string" ? { [faction]: 1 } : faction;
+    c.named = true; c.name = at.name || "Ama";
+    if (at.near) Object.assign(c, { x: p().x + at.near[0], y: p().y + at.near[1], z: p().z, tx: Math.floor(p().x + at.near[0]), ty: Math.floor(p().y + at.near[1]) });
+    creatures.addCreature(game.zone, c);
+    return c;
+  };
+  const setEgo = (score) => { p().attrs = { ...(p().attrs || stats6.makeAttrs()), ego: score }; stats6.invalidateStats(p()); };
+  const close = (a, b) => Math.abs(a - b) < 1e-9;
+
+  // --- 8. Prices: EGO × the rep step (bible §3.1, §15.6) ----------------------------------------------------------------
+  {
+    fresh(1234, { genotype: "bent" });
+    const undo = overrideRules("stats", "attributes");
+    try {
+      const it = { kind: "weapon", id: "mace", ench: 0, known: true }, worth = items.itemPrice(it);
+      const trader = named("mira", "merchant", "drovers", { level: 0 });
+      let cells = 0;
+      const STEP = { disliked: -0.1, indifferent: 0, liked: 0.1, loved: 0.2 };
+      for (const score of [10, 12, 16, 20, 24]) for (const [bandId, step] of Object.entries(STEP)) {
+        setEgo(score);
+        game.state.rep = { drovers: EDGES[bandId][0] };
+        const m6 = stats6.mod(p(), "ego");
+        const sell = Math.max(0, 0.3 + 0.05 * m6 + step / 2), buy = Math.max(0.2, sell, 1.5 - 0.1 * m6 - step);
+        if (!close(merchants.repStepOf(game, trader), step)) fail(`the rep step at ${bandId}: ${merchants.repStepOf(game, trader)}, want ${step}`);
+        const gotBuy = merchants.priceOf(game, it, trader, "buy"), gotSell = merchants.priceOf(game, it, trader, "sell");
+        if (gotBuy !== Math.round(worth * buy)) fail(`buy at EGO ${score} (${m6}), ${bandId}: ${gotBuy}, want ${Math.round(worth * buy)}`);
+        if (gotSell !== Math.floor(worth * sell)) fail(`sell at EGO ${score} (${m6}), ${bandId}: ${gotSell}, want ${Math.floor(worth * sell)}`);
+        const note = merchants.priceNote(game, trader);
+        if (!close(note.buy, buy) || !close(note.sell, sell) || !note.text.includes(`EGO ${m6 >= 0 ? "+" : ""}${m6}`)) fail(`the price note at EGO ${score}, ${bandId}: ${note.text}`);
+        if (gotBuy <= gotSell) fail(`buying is no dearer than selling at EGO ${score}, ${bandId}: ${gotBuy} vs ${gotSell}`);
+        cells++;
+      }
+      setEgo(16); game.state.rep = { drovers: 0 };
+      const grey = [merchants.priceOf(game, it, trader, "buy"), merchants.priceOf(game, it, trader, "sell")];
+      setEgo(24); game.state.rep = { drovers: 600 };
+      const bright = [merchants.priceOf(game, it, trader, "buy"), merchants.priceOf(game, it, trader, "sell")];
+      // The Snuffer pays +20% to buy, and sells as before.
+      game.state.snuffer = { at: 0, until: (game.time || 0) + 100 };
+      const snuffed = [merchants.priceOf(game, it, trader, "buy"), merchants.priceOf(game, it, trader, "sell")];
+      if (snuffed[0] !== Math.round(bright[0] * 1.2)) fail(`the Snuffer's buy price ${snuffed[0]}, want ${Math.round(bright[0] * 1.2)}`);
+      if (snuffed[1] !== bright[1]) fail(`the Snuffer's sell price moved: ${snuffed[1]} vs ${bright[1]}`);
+      game.state.snuffer = null;
+      // A trader with no faction has no step; a level-6 trader charges × priceLevel(6) on buying.
+      const plain = named("rook", "merchant", null, { level: 6 });
+      setEgo(16);
+      if (merchants.repStepOf(game, plain) !== 0) fail("a trader with no faction has a rep step");
+      const want6 = Math.round(Math.round(worth * currency.priceLevel(6)) * 1.5);
+      if (merchants.priceOf(game, it, plain, "buy") !== want6) fail(`a level-6 trader's buy price ${merchants.priceOf(game, it, plain, "buy")}, want ${want6}`);
+      stats.prices = `${cells} cells (EGO 10-24 × Cold/Grey/Warm/Bright) as bible §3.1; a ${worth}-glim mace at Grey, EGO 16: buy ${grey[0]}, sell ${grey[1]}; Bright, EGO 24: ${bright[0]} / ${bright[1]}; the Snuffer buys at ${snuffed[0]}`;
+    } finally { undo(); }
+    // The legacy set: the parent's numbers whatever the band (priceMul ignores the trader there).
+    const pell = person("pell", "pell", null), it = { kind: "potion", effect: "healing" };
+    game.state.rep = {};
+    if (merchants.priceOf(game, it, pell, "sell") !== currency.sellPrice(game, p(), items.itemPrice(it))) fail("the legacy set's sell price changed");
+  }
+
+  // --- 9. The item backing: pay, receive, overflow (and the counter's overflow at trade) --------------------------------
+  {
+    fresh(1234, { genotype: "bent" });
+    const CUR = currency.CURRENCY, old = CUR.backing;
+    backings.registerCoinage("testBit", { name: "bit", plural: "bits", weight: 0.5 });
+    const undoSet = overrideRules("stats", "attributes"), undoEnc = overrideRules("encumbrance", true);
+    try {
+      CUR.backing = { kind: "item", item: "testBit" };
+      p().inv = []; p().funds = 0;
+      const r1 = currency.receive(game, p(), 30), f1 = currency.funds(p());
+      if (r1 !== 0 || f1 !== 30) fail(`item backing: receive 30 → overflow ${r1}, funds ${f1}`);
+      const ok1 = currency.pay(game, p(), 12), f2 = currency.funds(p());
+      if (!ok1 || f2 !== 18) fail(`item backing: pay 12 → ${ok1}, funds ${f2}`);
+      const ok2 = currency.pay(game, p(), 100), f3 = currency.funds(p());
+      if (ok2 || f3 !== 18) fail(`item backing: pay 100 of 18 → ${ok2}, funds ${f3} (nothing may go)`);
+      // Two stacks: the smaller goes first.
+      p().inv.push({ kind: "coinage", effect: "testBit", count: 5 });
+      currency.pay(game, p(), 6);
+      const counts = p().inv.filter((i) => i.kind === "coinage").map((i) => i.count);
+      if (JSON.stringify(counts) !== "[17]") fail(`paying 6 from stacks of 18 and 5: ${JSON.stringify(counts)}, want [17]`);
+      // Overflow: what the pack can't carry comes back.
+      const room = backings.coinRoom(p());
+      if (!Number.isFinite(room) || room <= 0) fail(`coinRoom under encumbrance: ${room}`);
+      const before = currency.funds(p()), over = currency.receive(game, p(), room + 40);
+      if (over !== 40 || currency.funds(p()) !== before + room) fail(`receive ${room + 40} with room for ${room}: overflow ${over}, funds ${currency.funds(p())}`);
+      if (currency.receive(game, p(), 7) !== 7) fail("a full pack took more coins");
+      // The money isn't offered for sale.
+      const t = named("mira", "merchant", "drovers");
+      if (merchants.tradeRows(game, t, "yours").some((r) => r.it.kind === "coinage")) fail("the money is offered for sale");
+      if (JSON.stringify(JSON.parse(JSON.stringify(p().inv))) !== JSON.stringify(p().inv)) fail("coins aren't plain JSON");
+      stats.backing = `item: receive 30, pay 12, pay 100 refused (18 kept), smallest stack first, overflow ${over} of ${room + 40} (room ${room})`;
+    } finally { CUR.backing = old; undoEnc(); undoSet(); }
+    if (currency.backingKinds().join() !== "counter,item") fail(`backings: ${currency.backingKinds().join()}, want counter,item (no liquid backing: DECISIONS)`);
+    // The counter: a sale the purse can't hold goes on the trader's slate, and buying spends it first.
+    p().funds = currency.purseCap(p()) - 3;
+    const t = named("mira", "merchant", "drovers");
+    p().inv = [{ kind: "weapon", id: "mace", ench: 0, known: true }];
+    const row = merchants.tradeRows(game, t, "yours")[0];
+    const out = merchants.tradeRow(game, t, "yours", row);
+    const credit = t.talk.state.credit || 0;
+    if (!out.ok || p().funds !== currency.purseCap(p()) || credit !== row.price - 3) fail(`a sale into a nearly full purse: ${out.line}; funds ${p().funds}, credit ${credit} (price ${row.price})`);
+    const buy = merchants.tradeRows(game, t, "theirs").find((r) => r.price <= credit);
+    if (buy) {
+      const f0 = p().funds;
+      merchants.tradeRow(game, t, "theirs", buy);
+      if (p().funds !== f0 || t.talk.state.credit !== credit - buy.price) fail(`buying ${buy.price} with ${credit} credit: funds ${f0} → ${p().funds}, credit ${t.talk.state.credit}`);
+    } else fail(`nothing in the stock costs ${credit} or less`);
+    stats.backing += `; counter: a ${row.price}-glim sale with room for 3 → ${credit} credit, spent first`;
+  }
+
+  // --- 10. Pell's services, all through registerService on the trade screen --------------------------------------------
+  {
+    fresh(1234, { genotype: "bent" });
+    const pell = person("pell", "pell", null);
+    creatures.addCreature(game.zone, pell);
+    const pl = p();
+    pl.funds = 1000; pl.purse = 1000;
+    const want = ["uncurseWorn", "enchant", "forge", "identify", "namePotion", "uncurse"];
+    pl.inv.push({ kind: "weapon", id: "longsword", ench: 1, known: false }, { kind: "potion", effect: "haste" },
+      { kind: "armour", id: "plate", ench: -2, known: true });
+    game.knownPotions.delete("haste");
+    const ring = { kind: "ring", id: "protection", ench: -1, known: true };
+    pl.inv.push(ring);
+    body.equip(game, pl, ring);
+    merchants.openTrade(game, pell, "services");
+    if (game.mode !== "trade") fail(`openTrade on Pell: ${game.mode}`);
+    const ids = new Set(merchants.tradeRows(game, pell, "services").map((r) => r.service.id));
+    for (const id of want) if (!ids.has(id)) fail(`Pell's service ${id} isn't on the trade screen (rows: ${[...ids].join(", ")})`);
+    let ran = 0;
+    for (const id of want) {
+      const row = merchants.tradeRows(game, pell, "services").find((r) => r.service.id === id);
+      if (!row) continue;
+      const f0 = pl.funds, out = merchants.tradeRow(game, pell, "services", row);
+      if (!out.ok || pl.funds !== f0 - row.price) fail(`${id}: ${out.line}, funds ${f0} → ${pl.funds} (price ${row.price})`); else ran++;
+    }
+    scrTrade.closeTrade(game);
+    stats.pell = `${ids.size} services listed (${[...ids].join(", ")}), ${ran} of ${want.length} paid and run from the trade screen`;
+  }
+
+  // --- 11. The Kindling: the three rites, each in its view; the bond; the menu; oathbreaking ------------------------------
+  {
+    const setup = () => {
+      fresh(1234, { genotype: "bent" });
+      p().funds = 200; p().inv = []; p().torch = true; setEgo(16); p().perks = [];
+      game.view = "map";
+    };
+    const face = (c) => { p().yaw = Math.atan2(c.y - p().y, c.x - p().x); };
+    setup();
+    const ama = named("mira", "villager", "hollowmere", { near: [1, 0] });
+    const optLabels = (c) => talk.talkTo(game, c).options.map((o) => o.label);
+    if (!optLabels(ama).includes("Will you kindle with me?")) fail(`a named Hollowmere villager offers no Kindling: ${optLabels(ama).join(" | ")}`);
+    const plainOne = named("mira", "villager", "hollowmere", { near: [0, 1] }); plainOne.named = false;
+    if (optLabels(plainOne).some((l) => /kindle/i.test(l))) fail("an unnamed villager offers the Kindling");
+    if (ritual.canKindle(game, named("mira", "villager", "askew", { near: [-1, 0] })) === null) fail("the Askew can be kindled");
+    if (optLabels(person("pell", "pell", null)).some((l) => /kindle/i.test(l))) fail("Pell (no faction) offers the Kindling");
+    // Each rite is ready only in its own view.
+    const readyIn = (c) => ["tracing", "lighting", "snuffing"].filter((r) => !ritual.riteReady(game, c, r)).join() || "none";
+    const views = {};
+    game.view = "map"; views.map = readyIn(ama);
+    game.view = "3d"; face(ama); views.lit = readyIn(ama);
+    p().torch = false; views.dark = readyIn(ama);
+    if (views.map !== "tracing" || views.lit !== "lighting" || views.dark !== "snuffing")
+      fail(`rites ready by view: map ${views.map}, lit 3D ${views.lit}, dark ${views.dark}; want tracing / lighting / snuffing`);
+    p().torch = true; p().yaw += Math.PI;
+    if (!ritual.riteReady(game, ama, "lighting")) fail("the Lighting with your back to them");
+    face(ama);
+    Object.assign(ama, { x: p().x + 3.2, y: p().y });
+    if (!ritual.riteReady(game, ama, "lighting")) fail("the Lighting from 3 tiles away");
+    game.view = "map";
+    if (!ritual.riteReady(game, ama, "tracing")) fail("the Tracing from 3 tiles away");
+    Object.assign(ama, { x: p().x + 1, y: p().y });
+    // In map view the talk option offers only the Tracing; in lit 3D only the Lighting.
+    const riteOpts = () => (talk.talkTo(game, ama).options.find((o) => o.label === "Will you kindle with me?")?.go()?.options || []).map((o) => o.label).filter((l) => /^The /.test(l));
+    game.view = "map"; const mapOpts = riteOpts().join();
+    game.view = "3d"; face(ama); const litOpts = riteOpts().join();
+    if (mapOpts !== "The Tracing." || litOpts !== "The Lighting.") fail(`the talk's rites: map [${mapOpts}], lit 3D [${litOpts}]`);
+    // "flat only" (the Flatfolk) takes only the Tracing; "dark only" (the Unlit) only the Snuffing.
+    const flat = named("ess", "villager", "flatfolk", { near: [0, -1], name: "Pip" }), ghost = named("brann", "villager", "unlit", { near: [-1, -1], name: "Wen" });
+    game.view = "3d"; face(flat);
+    if (!ritual.riteReady(game, flat, "lighting")) fail("the Flatfolk take the Lighting");
+    game.view = "map";
+    if (!ritual.riteReady(game, ghost, "tracing")) fail("the Unlit take the Tracing");
+    game.view = "3d"; p().torch = false;
+    if (ritual.riteReady(game, ghost, "snuffing")) fail(`the Unlit refuse the Snuffing in the dark: ${ritual.riteReady(game, ghost, "snuffing")}`);
+    p().torch = true;
+
+    // The bond's numbers, against what bible §3.3 says they should be.
+    const bond = (rite, c, { sac = null, ego = 16 } = {}) => {
+      setEgo(ego);
+      if (sac) p().inv.push({ kind: "vial", effect: sac, count: 1 });
+      const before = Object.fromEntries(Object.keys(F.FACTIONS).map((id) => [id, F.repOf(game, id)])), f0 = p().funds, t0 = game.time;
+      const out = ritual.performRite(game, c, rite);
+      const moved = Object.fromEntries(Object.keys(F.FACTIONS).map((id) => [id, F.repOf(game, id) - before[id]]).filter(([, n]) => n));
+      return { out, moved, paid: f0 - p().funds, waited: game.time - t0 };
+    };
+    const expect = (c, { rite, sac, ego = 16 }) => {
+      const eg = 1 + 0.1 * Math.floor((ego - 16) / 2), out = {};
+      const add = (id, n) => { out[id] = (out[id] || 0) + (n > 0 ? Math.round(n * eg) : n); };
+      const BOND = { loves: 80, likes: 40, dislikes: -40, hates: -80 };
+      for (const [id, op] of ritual.opinionsOf(game, c)) add(id, BOND[op]);
+      const own = Object.keys(c.faction)[0];
+      if (ritual.readingsOf(own).set.has({ tracing: "flat", lighting: "deep", snuffing: "dark" }[rite])) add(own, 40);
+      if (sac) add(own, 20);
+      for (const id of Object.keys(out)) if (!out[id]) delete out[id];
+      return out;
+    };
+    const same = (a, b) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
+    // The Tracing on the map, paid in glim (Hollowmere keep the deep reading: no own-reading bonus).
+    setup();
+    const t1 = named("mira", "villager", "hollowmere", { near: [1, 0], name: "Ama" });
+    const ops1 = ritual.opinionsOf(game, t1), want1 = expect(t1, { rite: "tracing" });
+    const r1 = bond("tracing", t1);
+    if (!r1.out.ok || !same(r1.moved, want1) || r1.paid !== 1) fail(`the Tracing: ${r1.out.text}; moved ${JSON.stringify(r1.moved)}, want ${JSON.stringify(want1)}; paid ${r1.paid}`);
+    if (!ritual.kin(game, t1) || !r1.out.text.includes("Here is my line.")) fail(`after the Tracing: kin ${!!ritual.kin(game, t1)}, "${r1.out.text}"`);
+    if (ops1[0][0] !== "hollowmere" || ops1[0][1] !== "likes" || !ops1.some(([id, op]) => id === "assize" && op === "dislikes")) fail(`Ama's opinions: ${JSON.stringify(ops1)}`);
+    const again = bond("tracing", t1);
+    if (Object.keys(again.moved).length) fail(`a second Tracing without Warm Hands moved ${JSON.stringify(again.moved)}`);
+    // The Tracing with a vial of ink: the ink is spent, not glim.
+    setup();
+    const t1b = named("mira", "villager", "flatfolk", { near: [1, 0], name: "Ink" });
+    // Two vials of ink: one draws the line, the other is poured (the Flatfolk's sacrament); with one, it only draws.
+    p().inv.push({ kind: "vial", effect: "ink", count: 2 });
+    const r1b = bond("tracing", t1b);
+    if (!r1b.out.ok || r1b.paid !== 0 || p().inv.some((i) => i.effect === "ink")) fail(`the Tracing in ink: paid ${r1b.paid}, ${JSON.stringify(p().inv)}`);
+    if (r1b.moved.flatfolk !== 40 + 40 + 20) fail(`a Flatfolk Tracing with two vials of ink (likes, own reading, sacrament): +${r1b.moved.flatfolk}, want +100`);
+    setup();
+    const t1c = named("mira", "villager", "flatfolk", { near: [1, 0], name: "Nib" });
+    p().inv.push({ kind: "vial", effect: "ink", count: 1 });
+    const r1c = bond("tracing", t1c);
+    if (r1c.paid !== 0 || r1c.moved.flatfolk !== 80) fail(`a Flatfolk Tracing with one vial of ink: paid ${r1c.paid}, +${r1c.moved.flatfolk}, want 0 and +80`);
+    // The Lighting in 3D with Hollowmere's sacrament (glim in a vial) at EGO 20 (+20% on gains); deep is their reading.
+    setup();
+    const t2 = named("mira", "villager", "hollowmere", { near: [1, 0], name: "Bel" });
+    game.view = "3d"; face(t2);
+    const want2 = expect(t2, { rite: "lighting", sac: "glim", ego: 20 });
+    const r2 = bond("lighting", t2, { sac: "glim", ego: 20 });
+    if (!r2.out.ok || !same(r2.moved, want2) || r2.paid !== 1) fail(`the Lighting: ${r2.out.text}; moved ${JSON.stringify(r2.moved)}, want ${JSON.stringify(want2)}; paid ${r2.paid}`);
+    if (r2.moved.hollowmere !== Math.round(40 * 1.2) + Math.round(40 * 1.2) + Math.round(20 * 1.2)) fail(`Hollowmere after the Lighting at EGO 20: +${r2.moved.hollowmere}, want +120`);
+    if (p().inv.some((i) => i.kind === "vial" && i.effect === "glim") || !p().inv.some((i) => i.kind === "vial" && i.effect === "")) fail("the sacrament wasn't poured out");
+    // The Snuffing in the dark: an hour passes (60 s of game time), no glim.
+    setup();
+    const t3 = named("brann", "villager", "lampless", { near: [1, 0], name: "Cay" });
+    game.view = "3d"; p().torch = false;
+    const want3 = expect(t3, { rite: "snuffing" });
+    const r3 = bond("snuffing", t3);
+    if (!r3.out.ok || !same(r3.moved, want3) || r3.paid !== 0 || Math.abs(r3.waited - 60) > 1e-6) fail(`the Snuffing: ${r3.out.text}; moved ${JSON.stringify(r3.moved)}, want ${JSON.stringify(want3)}; paid ${r3.paid}, waited ${r3.waited}`);
+    stats.kindling = `ready only in its view (map: ${views.map}; lit 3D: ${views.lit}; dark: ${views.dark}); Tracing ${JSON.stringify(r1.moved)}; in ink, Flatfolk +${r1b.moved.flatfolk}; Lighting at EGO 20 with glim poured ${JSON.stringify(r2.moved)}; Snuffing (${r3.waited} s) ${JSON.stringify(r3.moved)}`;
+
+    // The flame-kin menu: rep as currency, the +120 cap, the floor, recruiting, the best item, a power.
+    setup();
+    const k = named("mira", "merchant", "drovers", { near: [1, 0], name: "Dov", level: 5 });
+    k.teaches = ["swimmer", "tough"];
+    ritual.performRite(game, k, "tracing");
+    game.state.journal = { secrets: {
+      "loc:a": { learned: 0, kind: "location", reading: "deep", text: "Where the reeds bend." },
+      "gossip:1": { learned: 0, kind: "gossip", text: "The ford moved." },
+      "loc:b": { learned: 0, kind: "location", reading: "dark", text: "A rune under the mill." } } };
+    const rows = () => ritual.ritualRows(game, k);
+    const ids = rows().map((r) => r.id);
+    for (const w of ["give:loc:a", "give:gossip:1", "power:swimmer", "power:tough", "recruit", "best"]) if (!ids.includes(w)) fail(`the flame-kin menu lacks ${w}: ${ids.join(", ")}`);
+    if (ids.includes("give:loc:b")) fail("the Drovers (deep) want a dark reading");
+    const rep0 = F.repOf(game, "drovers");
+    const doRow = (id, c = k) => ritual.ritualRow(game, c, ritual.ritualRows(game, c).find((r) => r.id === id));
+    doRow("give:gossip:1"); doRow("give:loc:a");
+    const kk = ritual.kin(game, k);
+    if (F.repOf(game, "drovers") - rep0 !== 95 || kk.net !== 95) fail(`rumour + reading: +${F.repOf(game, "drovers") - rep0}, net ${kk.net}, want 95`);
+    if (!game.state.journal.secrets["gossip:1"].sold || rows().some((r) => r.id === "give:gossip:1")) fail("a sold reading is offered again");
+    game.state.journal.secrets["loc:c"] = { learned: 0, kind: "location", text: "Another." };
+    doRow("give:loc:c");
+    if (kk.net !== 120) fail(`the cap: net ${kk.net} after 95 + 35, want 120`);
+    game.state.journal.secrets["loc:d"] = { learned: 0, kind: "location", text: "One more." };
+    if (doRow("give:loc:d").ok) fail("a gain past the +120 cap went through");
+    const repB = F.repOf(game, "drovers");
+    doRow("power:tough");
+    if (F.repOf(game, "drovers") !== repB - 50 || leveling.perkRank(p(), "tough") !== 1) fail(`a rank-1 power: rep ${repB} → ${F.repOf(game, "drovers")}, rank ${leveling.perkRank(p(), "tough")}`);
+    const rank2 = rows().find((r) => r.id === "power:tough");
+    if (rank2?.n !== -100) fail(`a rank-2 power costs ${rank2?.n}, want −100`);
+    p().level = 1;
+    if (ritual.recruitCost(game, k) !== -(150 + 15 * 4)) fail(`recruit cost at a gap of 4: ${ritual.recruitCost(game, k)}`);
+    p().level = 20;
+    if (ritual.recruitCost(game, k) !== -60) fail(`recruit cost far below you: ${ritual.recruitCost(game, k)}, want the floor −60`);
+    const best = merchants.bestStock(game, k), bestRow = rows().find((r) => r.id === "best");
+    if (bestRow?.n !== -Math.max(10, Math.round(items.itemPrice(best.item) / 5))) fail(`the best item's cost ${bestRow?.n} for worth ${items.itemPrice(best.item)}`);
+    const nBest = best.count, invN = p().inv.length;
+    doRow("best");
+    if (best.count !== nBest - 1 || p().inv.length !== invN + 1) fail("asking for the best item gave nothing");
+    // The floor: a cost that would take you to −250 or below is refused.
+    game.state.rep.drovers = -200;
+    const refused = doRow("recruit");
+    if (refused.ok || k.brain?.leader === "player") fail(`recruiting at −200 for −60: ${refused.line}`);
+    game.state.rep.drovers = 500;
+    const rec = doRow("recruit");
+    if (!rec.ok || k.brain?.leader !== "player" || F.attitude(game, k, p()) !== "friendly") fail(`recruiting: ${rec.line}; leader ${k.brain?.leader}, ${F.attitude(game, k, p())}`);
+    // At most 2 Kindled followers (3 at EGO 20).
+    const more = [0, -1].map((n) => { const c = named("mira", "villager", "drovers", { near: [n, 1], name: `F${n}` }); game.view = "map"; ritual.performRite(game, c, "tracing"); return c; });
+    game.state.rep.drovers = 500;
+    doRow("recruit", more[0]);
+    const third = ritual.ritualRows(game, more[1]).find((r) => r.id === "recruit");
+    if (!third?.why || doRow("recruit", more[1]).ok) fail(`a third Kindled follower at EGO 16: ${JSON.stringify(third)}`);
+    setEgo(20);
+    if (ritual.ritualRows(game, more[1]).find((r) => r.id === "recruit")?.why) fail("a third Kindled follower refused at EGO 20");
+    setEgo(16);
+    stats.menu = "rumour +60, reading +35, the +120 cap held; power −50 then −100; recruit −210 at a gap of 4, −60 far below; the best item −value/5; the −250 floor; 2 Kindled followers (3 at EGO 20)";
+
+    // The screen: "Sit with me" opens it; Esc goes back to talking.
+    game.modeStack = []; screens.setMode(game, "map", undefined, { pointer: false });
+    dl.openTalk(game, k);
+    game.talk.shown = game.talk.length;
+    const sit = game.talk.node.options.findIndex((o) => /Sit with me/.test(o.label));
+    if (sit < 0) fail(`a flame-kin's talk has no "Sit with me": ${game.talk.node.options.map((o) => o.label).join(" | ")}`);
+    else {
+      keys.dispatchKey(game, `Digit${sit + 1}`);
+      if (game.mode !== "ritual") fail(`"Sit with me" opened ${game.mode}`);
+      S.clear(); screens.drawStack(game); S.present();
+      const frame = scr.frameText();
+      for (const w of ["THE KINDLING", "Flame-kin by", "Learn"]) if (!frame.includes(w)) fail(`the ritual screen doesn't show "${w}"`);
+      keys.dispatchKey(game, "Escape");
+      if (game.mode !== "talk") fail(`Esc on the ritual screen led to ${game.mode}`);
+      keys.dispatchKey(game, "Escape");
+    }
+
+    // Oathbreaking: you kill a flame-kin → −120 with everyone, the Moths at −600, the Snuffer (no Kindling for 7 days).
+    setup();
+    const victim = named("mira", "villager", "clatter", { near: [1, 0], name: "Eff" });
+    ritual.performRite(game, victim, "tracing");
+    const before = F.repOf(game, "survey"), stranger = named("mira", "villager", "hollowmere", { near: [0, 1], name: "Gil" });
+    events.emit(game, "kill", { c: victim, src: p() });
+    if (F.repOf(game, "survey") !== before - 120 || F.repOf(game, "moths") !== -600) fail(`oathbreaking: the Survey ${before} → ${F.repOf(game, "survey")}, the Moths ${F.repOf(game, "moths")}`);
+    if (!merchants.snuffed(game) || ritual.canKindle(game, stranger) === null) fail("the Snuffer can still kindle");
+    const sTalk = talk.talkTo(game, stranger).options.find((o) => /kindle/i.test(o.label))?.go();
+    if (!/Snuffer/.test(sTalk?.text || "")) fail(`asking to kindle as the Snuffer: ${sTalk?.text}`);
+    game.time += 7 * 24 * 60 * RULES.clock.secondsPerMinute + 1;
+    if (merchants.snuffed(game)) fail("the Snuffer's mark lasts past 7 world days");
+    setup();
+    const v2 = named("mira", "villager", "clatter", { near: [1, 0], name: "Hob" });
+    ritual.performRite(game, v2, "tracing");
+    const s0 = F.repOf(game, "survey");
+    events.emit(game, "kill", { c: v2, src: null });
+    if (F.repOf(game, "survey") !== s0 || merchants.snuffed(game)) fail("an accidental death counted as oathbreaking");
+  }
+
+  // --- 12. Restock on zone:enter after two world days ------------------------------------------------------------------
+  {
+    fresh(1234, { genotype: "bent" });
+    const t = named("mira", "merchant", "drovers", { name: "Kit" });
+    merchants.ensureStock(game, t);
+    const day = 24 * 60 * RULES.clock.secondsPerMinute;
+    const sig = () => JSON.stringify(t.talk.state.stock.map((s) => [s.item, s.count]));
+    for (const s of t.talk.state.stock) s.count = 0;
+    const sold = sig();
+    events.emit(game, "zone:enter", { zone: game.zone, away: 2 * day - 1, how: "walk", first: false, from: null });
+    if (sig() !== sold) fail("restocked after less than two world days away");
+    events.emit(game, "zone:enter", { zone: game.zone, away: null, how: "load", first: false, from: null });
+    if (sig() !== sold) fail("restocked on a load");
+    game.time += 2 * day;
+    events.emit(game, "zone:enter", { zone: game.zone, away: 2 * day, how: "walk", first: false, from: null });
+    const after = t.talk.state.stock;
+    if (sig() === sold || !after.some((s) => s.count > 0) || t.talk.state.stockedAt !== game.time) fail(`no restock after two world days: ${sig()}`);
+    if (JSON.stringify(merchants.restock(game, t)) !== JSON.stringify(after)) fail("a restock on the same day gave other goods");
+    // Pell restocks too (from his own table).
+    const pell = person("pell", "pell", null); creatures.addCreature(game.zone, pell);
+    pell.talk.state.stock = [{ item: { kind: "bomb" }, count: 0, price: 20 }];
+    events.emit(game, "zone:enter", { zone: game.zone, away: 3 * day, how: "walk", first: false, from: null });
+    if (!(pell.talk.state.stock.length > 1)) fail("Pell wasn't restocked");
+    // A builder's merchant sells its faction's sacrament, and the back shelf shows only at Bright.
+    const shelf = () => merchants.tradeRows(game, t, "theirs").some((x) => x.stock.best);
+    game.state.rep = { drovers: 0 };
+    if (shelf()) fail("the back shelf shows at Grey");
+    game.state.rep = { drovers: 600 };
+    if (!shelf()) fail("the back shelf is hidden at Bright");
+    if (!t.talk.state.stock.some((s) => s.item.kind === "vial" && s.item.effect === "longbackMilk")) fail("a Drover merchant sells no longback milk");
+    stats.restock = `${after.length} rows after two world days away (none at 2 days − 1 s, none on a load); the same day, the same goods; Pell too; the back shelf at Bright only`;
+  }
+
+  // --- 13. Voices -------------------------------------------------------------------------------------------------------
+  {
+    fresh(1234, { genotype: "bent" });
+    for (const id of ["maren", "pell", "corwin", "brann", "mira", "rook", "lio", "ess", "tee", "door", "shrine"]) {
+      const c = creatures.spawnCreature(id, 3, 3, 0, { talk: { dialogue: id, state: {} } });
+      if (voices.voiceFor(c) !== id) fail(`the legacy ${id}'s voice: ${JSON.stringify(voices.voiceFor(c))}`);
+    }
+    const lamp = person("mira", "priest", "lampless"), v = voices.voiceFor(lamp);
+    if (v?.pitch !== 110 || v.wave !== "sine" || v.ghost !== true) fail(`a Lampless priest's voice: ${JSON.stringify(v)}`);
+    const sur = person("mira", "guard", "survey"), v2 = voices.voiceFor(sur);
+    if (v2?.pitch !== 300 || v2.wave !== "square" || !v2.flags.includes("beat")) fail(`a Survey guard's voice: ${JSON.stringify(v2)}`);
+    const mix = person("mira", "villager", null); mix.faction = { clatter: 0.3, pleatwood: 0.7 };
+    if (voices.voiceFor(mix)?.stone !== true) fail(`the heaviest membership's voice (the Pleatwood, stone): ${JSON.stringify(voices.voiceFor(mix))}`);
+    const own = person("mira", "villager", "survey"); own.voice = { pitch: 99, wave: "sine" };
+    if (voices.voiceFor(own)?.pitch !== 99) fail("a creature's own voice doesn't win");
+    if (voices.voiceFor(creatures.spawnCreature("goblin", 2, 2, 0, { rng: R })) !== null) fail("a monster with no faction has a voice");
+    game.modeStack = []; screens.setMode(game, "map", undefined, { pointer: false });
+    creatures.addCreature(game.zone, lamp);
+    dl.openTalk(game, lamp);
+    if (JSON.stringify(game.talk?.voice) !== JSON.stringify(v)) fail(`the talk screen's voice: ${JSON.stringify(game.talk?.voice)}`);
+    keys.dispatchKey(game, "Escape");
+    stats.voices = `11 legacy people keep their voices; a Lampless priest ${JSON.stringify(v)}; a Survey guard ${JSON.stringify(v2)}`;
+  }
+
+  // --- 14. Liquids and the vial ------------------------------------------------------------------------------------------
+  {
+    fresh(1234, { genotype: "bent" });
+    const z = game.zone, x = Math.floor(p().x) + 1, y = Math.floor(p().y), wz = Math.floor(p().z);
+    if (liquids.liquidAt(z, x, y) !== (z.liquid || "water")) fail("liquidAt without zone.liquids");
+    z.liquids = { [x + y * z.w]: "brine" };
+    if (liquids.liquidAt(z, x, y) !== "brine" || liquids.liquidAt(z, x + 1, y) !== (z.liquid || "water")) fail("liquidAt by column");
+    const old = z.get(x, y, wz);
+    z.set(x, y, wz, world.B.WATER_SHALLOW);
+    p().inv = [{ kind: "vial", effect: "", count: 1 }];
+    items.useItem(game, p(), p().inv[0]);
+    if (!p().inv.some((i) => i.kind === "vial" && i.effect === "brine")) fail(`filling a vial beside brine: ${JSON.stringify(p().inv)}`);
+    z.set(x, y, wz, old); delete z.liquids;
+    p().inv = [{ kind: "vial", effect: "", count: 1 }];
+    if (items.useItem(game, p(), p().inv[0]) !== 0 || p().inv[0]?.effect !== "") fail("an empty vial filled with no water near");
+    p().hp = 5;
+    p().inv = [{ kind: "vial", effect: "freshWater", count: 1 }];
+    items.useItem(game, p(), p().inv[0]);
+    if (p().hp !== 7 || !p().inv.some((i) => i.kind === "vial" && i.effect === "")) fail(`fresh water: hp ${p().hp}, ${JSON.stringify(p().inv)}`);
+    liquids.drinkLiquid(game, p(), "ink");
+    if (!p().status?.flat) fail("ink didn't make you Flat");
+    for (const f of Object.values(F.FACTIONS)) {
+      if (f.hidden || f.group) continue;
+      const s = liquids.sacramentOf(f.id);
+      if (s !== "any" && !liquids.liquidDef(s)) fail(`${f.id}'s sacrament ${s} isn't in content/liquids.js`);
+    }
+    if (!liquids.isSacrament("unlit", "brine") || liquids.isSacrament("assize", "brine") || !liquids.isSacrament("noonVigil", "water")) fail("isSacrament");
+    const L = (await m("content/liquids.js")).LIQUIDS;
+    stats.liquids = `${Object.keys(L).length} liquids (every faction's sacrament among them); a vial filled with brine; fresh water +2 HP; ink, Flat`;
+  }
+
+  // --- 15. Shrines -------------------------------------------------------------------------------------------------------
+  {
+    fresh(1234, { genotype: "bent" });
+    p().funds = 1000; p().purse = 1000; p().torch = true;
+    const post = creatures.spawnCreature("shrine", 3, 3, 0, { talk: { state: {} } });
+    post.talk.dialogue = undefined;
+    shrines.makeShrine(post, { cost: 15, faction: "noonVigil" });
+    if (post.talk.dialogue !== "shrine" || post.talk.state.cost !== 15) fail(`makeShrine: ${JSON.stringify(post.talk)}`);
+    const opts = talk.talkTo(game, post).options.map((o) => o.label);
+    if (!opts.some((l) => /^Offer/.test(l)) || !opts.some((l) => /Give 50 glim to the Noon Vigil/.test(l))) fail(`a Vigil shrine's options: ${opts.join(" | ")}`);
+    const r0 = F.repOf(game, "noonVigil");
+    shrines.donate(game, post, 50);
+    if (F.repOf(game, "noonVigil") !== r0 + 10 || p().funds !== 950) fail(`50 glim to the Vigil: rep +${F.repOf(game, "noonVigil") - r0}, funds ${p().funds}`);
+    for (let k = 0; k < 30; k++) shrines.donate(game, post, 50);
+    if (F.repOf(game, "noonVigil") !== r0 + 200) fail(`the Vigil's donation cap: +${F.repOf(game, "noonVigil") - r0}, want +200`);
+    const hush = creatures.spawnCreature("shrine", 4, 3, 0, { talk: { state: {} } });
+    shrines.makeShrine(hush, { faction: "lampless" });
+    if (shrines.donate(game, hush, 10).ok) fail("a Lampless donation with the torch lit");
+    p().torch = false; p().funds = 100;
+    const l0 = F.repOf(game, "lampless"), out = shrines.donate(game, hush, 10);
+    if (!out.ok || F.repOf(game, "lampless") !== l0 + 5) fail(`10 glim poured in the dark: ${out.line}`);
+    const priest = person("mira", "priest", "noonVigil");
+    if (talk.talkTo(game, priest).options.some((o) => /Give/.test(o.label))) fail("a Vigil priest takes donations past the cap");
+    stats.shrines = `the shrine component on a statue (the legacy offering kept); the Vigil +10 per 50 glim, capped at +200; the Lampless +1 per 2 glim, in the dark only`;
+  }
+
+  // --- 16. The trade screen by keys -----------------------------------------------------------------------------------------
+  {
+    fresh(1234, { genotype: "bent" });
+    p().funds = 300;
+    const t = named("mira", "merchant", "drovers", { near: [1, 0], name: "Lu" });
+    game.modeStack = []; screens.setMode(game, "map", undefined, { pointer: false });
+    dl.openTalk(game, t);
+    game.talk.shown = game.talk.length;
+    const k = game.talk.node.options.findIndex((o) => /what you have/.test(o.label));
+    keys.dispatchKey(game, `Digit${k + 1}`);
+    if (game.mode !== "trade" || game.trade?.tab !== "theirs") fail(`"Show me what you have" opened ${game.mode} on ${game.trade?.tab}`);
+    S.clear(); screens.drawStack(game); S.present();
+    let frame = scr.frameText();
+    for (const w of ["LU", "THEIRS", "yours", "services", "EGO", "buy ×", "glim"]) if (!frame.includes(w)) fail(`the trade screen doesn't show "${w}"`);
+    const f0 = p().funds, rows0 = merchants.tradeRows(game, t, "theirs");
+    const cheap = rows0.findIndex((r) => r.price <= f0);
+    game.trade.sel = cheap;
+    keys.dispatchKey(game, "Enter");
+    if (p().funds !== f0 - rows0[cheap].price) fail(`Enter on theirs: funds ${f0} → ${p().funds}, price ${rows0[cheap].price}`);
+    keys.dispatchKey(game, "Tab");
+    if (game.trade.tab !== "yours") fail(`Tab led to ${game.trade.tab}`);
+    S.clear(); screens.drawStack(game); S.present();
+    if (!scr.frameText().includes("YOURS")) fail("the yours tab isn't drawn");
+    keys.dispatchKey(game, "Escape");
+    if (game.mode !== "talk" || game.trade) fail(`Esc from trade: ${game.mode}`);
+    if (!game.talk.node.options.some((o) => /what you have/.test(o.label))) fail("back from trade, the talk didn't start over");
+    keys.dispatchKey(game, "Escape");
+    stats.tradeScreen = `opened from talk on theirs; a buy by Enter (${rows0[cheap].price} glim); Tab to yours; Esc back to the talker's first words`;
+  }
+
+  // --- 17. JSON ----------------------------------------------------------------------------------------------------------
+  {
+    const st = JSON.parse(JSON.stringify(game.state));
+    for (const k of ["kindling", "snuffer", "donations", "merchants"]) if (JSON.stringify(st[k]) !== JSON.stringify(game.state[k])) fail(`state.${k} isn't plain JSON`);
   }
 
   return { name: "social", ok: !problems.length, problems, stats };
