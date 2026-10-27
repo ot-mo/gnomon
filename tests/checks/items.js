@@ -355,6 +355,7 @@ export function checkItems(m) {
     const hp0 = St.maxHp(p);
     withC(() => { IM.install(game, p, heart, "body"); IM.install(game, p, rack, "back"); IM.install(game, p, eye2, "face"); });
     if (St.maxHp(p) !== hp0 - 5) fail(`the glim heart: max HP ${St.maxHp(p)}, want ${hp0 - 5}`);
+    if (m.torch.torchCost(p) !== 0) fail(`the glim heart: the torch costs ${m.torch.torchCost(p)} of its glim, want nothing (torch.js torchCost)`);
     if (!p.body.parts.some((q) => q.id === "back_2")) fail("the folding rack gave no second back");
     const cloak = { kind: "armour", id: "cloak", ench: 0, known: true };
     if (!Bd.equip(game, p, cloak, "back_2").ok) fail("no cloak on the second back");
@@ -364,6 +365,7 @@ export function checkItems(m) {
     if (!u1.ok || u1.destroyed || !p.inv.includes(eye2) || IM.gradeUsed(p) !== 8) fail(`taking out the level-eye: ${JSON.stringify({ ok: u1.ok, destroyed: u1.destroyed })}, grade used ${IM.gradeUsed(p)} (want 8)`);
     const u2 = withC(() => IM.uninstall(game, p, "body"));
     if (!u2.ok || !u2.destroyed || p.inv.includes(heart) || St.maxHp(p) !== hp0) fail("the glim heart wasn't destroyed on removal, or max HP didn't come back");
+    if (m.torch.torchCost(p) !== 1) fail(`the glim heart taken out: the torch costs ${m.torch.torchCost(p)}, want the full 1`);
     const u3 = withC(() => IM.uninstall(game, p, "back"));
     if (!u3.ok || p.body.parts.some((q) => q.id === "back_2") || !p.inv.includes(cloak) || !p.inv.includes(rack)) fail("taking out the folding rack: the part, the cloak or the rack went astray");
     // Removal takes the hour too, and a hunt within reach refuses it; the "uninstall" and "grade" events; HP clamped when
@@ -1009,7 +1011,7 @@ export async function run(env) {
     load("events", "events.js"), load("renderMap", "renderMap.js"), load("interact", "interact.js"), load("talk", "talk.js"),
     load("currency", "currency.js"), load("creatures", "creatures.js"), load("world", "world.js"), load("rules", "rules.js"),
     load("status", "status.js"), load("abilities", "abilities.js"), load("codec", "save/codec.js"), load("rng", "rng.js"),
-    load("time", "time.js"), load("effects", "effects.js"), load("player", "player.js"), load("throwing", "throwing.js"), load("ui", "ui.js"), load("combat", "combat.js"),
+    load("time", "time.js"), load("effects", "effects.js"), load("player", "player.js"), load("throwing", "throwing.js"), load("ui", "ui.js"), load("combat", "combat.js"), load("torch", "torch.js"),
   ]);
   m.implantTable = (await env.src("content/items/implants.js")).IMPLANTS;
   m.artifactTable = (await env.src("content/items/artifacts.js")).ARTIFACTS;
