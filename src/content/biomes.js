@@ -9,7 +9,11 @@
 //               §4.4's Rust Steps), still at most 12 blocks above the datum (DECISIONS: heights)
 //
 // WS2b adds the builder's fields (ground and sub-ground blocks, rocks, ponds, props, light sources, spawn
-// tables, densities). A biome missing here takes DEFAULT_BIOME's values.
+// tables, densities). A biome missing here takes DEFAULT_BIOME's values, and so does every span of a world whose
+// terrains aren't the real world's (content/world/terrains.js): the test world's fixture terrains share some ids
+// ("flats") but none of this data, so its zones stay as 0A2 made them (biomeFor).
+import { TERRAINS } from "./world/terrains.js";
+
 export const DEFAULT_BIOME = { liquid: "water", cliffTiers: 1 };
 
 export const BIOMES = {
@@ -28,11 +32,8 @@ export const BIOMES = {
   sea: { liquid: "brine" },
   river: { liquid: "water" },
   road: { liquid: "water" },
-  // The test world's own fixture terrains (its "flats" shares the real world's id, and so its brine).
-  hills: { liquid: "water" },
-  forest: { liquid: "water" },
-  marsh: { liquid: "water" },
-  mountains: { liquid: "water" },
 };
 
 export const biomeOf = (id) => ({ ...DEFAULT_BIOME, ...(BIOMES[id] || {}) });
+// The biome data of a world's span: its biome's when its terrain is the real world's, else the defaults.
+export const biomeFor = (world, tile) => (world.terrains[tile.terrain] === TERRAINS[tile.terrain] ? biomeOf(tile.biome) : { ...DEFAULT_BIOME });

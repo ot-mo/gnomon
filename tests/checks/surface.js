@@ -23,13 +23,14 @@
 //    can't be stood on.
 // 8. Roads never climb a cliff: the test world's spans where the zone centre (a road's hub) is on a cliff
 //    (verification of 2a: seeds 3, 20 and 42) have their hub on plain ground and no road on a map wall.
+// 9. The test world's zones all hold plain water (the real world's biome data isn't theirs).
 import { buildRun } from "../../src/world/run.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
 import { TEST_WORLD } from "../../src/content/world/test-world.js";
 import { generateSurface, surfaceSteps, validateSurface, worldFns, buildApronBand, forgetWorld, SURFACE_RULES } from "../../src/gen/surface.js";
 import { edgePorts, portsOf, portTable } from "../../src/gen/ports.js";
 import { apronBandSteps } from "../../src/gen/apron.js";
-import { biomeOf } from "../../src/content/biomes.js";
+import { biomeFor } from "../../src/content/biomes.js";
 import { B, FLOOR_Z, SURFACE, APRON_SIDES } from "../../src/world.js";
 import { SIDE_STEP } from "../../src/world/worldmodel.js";
 import { makeRng } from "../../src/rng.js";
@@ -86,7 +87,7 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
       // 4. Liquids.
       liquids.zones++;
       const river = W.portsOf(t.wx, t.wy).filter((p) => p.kind === "river");
-      const want = river.length ? river.map((p) => p.liquid).sort()[0] : biomeOf(t.biome).liquid;
+      const want = river.length ? river.map((p) => p.liquid).sort()[0] : biomeFor(world, t).liquid;
       if (z.liquid !== want) fail(`${at}: liquid ${z.liquid}, want ${want}`);
       liquids.byLiquid[z.liquid] = (liquids.byLiquid[z.liquid] || 0) + 1;
       if (river.length) liquids.rivers++;
@@ -248,6 +249,15 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
       z.set(ax + 6, ay, FLOOR_Z + 5, B.ROAD);
     }, "road columns");
     expectCaught("the north edge cut off", (z) => { for (let x = 0; x < z.w; x++) for (let k = 0; k < FLOOR_Z + 6; k++) z.set(x, 2, k, B.ROCK); }, "the n edge");
+  }
+
+  // 9. The test world keeps plain water: its fixture "flats" isn't the real world's (biomeFor), so the legacy
+  // start span (the temple, 0, 0) and every other test-world zone hold "water".
+  {
+    const run = buildRun(1, TEST_WORLD), W = worldFns(run.world, run.seed);
+    const odd = run.world.tiles.filter((t) => (t.edges === "open" || t.landmark) && W.liquidOf(t.wx, t.wy) !== "water");
+    if (odd.length) fail(`test world: ${odd.length} spans hold another liquid than water, (${odd[0].wx}, ${odd[0].wy}) ${W.liquidOf(odd[0].wx, odd[0].wy)}`);
+    if (generateSurface(run, 0, 0).liquid !== "water") fail("test world: the temple's span holds another liquid than water");
   }
 
   // 8. Roads and cliffs.

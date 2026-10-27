@@ -111,8 +111,10 @@ screenshots of three biomes in the browser (`?silent=1`, port 8652).
 
 ### `content/biomes.js`
 
-- `BIOMES[biome] = { liquid, cliffTiers }` (2a's fields; 2b adds the builder's), `DEFAULT_BIOME`, `biomeOf(id)`. A
-  biome id is a terrain's `biome`, else its id; the test world's `flats` shares the real world's id.
+- `BIOMES[biome] = { liquid, cliffTiers }` (2a's fields; 2b adds the builder's), `DEFAULT_BIOME`, `biomeOf(id)`,
+  `biomeFor(world, tile)` (what the world functions read: the tile's biome data when its terrain is the real world's,
+  `content/world/terrains.js`, else the defaults, so the test world's fixture terrains, whose `flats` shares an id,
+  keep plain water and single cliffs). A biome id is a terrain's `biome`, else its id.
 
 ## Integration requests
 

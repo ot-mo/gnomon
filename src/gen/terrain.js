@@ -48,7 +48,7 @@
 import { B, FLOOR_Z, SURFACE } from "../world.js";
 import { seedFor, hashInt, hashFloat, seededNoise, fbm, distance } from "../rng.js";
 import { FLATTEN_SKIRT } from "../world/worldmodel.js";
-import { biomeOf } from "../content/biomes.js";
+import { biomeFor } from "../content/biomes.js";
 import { portTable } from "./ports.js";
 
 export const SURFACE_RULES = {
@@ -100,7 +100,7 @@ function makeWorldFns(world, seed) {
   for (const t of world.tiles) {
     const T = world.terrains[t.terrain] || {}, i = t.wx + t.wy * WW;
     relief[i] = T.relief ?? 0.3; cliffs[i] = T.cliffs ?? 0; trees[i] = T.trees ?? 0;
-    stacked[i] = biomeOf(t.biome).cliffTiers >= 2 ? cliffs[i] : 0;
+    stacked[i] = biomeFor(world, t).cliffTiers >= 2 ? cliffs[i] : 0;
     ground[i] = B[T.ground] ?? B.GRASS;
   }
   const spanIndex = (tx, ty) => clampInt(tx, 0, WW - 1) + clampInt(ty, 0, WH - 1) * WW;
@@ -203,7 +203,7 @@ function makeWorldFns(world, seed) {
     let out = null;
     for (const p of portsOf(wx, wy)) if (p.kind === "river" && (out === null || p.liquid < out)) out = p.liquid;
     const t = world.tileAt(wx, wy);
-    return out || (t ? biomeOf(t.biome).liquid : "water");
+    return out || (t ? biomeFor(world, t).liquid : "water");
   }
 
   return { seed, world, portsOf, channel, columnAt, heightAt: (gx, gy) => columnAt(gx, gy).height, treeAt, liquidOf };
