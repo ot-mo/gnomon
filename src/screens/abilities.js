@@ -77,7 +77,7 @@ function draw(game) {
     const id = bar[k], x = x0 + 2 + k * sw, name = id ? ABILITIES[id]?.name || id : "-";
     const sel = rows[view.sel]?.id === id && !!id;
     S.text(x, y0 + 2, `${k + 1}`, ...UI.title);
-    S.text(x + 1, y0 + 2, ` ${name}`.slice(0, sw - 2), ...(sel ? UI.sel : id && mine.has(id) ? UI.text : UI.help));
+    S.text(x + 2, y0 + 2, name.slice(0, sw - 2), ...(sel ? UI.sel : id && mine.has(id) ? UI.text : UI.help));
     hit({ x, y: y0 + 2, w: sw - 1, h: 1 }, { slot: k });
   }
 

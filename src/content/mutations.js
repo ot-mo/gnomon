@@ -102,7 +102,7 @@ export const MUTATIONS = {
   foldStep: {
     name: "Fold Step", kind: "mental", cost: 4, max: 10, excludes: [], planar: true,
     bridge: "a blink where you aim in 3D, or onto the tile you pick on the map",
-    info: (l) => `Blink up to ${tiles(4 + l)}: where you aim in 3D, on the map toward what you pick.`,
+    info: (l) => `Blink up to ${tiles(4 + l)}: where you aim in 3D, on the map toward your target or the way you face.`,
     ability: "foldStep",
   },
   overlook: {

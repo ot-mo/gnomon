@@ -228,7 +228,7 @@ const foldRange = (lvl, e) => (e?.mutations?.foldStep ? 4 + lvl : 4);
 registerAbility("foldStep", {
   name: "Fold Step", source: "mutation", target: "tile", range: 4, rangeFor: foldRange, mapTime: 0.5,
   cooldown: () => 12,
-  info: (lvl, e) => `Step through a fold in the world, up to ${foldRange(lvl, e)} tiles: where you aim in 3D; on the map toward the nearest monster you see, or the way you face.`,
+  info: (lvl, e) => `Step through a fold in the world, up to ${foldRange(lvl, e)} tiles: where you aim in 3D; on the map toward your target, or the way you face.`,
   use(game, e, lvl, target) {
     // A tile picked on the map (WS8's target screen) that is your own: nowhere to go (not the way you face).
     if (game.mode === "map" && !target?.creature && target?.tile && target.tile.x === Math.floor(e.x) && target.tile.y === Math.floor(e.y)) {

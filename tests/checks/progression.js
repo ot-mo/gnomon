@@ -871,7 +871,9 @@ export async function checkProgression(m) {
         place(p, at, Math.PI);
         zone.seen.fill(0);
         const tile = { x: at.x + 8, y: at.y }, picked = (t) => ({ creature: null, tile: t, point: { x: t.x + 0.5, y: t.y + 0.5, z: at.z }, dir: [1, 0, 0] });
+        rat(tile.x, tile.y, at.z, { speedMul: 0 });
         A.activate(game, p, "overlook", picked(tile));
+        if (!said(/: something stands there\.$/)) fail(`Overlook over one rat said: ${game.messages.slice(-1).map((x) => x.text)}`);
         if (!zone.seen[tile.x + tile.y * zone.w] || zone.seen[at.x - 6 + at.y * zone.w]) fail("Overlook on a picked tile: the 9 × 9 isn't around it");
         const own = A.activate(game, p, "foldStep", picked({ x: at.x, y: at.y }));
         if (own || Math.floor(p.x) !== at.x || A.cooldownLeft(p, "foldStep") > 0) fail(`Fold Step onto your own tile: ${own ? "used" : "refused"}, at ${Math.floor(p.x) - at.x} east, cooldown ${A.cooldownLeft(p, "foldStep")}`);
@@ -1019,7 +1021,7 @@ export async function checkProgression(m) {
       press("KeyB");
       if (game.mode !== "abilities") fail(`B on the map opened ${game.mode}`);
       let rows = text().join("\n");
-      for (const want of ["ABILITIES", "Fold Step", "Wings", "Echo", "keys 1-9 use these in 3D and on the map alike", "ready"]) if (!rows.includes(want)) fail(`B: "${want}" isn't on screen`);
+      for (const want of ["ABILITIES", "Fold Step", "Wings", "Echo", "keys 1-9 use these in 3D and on the map alike", "ready", "1 Fold Ste"]) if (!rows.includes(want)) fail(`B: "${want}" isn't on screen`);
       edge("B");
       // The second row (Wings) onto key 5 by its digit: off key 2.
       press("ArrowDown"); press("Digit5", "5");
@@ -1088,6 +1090,8 @@ export async function checkProgression(m) {
       click("Effects");
       if (m.charsheet.sheetView(game).tab !== "effects") fail(`K: a click on Effects went to ${m.charsheet.sheetView(game).tab}`);
       if (!text().join("\n").includes("WHAT ADDS UP")) fail("K: the effects tab shows no bonuses");
+      STS.addStatus(game, p, "shadowsense", { t: 9 });
+      if (!text().join("\n").includes("SENSE") || text().join("\n").includes("shadowsense")) fail("K: the effects tab names a status by its id, not as the HUD does");
       edge("K effects");
       press("Escape");
       if (game.mode !== "map") fail(`K: Esc left ${game.mode}`);

@@ -43,6 +43,9 @@ const ATTR_TEXT = {
 };
 
 const sheet = { tab: 0, msg: "", lists: TABS.map(() => ({ sel: 0, top: 0 })) };
+// A status as the HUD calls it ("SHAKEN", "FLAT"), its seconds left off (the list shows them), or its id in words.
+const statusName = (game, id, s) => (STATUS_DEFS[id].hud?.(s, game) || "").replace(/\s*\d+s$/, "") ||
+  id.replace(/([A-Z])/g, " $1").toUpperCase();
 const signed = (n) => (n > 0 ? `+${n}` : `${n}`);
 const round = (n) => Math.round(n * 100) / 100;
 const track = (p) => GENOTYPES[p.genotype]?.track || null;
@@ -227,7 +230,7 @@ function drawEffects(game, p, L, R) {
     if (sel) S.text(x, y, ">", ...UI.mark);
     if (r.status) {
       const def = STATUS_DEFS[r.status], s = p.status[r.status];
-      S.text(x + 2, y, def.name.slice(0, rw - 10), ...(sel ? UI.sel : def.color));
+      S.text(x + 2, y, statusName(game, r.status, s).slice(0, rw - 10), ...(sel ? UI.sel : def.color));
       S.text(x + rw - 7, y, Number.isFinite(s.t) && !lasting(s) ? `${Math.ceil(s.t)}s` : "", ...UI.dim);   // (a defect's lasts while its cause holds)
     } else {
       S.text(x + 2, y, `${ABILITIES[r.cooldown]?.name || r.cooldown} cools`.slice(0, rw - 10), ...(sel ? UI.sel : UI.dim));

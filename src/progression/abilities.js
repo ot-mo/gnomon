@@ -172,7 +172,7 @@ registerAbility("overlook", {
     const there = zone.creatures.filter((c) => !canTalk(c) && Math.abs(Math.floor(c.x) - at.x) <= 4 && Math.abs(Math.floor(c.y) - at.y) <= 4);
     for (const c of there) sight(game, c);
     mapped(game);
-    say(game, e, `You look down on the floor around (${at.x}, ${at.y}) from above${there.length ? `: ${there.length === 1 ? "something" : `${there.length} things`} stand there` : ""}.`);
+    say(game, e, `You look down on the floor around (${at.x}, ${at.y}) from above${there.length ? `: ${there.length === 1 ? "something stands" : `${there.length} things stand`} there` : ""}.`);
     return true;
   },
 });
