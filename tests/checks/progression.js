@@ -789,7 +789,9 @@ export async function checkProgression(m) {
       const cases = {
         fling: { muts: ["thistlehide"], set: (p, at) => ({ r: rat(at.x + 1, at.y, at.z) }), ok: (p, s) => s.r.hp < s.hp0 || !game.zone.creatures.includes(s.r) },
         wingsUp: { muts: ["wings"], ok: (p) => STS.statusLeft(p, "flying") > 24 },
-        bellows: { muts: ["bellowsThroat"], set: (p, at) => ({ r: rat(at.x + 2, at.y, at.z) }), ok: (p, s) => !game.zone.creatures.includes(s.r) || (s.r.hp < s.hp0 && STS.hasStatus(s.r, "burning")) },
+        // (a sturdy rat, so it lives to burn; its burning holds no copy of you, since a zone saves its creatures' statuses)
+        bellows: { muts: ["bellowsThroat"], set: (p, at) => ({ r: rat(at.x + 2, at.y, at.z, { hp: 99, maxHp: 99 }) }),
+                   ok: (p, s) => s.r.hp < s.hp0 && STS.hasStatus(s.r, "burning") && JSON.stringify(s.r.status.burning).length < 80 },
         flatwise: { muts: ["flatwise"], ok: (p) => STS.statusFlag(p, "flat") && game.mode === "map" },
         echo: { muts: ["echoThroat"], set: (p, at) => { p.torch = false; return { r: rat(at.x + 6, at.y, at.z) }; },
                 ok: (p, s) => game.zone.sightings.get(s.r.id)?.time === game.time },
