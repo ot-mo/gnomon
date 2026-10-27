@@ -120,12 +120,14 @@ when it lands. 1-3 are WS8's requests 1, 8 and 11 (`git show p1-ws8:docs/ws8.md`
    and `useAbility` goes on in the callback (`def.target === "self"` at once; on the map `return false` and act when the
    screen confirms). `check-abilities` §5 then drives the screen with Enter. 4b does it once `ws/ws8` is merged (its
    `screens/target.js` isn't in this tree).
-2. **`stats.js` `BONUS_KEYS` (the integrator), WS8's request 8:** a `missileAcc` key, which WS8's `missileSpec` adds to
-   `acc`. Then in `content/powers.js` `steadyHand` gets `bonus: () => ({ missileAcc: 2 })` and loses its `needs`.
-3. **`stats.js` (the integrator), WS8's request 11:** `innate` has two meanings in P0: `stats.js` reads a creature's
-   `innate` as a bonus table, `abilities.js` (and WS8's `ai.js`) as a list of ability ids, so the player's
-   `["foldStep"]` adds a stray key `"0"` to its bonus table. Proposed, one line, leaving abilities.js and ai.js as they
-   are: `registerBonusSource("innate", (e) => (e.innate && !Array.isArray(e.innate) ? [e.innate] : []))`.
+2. **`stats.js` `BONUS_KEYS` (the integrator), WS8's request 8:** the integrator adds `missileAcc` at the WS8 merge
+   (its message of 2026-10-27), and `missileSpec` adds `bonus(p, "missileAcc")` to the accuracy. `content/powers.js`
+   `steadyHand` already gives `{ missileAcc: 2 }`; at the merge drop its `needs` line so it is offered.
+3. **`stats.js` (the integrator), WS8's request 11:** settled by the integrator at the WS8 merge: a creature's own bonus
+   table moves from `e.innate` to `e.bonuses` (stats.js's "innate" source reads `e.bonuses`), and `innate` means a list
+   of ability ids only, as `abilities.js`, `player.js` (`innate: ["foldStep"]`) and WS8's `ai.js` read it. WS4 keeps
+   the name; if 4b drops the innate Fold Step grant, the field stays a list (or empty). (Until then the player's
+   `["foldStep"]` adds a stray key `"0"` to its bonus table, as in P0.)
 4. **`game.js` `startRun(seed, world, { mode, player })` (the integrator; with WS9's request 2):** take the made
    character and the mode there. Then `chargen.js beginRun` calls it so, and `player.js` drops `nextRunPlayer` (the
    seam that hands the character to `startRun`'s `makePlayer()` today).
@@ -165,4 +167,44 @@ when it lands. 1-3 are WS8's requests 1, 8 and 11 (`git show p1-ws8:docs/ws8.md`
 
 ## Handoff
 
-(Written at the end of 4a, for 4b.)
+**For the WS4b session** (same worktree `C:\Users\Otto Mörner\Code\gnomon-wt\ws4`, branch `ws/ws4`). State at the
+end of 4a: see the bottom of this section for the tag and the last commit.
+
+**What 4a built** (gate numbers in `docs/sessions/ws4.md` "Part 4a"): the genotypes, the 12 backgrounds and the Levels;
+`POWERS` (the parent's perks in the bible's trees, plus what waits); `makeCharacter`, the point-buy, names and
+`beginRun`; the attribute set's leveling (HP, creases, attribute points, seeded power offers, killXp, Pilgrim); the
+attribute set's level-up card; the creation wizard (keys and mouse, å ä ö); `check-progression` (Node and the
+browser's test page) and `tools/browser-ws4.mjs`.
+
+**The exact next step for 4b:** fill `content/mutations.js` and `progression/mutations.js` (drop both `STUB`s):
+`mutationOffers(game, p, rng)` (3 seeded offers, one planar), `gainMutation(game, p, id)` (4 creases; `game` may be
+null at creation: `makeCharacter` calls `gainMutation(null, p, id)` for each of `choices.mutations`),
+`raiseMutation(game, p, id)` (1 crease, cap floor(level / 2) + 1, at most 10), defects refunding 2-3 (the wizard
+reads `MUTATIONS[id].cost`, 4 by default, so a defect with `cost: -2` gives two back: `screens/create.js`
+`creasesLeft` and `pickTrack`). Then a mutation bonus source (progression/index.js) and an ability
+source (`registerAbilitySource("mutations", …)` in abilities.js), Fold Step as the Bent's mutation (drop
+`innate: ["foldStep"]` from `player.js quickPlayer` only for made characters, or for all once the integrator
+agrees: the quick start's hotbar is in recorded frames only while it cools down), then B, K and the hotbar hint.
+
+**Where to look:**
+- The wizard's mutation step already calls `mutationOffers` with a seeded rng (`seedFor(seed, "creation",
+  "mutations", n)`) and lists `taken` rows (a click gives one back) and a last "Go on" row; `check-progression` §4
+  drives it with an empty table. Add a 4b section that takes and gives back mutations through it.
+- `screens/levelup.js` shows "+1 crease" on the card; spending creases at level-up or on the sheet is 4b's (bible:
+  creases buy new mutations or levels at any time).
+- `p.attrPoints` kept "for later" today wait for the next card; K's sheet should spend them too.
+- Cast (bible §10.3) and the mutations' reputation changes (§10.4) are 4b's; `mentalLevel(e)` in `stats.js` is
+  `level + mod(ego)`.
+
+**Integration requests 1-3** (WS8's) are WS4's or the integrator's: 1 is 4b's once `ws/ws8` is merged into the
+integration branch (its target screen isn't in this tree; don't merge it here).
+
+**Surprising / worth knowing:**
+- `progression/chargen.js` imports `game.js` (for `startRun`), and `game.js` reaches `screens/create.js`, which imports
+  `chargen.js`: a cycle that is fine as long as `create.js` reads nothing of `chargen.js` while loading (its `wiz` state
+  takes the name's max in `reset()`). check-imports loads every module on its own and catches a slip.
+- Under the legacy set nothing of 4a shows (golden, screen frames and legacy fights hold); tests switch with
+  `overrideRules("stats", "attributes")` and must undo it.
+- This machine runs WS9, WS5, the integrator and an ML job: timed checks read slow under load; take timed numbers
+  alone, against `p0-done` in alternation (`node tools/check-perf.mjs --against p0-done`).
+- Port 8644 is WS4's (`node tools/serve.mjs 8644`); 8645 is WS5's.
