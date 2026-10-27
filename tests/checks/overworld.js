@@ -644,6 +644,12 @@ async function stored(G, problems) {
 // --- 7. Discovery ------------------------------------------------------------------------------------------------
 function discovery(G, scr, problems) {
   const out = {};
+  // A new run starts on its world's start span with no XP (its landmark is paid without any: the parent's campaign
+  // under (0, 0) keeps its numbers), on both worlds.
+  for (const [wn, w] of WORLDS(G.game)) {
+    const g0 = fresh(G, 70, w), st = g0.run.world.start, site = g0.run.sites.get(`landmark:${st.landmarkId}`);
+    if (g0.player.xp !== 0 || g0.player.level !== 1 || !atlas(g0).paid[site?.id]) problems.push(`discovery: a new run on the ${wn} world starts with ${g0.player.xp} XP at level ${g0.player.level} (start landmark paid: ${!!atlas(g0).paid[site?.id]})`);
+  }
   const game = fresh(G, 71, G.game.world), W = game.run.world, A = atlas(game), p = game.player;
   if (!isKnown(game, 0, 0)) problems.push("discovery: the start span isn't known");
   if (isKnown(game, 20, 8)) problems.push("discovery: the ruin's span known from the start");
