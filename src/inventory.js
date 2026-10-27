@@ -104,6 +104,8 @@ export function inventoryKey(game, code) {
 
 function packKey(game, code) {
   const inv = game.player.inv, shown = visible(game);
+  // What acts on the selection acts only on a thing the list shows (a filter may hide what game.invSel points at).
+  if (["KeyE", "Enter", "Space", "NumpadEnter", "KeyT", "KeyX", "KeyL"].includes(code) && !shown.includes(game.invSel)) return 0;
   if (code === "KeyE" || code === "Enter" || code === "Space" || code === "NumpadEnter") return useSelected(game);
   if (code === "KeyT") {
     const it = inv[game.invSel];
@@ -179,6 +181,7 @@ export function useSelected(game) {
   if (!it || !canUse(it)) return 0;
   const t = useItem(game, p, it);
   game.invSel = Math.min(game.invSel, Math.max(0, p.inv.length - 1));
+  keepInView(game);
   return t;
 }
 
@@ -296,8 +299,14 @@ function dropSelected(game) {
   emit(game, "drop", { e: p, item });   // (bodymods: what ran in the pack stops)
   game.log(`You drop the ${itemName(game, one)}.`, DIM);
   game.invSel = Math.min(game.invSel, Math.max(0, p.inv.length - 1));
-  if (!visible(game).includes(game.invSel)) game.invSel = visible(game)[0] ?? game.invSel;
+  keepInView(game);
   return 0;
+}
+// After the pack changed: a filter left with nothing goes back to everything, and the selection is a thing shown.
+function keepInView(game) {
+  if (game.invFilter && game.invFilter !== "all" && !visible(game).length) { game.invFilter = "all"; game.invFor = null; }
+  const shown = visible(game);
+  if (shown.length && !shown.includes(game.invSel)) game.invSel = shown[0];
 }
 
 // --- The Equipment tab's rows ------------------------------------------------------------------------------------

@@ -658,6 +658,21 @@ export function checkItems(m) {
     const left = game.zone.items.includes(knife);
     m.keys.dispatchKey(game, "KeyG", false, "g");
     if (!left || game.zone.items.includes(knife) || (q.inv.find((x) => x.kind === "knife")?.count || 0) !== n0 + 1) fail("G didn't pick up the knife you'd just dropped");
+    // A filter hiding what game.invSel points at: E does nothing to it; dropping the filter's last thing goes back to
+    // everything, with the selection on something shown.
+    {
+      const r = fresh();
+      r.inv.length = 0;
+      r.inv.push({ kind: "potion", effect: "healing", count: 1 }, { kind: "scroll", effect: "teleport", count: 1 });
+      game.debug.openInv();
+      game.invFilter = "potions"; game.invSel = 1;
+      const hidden = m.inventory.inventoryKey(game, "Enter");
+      if (hidden !== 0 || r.inv.length !== 2) fail(`E under the potions filter read the hidden scroll (${hidden} s, ${r.inv.length} things left)`);
+      game.invSel = 0;
+      m.inventory.inventoryKey(game, "KeyX");
+      if (game.invFilter !== "all" || r.inv[game.invSel]?.kind !== "scroll") fail(`dropping the last potion under its filter: filter ${game.invFilter}, selected ${r.inv[game.invSel]?.kind}`);
+      m.keys.dispatchKey(game, "Escape", false, "");
+    }
   });
 
   // --- 7. The consumable effects table ---------------------------------------------------------------------------
@@ -692,6 +707,7 @@ export function checkItems(m) {
           for (let k = 0; k < 2; k++) game.debug.step(1 / 60);
           for (const id of ["hasted", "poisoned", "shadowed"]) m.status.addStatus(game, p, id, { t: 30 });
           game.log("A test line in the log.", [200, 200, 200]);
+          game.invFilter = "all";   // (the filter is remembered between openings: these states show everything)
           game.debug.openInv();
           const text = () => { game.debug.draw(); return m.capture.chars.join(""); };
           let t = text();
