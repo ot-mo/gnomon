@@ -54,7 +54,7 @@ export const VAULTS = [
   {
     // On the map: an open room with treasure in the far corner. In 3D: it's a chasm,
     // and the only way across is a narrow winding path.
-    id: "flatLie", name: "The Flat Lie", height: 4, wall: B.MOSS, floorBlock: B.ROCK,
+    id: "flatLie", name: "The Flat Lie", height: 4, wall: B.MOSS, floorBlock: B.ROCK, holes: true,
     plan: [
       "############",
       "#~~~~~~~~.*#",
@@ -101,7 +101,7 @@ export const VAULTS = [
   {
     // A chasm with treasure on the far side, and a winding bridge of ghost planks that
     // only shows with your torch out. The map, of course, shows only the chasm.
-    id: "unseenPath", name: "The Unseen Path", height: 4, wall: B.STONE, floorBlock: B.ROCK,
+    id: "unseenPath", name: "The Unseen Path", height: 4, wall: B.STONE, floorBlock: B.ROCK, holes: true,
     build: unseenPathPlan,
     hint: "A chasm, and treasure on the far side. They say the old builders made bridges only the dark can see.",
   },
@@ -427,8 +427,9 @@ export function buildVault(v, rng) {
 //   p.forcedVault        that one (the legacy stack's fixed sequence, a site's own hall)
 //   p.final + p.bottom   the bottom's hall (bottomHall): a guardian's, a boss's, a legend's lair, the reliquary
 //   otherwise            a pick from p.vaultPool (ids, or [id, weight]; default every puzzle vault),
-//                        keeping vaults whose `levels` range holds p.level. Equal weights draw
-//                        exactly as rng.pick does, so the legacy stack's random vaults don't move.
+//                        keeping vaults whose `levels` range holds p.level, and on a last level only vaults
+//                        without chasms (`holes`: there's nowhere to fall to). Equal weights draw exactly as
+//                        rng.pick does, so the legacy stack's random vaults don't move (its last level is a hall).
 export function pickVault(rng, p = {}) {
   let v = p.forcedVault ? vaultById(p.forcedVault) : null;
   if (!v && p.final && p.bottom) v = bottomHall(p.bottom);
@@ -436,7 +437,7 @@ export function pickVault(rng, p = {}) {
     const level = p.level ?? 1;
     const pool = (p.vaultPool || VAULTS.map((o) => o.id))
       .map((e) => (Array.isArray(e) ? { v: vaultById(e[0]), w: e[1] } : { v: vaultById(e), w: 1 }))
-      .filter(({ v: o }) => o && (!o.levels || (level >= o.levels[0] && level <= o.levels[1])));
+      .filter(({ v: o }) => o && (!o.levels || (level >= o.levels[0] && level <= o.levels[1])) && !(p.final && o.holes));
     if (!pool.length) throw new Error(`no vault fits level ${level}`);
     if (pool.every((e) => e.w === pool[0].w)) v = pool[Math.floor(rng() * pool.length)].v;
     else {

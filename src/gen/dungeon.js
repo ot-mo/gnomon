@@ -328,6 +328,9 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   // --- 10½. The site's gimmicks (none on the legacy stack), and a Truing Cradle where the site has one.
   const ctx = { start, nearDoor, holesOk, depth, final, cosmetic };
   for (const id of p.gimmicks || []) GIMMICKS[id](f, rng, rooms, p, ctx);
+  // A level-wide rule holds over whatever ran after it (a climb brings a lamp, spikeworks new spikes).
+  if (f.flags.lightless) GIMMICKS.lightless(f);
+  if (f.beat) GIMMICKS.oneBeat(f);
   if (p.cradle) placeCradle(f, rng, rooms, ctx);
   if ((p.gimmicks || []).length || p.cradle) f.refresh();
 
