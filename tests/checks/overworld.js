@@ -525,10 +525,10 @@ function discovery(G, problems) {
     if (g !== w2 || discoveryXp(game, site) !== w2) problems.push(`discovery: ${site.kind} ${site.id} gave ${g} XP, not ${w2}`);
     out.site = { kind: site.kind, xp: g };
   }
-  if (village) {
-    const x2 = totalXp(p);
+  if (village) {   // nothing from discovery (a village's own first visit pays its XP: story/village-site.js, WS7b)
     goTo(game, village.at.wx, village.at.wy);
-    if (totalXp(p) !== x2) problems.push("discovery: XP for a village (its own first visit pays)");
+    const ours = game.messages.filter((m) => m.text.startsWith(`You've found ${village.name}.`));
+    if (discoveryXp(game, village) !== 0 || ours.length) problems.push(`discovery: XP for a village (${ours.map((m) => m.text).join("; ")})`);
     out.village = 0;
   }
   // A hidden site seen from the road: declined, not recorded; then looked at.

@@ -16,7 +16,7 @@
 //                           member is the leader's kind; elites as creatures.js rollElite gives them
 //   ENCOUNTERS.travellers   rumour: how many spans away a site they tell you of may lie; reveal: the radius
 //                           of spans they describe when they know of no site
-//   ENCOUNTERS.legend       tiers: how far a legend's tier may be from the span's for it to roam there
+//   ENCOUNTERS.legend       tiers: how far the span's tier may be from its lair's for a legend to roam there
 //   ENCOUNTERS.lines        what the log says; {who}, {site}, {dir}, {spans}, {name} are filled in
 export const ENCOUNTERS = {
   kinds: { band: 6, travellers: 3, legend: 1 },

@@ -14,7 +14,8 @@
 //                                    Keen Eye); the first hit is asked about ("Stop and look?"), and only a yes
 //                                    records it (bible §4.9: sites you decline are not recorded)
 //   legendsFor(game, tile) → [LegendDef]     the legends that may roam span `tile`: within
-//                                    ENCOUNTERS.legend.tiers of its tier, alive, placed nowhere yet (claimUid
+//                                    ENCOUNTERS.legend.tiers of its lair's tier (or its own, without a lair),
+//                                    alive, placed nowhere yet (claimUid
 //                                    would succeed), their lair not on this span
 //
 // A band is one patch (op "band"): its first member 8-12 tiles from where you arrive, the rest next to it,
@@ -58,7 +59,8 @@ export function legendsFor(game, tile) {
     if (!def || uidWhere(game, uid) !== null) continue;   // placed somewhere (its lair made, or met), or dead
     const lair = def.siteId && run.sites?.get(def.siteId);
     if (lair && lair.at.wx === tile.wx && lair.at.wy === tile.wy) continue;
-    if (Math.abs(tierOfLevel(def.level || 1) - tile.tier) > E().legend.tiers) continue;
+    // It roams near home: its lair's tier (a legend is 3 levels above its lair, bible §12.13), else its own.
+    if (Math.abs((lair?.tier ?? tierOfLevel(def.level || 1)) - tile.tier) > E().legend.tiers) continue;
     out.push(def);
   }
   return out;
