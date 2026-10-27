@@ -68,7 +68,7 @@ export function offend(game, by, victim) {
 
 export function killed(game, by, victim) {
   const out = {};
-  if (!offender(game, by)) return out;
+  if (!offender(game, by) || followsPlayer(victim)) return out;   // (your own follower's death is no offence)
   const t = creatures.typeOf(victim);
   const mine = membershipsOf(victim);
   const pen = victim.named || t?.named || victim.talk ? REP_RULES.namedKillPenalty : REP_RULES.killPenalty;

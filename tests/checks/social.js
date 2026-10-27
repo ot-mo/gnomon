@@ -251,6 +251,8 @@ export async function run(env) {
     const r4 = rep.killed(game, p(), leg);
     if (r4.survey !== 150 || r4.rustbacks !== -550) fail(`repOnKill: ${JSON.stringify(r4)}`);
     const before = JSON.stringify(game.state.rep);
+    const ally = mob("hollowmere"); ally.brain = { leader: "player" };
+    rep.killed(game, p(), ally);   // your follower dying (the default source says you) is no offence
     rep.killed(game, null, mob("hollowmere")); rep.killed(game, mob("assize"), mob("hollowmere"));
     if (JSON.stringify(game.state.rep) !== before) fail("a kill with no source, or by a creature, moved rep");
     // Through the bus: killMonster with you as the source, and with none (a status, a fall).
