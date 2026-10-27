@@ -115,12 +115,23 @@ const CORE_TYPES = Object.entries(GRAMMAR.events).filter(([, e]) => e.weight > 0
 const pickVariant = (rng, type, only) =>
   weighted(rng, Object.entries(GRAMMAR.events[type].variants).filter(([v]) => !only || only.includes(v)).map(([v, d]) => [v, d.weight]));
 
-// The tiers that have a span a site can use (WS10's rule: no landmark, walkable, open edges, no road or river).
+// The tiers where a site can go: WS10's placeSites takes a span that is walkable, open-edged, with no landmark, road
+// or river on it and no landmark (or other site) on it or next to it. A tier needs at least USABLE_MIN such spans, so
+// that a request still finds one beside the sites placed before it (the real world's only tier-8 span of that kind
+// is beside the Gnomon: WS10 moved such a request to tier 7, against its own check).
+const USABLE_MIN = 3;
+const SIDE_KEYS = ["n", "e", "s", "w"];
 function usableTiers(world) {
   if (!world?.tiles) return null;
-  const out = new Set();
-  for (const t of world.tiles) if (!t.landmark && t.travel === "yes" && t.edges === "open" && !t.roadWidth && !t.riverWidth) out.add(t.tier);
-  return out;
+  const nearLandmark = (wx, wy) => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (world.tileAt?.(wx + dx, wy + dy)?.landmark) return true;
+    return false;
+  };
+  const count = new Map();
+  for (const t of world.tiles)
+    if (!t.landmark && t.travel === "yes" && t.edges === "open" && !t.roadWidth && !t.riverWidth
+        && !SIDE_KEYS.some((s) => t.road?.[s] || t.river?.[s]) && !nearLandmark(t.wx, t.wy)) count.set(t.tier, (count.get(t.tier) || 0) + 1);
+  return new Set([...count].filter(([, n]) => n >= USABLE_MIN).map(([tier]) => tier));
 }
 
 function makeHistory(seed, world) {

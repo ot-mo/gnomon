@@ -94,6 +94,9 @@ export async function run(env) {
       "a dangling site request": (h) => { h.siteRequests[0].eventId = "nobody:1"; },
       "two requests with one name": (h) => { h.siteRequests[1].name = h.siteRequests[0].name; },
       "a tier without a span": (h) => { h.siteRequests[2].tier = 9; },
+      "tier 8 (its one usable span sits beside the Gnomon)": (h) => { h.siteRequests[0].tier = 8; },
+      "a gospel of four sentences": (h) => { h.rulers[3].events[2].text.gospel = "One. Two. Three. Four."; },
+      "two favoured factions": (h) => { h.rulers[4].favoured = h.rulers[4].favoured.slice(0, 2); },
       "a relic placed twice": (h) => { const r = h.relics.find((x) => x.id); h.siteRequests[0].relicId = r.id; h.siteRequests[1].relicId = r.id; },
       "four Hours": (h) => { h.rulers.pop(); },
     };
