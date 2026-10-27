@@ -328,6 +328,16 @@ export function checkItems(m) {
     want("a hunt within reach", withC(() => IM.install(game, p, eye, "face")), "hunted");
     if (game.time !== t0 || p.funds !== 500 || !p.inv.includes(eye) || p.body.implants.face) fail("a refused fitting took time, glim or the implant");
     game.zone.creatures = game.zone.creatures.filter((c) => c !== goblin);
+    // Dying on the table (poison running out your last HP inside the hour): not fitted, nothing paid.
+    {
+      const q = fresh();
+      const crown2 = { kind: "implant", id: "lampCrown" };
+      q.inv.push(crown2); q.hp = 2;
+      m.status.addStatus(game, q, "poisoned", { t: 30, mag: 1 });
+      const fd = q.funds, r = withC(() => IM.install(game, q, crown2, "head"));
+      if (r.ok || r.reason !== "dead" || q.body.implants.head || q.funds !== fd) fail(`dying on the table: ${JSON.stringify({ ok: r.ok, reason: r.reason, fitted: !!q.body.implants.head, paid: fd - q.funds })} (want refused, "dead", nothing paid)`);
+      reasons["dying on the table"] = r.reason;
+    }
     // Taking out: the curse lock, the grade back, † destroyed, the folding rack's part.
     p = fresh();
     p.license = { grade: 12 };

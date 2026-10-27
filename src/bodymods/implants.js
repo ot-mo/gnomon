@@ -7,7 +7,8 @@
 //       "twice" (one of each, but plate grafts, up to their max), "grade" (over the grade you hold; need, have)
 //   install(game, p, item, partId, { free, paid }) → { ok, reason, time, fee, item }
 //       into p.body.implants[partId]: pays the fee (25 glim × its grade; reason "funds") and lies you down for
-//       one world hour (skipTime: a hunt nearby refuses it, reason "hunted", and nothing is paid or fitted);
+//       one world hour (skipTime: a hunt nearby refuses it, reason "hunted"; dying on the table, "dead"; nothing is
+//       paid or fitted unless the whole hour passed);
 //       takes the item out of the pack; a part it adds (the folding rack) appears; invalidateStats; emits
 //       "install" { e, item, partId }. free: no station, fee or hour (WS4's starting implant); paid: the fee
 //       is already paid (a surgeon's service).
@@ -101,10 +102,12 @@ export function canInstall(game, p, item, partId, { free = false } = {}) {
   return { ok: true };
 }
 
-// One world hour on the table, in either view (the same skipTime). A hunt within reach refuses it.
+// One world hour on the table, in either view (the same skipTime). Returns null when the whole hour passed, else why
+// not: "hunted" (a hunt within reach: nothing passes at all), "dead" (poison or fire finished you on the table).
 function lieStill(game) {
   const r = skipTime(game, FITTING_TIME, { reason: "truing" });
-  return r.elapsed > 0 || !r.interrupted;
+  if (game.mode === "dead") return "dead";   // (even on the hour's last step)
+  return r.interrupted ? (r.why === "hostile" ? "hunted" : r.why || "hunted") : null;
 }
 
 // paid: the fee is already paid (a surgeon's service: the shop takes the price before it runs).
@@ -114,7 +117,8 @@ export function install(game, p, item, partId, { free = false, paid = false } = 
   const fee = free || paid ? 0 : fittingFee(item);
   if (fee > funds(p)) return { ok: false, reason: "funds", fee, time: 0 };
   const t0 = game?.time ?? 0;
-  if (!free && !lieStill(game)) return { ok: false, reason: "hunted", time: 0, fee: 0 };
+  const stopped = free ? null : lieStill(game);
+  if (stopped) return { ok: false, reason: stopped, time: (game?.time ?? 0) - t0, fee: 0 };
   if (fee) pay(game, p, fee);
   if (p.inv?.includes(item)) takeOne(p, item);
   p.body.implants[partId] = item;
@@ -130,7 +134,8 @@ export function uninstall(game, p, partId) {
   const item = p?.body?.implants?.[partId];
   if (!item) return { ok: false, item: null, reason: "empty" };
   if (!game?.truing) return { ok: false, item, reason: "station" };
-  if (!lieStill(game)) return { ok: false, item, reason: "hunted" };
+  const stopped = lieStill(game);
+  if (stopped) return { ok: false, item, reason: stopped };
   const def = IMPLANTS[item.id] || {};
   p.body.implants[partId] = null;
   let dropped = [];
