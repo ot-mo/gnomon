@@ -198,6 +198,7 @@ async function checkSections({ game, startRun, inputHandlers, runSession, fresh,
         const again = await encodeZone(back, { slot: "x", savedAt: 1 }, { deflate });
         if (canonicalJson(rec) !== canonicalJson(again)) fail(`${z.key} (${deflate ? "deflate" : "raw"}): encode → decode → encode differs`);
         if (back.hasDerived || !back.sealed) fail(`${z.key}: decoded with derived arrays ${back.hasDerived}, sealed ${back.sealed}`);
+        if (back.liquid !== z.liquid) fail(`${z.key}: its water holds ${z.liquid}, read back ${back.liquid}`);
         for (const c of back.creatures) {
           const o = z.creatures.find((q) => q.id === c.id);
           if (!o) { fail(`${z.key}: creature ${c.id} came back but wasn't there`); continue; }
@@ -207,6 +208,15 @@ async function checkSections({ game, startRun, inputHandlers, runSession, fresh,
         }
         zonesTried++;
       }
+    }
+    // A span's own liquid (WS2a: the Brine Flats' brine, the Tessellate's ink…) comes back with it (WS2a #1, at the WS9 merge).
+    {
+      const z = sessionZones[0], keep = z.liquid;
+      z.liquid = "brine";
+      try {
+        const back = await decodeZone(JSON.parse(JSON.stringify(await encodeZone(z, { slot: "x", savedAt: 1 }, { deflate: true }))));
+        if (back.liquid !== "brine") fail(`a zone of brine read back holds ${back.liquid}`);
+      } finally { z.liquid = keep; }
     }
     if (entityCounter() !== was) fail(`decoding moved the id counter ${was} → ${entityCounter()}`);
     // Behind it, a creature rebuilt with an id at or past the counter moves the counter past it (rebuildCreature's
