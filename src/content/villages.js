@@ -134,11 +134,12 @@ const styles = {
 };
 
 // Building plans: a hall (the leader's), houses, a workshop. 5 rows deep; the door in the middle of the south row with
-// its lintel (M) above it, and the doorstep just inside (r: where a cruel event's rune goes). Width varies.
+// its lintel (M) above it, and the doorstep just inside (r: where a cruel event's rune goes). Widths: the hall 9, the
+// rest at most 8 (story/village-site.js lays them in five slots round a 24 × 16 green).
 const plans = {
   hall: ["#########", "#.......#", "l.......l", "#...r...#", "####M####"],
   house: ["#######", "#.....#", "l.....#", "#..r..#", "###M###"],
-  longhouse: ["#########", "#.......l", "#.......#", "#...r...#", "####M####"],
+  longhouse: ["########", "#......l", "#......#", "#..r...#", "###M####"],
   workshop: ["######", "#....#", "l....#", "#.r..#", "##M###"],
 };
 

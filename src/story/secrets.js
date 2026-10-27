@@ -14,6 +14,9 @@
 //                                       hist:<event id>:<flat | deep | dark>   one account of an Hour's event
 //                                       hist:noon:<n>:<flat | deep | dark>     one of Noon's (bible §8.6)
 //                                       gossip:<n>                             a rumour from history (gossip.js)
+//                                       village:<site id>:<n>                  a village's own story (its two founding events,
+//                                                                              n 1-2: the first told openly, "flat"; the second
+//                                                                              kept, "deep"; story/villages.js)
 //   secretsOf(run) → Map                run.secrets when the run step filled it, else made here once per run
 //   secretDef(run, id) · secretText(run, idOrDef) · secretTitle(run, idOrDef) → string
 //   muralSecret(run, text) → id | null  the history account a mural's text is (murals.js)
@@ -33,6 +36,7 @@ import { registerQuest, startQuest, questOf, advanceQuest } from "./quests.js";
 import { parseKey } from "../zones.js";
 import { gainXp, xpToNext } from "../leveling.js";
 import * as discovery from "../overworld/discovery.js";
+import { villageOf } from "./villages.js";
 
 export const ACCOUNT = { flat: "gospel", deep: "inscription", dark: "hostile" };
 export const READINGS = ["flat", "deep", "dark"];
@@ -63,6 +67,12 @@ export function makeSecrets(run) {
       add({ id: `hist:noon:${k + 1}:${reading}`, kind: "history", reading, tags: ["noon"], value: 30, ref: { noon: k + 1 } });
   });
   for (const g of rumours(run)) add(g);
+  for (const s of sites) {
+    if (s.kind !== "village") continue;
+    const v = villageOf(run, s.id);
+    (v?.founding || []).forEach((f, k) => add({ id: `village:${s.id}:${k + 1}`, kind: "village", reading: k ? "deep" : "flat",
+      tags: [v.factionId, v.people], value: 10 + 5 * (v.tier || 1), at: { wx: s.at.wx, wy: s.at.wy }, ref: { siteId: s.id, n: k + 1 }, text: f.text }));
+  }
   return out;
 }
 
@@ -135,6 +145,7 @@ export function secretTitle(run, idOrDef) {
     const { R, e } = historyOf(run, def);
     return `${R?.name}: ${GRAMMAR.titles.events[e?.type] || e?.type} (${acct})`;
   }
+  if (def.kind === "village") return `${run.sites?.get(def.ref.siteId)?.name || def.ref.siteId}: ${def.ref.n === 1 ? "how it began" : "what it keeps"}`;
   return def.kind === "gossip" ? "a rumour" : def.id;
 }
 

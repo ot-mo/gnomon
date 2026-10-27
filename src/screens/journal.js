@@ -49,6 +49,9 @@ export function journalLines(game, tab, width) {
       put(`${secretTitle(run, d)}${questDone(game, `visit:${d.id}`) ? "  (visited)" : ""}`, C.head);
       para(d.text, C.text, "  ");
     }
+    const tales = learned("village");   // a village's own story (story/villages.js), under the places
+    if (tales.length) { put("", null); put("Village tales:", C.mark); }
+    for (const d of tales) { put(secretTitle(run, d), C.head); para(d.text, C.text, "  "); }
   } else if (tab === 2) histories(game, J, put, para);
   else if (tab === 3) {   // Gossip
     const heard = learned("gossip");
