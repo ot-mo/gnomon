@@ -3,30 +3,31 @@
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
 **Updated:** 2026-10-27, the integrator (local session), on `integration`. **Phase 1 is running and Phase 2's
-integration has started: WS3, WS8, WS4 and WS6 (both halves each), WS5, WS10, WS2a and WS7a are merged (`p2-ws3`,
-`p2-ws8`, `p2-ws4a`, `p2-ws5`, `p2-ws6a`, `p2-ws4b`, `p2-ws6b`, `p2-ws10`, `p2-ws2a`, `p2-ws7a`), and the flip is in
-(`p2-flip`: the attribute set and d20 by default); the next `p1-*` tag merges as it lands (WS9 is paused before its
-tag; WS2b and WS7b go on in their worktrees).** From here on only the integrator edits this file and
+integration has started: WS3, WS8, WS4, WS6 and WS7 (both halves each), WS5, WS10 and WS2a are merged (`p2-ws3`,
+`p2-ws8`, `p2-ws4a`, `p2-ws5`, `p2-ws6a`, `p2-ws4b`, `p2-ws6b`, `p2-ws10`, `p2-ws2a`, `p2-ws7a`, `p2-ws7b`), and the
+flip is in (`p2-flip`: the attribute set and d20 by default); the next `p1-*` tag merges as it lands (WS9 and WS2b
+aren't tagged yet; WS1 is queued).** From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p2-ws7a` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
-  `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b`, `p1-ws10`, the flip, `p1-ws2a` and `p1-ws7a`, with their
-  integration requests; `p2-ws3` … `p2-ws2a` before it).
+- **Last tag:** `p2-ws7b` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+  `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b`, `p1-ws10`, the flip, `p1-ws2a`, `p1-ws7a` and
+  `p1-ws7b`, with their integration requests; `p2-ws3` … `p2-ws7a` before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
 - **Branch:** `integration`, in the worktree `C:\Users\Otto Mörner\Code\gnomon-wt\integration` (serves on port
   8660). Nothing is half finished.
-- **Done:** Phase 0 (0A1 … 0D2, notes in `docs/sessions/0A1.md` … `0D2.md`); WS3, WS8, WS4, WS5 and WS6a
-  WS6b and WS10 (`docs/ws3.md`, `ws8.md`, `ws4.md`, `ws5.md`, `ws6.md`, `ws10.md`; `docs/sessions/ws3.md`, `ws8.md`,
-  `ws4.md` "Part 4a" and "Part 4b", `ws5.md`, `ws6.md` "Part 6a" and "Part 6b", `ws10.md`), merged. The merges' own numbers are under "Integration log" below.
+- **Done:** Phase 0 (0A1 … 0D2, notes in `docs/sessions/0A1.md` … `0D2.md`); WS3, WS8, WS4, WS5, WS6, WS10
+  and WS7, and WS2a (`docs/ws3.md`, `ws8.md`, `ws4.md`, `ws5.md`, `ws6.md`, `ws10.md`, `ws7.md`, `ws2.md`;
+  `docs/sessions/ws3.md`, `ws8.md`, `ws4.md` "Part 4a" and "Part 4b", `ws5.md`, `ws6.md` "Part 6a" and "Part 6b",
+  `ws10.md`, `ws7.md` "Part 7a" and "Part 7b", `ws2.md`), merged. The merges' own numbers are under "Integration log" below.
 - **Checks:** `node tools/run-all.mjs`, 38 checks (WS10 added `check-sites`) (about 2 minutes on an idle machine, 4 with three workstreams
   running; the timed ones, `check-dungeons`, `check-status`, `check-stats` and `check-perf`, alone at the end; since
   WS3, `check-perf` runs the render check first). Browser (headless Playwright, audio silenced,
   `NODE_PATH="$(npm root -g)"`): `browser-0d2.mjs`, `browser-0d1.mjs`, `browser-gate.mjs`, `browser-silent.mjs`, and
   with `node tools/serve.mjs <port>` running, `browser-shell.mjs` and `browser-0c.mjs` (`--port <port>`); each
   workstream's own (`browser-ws8.mjs` from WS8, `browser-ws4.mjs` from WS4, `browser-ws5.mjs` from WS5,
-  `browser-ws6.mjs` from WS6). `tools/README.md` has every command and what each check proves.
+  `browser-ws6.mjs` from WS6; `browser-ws7.mjs`, the integrator's, for WS7b's pray quests). `tools/README.md` has every command and what each check proves.
 
 ## Next step
 
@@ -77,7 +78,7 @@ tags; WS1, which builds on the most, last):
 | 6 | WS6a → WS6b Factions, dialogue builders → trade, the Kindling, backings | `ws6`, `ws/ws6` | WS6a tagged `p1-ws6a` (0697109), **merged, `p2-ws6a`**; WS6b tagged `p1-ws6b` (68ef866), **merged, `p2-ws6b`** (2026-10-27) |
 | 7 | WS10 Dungeon sites, lairs and legends | `ws10`, `ws/ws10` | tagged `p1-ws10` (1bbd302), **merged, `p2-ws10`** (2026-10-27) |
 | 8 | WS2a → WS2b Surface generation | `ws2`, `ws/ws2` | WS2a tagged `p1-ws2a` (386bd98), **merged, `p2-ws2a`** (2026-10-27); WS2b running |
-| 9 | WS7a → WS7b Knowledge: history, villages, quests | `ws7`, `ws/ws7` | WS7a tagged `p1-ws7a` (b503957), **merged, `p2-ws7a`** (2026-10-27); WS7b running |
+| 9 | WS7a → WS7b Knowledge: history, villages, quests | `ws7`, `ws/ws7` | WS7a tagged `p1-ws7a` (b503957), **merged, `p2-ws7a`**; WS7b tagged `p1-ws7b` (d7a0038), **merged, `p2-ws7b`** (2026-10-27) |
 | 10 | WS1 Overworld travel | `ws1`, `ws/ws1` | queued |
 
 - **Why these three first:** WS9 fixes the Continue hazard and gives real saves (IndexedDB, periodic and unload
@@ -158,26 +159,22 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   keys mapped onto `GIMMICKS` (WS10 #8); the real world's Keeper's Stair, listed with levels 2-21 (bible §15.3), is
   built by `world/legacy.js legacyZone` at level z, 1-20, as golden needs (WS10 #9: left as it is; decide with the
   real world).
-- **WS7b** (at its merge; WS6a #6): villager types carry `factions` (or each villager `c.faction`) and `talk.dialogue`
-  one of `social/builders.js ROLES`; a village registers its own faction with `parent: "bent"` (a Bent village) or
-  `"peoples"`, so the Assize's hatred of the Bent reaches it, its members carrying `bentVillages` as a second membership
-  (0.25-0.5) so the Assize writ and the Aspirant move them; quests `addRep(game, id, n, "quest")` (+100 with the
-  village, +25 with each faction that likes it); Grey members hostile in their holy places (WS7 or C1). **WS6a #1,
-  mortal people** (the integrator's, in WS8's files, at WS7's merge, when villager types with `hp` exist to test
-  against): a talker whose type has `hp` gets `hp`, `maxHp`, `attack` and the AI's fields like a monster and is
-  touchable while `hp > 0` (legacy people, with no `hp`, stay untouchable); the map's bump talks while it isn't
-  hostile and strikes with Shift. Until then `touchable` refuses every talker, so the witnesses fire only on members
-  that don't talk. WS10 #5's murals came built with WS7a (learned through `inspect`, the map's hover and WS8's look);
-  left: the Hour's cult (bible §8.7, −500; WS7a #7: `ruler.cult.name`, `game.state.journal.cultPass[rulerId]` making
-  that cult treat you as a pilgrim in its sites) and an Hourbound leader at the reliquary need the run's factions
-  step (`site.historyRef.rulerId`), WS7b or C. The powers Hour script, Gossip, Triangulator and Vey's script lose
-  their `needs` once an effect of theirs reads WS7's API (WS4 #11; the triangulation's XP is `xpReward` since
-  `p2-ws7a`).
+- **C (content), from the WS7b merge** (WS7b #16, WS6a #6, WS7a #7): Grey members hostile in their holy places (no
+  village is a holy place yet); bible §9.4's heights (stilts, ledges, canopy platforms, the Stacks' storeys: every
+  village stands on the datum); the dish, the commons lamp's services, the shrine's rewards; the Hour's cults (bible
+  §8.7, −500: `ruler.cult.name`, `game.state.journal.cultPass[rulerId]` making that cult treat you as a pilgrim in
+  its sites) and an Hourbound leader at the reliquary (`site.historyRef.rulerId`), as generated factions in the run's
+  factions step (`world/run.js`, which registers each village's own since `p2-ws7b`); the villagers' fight (mortal
+  since `p2-ws7b`, they neither fight back nor flee: people's brains); the line logged after the intro on a
+  real-world run (still the parent's "Maren is waiting in the main hall").
 - **WS1** (at its merge; WS10 #7, WS7a #3): `learnSecret` calls `overworld/discovery.js pin(game, wx, wy, { label,
   secretId })` once discovery.js drops `STUB`; the visit quest also listens to `world:step` and reads `ev.to` as `{ wx,
-  wy }`; the journal's Locations tab wants a key that opens the world map centred on a span; discovery XP is WS1's. a legend met on the road is a zone patch `{ op: "spawnCreature", uid: def.uid, type:
+  wy }`; the journal's Locations tab wants a key that opens the world map centred on a span; discovery XP is WS1's and skips
+  village sites, whose first visit pays its own (`story/village-site.js`, `xpReward("village")`, source `"village"`;
+  WS7b #13), and WS7b's find quest listens to `world:step` too. A legend met on the road is a zone patch `{ op: "spawnCreature", uid: def.uid, type:
   def.species, level: def.level }` with the def from `legendOf(run, uid)`; its lair is then empty of it (checked).
-- **WS9** addition (from WS10 #2): `config.js` `VERSION.gen` should follow `world/run.js GEN_VERSION`, now 3 (WS7a's history and secrets). From
+- **WS9** addition (from WS10 #2): `config.js` `VERSION.gen` should follow `world/run.js GEN_VERSION`, now 4 (WS7a's history and secrets; WS7b's villages,
+  their secrets and factions). From
   WS2a: #1, `save/codec.js` saves `zone.liquid` (in `AFTER`; one string a zone: without it a surface zone read back
   holds plain water, the Brine Flats' brine and the rest lost); #3 (WS3 #6's other half, with WS9's "prefetch through
   the loader"): a neighbour read from the save (`zones.js readAhead`) builds its far bands in the swap; step
@@ -192,10 +189,6 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   the village dish, the faction specials (the Spore Moot's limb, the Pressing, the Snuff), the commons lamp, the
   Chandler banks, clear glim's and turnwater's full effects; a faction's `buys: { readings, topics }`. Powers still
   waiting on them: Oil fire (glim puddles), Brew (a village oven), Chime (preaching).
-- **WS7b (from WS6b, #5 and #6):** villagers carry `c.readings` (secret ids: the Kindling's "ask for a reading"
-  learns them through `learnSecret` since `p2-ws7a`), village leaders `named: true`, opinions as `c.opinions`, teachers
-  list power ids in `c.teaches` ("teachers opening a tree", WS4 #11); the Kindling reads the journal through
-  `readings(game)` and `markSold` (applied at the WS7a merge).
 - **The integrator's own backlog** (WS5's requests in merged workstreams' files, new behaviour rather than wiring, so
   not rushed into the merge): #8 in `throwing.js`, gyro wrists (`gyroWrists`: thrown things fly flat, +2 damage) and
   the juggler's arm (`jugglerArm`: up to four knives at once); #9, the survey lens (`surveyLens`: 3D fills the map twice
@@ -211,7 +204,9 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   Stilt Legs level 3, not 5). From the WS10 merge: WS10 #6, a legend's `opinions` `[{ faction, feeling, reason }]`
   (bible §12.13) for `attitude` and the Kindling, and the Herdmother's herd turning friendly with her. From the WS6b merge: WS6b #3, the Snuffer's mark, the torch's radius −1 for the rest of
   the run once `game.state.snuffer` is set (`player.js torchRange` has no game: a status or a field on the player);
-  its "no shadow under you" needs nothing, as 3D draws no shadow of yours.
+  its "no shadow under you" needs nothing, as 3D draws no shadow of yours. From the WS7b merge: the lore powers'
+  effects (Hour script, one more account on every stele; Gossip, one free rumour in every village; Triangulator, twice
+  the triangulation's XP), after which they lose their `needs` (WS4 #11, WS7 #14; there is no "Vey's script" power).
 - **WS5** (merged at `p2-ws5`; what was carried to it): WS4 #9, the six free implants the Plumb backgrounds name (`tallyEye`, `plumbLineEar`,
   `truesteelKnuckles`, `levelEye`, `lampCrown`, `darkLens`), each costing at most 2, with `parts`; `makeCharacter` fits
   one with `canInstall(null, p, item, part)` and `install(null, p, item, part)` (no game at creation); the kits'
@@ -243,7 +238,8 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
 - **WS1, WS7, WS6b** (at their merges): WS4 #11, discoveries, quests, triangulations and Kindlings give XP through
   `gainXp(game, xpReward(kind, level), { source: kind })` (Pilgrim's ×2.2), and the powers waiting on them (Keen Eye,
   Pathfinder, Terrain lore, Homing sense: WS1; Hour script, Gossip, Triangulator, Vey's script: WS7) lose their `needs`
-  (WS6b's part is done: the Kindling's XP and Warm Hands; Oil fire, Brew and Chime wait for content, above). WS8's glimgun (WS4 #10, for the Lamplighter
+  (WS7's part is done: its quest, beat and village XP go through `xpReward`, and the three lore powers wait in the
+  integrator's backlog; WS6b's part is done: the Kindling's XP and Warm Hands; Oil fire, Brew and Chime wait for content, above). WS8's glimgun (WS4 #10, for the Lamplighter
   and the Glimgunner power) is new content: C4 or a later pass, not a merge item. From WS4b: #22 (WS1), Wings gives `bonus(travel) = 1`, read as world-map travel × (1 +
   travel); #17 (C2, with WS8's flat movement), a listener for `"smoothers" { zone, size, burnisher, great }` spawns the
   pack along the floor (until then the warning shows and nothing comes).
@@ -252,6 +248,41 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p2-ws7b`** (2026-10-27): `p1-ws7b` (d7a0038) merged into `integration` (`574ac45`), cleanly: `story/index.js`
+registers `SITE_BUILDERS.village` and WS10's `world/sites.js` every other kind. No P0 check, fixture or frame changed in
+7b. Villages exist only on the test world until C1 gives the real world regions with a village chance.
+- Applied, each with an assertion that fails without it: WS6a #1 / WS7b #10, mortal villagers (`d7d23d0`: a talker
+  whose type has `hp` gets a monster's health and blow fields; a bump talks, Shift strikes, a bump strikes once it's out
+  for you; `factions.js` reads `maxHp`, as `hp` charged a killing blow's −10 twice; a legacy person stays untouchable);
+  #9 (`f1d6231`: the run's factions step registers `villageFaction(v)`, 73 villages under bent and 79 under peoples on
+  20 seeds; `GEN_VERSION` 4, as WS7b's villages, their secrets and factions change the test world's run for a seed;
+  `restoreRun` refuses no older version and `villageOf` regenerates an older save's fixture villages, so no save is
+  lost); #11 (`23a173d`: `startRun` opens `introPages(game.run)`, the same `INTRO` object on the test world); #12
+  (`888d07f`: `items.js` emits `pickup { e, item }` for what goes into the pack; the fetch quests move on it before the
+  tick).
+- Confirmed, nothing to apply: #14's XP (quest, beat and village XP go through WS4's `xpReward`, whose table has all
+  three keys); #18 (check-determinism's scan has covered `story/` since 0A1). Not applied: #14's `needs` (no effect reads
+  Hour script, Gossip or Triangulator yet; to the integrator's backlog). Carried: #13 to WS1, #16 to C.
+- #17 in the browser (`tools/browser-ws7.mjs`, `7622fed`): seed 1, a prayer at Reedwick's carved shrine and one at
+  Reedwick Cross's rune shrine by L in 3D with real keys: the rune refused at 10:00 with the torch out and at 21:00 with
+  it lit, made at 21:00 after F; the relief refused that night with the torch out, made at 10:00 the next day. A Node
+  probe of every relief and rune pray quest of seeds 1-120 through `look()` agrees (20 of 20, 22 of 22).
+- Merge findings: a prayer made said nothing (`92e528b`: a shrine is a block, not a mural, so only the look's "Carved
+  stone." showed; finding or charting a place was as silent): a village quest at "return" now logs "<title>: go back
+  to <giver>."; a village leader taught a power still waiting on its `needs` (`b323864`: an artificing village's
+  Repair, a pathcraft village's Pathfinder, offered on the flame-kin menu): `teachesFor` takes the tree's first power
+  without `needs`, and the menu skips any (130 of 139 leaders teach one on 20 seeds; pathcraft's none until WS1);
+  check-story ran only in Node (`84b8a09`: WS7b's "the same zone twice" used Node's `Buffer`, so `browser-0d2 --all`
+  failed it in test-world.html: 33 passed, 1 failed); the blocks are compared element by element.
+- Checks: `run-all` at `84b8a09` **38 of 38** (186.6 s; check-story alone 12.9 s). Timed alone on a quiet machine (8% load, no training job) against `p2-ws7a`, `check-perf --rounds 3
+  --no-render`: **PASS**, ×0.96-1.14 (the outdoor frame p50 16.17 against 16.23, surface generation p95 36.5 against
+  34.8 and max 139.9 against 123.2, budget 150; passTime p50 6.7 against 6.0, budget 12; `buildRun` 13.8 against 13.8).
+  Browser (0 console errors, audio silenced): `browser-0d1 --against p0-done` (23 of 23 modes, the HUD at 100×30,
+  golden (b) 27 of 27, per tick underground −0.1% in 3D and −0.4% on the map); `browser-0d2 --all` (boot with 162
+  modules, `test-world.html` 34 passed, 0 failed); `browser-gate` (1234, 7); `browser-silent`; and on
+  `tools/serve.mjs 8660`, `browser-0c` (1234, 7), `browser-shell` (1280×720, 600×300), `browser-ws6`, `browser-ws7`,
+  `browser-ws8`.
 
 **`p2-ws7a`** (2026-10-27): `p1-ws7a` (b503957) merged into `integration` (`c4b725d`). One conflict,
 `tests/checks/world.js` `siteRules`, joining two coordinator-approved changes: WS7a's history line (the test world
@@ -636,7 +667,8 @@ its §8.4 files and two P0 checks).
 ## Open items carried forward
 
 - **Balance phase** (the user, 2026-10-27: "settle the tuning (creature scaling, kill XP) in the balance phase once
-  C4's gear and WS1/WS7's XP are in"): with C4's gear and WS1's and WS7's discovery and quest XP (`xpReward`) in, rerun
+  C4's gear and WS1/WS7's XP are in"): with C4's gear and WS1's discovery XP in (WS7's quest, beat and village XP are in since `p2-ws7b`: `xpReward` 0.6,
+  0.75 and 0.2 of a level), rerun
   WS8's TTK tables (`node tools/check-combat.mjs --only ttk`, the balance reference since the flip) and settle the
   creatures' level scaling (`spawnCreature`: +6% HP a level, +1 damage per 4), the tier gear's enchantment, and the
   kill-XP pace (the bible's `killXp`: about 1% of a level for a same-level kill, so ~100 kills a level at every level,
@@ -664,16 +696,21 @@ its §8.4 files and two P0 checks).
 - **WS8 (merged; what's left):** `passTime` costs ×1.2-1.7 `p0-done`'s in WS8's alternating measure (p50 4-5 ms
   against a 12 ms budget); spikes hurt a flat you (WS10, carried). (Monsters out for you are out for your followers
   since WS6a; L opens WS5's examine.)
-- **WS6a (merged; what's left):** talkers can't be struck until WS6a #1 (at WS7's merge), so the witnesses fire only on
-  faction members that don't talk; a witness sees no farther than its own sight (WS8's `sees`: people 10, a goblin
-  11, ×0.55 with you in the dark), inside the 12-tile witness range; the Bent villages are one rep pool until WS7 gives
-  villages factions; grudges never expire; spikes still count as your harm (WS10, carried).
+- **WS6a (merged; what's left):** villagers are mortal since `p2-ws7b` (a bump talks; Shift strikes, and so does a
+  bump once it's out for you; the parent's people stay untouchable); a witness sees no farther than its own sight (WS8's `sees`: people 10, a goblin
+  11, ×0.55 with you in the dark), inside the 12-tile witness range; each village is its own faction, under the Bent villages or
+  its people's, since `p2-ws7b`; grudges never expire; spikes still count as your harm (WS10, carried).
 - **WS10 (merged; what's left):** six of bible §12.13's legendary templates need systems that aren't in (WS10 #8,
   content); history's sites are placed after P0's kinds (deviation 2); a spike kill's harm is nobody's, its experience
   yours (the integrator's call); the legends' opinions (the integrator's backlog).
-- **WS7a (merged; what's left):** villages, villagers, quests and the campaign are WS7b's; the journal has no Villages
-  tab yet; `dialogue.js drawJournal`/`journalKey` are unused by the game (the journal is `screens/journal.js`) and stay
-  only for check-story's comparison with the parent's journal.
+- **WS7 (merged; what's left):** villages exist only on the test world: the real world has no regions, so no village
+  sites, until C1 (check-story's 20 seeds are the test world's 152 villages); the game still builds its runs on the
+  test world (`game.js` `world: TEST_WORLD`), so the campaign's pages and beats show only on a real-world run; the
+  village builder assumes P0's 24 × 16 village footprint; the journal has no Villages tab; `dialogue.js
+  drawJournal`/`journalKey` stay only for check-story's comparison with the parent's journal. Mortal villagers
+  neither fight back nor flee, and a creature of a faction that hates a village's may now go for its people
+  (`factions.js` no longer counts them unstrikable). A rune shrine reads at night two tiles from a lit commons lamp,
+  as `light.js inDark` reads only the sky (P0's rule). The content above (C).
 - **WS2a (merged; what's left):** WS2b builds the biome builders, the ways up the cliffs and the 3D-only plateaus,
   the legend handlers and wildlife; cliff tops (about 14 columns a zone) have no way up yet; the map can't show height
   (ground 4 or more up is a wall glyph, so `tile.elev` is unread); every river is plain water until C1 gives the
