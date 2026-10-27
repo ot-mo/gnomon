@@ -46,7 +46,7 @@ function drawRow(game, id, { x, y, w, sel }) {
   if (sel) S.text(x, y, ">", ...UI.mark);
   S.text(x + 2, y, f.name.slice(0, 22), ...(f.color || UI.text));
   // The bar: −1000 … +1000, with a tick at 0 and the band's light word after it.
-  const bw = Math.max(8, w - 40), bx = x + 26;
+  const bw = (Math.max(9, w - 40) - 1) | 1, bx = x + 26;   // odd: as many cells each side of 0
   const at0 = Math.round(((0 - REP_MIN) / (REP_MAX - REP_MIN)) * (bw - 1));
   const atR = Math.round(((r - REP_MIN) / (REP_MAX - REP_MIN)) * (bw - 1));
   for (let k = 0; k < bw; k++) {
