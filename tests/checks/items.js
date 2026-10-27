@@ -470,6 +470,11 @@ export function checkItems(m) {
       use(lance);
       r.lancet = { hit: (h2 > g2.hp) + (h3 > g3.hp), charge: lance.cell.charge };
       p = fresh({ view, depth: 4 }); lineEast(p);
+      const g5 = hostileAhead(p, 4), h5 = g5.hp, wx = Math.floor(p.x) + 2, wy = Math.floor(p.y);
+      game.zone.set(wx, wy, p.z, m.world.B.STONE); game.zone.set(wx, wy, p.z + 1, m.world.B.STONE); game.zone.refresh();
+      use(known("lancet"));
+      r.lancetWall = g5.hp === h5;   // a wall between: the beam stops at it
+      p = fresh({ view, depth: 4 }); lineEast(p);
       const x0 = p.x, knife = known("foldKnife");
       use(knife);
       r.foldKnife = { moved: +(p.x - x0).toFixed(2), charge: knife.cell.charge };
@@ -499,7 +504,7 @@ export function checkItems(m) {
       const r = out[view];
       const bad = [
         w("plumb-bob", r.plumbBob), w("quicksilver level", r.quicksilver), w("echo-bell", r.echoBell.revealed > 0 && r.echoBell.charge === 400),
-        w("glimgun", r.glimgun.hurt > 0 && r.glimgun.paid === 1), w("lancet", r.lancet.hit === 2 && r.lancet.charge === 2250),
+        w("glimgun", r.glimgun.hurt > 0 && r.glimgun.paid === 1), w("lancet", r.lancet.hit === 2 && r.lancet.charge === 2250), w("lancet (stopped by a wall)", r.lancetWall),
         w("fold-knife", r.foldKnife.moved > 2 && r.foldKnife.moved <= 4.6 && r.foldKnife.charge === 2200), w("recall bead", r.recallBead.back && r.recallBead.charge === 1500),
         w("still-dial", r.stillDial), w("lantern-mote", r.lanternMote.lit === 0.4 && r.lanternMote.after300s === 50 && r.lanternMote.outWhenEmpty),
       ].filter(Boolean);

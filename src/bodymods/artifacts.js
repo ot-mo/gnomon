@@ -303,7 +303,12 @@ const EFFECTS = {
       const to = target.creature || target.point, d = Math.hypot(to.x - p.x, to.y - p.y);
       if (d > 0.3) { dx = (to.x - p.x) / d; dy = (to.y - p.y) / d; }
     }
-    const len = AIM_RANGE.lancet, hits = [];
+    // The beam runs until the first wall at body height (in either view: the same line over the same tiles).
+    const zone = game.zone, bz = Math.floor(p.z) + 1;
+    let len = AIM_RANGE.lancet;
+    for (let t = 0.25; t <= AIM_RANGE.lancet; t += 0.25)
+      if (zone.solid(Math.floor(p.x + dx * t), Math.floor(p.y + dy * t), bz)) { len = t - 0.25; break; }
+    const hits = [];
     for (const c of game.zone.creatures) {
       if (!touchable(game, c) || ghostHidden(game, c) || Math.abs(c.z - p.z) > 2) continue;
       const along = (c.x - p.x) * dx + (c.y - p.y) * dy;
