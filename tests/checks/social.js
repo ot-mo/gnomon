@@ -385,7 +385,8 @@ export async function run(env) {
     const d0 = F.repOf(game, "drovers");
     rep.offend(game, P, lone);
     if (F.repOf(game, "drovers") !== d0 || !lone.brain.grudges?.player) fail(`an unseen blow: drovers ${d0} → ${F.repOf(game, "drovers")}, grudge ${JSON.stringify(lone.brain.grudges)}`);
-    // The witness range's edge, on an open span: a fellow in sight 11 tiles off saw it, one 13 tiles off didn't.
+    // The witness range's edge, on an open span: a fellow in sight 11 tiles off saw it, one 13 tiles off didn't. (A
+    // witness sees no farther than its own sight, WS8's creatures.sees: so an archer, sight 13, for the 12-tile range.)
     {
       zones.changeZone(game, "1,0,0", { how: "start", rng: R });
       for (const o of [...game.zone.creatures]) creatures.removeCreature(game.zone, o);
@@ -403,7 +404,7 @@ export async function run(env) {
       const i11 = seeAt(11.75), o13 = seeAt(12.3);
       if (!i11 || !o13) fail(`the range edge: no open tile in sight at 11.75 (${i11}) or 12.3 (${o13}) tiles on 1,0,0`);
       else {
-        const put2 = ([x, y]) => { const c = mob("survey", "neutral", { x, y, z: z2.stand[x + y * z2.w] }); return creatures.addCreature(z2, c); };
+        const put2 = ([x, y]) => { const c = mob("survey", "neutral", { x, y, z: z2.stand[x + y * z2.w], type: "archer" }); return creatures.addCreature(z2, c); };
         const v2 = mob("survey", "neutral"); Object.assign(v2, { x: P2.x + 0.6, y: P2.y, z: P2.z }); creatures.addCreature(z2, v2);
         const near11 = put2(i11), far13 = put2(o13);
         const seen = rep.witnessesOf(game, P2, v2);
