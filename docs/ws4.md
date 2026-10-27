@@ -225,8 +225,9 @@ before doing more.
   holds to bible §15.11 (keep any new syllable or family in it).
 - Shell quoting on this machine: a Python heredoc through Git Bash turned `\n` and `\u0000` into raw characters in a
   test file once; write such edits to a script file in the scratchpad (or use the Edit tool) instead.
-- Open for the user, not 4b: the Lamplighter of Cassin's 500 purse (`docs/sessions/ws4.md` deviation 2); the flip
-  before WS9's title can push the wizard (integration request 13).
+- Settled by the user (2026-10-27): the Lamplighter of Cassin keeps the 500 purse that holds its 250 glim
+  (`docs/sessions/ws4.md` deviation 2). Still the integrator's: the flip before WS9's title can push the wizard
+  (integration request 13).
 
 **State at the end of 4a:** tag `p1-ws4a` on `ws/ws4` (pushed), every 4a acceptance item with its numbers in
 `docs/sessions/ws4.md` "Part 4a"; nothing half finished; the server on 8644 stopped, no browser open.

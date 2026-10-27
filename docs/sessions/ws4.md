@@ -64,7 +64,7 @@ the browser's `test-world.html`, through `tools/browser-0d2.mjs --only progressi
 2. **The Lamplighter of Cassin starts with the 500 purse**: its 250 glim doesn't fit the 200 one (the bible gives no
    purse, and DECISIONS starts everyone at 200). Every other background's glim fits 200. A 500 flask is worth something
    in a shop, so this gives the Lamplighter a little more than the bible says; the other way, 200 glim in the 200
-   purse, loses 50 of the bible's 250. Which one is the user's call (balance, C2/C4). The test world starts every run
+   purse, loses 50 of the bible's 250. **The user chose the 500 purse on 2026-10-27**, so it stays as built. The test world starts every run
    with 1,000 (game.js `startRun` applies the world's `startPurse` after the player is made, for the parent's prices),
    made characters too; their glim stays the background's.
 3. **The background's attribute bonus is a bonus source** ("origin"), not added to the base attributes: the base
@@ -156,7 +156,7 @@ offer).
   directly, but check-progression §6 and the screen frames catch it.
 - The steps along the top clip below about 75 columns (every screen is held to 100×30, §4.4). Lucky's "You gain a
   perk" line is cut at 100 columns, as in the parent game.
-- The Lamplighter of Cassin's 500 purse (deviation 2), offers from other trees while the open ones are thin
+- The Lamplighter of Cassin's 500 purse (deviation 2; the user kept it, 2026-10-27), offers from other trees while the open ones are thin
   (deviation 4), the card's current HP figure (deviation 14) and the wizard under the legacy set (deviation 15,
   integration request 13): documented design calls, not defects.
 
