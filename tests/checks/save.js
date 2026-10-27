@@ -1110,6 +1110,8 @@ async function ws9Sections(ctx) {
     compare("exported, imported into another store, loaded", a, await digestGame(game, ks));
     const id3 = await importSlot(text, { store: other });
     if (id3 === id2 || (await listSlots({ store: other })).length !== 2) fail(`the same file imported twice: ids ${id2}, ${id3}`);
+    const both = await Promise.all([importSlot(text, { store: other }), importSlot(text, { store: other })]);   // (at once)
+    if (both[0] === both[1] || (await listSlots({ store: other })).length !== 4) fail(`the same file imported twice at once: ids ${both.join(", ")}, ${(await listSlots({ store: other })).length} slots (want 4)`);
     const bad = [];
     for (const [what, f, re] of [["another game's", (d) => ({ ...d, game: "other" }), /isn't a GNOMON save/], ["a newer game's", (d) => ({ ...d, slot: { ...d.slot, version: 99 } }), /newer/],
                                  ["one without the zone you were in", (d) => ({ ...d, zones: d.zones.filter((r) => r.key !== d.slot.where.zoneKey) }), /no record/]]) {
@@ -1172,7 +1174,7 @@ async function ws9Sections(ctx) {
       if (left.join() !== "0,0,0") fail(`a run saved into another run's slot id: the slot holds ${left.join(" ")} (want 0,0,0, the new run's)`);
       stats.reusedSlot = `a run saved into another run's slot id: the slot holds ${left.join(" ")} (the old run's 0,0,1-0,0,3 gone)`;
     }
-    stats.exportImport = `export → import → load ${problems.length === n0 ? "identical" : "DIFFERENT"}; the same file twice: 2 slots; refused: ${bad.join(", ")} and a file that isn't JSON`;
+    stats.exportImport = `export → import → load ${problems.length === n0 ? "identical" : "DIFFERENT"}; the same file twice: 2 slots, twice more at once: 4; refused: ${bad.join(", ")} and a file that isn't JSON`;
     stats.acrossStores = res.join("; ");
     stats.worlds = `the real world's run (${rks.join(" ")}) loaded ${problems.length === n2 ? "identical" : "DIFFERENT"} on "${game.run.world.id}" with new runs still on "${testWorld.world.id}"; an unknown world refused`;
   }

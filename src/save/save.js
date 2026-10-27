@@ -645,7 +645,14 @@ export async function exportSlot(id, { store } = {}) {
   return { kind: "gnomon-save", game: GAME_ID, version: slot.version, exported: Date.now(), slot,
            zones: await st.list("zones", { slot: id }), checkpointZones: await st.list("checkpointZones", { slot: id }) };
 }
-export async function importSlot(file, { store } = {}) {
+// One import at a time (each looks for a free id before it writes), and an id taken gets a suffix of its own.
+let importing = Promise.resolve();
+export function importSlot(file, opts = {}) {
+  const done = importing.then(() => importOne(file, opts));
+  importing = done.catch(() => {});
+  return done;
+}
+async function importOne(file, { store } = {}) {
   const st = storeFor(store);
   const data = typeof file === "string" ? JSON.parse(file) : file;
   if (data?.kind !== "gnomon-save" || data.game !== GAME_ID || !data.slot?.id || !Array.isArray(data.zones))
@@ -654,7 +661,7 @@ export async function importSlot(file, { store } = {}) {
   migrate(data.slot, [], {});   // (refuses a save from a newer game, or one with no way up)
   if (!data.zones.some((r) => r.key === data.slot.where?.zoneKey)) throw new Error("importSlot: the file holds no record of the zone you were in");
   let id = data.slot.id;
-  if (await st.get("slots", id)) id = `${id}-${Date.now().toString(36)}`;
+  if (await st.get("slots", id)) id = `${id}-${Date.now().toString(36)}${(slotSeq++).toString(36)}`;
   await st.tx(async (t) => {
     for (const r of data.zones) await t.put("zones", { ...r, slot: id });
     for (const r of data.checkpointZones || []) await t.put("checkpointZones", { ...r, slot: id });
