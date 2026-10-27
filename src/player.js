@@ -19,7 +19,17 @@ const JUMP_HIGH = 11.4;            // with the High jumper perk: ≈ 2.5 blocks
 const FLY_SPEED = 4;               // blocks per second up (Space) or down (C) while flying
 const EPS = 0.001;
 
+// A new run's player (game.js startRun): the quick start's, or the character the creation wizard made for this
+// run (progression/chargen.js beginRun hands it over with nextRunPlayer, and takes it back after startRun).
+let madeForNextRun = null;
+export function nextRunPlayer(p) { madeForNextRun = p; }
 export function makePlayer() {
+  if (madeForNextRun) { const p = madeForNextRun; madeForNextRun = null; return p; }
+  return quickPlayer();
+}
+
+// The quick start: the parent game's hero (and the shape every made character starts from).
+export function quickPlayer() {
   const p = {
     x: 0, y: 0, z: FLOOR_Z, vz: 0, onGround: false, yaw: 0, pitch: 0,
     hp: 20, keys: 0, funds: 0, purse: CURRENCY.startPurse, torch: true,   // funds, purse: currency.js (the counter)
