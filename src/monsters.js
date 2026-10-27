@@ -82,6 +82,7 @@ export function pushPlayerOut(game) {
   const { zone, player: p } = game;
   for (const m of zone.creatures) {
     if (canTalk(m)) continue;   // people step aside for you (as they always have)
+    if (m.brain?.arriving > 0) continue;   // still on its way in after you (ai.js): not here yet
     if (isFlat(m) || ghostHidden(game, m) || p.z > m.z + m.h || p.z + HEIGHT < m.z) continue;   // you walk right over flat things
     const dx = p.x - m.x, dy = p.y - m.y, dist = Math.hypot(dx, dy);
     const minDist = RADIUS + m.w * 0.4;

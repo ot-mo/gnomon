@@ -45,6 +45,7 @@ import { enterZone, changeZone, cachedZone, zoneState } from "../../src/zones.js
 import { spawnCreature, addCreature, CREATURE_TYPES, pickCreatureType, touchable, nearestCreature, witnessesOf, creaturesAlong } from "../../src/creatures.js";
 import { resolveAttack, rollToHit, hitChance, toHitMod, critNat, dvOf, weaponSpec, naturalSpec, playerMelee, bumpAttack, combatLine, thrownSpec } from "../../src/combat.js";
 import { guardianThink } from "../../src/guardians.js";
+import { pushPlayerOut } from "../../src/monsters.js";
 import { mapStep, passTime, refreshView, startTravel, travelStep } from "../../src/turns.js";
 import { overrideRules, RULES } from "../../src/rules.js";
 import { invalidateStats, mod, maxHp, av as armourValue } from "../../src/stats.js";
@@ -1314,6 +1315,18 @@ export async function checkAiDepth(ctx) {
       // A creature still on its way in can't be touched.
       foe.brain = { arriving: 1 };
       expect(!touchable(game, foe), "a creature still arriving can be struck");
+      // Nor does it push you (monsters.js pushPlayerOut, integration request 4): overlapping you, it moves you once arrived.
+      {
+        const was = { x: foe.x, y: foe.y, z: foe.z }, at = { x: p.x, y: p.y };
+        Object.assign(foe, { x: p.x + 0.2, y: p.y, z: p.z });
+        pushPlayerOut(game);
+        const pushedArriving = Math.hypot(p.x - at.x, p.y - at.y);
+        delete foe.brain;
+        pushPlayerOut(game);
+        const pushedHere = Math.hypot(p.x - at.x, p.y - at.y);
+        Object.assign(p, at); Object.assign(foe, was);
+        expect(pushedArriving === 0 && pushedHere > 0.05, `a creature overlapping you: pushed you ${pushedArriving.toFixed(2)} tiles while still arriving (want 0), ${pushedHere.toFixed(2)} once here`);
+      }
       delete foe.brain;
       // Under the legacy set nothing flees, out in the open either.
       const undoLegacy = overrideRules("combat", "legacy");
