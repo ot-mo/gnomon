@@ -357,6 +357,37 @@ export function checkItems(m) {
     if (!u2.ok || !u2.destroyed || p.inv.includes(heart) || St.maxHp(p) !== hp0) fail("the glim heart wasn't destroyed on removal, or max HP didn't come back");
     const u3 = withC(() => IM.uninstall(game, p, "back"));
     if (!u3.ok || p.body.parts.some((q) => q.id === "back_2") || !p.inv.includes(cloak) || !p.inv.includes(rack)) fail("taking out the folding rack: the part, the cloak or the rack went astray");
+    // Removal takes the hour too, and a hunt within reach refuses it; the "uninstall" and "grade" events; HP clamped when
+    // an implant lowers max HP; one of each outside plate grafts; the Cradle's G row raises the grade.
+    {
+      const q = fresh(); q.license = { grade: 12 };
+      const eye = { kind: "implant", id: "levelEye" }, eye2 = { kind: "implant", id: "levelEye" }, glim = { kind: "implant", id: "glimHeart" };
+      q.inv.push(eye, eye2, glim);
+      withC(() => IM.install(game, q, eye, "face"));
+      const seen = [], offs = ["uninstall", "grade"].map((t) => m.events.on(t, () => seen.push(t)));
+      const hunter = m.creatures.addCreature(game.zone, m.creatures.spawnCreature("goblin", Math.floor(q.x) + 2, Math.floor(q.y), q.z, { rng: () => 0.5, state: "chase", level: 3 }));
+      const tr = game.time, hr = withC(() => IM.uninstall(game, q, "face"));
+      if (hr.ok || hr.reason !== "hunted" || game.time !== tr || q.body.implants.face !== eye) fail(`taking out with a hunt within reach: ${hr.reason}, ${game.time - tr} s`);
+      game.zone.creatures = game.zone.creatures.filter((c) => c !== hunter);
+      const tu = game.time, ur = withC(() => IM.uninstall(game, q, "face"));
+      if (!ur.ok || game.time - tu !== 60 || !seen.includes("uninstall")) fail(`taking out: ${ur.ok ? "ok" : ur.reason}, ${game.time - tu} s (want 60), uninstall event ${seen.includes("uninstall")}`);
+      q.credits = 2;   // (past grade 8 a grade takes 2)
+      IM.raiseGrade(game, q);
+      if (!seen.includes("grade")) fail("no grade event");
+      offs.forEach((off) => off());
+      q.hp = St.maxHp(q);
+      withC(() => IM.install(game, q, glim, "body"));
+      if (q.hp !== St.maxHp(q)) fail(`the glim heart left HP ${q.hp} above max HP ${St.maxHp(q)}`);
+      q.body.parts.push({ id: "face_2", type: "face", implant: true }); q.body.implants.face_2 = null;
+      withC(() => IM.install(game, q, eye, "face"));
+      want("a second level-eye in a second face socket", withC(() => IM.canInstall(game, q, eye2, "face_2")), "twice");
+      q.credits = 2;
+      const g0 = IM.gradeOf(q);
+      m.equipment.openTruing(game, { at: "cradle" });
+      m.keys.dispatchKey(game, "KeyG", false, "g");
+      if (IM.gradeOf(q) !== g0 + 1 || q.credits !== 0) fail(`G at the Cradle: grade ${g0} → ${IM.gradeOf(q)}, ${q.credits} true-marks left`);
+      m.keys.dispatchKey(game, "Escape", false, "");
+    }
     // Plate grafts: three, one per part; a fourth refused even with a socket.
     p = fresh(); p.license = { grade: 20 };
     const grafts = [0, 1, 2, 3].map(() => ({ kind: "implant", id: "plateGraft" }));
