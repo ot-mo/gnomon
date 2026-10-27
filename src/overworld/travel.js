@@ -102,7 +102,7 @@ export function worldStep(game, dx, dy, { confirm = false, fast = false, drop = 
   const to = { wx: from.wx + dx, wy: from.wy + dy }, t = world.tileAt(to.wx, to.wy), edge = edgeBetween(world, from, to);
   const k = spanKey(to.wx, to.wy);
   if (!confirm && t.tier >= playerTier(game) + OW().tierWarning && !trip.warned?.[k]) {
-    trip.prompt = { kind: "tier", dx, dy, to, line: `${regionName(game, t)} is tier ${t.tier}, far beyond you. Go on?` };
+    trip.prompt = { kind: "tier", dx, dy, to, line: `${capital(regionName(game, t))} is tier ${t.tier}, far beyond you. Go on?` };
     return { ok: false, why: "tier", confirm: "tier", from, to };
   }
   const hours = stepHours(game, from, to, edge), flying = statusFlag(game.player, "flying");   // as you set out
@@ -143,6 +143,7 @@ export function worldStep(game, dx, dy, { confirm = false, fast = false, drop = 
 }
 
 const regionName = (game, t) => game.run.world.regions?.[t.region]?.name || game.run.world.terrains?.[t.terrain]?.name || t.terrain;
+const capital = (s) => s.charAt(0).toUpperCase() + s.slice(1);   // "the Eastfells" opens a sentence
 
 // The open prompt: yes or no.
 export function answer(game, yes) {
@@ -201,7 +202,9 @@ export function fastTravel(game, to, { confirm = false } = {}) {
   if (!isKnown(game, to.wx, to.wy)) return { ok: false, why: say(game, "You don't know the way there.") };
   const path = travelPath(game, trip, to);
   if (!path) return { ok: false, why: say(game, "You know no way there by roads, rivers and places you've been.") };
-  const far = path.find((s) => tileOf(game, s.wx, s.wy).tier >= playerTier(game) + OW().tierWarning && !trip.warned?.[spanKey(s.wx, s.wy)]);
+  // The highest tier on the way, so one yes covers what it names.
+  const far = path.filter((s) => tileOf(game, s.wx, s.wy).tier >= playerTier(game) + OW().tierWarning && !trip.warned?.[spanKey(s.wx, s.wy)])
+    .sort((a, b) => tileOf(game, b.wx, b.wy).tier - tileOf(game, a.wx, a.wy).tier)[0];
   if (far && !confirm) {
     trip.prompt = { kind: "tier", to: far, path, line: `The way goes through tier ${tileOf(game, far.wx, far.wy).tier} land, far beyond you. Go on?` };
     return { ok: false, why: "tier", confirm: "tier", path };

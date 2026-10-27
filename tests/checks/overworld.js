@@ -689,6 +689,7 @@ function discovery(G, scr, problems) {
     goTo(g3, from.wx, from.wy); enterWorldMap(g3);
     const t0 = g3.time, r = worldStep(g3, far.wx - from.wx, far.wy - from.wy);
     if (r.confirm !== "tier" || g3.time !== t0 || g3.trip.wx !== from.wx) problems.push("discovery: no tier warning before a tier-3 span at level 1");
+    if (!/^[A-Z]/.test(g3.trip.prompt?.line || "")) problems.push(`discovery: the tier warning begins in lower case: "${g3.trip.prompt?.line}"`);
     // Under the prompt a click on the footer's "Enter: go down" doesn't answer it; a click on "Y: yes" does.
     G.draw();
     const lines = scr.frameText().split("\n"), find = (label) => { for (let y = lines.length - 1; y >= 0; y--) { const x = lines[y].indexOf(label); if (x >= 0) return { x, y }; } return null; };
@@ -700,6 +701,19 @@ function discovery(G, scr, problems) {
     const r2 = g3.trip?.prompt ? answer(g3, true) : { ok: g3.trip?.wx === far.wx, dropped: !g3.trip };
     if (!r2?.ok || g3.trip?.wx !== far.wx && !r2?.dropped) problems.push("discovery: yes to the tier warning didn't take the step");
     out.tierWarning = true;
+    // Fast travel names the highest tier on its way: a path of visited spans along row 5 of the Westreach, one span
+    // made tier 3 midway and the last tier 5, asks about tier 5.
+    const g6 = fresh(G, 76, G.game.world), W6 = g6.run.world, A6 = atlas(g6);
+    goTo(g6, 1, 5); enterWorldMap(g6);
+    for (let x = 2; x <= 7; x++) A6.visited[spanKey(x, 5)] = 0;
+    const end = { wx: 7, wy: 5 }, p6 = travelPath(g6, g6.trip, end);
+    if (!p6 || p6.length < 3) problems.push("discovery: no fast-travel path along row 5 to test the warning on");
+    else {
+      const undo = [swap(W6.tileAt(p6[1].wx, p6[1].wy), { tier: 3 }), swap(W6.tileAt(end.wx, end.wy), { tier: 5 })];
+      try { fastTravel(g6, end); } finally { undo.forEach((u) => u()); }
+      out.fastWarning = g6.trip.prompt?.line;
+      if (!/tier 5/.test(g6.trip.prompt?.line || "")) problems.push(`discovery: fast travel's warning names "${g6.trip.prompt?.line}", not the tier-5 span at its end`);
+    }
   }
   return out;
 }
