@@ -149,6 +149,7 @@ async function gate(browser, seed) {
       const s = await state();
       if (s.mode === mode) return s;
       if (s.mode === "story") await page.keyboard.press("Space");
+      if (s.mode === "levelup") await page.keyboard.press("Digit1");   // (a level gained: since WS1, a span's discovery pays XP; its first offer, as the bot takes it)
       await page.waitForTimeout(100);
     }
     return state();
