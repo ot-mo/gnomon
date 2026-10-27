@@ -7,7 +7,7 @@
 //
 // def.world = { id, version, w, h, name?, terrain: [h strings of w chars], terrainKey: { ch: terrainId | [{ from?, to?, id }] },
 //               regions?: [h strings], regionKey?: { ch: regionId }, tiers?: [h strings of 1-8], elevation?: [h strings of 0-3],
-//               roads: [{ id, path: [[wx, wy], …], width? }], rivers: [{ id, path, width }], start: landmarkId }
+//               roads: [{ id, path: [[wx, wy], …], width? }], rivers: [{ id, path, width, liquid? }], start: landmarkId }
 //   A terrainKey entry may be a list of x ranges, for a glyph that means two terrains (the real world's &).
 //   Without regions, a span's region is its terrain id (the real world until content phase C1).
 //   Without tiers, a span's tier is its region's tier. A landmark's own tier always wins.
@@ -193,6 +193,8 @@ export function compileWorld(def) {
   };
   link(W.roads, "road", 2);
   link(W.rivers, "river", 3);
+  // A river's liquid (rivers[].liquid; none: plain water) on every span of its path, for the ports (gen/ports.js).
+  for (const r of W.rivers || []) if (r.liquid) for (const [x, y] of r.path) tileAt(x, y).riverLiquid = r.liquid;
 
   // Landmarks.
   const landmarks = new Map(), flatten = [];
