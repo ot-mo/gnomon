@@ -525,7 +525,7 @@ export function checkItems(m) {
         for (let nat = 1; nat <= 20; nat++) { const miss = dc - nat - b; if (miss <= 0) wk++; else if (miss <= 5 || def.sturdy) wp++; else wb++; }
         const exp = { known: wk / 20, partial: wp / 20, broke: wb / 20 };
         const tally = { known: 0, partial: 0, broke: 0 };
-        const rng = m.rng.makeRng(1000 + def.complexity * 31 + int);
+        const rng = m.rng.makeRng(1000 + Object.keys(m.artifactTable).indexOf(id) * 97 + int * 7 + extra);   // (a stream of its own for each case)
         for (let k = 0; k < N; k++) {
           const it = { kind: "artifact", id, known: false, cell: null };
           const r = AR.examineArtifact(game, p, it, rng);
