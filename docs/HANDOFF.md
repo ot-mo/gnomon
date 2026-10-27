@@ -3,18 +3,19 @@
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
 **Updated:** 2026-10-27, the integrator (local session), on `integration`. **Phase 1 is running and Phase 2's
-integration has started: WS3 is merged (`p2-ws3`); WS8 is next.** From here on only the integrator edits this file
+integration has started: WS3 and WS8 are merged (`p2-ws3`, `p2-ws8`); the next is whichever `p1-*` tag lands
+next (WS9, WS5 and WS4a are running).** From here on only the integrator edits this file
 and moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p2-ws3` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3` + WS3's integration
-  requests 4 and 8). `main` is fast-forwarded to it. Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams'
+- **Last tag:** `p2-ws8` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3` and `p1-ws8` with
+  their integration requests; `p2-ws3` before it). `main` is fast-forwarded to it. Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams'
   `p1-*` tags are on GitHub.
 - **Branch:** `integration`, in the worktree `C:\Users\Otto Mörner\Code\gnomon-wt\integration` (serves on port
   8660). Nothing is half finished.
-- **Done:** Phase 0 (0A1 … 0D2, notes in `docs/sessions/0A1.md` … `0D2.md`); WS3 (`docs/ws3.md`,
-  `docs/sessions/ws3.md`), merged. The merges' own numbers are under "Integration log" below.
+- **Done:** Phase 0 (0A1 … 0D2, notes in `docs/sessions/0A1.md` … `0D2.md`); WS3 and WS8 (`docs/ws3.md`,
+  `docs/ws8.md`, `docs/sessions/ws3.md`, `ws8.md`), merged. The merges' own numbers are under "Integration log" below.
 - **Checks:** `node tools/run-all.mjs`, 37 checks (about 2 minutes on an idle machine, 4 with three workstreams
   running; the timed ones, `check-dungeons`, `check-status`, `check-stats` and `check-perf`, alone at the end; since
   WS3, `check-perf` runs the render check first). Browser (headless Playwright, audio silenced,
@@ -24,13 +25,14 @@ and moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## Next step
 
-**The integrator:** merge `p1-ws8` (tagged, waiting), then each `p1-*` tag as the coordinator reports it, in §8.5's
+**The integrator:** wait for the coordinator's message; merge each `p1-*` tag as it lands, in §8.5's
 order (WS9, WS3, WS8, WS5, WS4, WS6a, WS6b, WS10, WS2, WS7, WS1). For each: read `docs/<ws>.md` and
 `docs/sessions/<ws>.md`; merge the tag; apply the requests aimed at P0's, unowned, the integrator's or merged
 workstreams' files, and carry the rest (below, "Carried integration requests"); rerun its dependency-table items
 (§8.3's end) against the real code; `run-all`, the bot, golden (b), the browser checks (serve on 8660, `?silent=1`);
-verify sceptically, one commit per finding; tag `p2-<ws>`, push it, and `git push origin p2-<ws>:main` only when
-`git merge-base --is-ancestor origin/main p2-<ws>` holds.
+verify sceptically, one commit per finding; tag `p2-<ws>` (annotated), push it, and only when
+`git merge-base --is-ancestor origin/main p2-<ws>` holds, `git push origin 'p2-<ws>^{commit}:refs/heads/main'` (an
+annotated tag's own name can't be pushed to a branch; `^{commit}` is the commit it tags).
 
 **The workstreams** go on as the "Phase 1 plan" below says (the coordinating session starts the next one in the
 queue as a slot frees).
@@ -58,7 +60,7 @@ tags; WS1, which builds on the most, last):
 |---|---|---|---|
 | 1 | WS9 Persistence and shell | `ws9`, `ws/ws9` | running (since 2026-10-26) |
 | 2 | WS3 Rendering outdoors and presentation | `ws3`, `ws/ws3` | tagged `p1-ws3` (51785f7); **merged, `p2-ws3`** (2026-10-27) |
-| 3 | WS8 Combat depth, AI and targeting | `ws8`, `ws/ws8` | tagged `p1-ws8` (c9638c0); merge next |
+| 3 | WS8 Combat depth, AI and targeting | `ws8`, `ws/ws8` | tagged `p1-ws8` (c9638c0); **merged, `p2-ws8`** (2026-10-27) |
 | 4 | WS5 Body mods, items and equipment UI | `ws5`, `ws/ws5` | running (since 2026-10-27) |
 | 5 | WS4a → WS4b Character creation and progression | `ws4`, `ws/ws4` | WS4a running (since 2026-10-27); WS4b after `p1-ws4a` |
 | 6 | WS6a → WS6b Factions, dialogue builders → trade, the Kindling, backings | `ws6`, `ws/ws6` | queued |
@@ -100,11 +102,12 @@ tags; WS1, which builds on the most, last):
 
 **The integrator** (§8.5): one session in `gnomon-wt\integration` on branch `integration` from `p0-done`, started when
 the first `p1-*` tag is up. It first merges `wip/p1-plan` (this file; it already holds `main`'s `4002a50`, DECISIONS'
-serve rule, so `main` can fast-forward to the integrator's tags; merge `main` too if it has moved since), and folds `torch.js`, `keyset.js` and `tools/serve.mjs` into §8.4 (`0D2.md` §6).
+serve rule, so `main` can fast-forward to the integrator's tags; merge `main` too if it has moved since), and folds `torch.js`, `keyset.js` and `tools/serve.mjs` into §8.4 (`0D2.md` §6): both done on 2026-10-27 (`ad067c5`
+fast-forwarded, `e6b3f98`).
 Then, for each `p1-*` tag (in §8.5's order when several are ready): merge,
 apply that workstream's integration requests, rerun its dependency-table items against the real code, `run-all`, the
-bot and golden (b); tag `p2-<ws>` and fast-forward `main` to it (`git push origin p2-<ws>:main`, only as a
-fast-forward). Only the integrator edits this file and moves `main`; the file lives on `integration` (started
+bot and golden (b); tag `p2-<ws>` and fast-forward `main` to it (only as a fast-forward; the command is under
+"Next step"). Only the integrator edits this file and moves `main`; the file lives on `integration` (started
 2026-10-27; `wip/p1-plan` is merged in and no longer updated).
 
 **Timed checks with three workstreams running:** three `run-all`s at once skew the timed checks the way the training
@@ -122,7 +125,7 @@ job does. For a timed gate number, run that check alone on an idle machine and a
   `tests/checks/screen-frames.js`, P0's guard on the shell). Only WS3's "victory card" is excluded (approved for WS3,
   drawn over the outdoor map). A blanket exclusion is not approved: at WS9's merge the integrator lists which frames
   change and why, and asks before excluding any.
-- **Key hints on the map** (WS8 #5, WS3 #4, `0D2.md` §5's hotbar hint): the map header is in golden (b)'s 27
+- **Key hints on the map** (WS8 #5, WS3 #4, `0D2.md` §5's hotbar hint; WS4b's B and K to come): the map header is in golden (b)'s 27
   underground frames, so it can't name L (look), V (fire), G (legend) or hotbar key 1 while golden (b) is held. Where
   they go instead (the pause card's key list at WS9's merge, WS4b's sheet) or when golden (b) retires is yours.
 
@@ -131,6 +134,26 @@ job does. For a timed gate number, run that check alone on an idle machine and a
 Requests the integrator can't apply yet because the file belongs to a workstream that hasn't merged; each is applied
 at that merge (so it doesn't conflict with the branch). Numbers are the asking workstream's (`docs/<ws>.md`).
 
+- **WS4** (at its merge; WS4's session has `docs/ws8.md` and was told how #8 and #11 landed): WS8 #1,
+  `abilities.requestTarget` through `screens/target.js` (on the map the screen answers later; `useAbility` goes on
+  in the callback; `check-abilities` §5 then drives the screen with Enter), and an ability's `use` may get the player
+  as `target.creature` when a creature uses it (ai.js). WS8 #8 and #11 are applied (below): Steady hand gives
+  `{ missileAcc: 2 }`; `innate` is ability ids only, a bonus table is `e.bonuses`. The integrator's hook for the
+  torch's ways out (Lampskin, the Lamplighter) when WS4 asks.
+- **The flip** (§8.5; WS8 #9), at WS4's merge (WS4 and WS8 both in): `RULES.stats = "attributes"` and
+  `RULES.combat = "d20"` (DECISIONS: d20, not §8.5's "dice") by default; golden (a) retires; `check-legacyfights`
+  then needs `overrideRules("combat", "legacy")` around its fights (its fixture is the parent's); WS8's TTK tables
+  (`node tools/check-combat.mjs --only ttk`) become the balance reference. Under d20 the map's T opens the target
+  screen, creatures flee, and the log takes the d20 lines. The user's call on the tier 5-8 balance (above) comes first.
+- **WS6a** (at its merge): WS8 #2, a creature hostile to you is hostile to your followers (`attitude(a, f)` with
+  `f.brain.leader === "player"`: "hostile" when `attitude(a, player)` is); until then monsters ignore your
+  followers until one strikes them. WS8's spatial queries (`nearestCreature`, `sees`, `witnessesOf`) are in for the
+  witnesses.
+- **WS10** (at its merge): WS8 #3, spikes rise through a flat you harmlessly (bible §10.2): `traps.js updateSpikes`
+  skips you when `!touchesYou(game, null)` (creatures.js).
+- **WS5** (information): WS8's L in both views emits `inspect { open: true }`; the examine screen opens on it. Missile
+  weapons are carried in the pack, not held (`docs/ws8.md`, deviation 2), and `inventory.js` reads
+  `WEAPONS[wielded.id]`.
 - **WS9** (at its merge): WS3 #3, register the HUD's clock segment (`hud.registerHudSegment("clock",
   render3d.CLOCK_SEGMENT)`, under the sky only) and let `tests/checks/hud.js:91`'s 180-column "parent's order"
   assertion allow it on the start span (outdoors); WS3 #7, the held weapon at night (`hud.js:326-328`) lit by
@@ -149,6 +172,45 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p2-ws8`** (2026-10-27): `p1-ws8` (c9638c0) merged into `integration` (a05decb), no conflicts (no file of WS8's
+is WS3's).
+- WS8's P0 check lines, confirmed and kept (#6): one `ITEM_SAMPLES` line in `tests/checks/content.js` and one sample
+  line in `tests/checks/body.js` (the `missile` and `ammo` kinds, each `// WS8`), as `0D2.md` §6 asks of a new kind.
+  #12 (3D draws every creature) came in with `p1-ws3` (`c8f2273`): dropped.
+- Applied, each with an assertion that fails without it: #4 (`5351983`: `monsters.js pushPlayerOut` skips a creature
+  still arriving: pushed 0 tiles while arriving, 0.40 once here); #11 (`d13fe5f`: `stats.js`'s own-bonuses source reads
+  `e.bonuses`, so `innate` is ability ids only; the player's `["foldStep"]` used to sum into the bonus table as
+  `{"0": "0foldStep"}`); #8 (`45816a9`: a bonus key `missileAcc` added to a shot's accuracy, the bolt-bow 1 → 3 with
+  `{ missileAcc: 2 }`, the blade unchanged; Appendix A); #7 (`4e62fbb`: `tools/README.md` for check-combat's parts and
+  `browser-ws8.mjs`; §8.4 gives `browser-ws8` to WS8). Not applied: #5 (the map header is in golden (b)'s frames: for
+  the user, above; the outdoor legend's `)` row is 18 cells wide, too narrow for "missile weapons and bolts"); #9 (the
+  flip, at WS4's merge); #10 (nothing asked). Carried: #1 to WS4, #2 to WS6a, #3 to WS10 (above).
+- Dependency table: "WS3 night auto-map, daylight perception" rerun against WS8's real `refreshView` and
+  `creatures.sees` (`d5e308d`, render.js §3: the auto-map 576 / 9 / 137 / 127 columns as before; a goblin 7.7 tiles
+  off sees you at noon and 18:30, not at midnight with your torch out, and again with it lit; fails with `sees`' dark
+  factor taken out). "WS8 followers across edges" against P0's real zone events: check-combat's AI part passes (both
+  views, the stairs, travel). The rest of WS8's (WS4 abilities on the map, WS5 examine from L, WS6a witnesses, WS7
+  murals, WS8 attitudes) wait for those merges.
+- Verification finding, fixed (`09b687e`): `browser-0d1` failed "modes never reached: target" (WS8's new screen; WS8
+  hadn't run `browser-0d1`). It now opens the look cursor with L on the map and closes it by Esc and by a right
+  click: 15 of 15 modes.
+- Checks: `run-all` at `d5e308d` (every request in) **37 of 37** (209 s, CPU 74% at the start, three workstreams
+  running), the timed ones within budget in the run (`check-perf` against `p0-done`: the outdoor frame 19.2 against
+  26.3, ×0.73, the machine's; refresh 7.6 ×0.83; generation p95 35.7 / 31.7 ×0.78 / ×0.71; passTime 8.45 ×1.05; the
+  swap 26.0 against 70.8; `check-dungeons` p95 38.5). Golden: mechanics 86, frames 27, dungeons 95, vaults 28, temple 2,
+  0 mismatched; screen frames 46 of 46 compared; the legacy fights, the bot, determinism; check-combat's five parts
+  (P0's combat, targeting, AI depth, the arena, the TTK tables). WS8's own timed item alone, `check-combat --perf
+  --seconds 40 --against p0-done` (CPU 62-73%): passTime p50 7.40 / 7.11 / 7.97 ms (hunting legacy, hunting d20, two
+  factions) against 5.32 / 4.95 / 4.89, ×1.39-1.63 as WS8 reported (×1.2-1.7), within the 12 ms budget. Browser
+  (`tools/serve.mjs 8660`, `?silent=1`, 0 console errors): `browser-ws8` seeds 1234 and 7 pass (L, Tab, Enter, Esc, the
+  mouse, T and TT, V and a click on the orc, L/V/T in 3D, the follower 3.0 tiles off, never striking you);
+  `browser-gate` 1234 and 7 (the swap 43.0 / 44.2 ms on SwiftShader, black 0.006 → 0.007); `browser-0c` 1234 and 7;
+  `browser-shell` 1280×720 and 600×300; `browser-0d1 --against p0-done` after the fix: 15 of 15 modes, the HUD at
+  100×30 with 13 segments (WS8's `missile` among them), golden (b) 27 of 27 in the browser, per tick underground
+  +1.6% (3D) and +2.0% (map), within its 5%, surface 3D −11.0%; `browser-0d2 --all`: boot with 153 modules, imports
+  156 of 156, `test-world.html` 34 of 34 checks in the browser (render and combat with the integrator's assertions
+  among them); `browser-silent` passes.
 
 **`p2-ws3`** (2026-10-27): `p1-ws3` (51785f7) merged into `integration` (a7d3124), no conflicts (WS3 touched only
 its §8.4 files and two P0 checks).
@@ -180,6 +242,7 @@ its §8.4 files and two P0 checks).
   services); `browser-shell` at 1280×720 and 600×300 pass (43 mode changes each); `browser-0d1 --against p0-done`
   passes (14 of 14 modes, the HUD at 100×30, golden (b) 27 of 27 in the browser; per tick underground 3D −0.2%, map
   −1.3%, surface 3D −11.4%, surface map −0.2%).
+- Not run at this tag: `browser-0d2` and `browser-silent` (run at the WS8 merge, on WS3's code too: both pass).
 - Verification of the merge: no file of WS3's overlaps another merged one; the old game in both views is held by
   golden (a) and (b), the 46 frames, the legacy fights, the bot's both-view session and determinism. G underground
   (a probe on legacy level 3, 48×48, at 180 and 160 columns): the parent's legend shown → hidden → shown, the frame
@@ -209,6 +272,9 @@ its §8.4 files and two P0 checks).
   WS2 above); the underground legend says "gold" while golden (b) holds (WS3 #9: change `renderMap.js`'s `$` row
   when it retires; the outdoor legend says glim). The outdoor frame, the horizon band and the clock's looks are done
   (`docs/sessions/ws3.md` §2: 16.1 ms at noon against `p0-done`'s 22.6 on a quiet machine).
+- **WS8 (merged; what's left):** `passTime` costs ×1.2-1.7 `p0-done`'s in WS8's alternating measure (p50 4-5 ms
+  against a 12 ms budget); the look line is all L shows until WS5's examine screen opens on `inspect`; monsters ignore
+  your followers until struck (WS6a, carried), spikes hurt a flat you (WS10, carried).
 - **WS9:** Continue can mix two moments (zones left after the last save are written behind and read on load: an item
   dropped after the save is duplicated); §7.3's save on a completed zone change fixes it. Saves are in memory only
   (IndexedDB, periodic and unload saves, the oneWick slot deleted on death, checkpoints). Prefetch is skipped while
@@ -221,6 +287,5 @@ its §8.4 files and two P0 checks).
   `tools/serve.mjs` and `report.mjs` frozen, `e6b3f98`.)
 - **C1:** the real world has no regions yet, so the Hollow Mere compiles as the Glass Sea; `content/world/regions.js`,
   `landmarks.js` and `plans/*.js` don't exist yet (import them from `worldmap.js`; the frozen index needs no edit).
-- From 0B: thrown things stop at a zone's border (WS8 lands them in the next zone).
 - From 0C (minor test gaps): check-legacyfights doesn't cover a creature hitting a creature under the legacy rules;
   check-light doesn't cover renderMap's ghost drawing directly.
