@@ -1477,6 +1477,7 @@ async function ws9Sections(ctx) {
       armed = false;
       const told = game.messages.filter((m) => /couldn't be saved/.test(m.text));
       if (told.length !== 1) fail(`two failed saves told the player ${told.length} time(s) (want once, in the log)`);
+      if (!told[0]?.text.includes("couldn't be saved (the store refused it (check)).")) fail(`the failed save's line: "${told[0]?.text}" (the store's reason whole)`);
       out.push(`two failed saves told the player once ("${told[0]?.text.slice(0, 70)}…")`);
       game.zone.items.push({ kind: "bomb", count: 5, x: game.player.x, y: game.player.y, z: game.player.z });
       await go("0,0,3", "down");

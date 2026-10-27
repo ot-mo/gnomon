@@ -215,7 +215,7 @@ function failed(game, sv, what, e) {
   const now = game.uiTime || 0;
   if (game.saving !== sv || sv.dead || typeof game.log !== "function" || now - (sv.toldAt ?? -Infinity) < SAVE_RULES.told) return;
   sv.toldAt = now;
-  const why = String(e?.message || e || "").replace(/.$/, "").slice(0, 80);
+  const why = String(e?.message || e || "").replace(/\.$/, "").slice(0, 80);
   game.log(`The game couldn't be saved${why ? ` (${why})` : ""}. It will try again; if the page closes first, what happened since the last save is lost.`, [255, 150, 100]);
 }
 // After writes commit, dormant zones beyond the limit may leave memory (only this run's).
