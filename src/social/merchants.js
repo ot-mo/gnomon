@@ -158,7 +158,7 @@ export function tradeRows(game, c, tab) {
   }
   if (tab === "services") return servicesFor(game, c).map(({ id, target }) => {
     const s = serviceDef(id);
-    return { label: s.label(game, c, target), glyph: s.glyph?.(game, c, target), price: s.price(game, c, target),
+    return { label: s.label(game, c, target), glyph: s.glyph?.(game, c, target), price: Math.round(s.price(game, c, target) * markup(game)),
              info: s.info?.(game, c, target), service: s, target };
   });
   return (p.inv || []).filter((it) => !moneyItem(it))

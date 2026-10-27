@@ -749,6 +749,12 @@ export async function run(env) {
     if (game.mode !== "trade") fail(`openTrade on Pell: ${game.mode}`);
     const ids = new Set(merchants.tradeRows(game, pell, "services").map((r) => r.service.id));
     for (const id of want) if (!ids.has(id)) fail(`Pell's service ${id} isn't on the trade screen (rows: ${[...ids].join(", ")})`);
+    // The Snuffer pays +20% for services too.
+    const plainPrice = merchants.tradeRows(game, pell, "services")[0].price;
+    game.state.snuffer = { at: 0, until: (game.time || 0) + 100 };
+    const marked = merchants.tradeRows(game, pell, "services")[0].price;
+    game.state.snuffer = null;
+    if (marked !== Math.round(plainPrice * 1.2)) fail(`the Snuffer's service price ${marked}, want ${Math.round(plainPrice * 1.2)} (plain ${plainPrice})`);
     let ran = 0;
     for (const id of want) {
       const row = merchants.tradeRows(game, pell, "services").find((r) => r.service.id === id);
