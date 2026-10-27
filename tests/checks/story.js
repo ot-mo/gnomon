@@ -668,7 +668,11 @@ async function quests7b(env, { fail, stats, test, json, startRun, game }) {
           if (dist[P.x + P.y * z.w] >= 0 || its[0].z !== P.z || dist[P.x - 2 + P.y * z.w] < 0) throw new Error("the perch is reachable on the map, or its steps aren't");
         }
         p.x = its[0].x; p.y = its[0].y; p.z = its[0].z;
-        items.pickUpItems(game); tick();
+        const heard = [], offPick = events.on("pickup", (g, ev) => heard.push(ev.item?.uid));
+        items.pickUpItems(game);   // items.js's "pickup" (WS7b #12, at the merge) moves it before the tick does
+        offPick();
+        if (q.stage !== "return" || json(heard) !== json([prm.itemUid])) throw new Error(`picked up: stage ${q.stage} before the tick, pickup heard for ${json(heard)}`);
+        tick();
         if (q.stage !== "return") throw new Error(`the thing in the pack: stage ${q.stage}`);
         // Dropped on the way back: fetching again, and no turn-in for it.
         const held = p.inv.find((i) => i.uid === prm.itemUid);

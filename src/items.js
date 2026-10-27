@@ -19,6 +19,7 @@
 //
 // Unknown kinds answer with the defaults (no name, no price, no aura) instead of throwing.
 import { sfx } from "./sfx.js";
+import { emit } from "./events.js";
 import { seededSort } from "./rng.js";
 import { RULES } from "./rules.js";
 import { POTIONS, SCROLLS, SYLLABLES, ELEMENTS, WEAPONS, ARMOURS, PROPERTIES, RINGS, AMULETS, RELICS, RELIC_COLOR } from "./content/items/legacy.js";
@@ -241,6 +242,7 @@ export function pickUpItems(game) {
     if (taken === "stay") return true;                // only part of it (a full purse): the rest stays
     if (taken) return false;                          // absorbed, counted or the story took over
     addToInventory(p, it);
+    emit(game, "pickup", { e: p, item: it });   // (TECH §2.12; WS7b's fetch quests)
     if (it.relic) game.log(`You pick up ${name}, a relic! ${RELICS[it.relic].info[0].toUpperCase() + RELICS[it.relic].info.slice(1)}.`, RELIC_COLOR);
     else game.log(it.count > 1 ? `You pick up ${it.count} ${name}s.` : `You pick up ${it.kind === "quest" ? name : withArticle(name)}.`, itemGlyph(game, it)[1]);
     return false;
