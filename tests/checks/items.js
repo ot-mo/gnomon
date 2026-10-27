@@ -535,6 +535,14 @@ export function checkItems(m) {
       delete p.body.implants.body; m.stats.invalidateStats(p);
       stats.ws10Seams = `body mods ${[...kinds].sort().join(", ")}; the beat ${without} without, ${withHeart} with a metronome heart`;
       if (![...kinds].every((k) => ["artifact", "cell", "implant"].includes(k)) || kinds.size < 2 || without || !withHeart) fail(`WS10's seams: ${stats.ws10Seams}`);
+      // A history relic as the reliquary's altar lays it (WS10 #4): the relic's name, the relic colour, a relic's price,
+      // and the history's powers on top of its base piece's own.
+      const rdef = game.run.history.relics[0], relic = m.vaults.BOTTOM_LOOT.relic(rdef), plainPiece = { ...relic, histRelic: undefined, relicName: undefined, powers: undefined };
+      const gain = Object.fromEntries(Object.entries(m.items.itemBonuses(relic)).map(([k, n]) => [k, n - (m.items.itemBonuses(plainPiece)[k] || 0)]).filter(([, n]) => n));
+      const want = Object.assign({}, ...rdef.powers);
+      stats.histRelic = `${m.items.itemName(game, relic)}, ${m.items.itemPrice(relic)} glim, colour ${m.items.itemGlyph(game, relic)[1]}, powers ${JSON.stringify(gain)}`;
+      if (m.items.itemName(game, relic) !== rdef.name || m.items.itemPrice(relic) !== 400 || JSON.stringify(m.items.itemGlyph(game, relic)[1]) !== JSON.stringify(m.items.RELIC_COLOR) || JSON.stringify(gain) !== JSON.stringify(want))
+        fail(`a history relic: ${stats.histRelic} (want ${rdef.name}, 400, the relic colour, ${JSON.stringify(want)})`);
     }
     // A save round trip.
     p = fresh(); p.license = { grade: 8 }; p.credits = 3;

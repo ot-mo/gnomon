@@ -249,16 +249,22 @@ export const FLOOR_ART = {
 // "+2 longsword" or "-1 chain mail". An element shows from the start: "flaming mace".
 const signed = (n) => (n > 0 ? `+${n}` : `${n}`);
 const isJewel = (it) => it.kind === "ring" || it.kind === "amulet";
+// A relic of the parent's (it.relic, RELICS) or of the run's history (it.histRelic: gen/vaults.js BOTTOM_LOOT.relic
+// lays it with relicName and its powers, bonus objects the stat bus adds through items.js itemBonuses).
+const shines = (it) => !!(it.relic || it.histRelic);
+const powersInfo = (it) => (it.powers || []).flatMap((b) => Object.entries(b).map(([k, n]) => `${signed(n)} ${k}`)).join(", ");
 
 // What its properties (or relic power) add, for the info line.
 function extrasInfo(it) {
   const parts = (it.props || []).map((k) => PROPERTIES[k].info);
   if (it.relic) parts.unshift(RELICS[it.relic].info);
+  else if (it.histRelic && it.powers?.length) parts.unshift(`a relic of the Hours: ${powersInfo(it)}`);
   return parts.length ? " · " + parts.join(" · ") : "";
 }
 
 function gearName(game, it) {
   if (it.relic) return RELICS[it.relic].name;
+  if (it.histRelic && it.relicName) return it.relicName;
   const jewel = isJewel(it);
   const base = jewel ? `${it.kind} of ${jewelTable(it)[it.id].name}` : (it.kind === "weapon" ? WEAPONS : ARMOURS)[it.id].name;
   const props = (it.props || []).map((k) => PROPERTIES[k]);
@@ -270,7 +276,7 @@ function gearName(game, it) {
 }
 // What the peddler charges at level 0 (deeper down, everything costs more: currency.js priceLevel).
 function gearPrice(it) {
-  if (it.relic) return 400;
+  if (shines(it)) return 400;
   if (it.ench < 0 && it.known) return 5;
   const tier = isJewel(it) ? 3 : (it.kind === "weapon" ? WEAPONS : ARMOURS)[it.id].tier;
   return 30 + tier * 30 + Math.max(0, it.ench) * 30 + (it.props?.length || 0) * 40 + (it.element ? 40 : 0);
@@ -309,7 +315,7 @@ registerItemKind("scroll", {
 });
 registerItemKind("weapon", gear({
   slot: () => "hand", hands: (it) => WEAPONS[it.id].hands || 1, req: strReq, stands: true,
-  glyph: (game, it) => [")", it.relic ? RELIC_COLOR : it.element ? ELEMENTS[it.element].color : [205, 210, 225]],
+  glyph: (game, it) => [")", shines(it) ? RELIC_COLOR : it.element ? ELEMENTS[it.element].color : [205, 210, 225]],
   info(game, it) {
     const w = WEAPONS[it.id];
     const el = it.element ? ` · ${ELEMENTS[it.element].info}` : "";
@@ -319,38 +325,39 @@ registerItemKind("weapon", gear({
   palette(game, it) {
     // A weapon with an element glows with it.
     const el = it.element && ELEMENTS[it.element];
-    const color = el ? el.color : it.relic ? RELIC_COLOR : null;
+    const color = el ? el.color : shines(it) ? RELIC_COLOR : null;
     return color ? { ...STEEL, w: [color, 0.6], W: [color, 0.4], ...GOLD, ...GRIP } : { ...STEEL, ...GOLD, ...GRIP };
   },
 }));
 registerItemKind("armour", gear({
   slot: (it) => ARMOURS[it.id].slot || "body", req: strReq,
   bonuses: (it) => ({ ...(ARMOURS[it.id].bonus || {}) }),
-  glyph: (game, it) => ["[", it.relic ? RELIC_COLOR : [175, 180, 195]],
+  glyph: (game, it) => ["[", shines(it) ? RELIC_COLOR : [175, 180, 195]],
   info: (game, it) => `armour ${ARMOURS[it.id].armour}${extrasInfo(it)}${ARMOURS[it.id].slot ? ` · worn on the ${{ arm: "arms", gloves: "hands" }[ARMOURS[it.id].slot] || ARMOURS[it.id].slot}` : ""} · needs ${strNeeded(it)} STR`,
   av: (it) => ARMOURS[it.id].armour + it.ench,   // stats.js av() adds up what's worn (not a bonus)
   art: FLOOR_ART.armour,
   palette(game, it) {
-    if (it.relic) return { d: [[150, 120, 50], 0.4], D: [RELIC_COLOR, 0.7] };
+    if (shines(it)) return { d: [[150, 120, 50], 0.4], D: [RELIC_COLOR, 0.7] };
     return ARMOURS[it.id].metal ? { d: [[80, 84, 98], 0], D: [[160, 165, 182], 0] } : { d: [[90, 55, 30], 0], D: [[150, 100, 60], 0] };
   },
 }));
 const jewelPalette = (game, it) => {
-  const metal = it.relic ? [[255, 200, 80], 0.6] : [[200, 165, 70], 0.25];
-  return { g: metal, c: [[150, 120, 70], 0.1], G: [GEMS[it.id], it.relic ? 1.4 : 0.9] };
+  const metal = shines(it) ? [[255, 200, 80], 0.6] : [[200, 165, 70], 0.25];
+  return { g: metal, c: [[150, 120, 70], 0.1], G: [GEMS[it.id], shines(it) ? 1.4 : 0.9] };
 };
 function jewelInfo(game, it) {
   const t = jewelTable(it)[it.id];
   if (it.relic) return RELICS[it.relic].info + ` · ${t.info(it.ench)}`;
+  if (it.histRelic) return `a relic of the Hours${it.powers?.length ? `: ${powersInfo(it)}` : ""} · ${t.info(it.ench)}`;
   return it.known || t.fixed ? t.info(it.ench) : `${t.info(1)} (how strong, or whether it's cursed, you'll know once you wear it)`;
 }
 registerItemKind("ring", gear({
   slot: () => "finger", bonuses: jewelBonuses, info: jewelInfo, art: FLOOR_ART.ring, palette: jewelPalette,
-  glyph: (game, it) => ["=", it.relic ? RELIC_COLOR : GEMS[it.id]],
+  glyph: (game, it) => ["=", shines(it) ? RELIC_COLOR : GEMS[it.id]],
 }));
 registerItemKind("amulet", gear({
   slot: () => "neck", bonuses: jewelBonuses, info: jewelInfo, art: FLOOR_ART.amulet, palette: jewelPalette,
-  glyph: (game, it) => ['"', it.relic ? RELIC_COLOR : GEMS[it.id]],
+  glyph: (game, it) => ['"', shines(it) ? RELIC_COLOR : GEMS[it.id]],
 }));
 registerItemKind("knife", {
   stack: true, throwable: true, weight: () => 0, price: () => 5,

@@ -365,7 +365,7 @@ export const RELIC_HALLS = { reliquary: RELIQUARY };
 export const BOTTOM_LOOT = {
   trueMark: (count) => (ITEM_KINDS.credit ? { kind: "credit", count } : null),
   bodyMod: null,
-  relic: (def) => ({ kind: def.base.kind, id: def.base.id, ench: 2, known: true, histRelic: def.id, relicName: def.name }),
+  relic: (def) => ({ kind: def.base.kind, id: def.base.id, ench: 2, known: true, histRelic: def.id, relicName: def.name, powers: JSON.parse(JSON.stringify(def.powers || [])) }),
 };
 
 // The guardians' halls (in the legacy stack on levels 5, 10 and 15; guardians.js): the guardian in the middle, and
