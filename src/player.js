@@ -67,11 +67,15 @@ export function regear(p, it, change) {
 }
 
 // How long one swing of your weapon takes (also what an attack costs on the map).
+// Bare hands (WS5 #4, at the WS9 merge; combat.js weaponSpec gives fists their damage): no design number, so the
+// dagger's swing and a shorter reach (the balance phase may tune them).
+export const FISTS = { swing: 0.3, reach: 1.3 };
+const inHand = (p) => WEAPONS[wielded(p)?.id] || FISTS;
 export function attackTime(p) {
   const faster = Math.min(0.6, bonus(p, "swing"));
-  return (WEAPONS[wielded(p).id].swing * (1 - faster)) / (hasStatus(p, "hasted") ? HASTE : 1);
+  return (inHand(p).swing * (1 - faster)) / (hasStatus(p, "hasted") ? HASTE : 1);
 }
-export const weaponReach = (p) => WEAPONS[wielded(p).id].reach + bonus(p, "reach");
+export const weaponReach = (p) => inHand(p).reach + bonus(p, "reach");
 
 // Can be negative with cursed armour: then blows hurt more (stats.js av()).
 export { av as armourValue } from "./stats.js";

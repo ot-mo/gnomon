@@ -125,7 +125,12 @@ function bless(game, bold) {
   const plain = [
     () => { raiseMaxHp(p, 3); p.hp += 3; return "Warmth settles into your bones. (+3 max HP)"; },
     () => { p.hp = maxHp(p); removeStatus(game, p, "poisoned"); return "Every hurt you carry fades away. (Healed fully.)"; },
-    () => { regear(p, wielded(p), (w) => { w.ench = Math.min(5, w.ench + 1); w.known = true; }); return `Light runs along your weapon. It's now a ${itemName(game, wielded(p))}.`; },
+    () => {   // (bare hands, WS5 #4: none to bless, so another boon)
+      const w = wielded(p);
+      if (!w) return null;
+      regear(p, w, (o) => { o.ench = Math.min(5, o.ench + 1); o.known = true; });
+      return `Light runs along your weapon. It's now a ${itemName(game, w)}.`;
+    },
     () => (liftCurses(p) ? "Something heavy lets go of you. (Every curse lifted.)" : null),
     () => { revealFloor(game); return "You see this whole floor laid out flat in your mind. (Your map is filled in.)"; },
     () => { addStatus(game, p, "hasted", { t: 60, stack: "refresh" }); return "Time slows around you. (Haste, for a minute.)"; },
@@ -324,9 +329,11 @@ registerDialogue("brann", (game, n) => {
       p.inv.splice(p.inv.indexOf(skull), 1);
       s.done = true;
       liftCurses(p);
-      regear(p, wielded(p), (w) => { w.ench = Math.min(5, w.ench + 1); w.known = true; });
+      const w = wielded(p);   // (bare hands, WS5 #4: the curses still lift)
+      if (w) regear(p, w, (o) => { o.ench = Math.min(5, o.ench + 1); o.known = true; });
       finishQuest(game, "brann", "Bones for Brann");
-      game.log("A cold hand touches your weapon. Every curse you carry lifts, and your weapon grows sharper (+1).", [150, 230, 255]);
+      game.log(w ? "A cold hand touches your weapon. Every curse you carry lifts, and your weapon grows sharper (+1)."
+        : "A cold hand touches yours. Every curse you carry lifts.", [150, 230, 255]);
       return node("Now I can rest. Take what's left of my blessing. It was never much use to me down here.", [bye("Rest well, Brann.")]);
     } },
   ]);
@@ -489,6 +496,7 @@ registerService("enchant", {
 registerService("forge", {
   available: (game) => {
     const it = wielded(game.player);
+    if (!it) return [];   // (bare hands, WS5 #4: nothing to forge into)
     return ["fire", "frost", "shock", "holy"].filter((el) => it.element !== el && !it.relic).map((el) => ({ it, el }));
   },
   label: (game, c, { it, el }) => `Forge ${ELEMENT_WORDS[el]} into your ${itemName(game, it)}`,

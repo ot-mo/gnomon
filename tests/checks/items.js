@@ -8,8 +8,8 @@
 //      holding parts are free of curses), worn() lists it once, unequip gives it back and every derived number
 //      comes back exactly (R3, the stat cache verified); a cursed one refuses to come off or be covered. Every
 //      part type of every plan has real gear that fits. The STR requirement refuses. Through the inventory: E
-//      equips from the pack, the Equipment tab takes off into the pack (the main hand's weapon stays; cursed things
-//      stick; the belt goes to the pack); no base field is written.
+//      equips from the pack, the Equipment tab takes off into the pack (the main hand's weapon too, since the WS9
+//      merge: bare hands, WS5 #4; cursed things stick; the belt goes to the pack); no base field is written.
 //   2. Implants: canInstall's every refusal (kind, genotype, station, part, slot, taken, twice, grade, funds,
 //      hunted); install pays 25 glim × grade, takes a world hour (the same in the map and in 3D), moves the item
 //      out of the pack, gives its bonuses and abilities (source "implant"); uninstall needs the station (the curse
@@ -242,7 +242,21 @@ export function checkItems(m) {
       if (t1 !== RULES().body.equipTime || Bd.wornOn(g, "head") || !g.inv.includes(cap)) fail(`taking the cap off: ${t1} s, still worn ${!!Bd.wornOn(g, "head")}, in the pack ${g.inv.includes(cap)}`);
       if (m.inventory.unequipPart(game, "feet") !== 0 || Bd.wornOn(g, "feet") !== boots) fail("cursed boots came off from the Equipment tab");
       const sword = Bd.wielded(g);
-      if (m.inventory.unequipPart(game, "hand_r") !== 0 || Bd.wielded(g) !== sword) fail("the weapon in the main hand came off with nothing to replace it");
+      // Bare hands (WS5 #4, at the WS9 merge; until then the main hand's weapon stayed): it comes off into the pack, and
+      // you fight with your fists (the dagger's swing, a shorter reach than the sword's, combat's fists); the 3D view
+      // draws no weapon; Pell's forge offers nothing. Then the sword goes back in hand.
+      const swordReach = m.player.weaponReach(g), forge = m.talk.serviceDef("forge"), forgeArmed = forge?.available(game, null)?.length;
+      const tOff = m.inventory.unequipPart(game, "hand_r");
+      let drawn = true;
+      const v = [game.view, game.mode];
+      try { game.view = "3d"; game.mode = "explore"; game.debug.draw(); } catch (e) { drawn = `threw ${e.message}`; } finally { [game.view, game.mode] = v; }
+      const bare = { off: tOff > 0 && !Bd.wielded(g) && g.inv.includes(sword), swing: m.player.attackTime(g), reach: m.player.weaponReach(g),
+                     fists: !!m.combat.weaponSpec(g).fists, drawn, forge: forge?.available(game, null)?.length };
+      if (!bare.off || !(bare.swing > 0) || !(bare.reach > 0 && bare.reach < swordReach) || !bare.fists || bare.drawn !== true || bare.forge !== 0 || !(forgeArmed > 0))
+        fail(`bare hands: ${JSON.stringify({ ...bare, swordReach, forgeArmed })}`);
+      stats.bareHands = { ...bare, swordReach, forgeArmed };
+      m.inventory.equip(game, sword, g.inv.indexOf(sword));
+      if (Bd.wielded(g) !== sword || g.inv.includes(sword)) fail("the sword didn't go back in hand after bare hands");
       const dagger = { kind: "weapon", id: "dagger", ench: 0, known: true };
       g.inv.push(dagger);
       m.inventory.equip(game, dagger, g.inv.indexOf(dagger));

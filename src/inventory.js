@@ -220,17 +220,11 @@ export function equip(game, it, index, part = defaultPart(game.player, it)) {
   return true;
 }
 
-// The Equipment tab's E: what that part wears goes into the pack. Cursed things stick; the weapon in your main hand
-// stays there until another takes its place (P0's 3D hand, swing and reach all need one: docs/ws5.md request 4);
-// implants come out only at a Truing Cradle. Returns the time it took.
+// The Equipment tab's E: what that part wears goes into the pack (the main hand's weapon too: then you fight with your
+// fists, WS5 #4 at the WS9 merge). Cursed things stick; implants come out only at a Truing Cradle. Returns the time it took.
 export function unequipPart(game, partId) {
   const p = game.player, it = wornOn(p, partId);
   if (!it) return 0;
-  const main = p.body.parts.find((q) => q.primary);
-  if (main && wielded(p) === it && wornOn(p, main.id) === it) {
-    game.log(`You keep the ${itemName(game, it)} in hand: wield another to put it away, or R swaps in the one on your belt.`, DIM);
-    return 0;
-  }
   const r = bodyUnequip(game, p, partId);
   if (!r.ok) {
     if (r.reason === "cursed") game.log(`Your cursed ${itemName(game, it)} won't come off! A scroll of remove curse would help.`, CURSE);

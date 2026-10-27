@@ -355,7 +355,8 @@ export function heldLight(game) {
 
 function drawSword(game) {
   const p = game.player, inHand = wielded(p);
-  const weapon = WEAPONS[inHand.id];
+  const weapon = WEAPONS[inHand?.id];
+  if (!weapon) return;   // bare hands (WS5 #4): nothing held to draw
   const held = weapon.held;
   const light = heldLight(game);
   const pose = weapon.thrust ? thrustPose : swingPose;
