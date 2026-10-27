@@ -24,7 +24,7 @@ import { ARTIFACTS, CELLS } from "../content/items/artifacts.js";
 import { IMPLANTS } from "../content/items/implants.js";
 import { registerItemKind, takeOne, addToInventory } from "../items.js";
 import { carried } from "../body.js";
-import { mod, bonus, invalidateStats } from "../stats.js";
+import { bonus, invalidateStats, examineScore } from "../stats.js";
 import { addStatus, removeStatus, hasStatus, registerStatus } from "../status.js";
 import { pay, funds, formatPrice } from "../currency.js";
 import { requestTarget } from "../abilities.js";
@@ -46,7 +46,7 @@ const MINUTE = 60;                   // "a minute" of game time
 
 // --- Identification -----------------------------------------------------------------------------------
 export const examineDc = (it) => 8 + 2 * (ARTIFACTS[it?.id]?.complexity || 0);
-export const examineBonus = (p) => mod(p, "int") + bonus(p, "examine");
+export const examineBonus = (p) => examineScore(p);   // stats.js: mod(int) + bonus(examine)
 export function identifyChance(p, it) {
   const dc = examineDc(it), b = examineBonus(p), sturdy = !!ARTIFACTS[it?.id]?.sturdy;
   let known = 0, partial = 0, broke = 0;

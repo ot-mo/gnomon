@@ -224,6 +224,10 @@ export function checkStats({ game, startRun, inventory, mechanics, gate = null }
       e.attrs.ego = 20; e.perks = perks; St.invalidateStats(e);
     }
     expect("mental level at EGO 20, level 1", at(St.mentalLevel), 3);
+    // The examine score (bible §13.4, WS5's request 14): INT's modifier plus bonus examine (the caller adds a d20).
+    e.attrs.int = 20; expect("examine at INT 20", at(St.examineScore), 2);
+    e.bonuses = { examine: 3 }; St.invalidateStats(e); expect("examine at INT 20 with +3", at(St.examineScore), 5);
+    delete e.bonuses; St.invalidateStats(e); e.attrs.int = 16; expect("examine at INT 16", at(St.examineScore), 0);
     expect("carry at STR 16", at(St.carryCap), 240);
     undoSet();
   }

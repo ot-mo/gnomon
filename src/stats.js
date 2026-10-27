@@ -146,7 +146,7 @@ export function cooldownMul(e) {
 }
 export const carryCap = (e) => RULES.carry.perStr * attr(e, "str") + bonus(e, "carry");
 export const mentalLevel = (e) => (e.level || 1) + mod(e, "ego");
-export const examineScore = (e) => attr(e, "int") + bonus(e, "examine");   // + d10 by the caller, vs complexity
+export const examineScore = (e) => mod(e, "int") + bonus(e, "examine");   // + d20 by the caller, against 8 + 2 × complexity (bible §13.4)
 export const canSwim = (e) => bonus(e, "swim") > 0;
 // Seconds per point of natural regeneration (the attribute set; the legacy game had none).
 export function regenEvery(e) {
