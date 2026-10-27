@@ -122,6 +122,8 @@ export function renderWorld(game) {
   const hover = trip?.hover;
   const path = hover && trip && !trip.viewOnly && Math.max(Math.abs(hover.wx - trip.wx), Math.abs(hover.wy - trip.wy)) > 1 ? pathTo(game, trip, hover) : null;
   const onPath = new Set((path || []).map((s) => spanKey(s.wx, s.wy)));
+  const pinned = new Set(Object.values(A.pins || {}).map((q) => spanKey(q.wx, q.wy)));   // (once a frame, not a span)
+  const withSites = game.run.sitesAt || new Map();
   for (let sy = 0; sy < viewH; sy++)
     for (let sx = 0; sx < viewW; sx++) {
       const wx = sx0 + sx, wy = sy0 + sy, t = world.tileAt(wx, wy);
@@ -131,7 +133,7 @@ export function renderWorld(game) {
       let ch = T.glyph || "?", col = T.color || UI.text;
       if (t.terrain !== "road" && t.roadWidth > 0) { ch = ":"; col = ROAD; }
       else if (t.terrain !== "river" && t.riverWidth > 0) { ch = "\""; col = RIVER; }
-      const known = knownSites(game, wx, wy);
+      const known = withSites.has(k) ? knownSites(game, wx, wy) : [];
       const lm = known.find((s) => s.kind === "landmark"), site = known.find((s) => s.kind !== "landmark");
       if (lm) { ch = initial(lm.name); col = GOLD; }
       else if (site) { ch = SITE_MARK[site.kind] || "*"; col = UI.sel; }
@@ -140,7 +142,7 @@ export function renderWorld(game) {
       if (trip && wx === trip.wx && wy === trip.wy) { ch = "@"; col = YOU; }
       S.put(x, y, ch, ...col);
       let c2 = " ", col2 = col;
-      if (pinsAt(game, wx, wy).length) { c2 = "!"; col2 = PIN; }
+      if (pinned.has(k)) { c2 = "!"; col2 = PIN; }
       else if (onPath.has(k)) { c2 = "·"; col2 = UI.cursor; }
       else if (t.road.e) { c2 = "-"; col2 = scale(ROAD, night); }
       else if (t.river.e) { c2 = "~"; col2 = scale(RIVER, night); }

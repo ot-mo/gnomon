@@ -906,7 +906,17 @@ function screen(G, scr, problems) {
         SCREENS.get("world").mouse(game, 2, { x: 0, y: v.y0 });
         if (Object.keys(atlas(game).pins).length !== pins0) problems.push(`${tag}: a right click in the margin pinned ${JSON.stringify(Object.values(atlas(game).pins).pop())}`);
       }
-      out[`${name} ${cols}×${rows}`] = { drawn, panel: v.panel, origin: [v.sx0, v.sy0] };
+      // TECH_DESIGN §6.7: the world map draws in ≤ 3 ms (p50), here with a far span under the pointer (its path drawn).
+      const far = { wx: W.w - 2, wy: Math.floor(W.h / 2) };
+      for (let x = 0; x < W.w; x++) atlas(game).visited[spanKey(x, far.wy)] ??= 0;
+      game.trip.hover = far;
+      const ms = [];
+      for (let k = 0; k < 60; k++) { const t0 = performance.now(); G.draw(); ms.push(performance.now() - t0); }
+      ms.sort((a, b) => a - b);
+      const p50 = +ms[30].toFixed(2);
+      if (p50 > 3) problems.push(`${tag}: the world map draws in ${p50} ms (p50), over §6.7's 3`);
+      game.trip.hover = null;
+      out[`${name} ${cols}×${rows}`] = { drawn, panel: v.panel, origin: [v.sx0, v.sy0], drawMs: p50, maxMs: +ms[59].toFixed(2) };
     }
   // Played by keys and the mouse on the test world, at 100×30.
   scr.resize(100, 30);
