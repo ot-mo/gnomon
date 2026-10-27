@@ -80,7 +80,7 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
   const apron = { pairs: 0, columns: 0, left: 0, leftDiffer: 0, voxels: 0, corners: 0, decoys: 0, told: 0 };
   const liquids = { zones: 0, rivers: 0, byLiquid: {} };
   const swap = { cold: [], warm: [], same: 0 };
-  const dressed = { byBiome: {}, plateaus: 0, ramps: 0, caches: 0, creatures: 0, props: 0, tops: 0, topsReached: 0, sub: 0 };
+  const dressed = { byBiome: {}, plateaus: 0, ramps: 0, caches: 0, creatures: 0, props: 0, tops: 0, topsReached: 0, sub: 0, localColumns: 0, overMarked: 0 };
 
   for (const seed of seeds) {
     const run = buildRun(seed, REAL_WORLD), world = run.world, W = worldFns(world, run.seed);
@@ -108,7 +108,7 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
       else if (validateSurface(z).length) fail(`${at}: validates in generation but not again`);
       navs.push(z.navigability);
       ground3d += z.ground3d;
-      dressing(z, t, dressed, fail, at);
+      dressing(z, t, dressed, fail, at, W);
       if (zones % 25 === 0) {   // twice the same, on a sample
         const again = generateSurface(run, t.wx, t.wy);
         twice++;
@@ -321,7 +321,7 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
   for (const [seed, wx, wy, what] of REGRESSIONS) {
     const run = buildRun(seed, REAL_WORLD), t = run.world.tileAt(wx, wy), z = generateSurface(run, wx, wy);
     for (const p of z.problems) fail(`seed ${seed} (${wx}, ${wy}) (${what}): ${p}`);
-    dressing(z, t, dressed, fail, `seed ${seed} (${wx}, ${wy}) ${t.terrain} (${what})`);
+    dressing(z, t, dressed, fail, `seed ${seed} (${wx}, ${wy}) ${t.terrain} (${what})`, worldFns(run.world, run.seed));
   }
 
   // 11-14.
@@ -337,7 +337,7 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
   if (apron.pairs < pairs * seeds.length) fail(`only ${apron.pairs} apron pairs found`);
   stats.spans = `${zones} zones (${spans} a seed × ${seeds.length} seeds, the real world), ${retried} needed a retry, ${twice} made twice the same`;
   stats.navigability = `map: min ${(100 * navs[0]).toFixed(1)}%, p5 ${(100 * q(navs, 0.05)).toFixed(1)}%, mean ${(100 * navs.reduce((a, b) => a + b, 0) / navs.length).toFixed(1)}%; ground the map doesn't walk (cliff tops, plateaus) ${(ground3d / zones).toFixed(0)} columns a zone, ${(100 * dressed.topsReached / Math.max(1, dressed.tops)).toFixed(0)}% of the cliff tops reached in 3D`;
-  stats.dressing = `${dressed.plateaus} plateaus, ${dressed.ramps} ramps, ${dressed.caches} caches, ${dressed.creatures} creatures, ${dressed.props} props over ${zones} zones; ` +
+  stats.dressing = `${dressed.localColumns} columns marked local away from footprints and canopies, ${dressed.overMarked} of them the world function's; ${dressed.plateaus} plateaus, ${dressed.ramps} ramps, ${dressed.caches} caches, ${dressed.creatures} creatures, ${dressed.props} props over ${zones} zones; ` +
     Object.entries(dressed.byBiome).map(([k, v]) => `${k} ${v.n}: ${v.plateaus}/${v.ramps}/${v.caches}/${v.creatures}/${v.props}`).join(", ") + " (plateaus/ramps/caches/creatures/props)";
   stats.builders = dressed.builders;
   stats.ms = `generateSurface p50 ${ms(q(times, 0.5))}, p95 ${ms(p95)}, max ${ms(max)}${budget ? " (budget held)" : " (budget: --budget, alone)"}`;
@@ -353,7 +353,7 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
 // [seed, wx, wy, what was wrong there] (docs/sessions/ws2.md, Part 2b §4).
 const REGRESSIONS = [
   [42, 20, 9, "a ramp up a cliff a site's skirt had pulled down to 3"],
-  [1, 14, 10, "a shrub buried in a barrow"], [1, 20, 15, "bones inside a crag"], [42, 10, 9, "a cache's scrap by the edge"],
+  [1, 14, 10, "a shrub buried in a barrow"], [1, 34, 6, "a Stacks floor plan's stone outline on stone, marked local"], [1, 20, 15, "bones inside a crag"], [42, 10, 9, "a cache's scrap by the edge"],
 ];
 
 // --- 10. Dressing, zone by zone ---------------------------------------------------------------------------
@@ -380,7 +380,7 @@ export function reach3d(zone) {
   return dist;
 }
 
-function dressing(z, t, out, fail, at) {
+function dressing(z, t, out, fail, at, W) {
   const g = z.gen, { w, d } = z, R = SURFACE_RULES;
   const b = (out.byBiome[t.biome] ||= { n: 0, plateaus: 0, ramps: 0, caches: 0, creatures: 0, props: 0 });
   b.n++;
@@ -423,6 +423,30 @@ function dressing(z, t, out, fail, at) {
     if (z.get(x, y, p.z) || !z.get(x, y, p.z - 1) || x < R.edgeKeep || y < R.edgeKeep || x >= w - R.edgeKeep || y >= d - R.edgeKeep || propTiles.has(x + y * w))
       fail(`${at}: the ${p.kind} at (${x}, ${y}, ${p.z}) is inside ${z.get(x, y, p.z)}, floats, sits by an edge or shares its tile`);
     propTiles.add(x + y * w);
+  }
+  // Over-marking: a column marked local really differs from the world function's (rock, sub-ground, ground, water),
+  // away from a site's footprint (marked whole by 2a) and from tree canopies (columnAt doesn't build trees).
+  const ox = z.wx * w, oy = z.wy * d, C = R.treeCell, treeNear = (x, y) => {
+    for (let cy = Math.floor((oy + y - 1) / C); cy <= Math.floor((oy + y + 1) / C); cy++)
+      for (let cx = Math.floor((ox + x - 1) / C); cx <= Math.floor((ox + x + 1) / C); cx++) {
+        const tr = W.treeAt(cx, cy);
+        if (tr && Math.abs(tr.gx - ox - x) <= 1 && Math.abs(tr.gy - oy - y) <= 1) return true;
+      }
+    return false;
+  };
+  for (let i = 0; i < w * d; i++) {
+    if (!g.local[i] || g.footprint[i] || g.plan[i]) continue;
+    const x = i % w, y = (i - x) / w;
+    if (treeNear(x, y)) continue;
+    const c = W.columnAt(ox + x, oy + y), top = FLOOR_Z - 1 + c.height;
+    let same = true;
+    for (let k = 0; k < z.h && same; k++) {
+      const want = c.water ? (k < FLOOR_Z - 1 ? B.ROCK : k === FLOOR_Z - 1 ? (c.water === 2 ? B.WATER_DEEP : B.WATER_SHALLOW) : 0)
+        : k < FLOOR_Z - 1 ? B.ROCK : k < top ? c.sub : k === top ? c.ground : 0;
+      same = z.get(x, y, k) === want;
+    }
+    out.localColumns++;
+    if (same) { out.overMarked++; fail(`${at}: (${x}, ${y}) is marked local but is the world function's column`); break; }
   }
   // Cliff tops (ground the map draws as wall): how many 3D reaches.
   for (let i = 0; i < w * d; i++) if (g.cliff[i] && open[i] < 0 && z.stand[i] >= 0) { out.tops++; if (deep[i] >= 0) out.topsReached++; }

@@ -417,7 +417,7 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
   // (The wildlife comes once the zone validates, zoneSteps: it needs the map's reach, which validation measures.)
   zone.gen = { ports: base.ports.map((p) => ({ ...p, tiles: Array.from({ length: p.width }, (_, k) => portTile(p, k)) })),
                keyPoints, scenery, cliff: base.cliff, worldWater: base.water, plan, planAt, hub, entranceGated, local,
-               planned: ctx.planned, jump: ctx.jump, ...ctx.made, dress: ctx };
+               planned: ctx.planned, jump: ctx.jump, footprint: reserved, ...ctx.made, dress: ctx };
   return zone;
 }
 

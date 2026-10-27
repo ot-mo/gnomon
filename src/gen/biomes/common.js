@@ -38,6 +38,9 @@ export function withHelpers(ctx) {
   const { zone } = ctx, W = zone.w, D = zone.d;
   const at = (x, y) => x + y * W;
   ctx.propAt = new Uint8Array(W * D);   // a prop stands there
+  // Every writer's one way into the zone: a voxel that changes marks its column local (check-surface holds that a
+  // column marked local really differs from the world function: over-marking would hide the apron's faults).
+  const set = (x, y, z, b) => { if (zone.get(x, y, z) !== b && z >= 0 && z < zone.h) { zone.set(x, y, z, b); ctx.local[at(x, y)] = 1; } };
   const inside = (x, y) => x >= 0 && y >= 0 && x < W && y < D;
   Object.assign(ctx, {
     inside,
@@ -53,21 +56,20 @@ export function withHelpers(ctx) {
     },
     occupy: (x, y) => { if (inside(x, y)) ctx.busy[at(x, y)] = 1; },
     // Rewrite a column: rock under the datum's layer, `body` (the biome's sub-ground) up to height h, `top` on
-    // it (the ground's own block), air above. Marks it local.
+    // it (the ground's own block), air above. Marks it local if that changed it.
     column: (x, y, h, { top = null, body = null } = {}) => {
       const i = at(x, y), t = FLOOR_Z - 1 + h;
-      for (let z = 0; z < zone.h; z++)
-        zone.set(x, y, z, z < FLOOR_Z - 1 ? B.ROCK : z < t ? (body ?? ctx.base.sub[i]) : z === t ? (top ?? ctx.base.ground[i]) : B.AIR);
-      ctx.H[i] = h; ctx.water[i] = 0; ctx.local[i] = 1;
+      for (let z = 0; z < zone.h; z++) set(x, y, z, z < FLOOR_Z - 1 ? B.ROCK : z < t ? (body ?? ctx.base.sub[i]) : z === t ? (top ?? ctx.base.ground[i]) : B.AIR);
+      ctx.H[i] = h; ctx.water[i] = 0;
     },
     // A water column: rock, the liquid at the datum (shallow or deep), air above.
     pool: (x, y, deep) => {
       const i = at(x, y);
-      for (let z = 0; z < zone.h; z++) zone.set(x, y, z, z < FLOOR_Z - 1 ? B.ROCK : z === FLOOR_Z - 1 ? (deep ? B.WATER_DEEP : B.WATER_SHALLOW) : B.AIR);
-      ctx.H[i] = 0; ctx.water[i] = deep ? 2 : 1; ctx.local[i] = 1;
+      for (let z = 0; z < zone.h; z++) set(x, y, z, z < FLOOR_Z - 1 ? B.ROCK : z === FLOOR_Z - 1 ? (deep ? B.WATER_DEEP : B.WATER_SHALLOW) : B.AIR);
+      ctx.H[i] = 0; ctx.water[i] = deep ? 2 : 1;
     },
     // A block standing on the ground (dz 0: the first layer above it).
-    put: (x, y, dz, block) => { zone.set(x, y, FLOOR_Z + ctx.H[at(x, y)] + dz, block); ctx.local[at(x, y)] = 1; },
+    put: (x, y, dz, block) => set(x, y, FLOOR_Z + ctx.H[at(x, y)] + dz, block),
     // Claim a rectangle (§1.4 reserve): false if any of it is taken.
     reserve: (rect) => {
       if (!ctx.freeRect(rect.x, rect.y, rect.w, rect.d)) return false;
