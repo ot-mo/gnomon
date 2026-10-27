@@ -8,8 +8,9 @@
 // set is switched on (rules.js overrideRules, as the integrator's flip will), and the wizard is pushed over the map
 // with { seed, mode } as WS9's title pushes it. At each window size (600×330 is 100×30 cells here):
 //   1. By keyboard: a Bent (Mesa Runner): Enter through the genotype, Esc back and on, a point moved from INT to
-//      WIL with the arrows, the mutations step passed, the name typed with real key events for å, ä and ö (as a
-//      Swedish keyboard sends them: CDP keyDown with the key, its code and its text), Commons Lamp chosen, begun.
+//      WIL with the arrows, the mutations step passed, the name typed over the suggestion with real key events, each
+//      capital after a Shift keydown, and å, ä and ö as a Swedish keyboard sends them (CDP keyDown with the key, its
+//      code and its text), Commons Lamp chosen, begun.
 //   2. By mouse: a Plumb (Forgehand of Orrum): rows clicked, [-] [-] on INT and [+] on TOU, [ Next ], [ Suggest ],
 //      Pilgrim, a step at the top to go back, [ Begin ].
 //   3. The level-up card: a level gained, the power clicked.
@@ -72,12 +73,14 @@ try {
     const key = async (k) => { await page.keyboard.press(k); await frames(1); };
     const typeName = async (text) => {
       for (const ch of text) {
+        const shift = ch !== ch.toLowerCase();
+        if (shift) await page.keyboard.down("Shift");   // a real Shift keydown first, as a person types a capital
         if (NORDIC[ch]) {
-          const shift = ch !== ch.toLowerCase();
           for (const type of ["keyDown", "keyUp"])
             await cdp.send("Input.dispatchKeyEvent", { type, key: ch, code: NORDIC[ch], text: type === "keyDown" ? ch : undefined,
               unmodifiedText: type === "keyDown" ? ch.toLowerCase() : undefined, modifiers: shift ? 8 : 0 });
         } else await page.keyboard.type(ch);
+        if (shift) await page.keyboard.up("Shift");
       }
       await frames(1);
     };

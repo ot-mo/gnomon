@@ -55,7 +55,13 @@ export async function checkProgression(m) {
     return true;
   }
   const press = (code, key = "") => keys.dispatchKey(game, code, false, key);
-  const typeText = (text) => { for (const ch of text) press(ch === " " ? "Space" : ch === "-" ? "Minus" : `Key${ch.toUpperCase()}`, ch); };
+  // As a browser types: a capital comes after a keydown of Shift itself (ShiftLeft, "Shift").
+  const typeText = (text) => {
+    for (const ch of text) {
+      if (ch !== ch.toLowerCase()) press("ShiftLeft", "Shift");
+      press(ch === " " ? "Space" : ch === "-" ? "Minus" : `Key${ch.toUpperCase()}`, ch);
+    }
+  };
   // A run begun and on its feet: past the intro, on the map.
   function begun(choices, seed) {
     C.beginRun(game, choices, { seed });
@@ -294,7 +300,7 @@ export async function checkProgression(m) {
       if (!W.wizard().name) fail("wizard: no name suggested");
       press("Tab"); const second = W.wizard().name;
       if (!second) fail("wizard: Tab suggested nothing");
-      typeText(name);
+      typeText(name);   // over the suggestion, which the first letter (after its Shift) replaces whole
       if (W.wizard().name !== name) fail(`wizard: typed "${name}", the field holds "${W.wizard().name}"`);
       press("KeyM", "m"); press("Backspace");   // M types here (no music toggle)
       if (game.messages.some((x) => /^Music/.test(x.text))) fail("wizard: M on the name toggled the music");

@@ -195,6 +195,9 @@ function suggest() {
   wiz.name.fresh = true;
 }
 const printable = (k) => typeof k === "string" && [...k].length === 1 && !/[\p{Cc}\p{Cf}]/u.test(k);
+// A browser sends its own keydown for Shift (and AltGr, a dead key's first press…) before the letter: those leave a
+// suggested name standing, so "Anna" typed with Shift replaces it like "anna" does.
+const MODIFIERS = new Set(["Shift", "Control", "Alt", "AltGraph", "Meta", "CapsLock", "Dead", "Compose"]);
 
 function nudge(k, d) {
   if (!wiz.attrs) return;
@@ -406,7 +409,7 @@ function key(game, code, repeat, k) {
   if (step === "name") {
     if (code === "Tab") { if (!repeat) suggest(); return true; }
     if (wiz.name.fresh && (printable(k) || code === "Backspace" || code === "Delete")) Object.assign(wiz.name, { text: "", cursor: 0 });
-    if (code !== "Enter" && code !== "NumpadEnter" && code !== "Escape") wiz.name.fresh = false;
+    if (code !== "Enter" && code !== "NumpadEnter" && code !== "Escape" && !MODIFIERS.has(k)) wiz.name.fresh = false;
     const r = textInput(wiz.name, code, k);
     if (r === "done" && !repeat) go(game, wiz.step + 1);
     else if (r === "cancel" && !repeat) back(game);
