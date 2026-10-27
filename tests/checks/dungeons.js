@@ -431,8 +431,13 @@ export function checkHistoric({ seeds = SEEDS } = {}) {
           if (/^the /.test(f.name)) stats.named++;
           if (p.gimmicks.includes("murals") && f.murals?.length) {
             stats.murals++;
-            const texts = new Set(ruler.events.flatMap((e) => [e.text.inscription, e.text.gospel]));
+            const texts = new Set(ruler.events.flatMap((e) => [e.text.inscription, e.text.gospel, e.text.hostile]));
             if (!f.murals.every((m) => texts.has(m.text))) problems.push(`${at} floor ${z}: a mural that isn't the Hour's account`);
+            // All three accounts (bible §8.5, since the WS7a merge): the relief in 3D, the tablet on the map, the Dark Gloss.
+            const views = new Set(f.murals.map((m) => m.view));
+            if (!views.has("dark") || ![...f.murals].some((m) => m.view === "dark" && ruler.events.some((e) => e.text.hostile === m.text) && f.get(m.x, m.y, m.z) === B.RUNE))
+              problems.push(`${at} floor ${z}: no Dark Gloss among its murals (${[...views].join(", ")})`);
+            else stats.glosses = (stats.glosses || 0) + 1;
           }
           if (z === d.levels) {
             const loot = f.bottomLoot || {};

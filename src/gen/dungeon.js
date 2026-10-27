@@ -639,6 +639,13 @@ GIMMICKS.collapsed = (f, rng, rooms, p, ctx) => {
   f.refresh();
 };
 const MURAL_TEXTS = [{ text: "Faded figures climb a stair that never ends.", map: "A floor of tiles shows a stair seen from above: a spiral." }];
+// A room's wall cells a carving can go in, at eye height, each with the floor tile you'd read it from.
+const carvable = (f, r) => {
+  const walls = [];
+  for (let x = r.x0 + 1; x < r.x1; x++) walls.push([x, r.y0 - 1, x, r.y0], [x, r.y1 + 1, x, r.y1]);
+  return walls.filter(([x, y, fx, fy]) => f.get(x, y, FLOOR_Z) === r.theme.wall && f.get(x, y, FLOOR_Z + 1) === r.theme.wall &&
+    !f.secretWalls.has(x + y * W) && !r.doors.some((d) => d.x === x && d.y === y) && f.stand[fx + fy * W] === FLOOR_Z);
+};
 GIMMICKS.murals = (f, rng, rooms, p, ctx) => {
   const texts = p.murals?.length ? p.murals : MURAL_TEXTS;
   f.murals ||= [];
@@ -647,10 +654,7 @@ GIMMICKS.murals = (f, rng, rooms, p, ctx) => {
     if (k >= Math.min(2, texts.length * 2)) break;
     const t = texts[Math.floor(k / 2) % texts.length];
     if (k % 2 === 0) {   // carved in a wall, at eye height
-      const walls = [];
-      for (let x = r.x0 + 1; x < r.x1; x++) walls.push([x, r.y0 - 1, x, r.y0], [x, r.y1 + 1, x, r.y1]);
-      const ok = walls.filter(([x, y, fx, fy]) => f.get(x, y, FLOOR_Z) === r.theme.wall && f.get(x, y, FLOOR_Z + 1) === r.theme.wall &&
-        !f.secretWalls.has(x + y * W) && !r.doors.some((d) => d.x === x && d.y === y) && f.stand[fx + fy * W] === FLOOR_Z);
+      const ok = carvable(f, r);
       if (!ok.length) continue;
       const [x, y] = rng.pick(ok);
       f.set(x, y, FLOOR_Z + 1, B.MURAL);
@@ -664,6 +668,17 @@ GIMMICKS.murals = (f, rng, rooms, p, ctx) => {
       f.murals.push({ x: x + 1, y, z: FLOOR_Z - 1, view: "map", text: t.map });
     }
     k++;
+  }
+  // The third account (bible §8.5: an Hour-site floor named after an event shows all three; WS7a #4): the Dark Gloss,
+  // the hostile line, cut as a rune in a wall and read only in the dark (story/murals.js).
+  const gloss = texts.find((t) => t.dark);
+  if (gloss) for (const r of rng.shuffle(others(rooms, ctx))) {
+    const ok = carvable(f, r).filter(([x, y]) => !f.murals.some((m) => m.x === x && m.y === y));
+    if (!ok.length) continue;
+    const [x, y] = rng.pick(ok);
+    f.set(x, y, FLOOR_Z + 1, B.RUNE);
+    f.murals.push({ x, y, z: FLOOR_Z + 1, view: "dark", text: gloss.dark });
+    break;
   }
 };
 GIMMICKS.braziers = (f, rng, rooms, p, ctx) => {

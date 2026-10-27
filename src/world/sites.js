@@ -212,7 +212,7 @@ function historicSite(run, req, t) {
   for (let z = 1; z <= levels; z++)
     named.push(z < levels && rng.chance(DUNGEONS.floorNames.liminal) ? null : floorName(rng, RUIN_ADJECTIVES[domain] || "Old"));
   const events = (ruler?.events || []).filter((e) => e.text);
-  const murals = events.slice(0, 3).map((e) => ({ text: e.text.inscription, map: e.text.gospel, eventId: e.id }));
+  const murals = events.slice(0, 3).map((e) => ({ text: e.text.inscription, map: e.text.gospel, dark: e.text.hostile, eventId: e.id }));
   const shape = SITE_SHAPES.historic;
   const rect = { x: rng.int(SITE_MARGIN, SURFACE.w - SITE_MARGIN - shape.w), y: rng.int(SITE_MARGIN, SURFACE.d - SITE_MARGIN - shape.d), w: shape.w, d: shape.d };
   const marks = DUNGEONS.trueMarks[Math.min(8, Math.max(1, t.tier))] || [1];
