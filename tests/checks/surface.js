@@ -317,6 +317,13 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
     if (c.cliff || c.water || z.problems.length) fail(`test world seed ${seed} (${wx}, ${wy}): hub (${hub.x}, ${hub.y}) cliff ${c.cliff}, water ${c.water}; ${z.problems.join("; ")}`);
   }
 
+  // 10b. Spans the verification of 2b found a fault in (whatever the random sample holds), item 10's rules.
+  for (const [seed, wx, wy, what] of REGRESSIONS) {
+    const run = buildRun(seed, REAL_WORLD), t = run.world.tileAt(wx, wy), z = generateSurface(run, wx, wy);
+    for (const p of z.problems) fail(`seed ${seed} (${wx}, ${wy}) (${what}): ${p}`);
+    dressing(z, t, dressed, fail, `seed ${seed} (${wx}, ${wy}) ${t.terrain} (${what})`);
+  }
+
   // 11-14.
   builders(fail, dressed);
 
@@ -342,6 +349,11 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
   stats.seconds = ((performance.now() - t0) / 1000).toFixed(1);
   return { name: "surface", ok: problems.length === 0, problems, stats, notes };
 }
+
+// [seed, wx, wy, what was wrong there] (docs/sessions/ws2.md, Part 2b §4).
+const REGRESSIONS = [
+  [42, 20, 9, "a ramp up a cliff a site's skirt had pulled down to 3"],
+];
 
 // --- 10. Dressing, zone by zone ---------------------------------------------------------------------------
 // Where 3D reaches from the anchor, column by column: a step up of at most 1 (a jump is 1.5 blocks), any drop,

@@ -31,6 +31,7 @@ import { SURFACE_RULES as R } from "../terrain.js";
 import { PROPS } from "../../content/biomes.js";
 
 const NEXT4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const WALL_UP = 4;   // ground this high above the datum is a wall on the map (world.js computeKinds)
 const blockOf = (key, fallback) => B[key] ?? fallback;
 
 export function withHelpers(ctx) {
@@ -254,11 +255,15 @@ export function ramps(ctx, count, caches = 0) {
   const { rng, zone, H, cliff } = ctx, W = zone.w;
   const n = roll(rng, count);
   if (!n) return;
+  // A top is a cliff column still a map wall's height (a site's skirt may have pulled a cliff down, the cliff mask
+  // kept) and still free (an earlier ramp or cache may have taken it since the list was made).
+  const top = (i) => cliff[i] && H[i] >= WALL_UP && !ctx.busy[i];
   const tops = [];
-  for (let i = 0; i < W * zone.d; i++) if (cliff[i] && !ctx.busy[i] && ctx.keep(i % W, (i - (i % W)) / W)) tops.push(i);
+  for (let i = 0; i < W * zone.d; i++) if (top(i) && ctx.keep(i % W, (i - (i % W)) / W)) tops.push(i);
   if (!tops.length) return;
   for (let made = 0, k = 0; made < n && k < n * 30; k++) {
     const c = tops[rng.int(0, tops.length - 1)], cx = c % W, cy = (c - cx) / W, T = H[c];
+    if (!top(c)) continue;
     for (const [dx, dy] of rng.shuffle([...NEXT4])) {
       const steps = [];
       let ok = false;
