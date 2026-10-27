@@ -28,7 +28,7 @@
 //
 // Placement:
 //   1. Every landmark is a site (kind "landmark", id "landmark:<id>"), with its dungeon if it has one.
-//   2. History's site requests (kind "historic", bible §8.7: Hour sites go first, by tier band): each on a
+//   2. History's site requests (kind "historic", bible §8.7: Hour sites go by tier band), after step 3: each on a
 //      free eligible span of its tier, nearest to it when none is free, in one of its regionPrefs when it can;
 //      its floors named after the Hour's places (some nameless), its floors played by its Hour's leaning
 //      (content/dungeons.js), the Hour's accounts carved in its murals, and at the bottom its relic on an altar
@@ -267,14 +267,6 @@ export function placeSites(run) {
   const eligible = world.tiles.filter((t) => t.travel === "yes" && t.edges === "open" && !t.landmark
     && !SIDES.some((s) => t.road[s] || t.river[s]) && t.roadWidth === 0 && t.riverWidth === 0);
 
-  // History's sites first (bible §4.10's placement order), on a stream of their own.
-  const hrng = runRng(run, "historic");
-  for (const req of run.history?.siteRequests || []) {
-    if (run.sites.has(req.id)) continue;
-    const t = spanFor(run, req, eligible, busy, hrng);
-    if (t) addSite(run, historicSite(run, req, t));
-  }
-
   const used = new Set();
   for (const kind of ROLLED) {
     const order = rng.shuffle(eligible.slice());
@@ -298,6 +290,17 @@ export function placeSites(run) {
       furnish(run, site);
       addSite(run, site);
     }
+  }
+
+  // History's sites, on a stream of their own. (Bible §4.10 places them first; here they come after P0's kinds,
+  // so that P0's villages, ruins and lairs keep exactly the spans P0 gave them: a span P0 found busy skips its
+  // site's draws, so anything placed earlier would move every later site. Each still gets a free span of its
+  // tier, or the nearest tier.)
+  const hrng = runRng(run, "historic");
+  for (const req of run.history?.siteRequests || []) {
+    if (run.sites.has(req.id)) continue;
+    const t = spanFor(run, req, eligible, busy, hrng);
+    if (t) addSite(run, historicSite(run, req, t));
   }
   return run;
 }
