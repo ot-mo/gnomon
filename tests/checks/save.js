@@ -1114,7 +1114,9 @@ async function ws9Sections(ctx) {
     if (both[0] === both[1] || (await listSlots({ store: other })).length !== 4) fail(`the same file imported twice at once: ids ${both.join(", ")}, ${(await listSlots({ store: other })).length} slots (want 4)`);
     const bad = [];
     for (const [what, f, re] of [["another game's", (d) => ({ ...d, game: "other" }), /isn't a GNOMON save/], ["a newer game's", (d) => ({ ...d, slot: { ...d.slot, version: 99 } }), /newer/],
-                                 ["one without the zone you were in", (d) => ({ ...d, zones: d.zones.filter((r) => r.key !== d.slot.where.zoneKey) }), /no record/]]) {
+                                 ["one without the zone you were in", (d) => ({ ...d, zones: d.zones.filter((r) => r.key !== d.slot.where.zoneKey) }), /no record/],
+                                 ["one whose character is named 42", (d) => ({ ...d, slot: { ...d.slot, character: { ...d.slot.character, name: 42 } } }), /the character/],
+                                 ["one whose zone's blocks are broken", (d) => ({ ...d, zones: d.zones.map((r) => (r.key === d.slot.where.zoneKey ? { ...r, blocks: { raw: "AAAA" } } : r)) }), /zone doesn't read/]]) {
       let msg = "";
       try { await importSlot(f(JSON.parse(text)), { store: other }); } catch (e) { msg = e.message; }
       if (!re.test(msg)) fail(`importing ${what} file: ${msg || "accepted"}`); else bad.push(what);
@@ -1227,6 +1229,18 @@ async function ws9Sections(ctx) {
     if (!exported || !armed || !disarmed || left.length !== 1) fail(`the Load list: exported ${exported}, armed ${armed}, disarmed by another key ${disarmed}, slots left ${left.join(" ")}`);
     key("Escape");
     out.push(`the warnings (unclean twice, an older generator); Load a save: X exported, Delete once asked, another key kept it, twice deleted (seed ${left[0]} left)`);
+    // A slot as no export makes it (stored by hand: a character named 42, an unclean exit): the title still draws.
+    {
+      const odd = (await listSlots({ store: st }))[0];
+      const rec = await st.get("slots", odd.id);
+      await st.put("slots", { ...rec, id: "odd", updated: Date.now() + 1, character: { ...rec.character, name: 42 }, unclean: 1 });
+      for (const r of await st.list("zones", { slot: odd.id })) await st.put("zones", { ...r, slot: "odd" });
+      let drew = "";
+      try { await title.openTitle(game); drew = text(); } catch (e) { fail(`the title with a slot named 42: ${e.message}`); }
+      if (drew && !/The quick game's last session ended without a save/.test(drew)) fail(`the title with a slot named 42: "${drew.replace(/s+/g, " ").slice(0, 160)}"`);
+      await deleteSlot("odd", { store: st });
+      out.push("a slot stored with a character named 42 drew as the quick game's");
+    }
     // The pause card, its line after the beat, Esc to the options.
     freshRun(1234, { store: st, view: "3d" });
     game.debug.enterZone("0,0,1", "down"); playing(game, "3d");

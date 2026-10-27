@@ -38,7 +38,7 @@ const menu = { sel: 0, top: 0, slots: [], busy: "", error: "", view: "main", mod
 export const titleState = () => ({ view: menu.view, mode: menu.mode, seed: menu.seed.text, slots: menu.slots, warnings: warnings(), busy: menu.busy, error: menu.error });
 
 const seedOf = () => (/^\d+$/.test(menu.seed.text) && Number(menu.seed.text) > 0 ? Number(menu.seed.text) : null);
-const who = (s) => s.character?.name || "the quick game";
+const who = (s) => (typeof s?.character?.name === "string" && s.character.name.trim() ? s.character.name : "the quick game");
 const ago = (t) => {
   const m = Math.max(0, Math.round((Date.now() - t) / 60000));
   return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
@@ -183,7 +183,7 @@ function drawLoad() {
   const h = Math.max(1, Math.min(menu.slots.length, S.rows - top - 6));
   list(menu.load, { x, y: top + 2, w, h, items: menu.slots, empty: "Nothing is saved.", row: (s, i, r) => {
     if (r.sel) S.text(r.x, r.y, ">", ...UI.mark);
-    const day = Math.floor(minutesAt(s.time || 0) / 1440) + 1;
+    const day = Math.floor(minutesAt(Number(s.time) || 0) / 1440) + 1;
     const text = `${who(s)} · level ${s.character?.level ?? 1} · ${RUN_MODES[s.mode]?.name ?? s.mode} · seed ${s.seed} · day ${day} · ${ago(s.updated)}` +
       `${s.unclean ? ` · ${s.unclean} unclean` : ""}${FLAGS.debug ? ` · ${s.id}` : ""}`;
     S.text(r.x + 2, r.y, text.slice(0, r.w - 2), ...(r.sel ? UI.sel : UI.text));

@@ -645,6 +645,25 @@ export async function exportSlot(id, { store } = {}) {
   return { kind: "gnomon-save", game: GAME_ID, version: slot.version, exported: Date.now(), slot,
            zones: await st.list("zones", { slot: id }), checkpointZones: await st.list("checkpointZones", { slot: id }) };
 }
+// What a file must hold for the title, a load and the game to read it (an export holds it; a hand-made file may not).
+const isObj = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+const isNum = (v) => typeof v === "number" && Number.isFinite(v);
+function fileProblems({ slot, zones, checkpointZones = [] }) {
+  const out = [], c = slot.character;
+  if (typeof slot.id !== "string" || !slot.id) out.push("no slot id");
+  if (!Number.isInteger(slot.seed)) out.push("the seed");
+  if (!isNum(slot.created) || !isNum(slot.updated) || !isNum(slot.time)) out.push("its times");
+  if (slot.mode !== undefined && !RUN_MODES[slot.mode]) out.push(`the mode ${JSON.stringify(slot.mode)}`);
+  if (!isObj(c) || (c.name !== null && c.name !== undefined && typeof c.name !== "string") || !Number.isInteger(c.level ?? 1)) out.push("the character");
+  if (!isObj(slot.where) || typeof slot.where.zoneKey !== "string") out.push("where you were");
+  if (!isObj(slot.state) || !isObj(slot.player) || !isObj(slot.run) || !isObj(slot.ids) || !Number.isInteger(slot.ids.entity)) out.push("the state, player, run or ids");
+  if (!Number.isInteger(slot.unclean ?? 0) || slot.unclean < 0) out.push("the unclean count");
+  if (slot.checkpoint !== undefined && (!isObj(slot.checkpoint) || !Number.isInteger(slot.checkpoint.n))) out.push("the checkpoint");
+  for (const r of [...zones, ...(Array.isArray(checkpointZones) ? checkpointZones : [null])])
+    if (!isObj(r) || typeof r.key !== "string" || !/^-?\d+,-?\d+,\d+$/.test(r.key)) { out.push("a zone record"); break; }
+  return out;
+}
+
 // One import at a time (each looks for a free id before it writes), and an id taken gets a suffix of its own.
 let importing = Promise.resolve();
 export function importSlot(file, opts = {}) {
@@ -659,7 +678,14 @@ async function importOne(file, { store } = {}) {
     throw new Error("importSlot: that isn't a GNOMON save file");
   checkSlot(data.slot, data.slot.id);
   migrate(data.slot, [], {});   // (refuses a save from a newer game, or one with no way up)
-  if (!data.zones.some((r) => r.key === data.slot.where?.zoneKey)) throw new Error("importSlot: the file holds no record of the zone you were in");
+  const bad = fileProblems(data);
+  if (bad.length) throw new Error(`importSlot: the file isn't a save this game can read (${bad.slice(0, 3).join("; ")})`);
+  const here = data.zones.find((r) => r.key === data.slot.where.zoneKey);
+  if (!here) throw new Error("importSlot: the file holds no record of the zone you were in");
+  // The run and the zone you were in, read as a load would read them (nothing kept): a file that would fail to load
+  // fails here, before it is stored.
+  try { restoreRun(data.slot.run, await worldFor(data.slot.state.world?.id ?? data.slot.run.world?.id)); await decodeZone(migrateZone(here)); }
+  catch (e) { throw new Error(`importSlot: the file's ${e.message?.startsWith("restoreRun") || /world/.test(e.message) ? "run" : "zone"} doesn't read (${String(e.message).slice(0, 80)})`); }
   let id = data.slot.id;
   if (await st.get("slots", id)) id = `${id}-${Date.now().toString(36)}${(slotSeq++).toString(36)}`;
   await st.tx(async (t) => {
