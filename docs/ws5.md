@@ -123,11 +123,13 @@ examineLines(game, subject) · examineSubjects(data) · bonusWords(bonuses)
    branch**, one line each marked `// WS5`, with samples of the four new kinds (`implant`, `credit`, `artifact`,
    `cell`); both checks fail on a registered kind without one (0D2.md §6). The same as WS8's request 6: keep both
    lines at the merge (they sit next to WS8's).
-2. **`tests/checks/screen-frames.js` (P0's): pending the coordinator.** The rebuilt inventory changes the 8 recorded
-   "… inventory" frames (seeds 99 and 31, depths 3 and 11, map and 3D); the other 39 frames still match p0-0c exactly.
-   Proposed: add those 8 names to WS3's `NOT_COMPARED` list (its shape, from `p1-ws3`), still drawn, with the reason
-   "the inventory screen WS5 rebuilt (Pack and Equipment tabs); tests/checks/items.js and tools/browser-ws5.mjs hold
-   it". The fixture is never touched. (See the Handoff for the state.)
+2. **`tests/checks/screen-frames.js` (P0's): applied on this branch, with the coordinator's leave** (2026-10-27,
+   the third exception in its queue notes; TECH_DESIGN §2 has WS5 rewrite `inventory.js`). The rebuilt inventory
+   changes the 8 recorded "… inventory" frames (seeds 99 and 31, depths 3 and 11, map and 3D): they are listed by
+   exact name in a `NOT_COMPARED` map in WS3's shape (`p1-ws3` has the same map with its "victory card"), still
+   drawn, lines marked `// WS5`; the fixture is untouched and the other 39 frames still match p0-0c (39 compared, 0
+   mismatched). At the merge, **union the two maps** (WS3's one entry and these 8). check-items §8 checks the new
+   screen in the same 8 states.
 3. **`throwing.js` (WS8):** a shattered potion's switch is now `effects.js SPLASH`. Replace `shatter`'s
    `switch (effect) { … }` with `splash(game, effect, { x, y, z, r: SPLASH, near, youToo, names })` (import `splash`
    from `effects.js`). The entries are WS8's cases line for line, so the legacy fights don't move.
@@ -168,13 +170,17 @@ examineLines(game, subject) · examineSubjects(data) · bonusWords(bonuses)
     the whole check (about 7 s, 720,000 identification rolls among it).
 16. **`renderMap.js` (WS3):** the legend could list the new item glyphs: `♦` implant, `Θ` artifact, `≡` cell, `¶`
     true-mark (none is a bible §15.7 glyph or a creature letter).
+17. **G clashes on `integration` (the integrator, the user's call).** TECH_DESIGN §4.3 gives G to WS5 ("pick up"), and
+    WS5 binds it in "play" (`bodymods/index.js`). `integration` (from WS3's merge) binds G in "map" to the map legend
+    (`screens/play.js`: `bind("map", "KeyG", toggleMapLegend)`); "map" bindings run before "play" ones, so on the map G
+    would show the legend and in 3D pick up. Either give the legend another key (§4.3 keeps `/` and `,` for
+    integration) or move pick-up; picking up also happens by walking over things, so nothing is lost meanwhile.
 
 ## Handoff
 
 **Updated:** 2026-10-27, local session, on `ws/ws5`. **WS5 is built and its acceptance passes** (`check-items`,
 `browser-ws5`); the independent verification is the next step, then the tag `p1-ws5`.
 
-- **Waiting:** the coordinator's answer on request 2 (the 8 inventory frames). Until it is applied, `run-all` reports
-  check-screen-frames failing on exactly those 8 frames and nothing else.
+- **Request 2 is applied** (the coordinator's leave): check-screen-frames passes with 39 frames compared.
 - **Next step:** the verification (gate, the old game in both views, spec and code), fixes one commit each, then
   `docs/sessions/ws5.md` §7 and the tag.
