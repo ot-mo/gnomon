@@ -79,7 +79,7 @@ export const BACKGROUNDS = {
            wants: ["an examining kit (+2)", "a bone stylus (a dagger stands in)"] },
   },
   surveyorOfVey: {
-    name: "Surveyor of Vey", genotype: "plumb", level: "vey", implant: "plumbLineEar",
+    name: "Surveyor of Vey", genotype: "plumb", level: "vey", implant: "plumbEar",
     info: "You were sent down from the Archive to measure what the Pressing left.",
     bonus: { int: 2, agi: 1 }, trees: ["survey", "missile"], glim: 80, rep: { survey: 200 },
     kit: { equip: { hand_r: weapon("dagger"), body: CLOTHES },
@@ -87,7 +87,7 @@ export const BACKGROUNDS = {
            wants: ["the theodolite (an artifact)", "a map case", "a dagger, so you hold a blade"] },
   },
   forgehandOfOrrum: {
-    name: "Forgehand of Orrum", genotype: "plumb", level: "orrum", implant: "truesteelKnuckles",
+    name: "Forgehand of Orrum", genotype: "plumb", level: "orrum", implant: "knuckles",
     info: "You worked the Forge's hammers until your arms were as true as the anvil.",
     bonus: { str: 3 }, trees: ["bludgeon", "artificing"], glim: 60, rep: { plan: 150 },
     kit: { equip: { hand_r: weapon("mace"), body: armour("leather") }, pack: [], wants: ["an iron mace (the parent's mace)"] },

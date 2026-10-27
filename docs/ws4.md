@@ -211,7 +211,7 @@ changes when it lands. 1-3 are WS8's requests 1, 8 and 11 (`git show p1-ws8:docs
    start at 0 or above" (bible §10.1). `beginRun` adds each background's changes on top with `addRep`. The Aspirant's
    −50 with the Bent villages is `BACKGROUNDS.aspirantOfTheRule.villageRep` (WS6a or WS7, once villages have factions).
 9. **WS5 (`content/items/implants.js`, `bodymods/implants.js`):** the six free implants the Plumb backgrounds name
-   (`tallyEye`, `plumbLineEar`, `truesteelKnuckles`, `levelEye`, `lampCrown`, `darkLens`), each costing at most 2, with
+   (`tallyEye`, `plumbEar`, `knuckles`, `levelEye`, `lampCrown`, `darkLens`), each costing at most 2, with
    `parts`; `makeCharacter` fits one with `canInstall(null, p, item, part)` and `install(null, p, item, part)` (no game
    yet at creation), and the wizard lists every implant costing at most 2 (it reads the cost as `grade`, `license` or
    `cost`). The kits' wants: materials (copper, iron, bone: bible §13.1), a reed cloak, an examining kit (+2), stilt
