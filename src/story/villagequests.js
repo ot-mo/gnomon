@@ -124,6 +124,12 @@ registerQuest("chart", { ...common, start: "chart", stages: {
     "zone:leave": (game, q, ev) => (zoneKeyOf(ev.zone) === q.vars.target.key && mapPercent(ev.zone) >= chartGoal(q) ? "return" : null),
   } }, return: { on: turnIn } } });
 
+// The work done (a prayer made, a place found or charted show nothing else): say so, and who to take it back to.
+on("quest:stage", (game, { q }) => {
+  if (q.stage === "return" && QUEST_ORDER.includes(q.template) && q.id === villageQuestId(q.vars?.village))
+    game.log?.(`${q.title}: go back to ${q.giver?.name || "the one who asked"}.`, [255, 220, 120]);
+});
+
 // How much of a level can be charted at all: the share of its open tiles you can walk to from where you first came in,
 // or stand beside (some levels are mostly beyond chasms and gates). The quest asks for percent%, or 5 under that share.
 const chartGoal = (q) => Math.max(1, Math.min(q.vars.percent, (q.vars.chartable ?? 100) - 5));

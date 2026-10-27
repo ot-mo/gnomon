@@ -739,6 +739,8 @@ async function quests7b(env, { fail, stats, test, json, startRun, game }) {
         z.seen.fill(1); tick();
       }
       if (q.stage !== "return") throw new Error(`stage ${q.stage}`);
+      const back = `${q.title}: go back to ${q.giver.name}.`;   // the line that says so (found at the WS7b merge: a prayer said nothing)
+      if (!game.messages.some((m) => m.text === back)) throw new Error(`no "${back}" in the log: ${json(game.messages.slice(-3).map((m) => m.text))}`);
       events.emit(game, "quest:turnIn", { q: { ...q } });   // someone else's turn-in
       if (q.done) throw new Error("another quest's turn-in finished it");
       enter(home);
