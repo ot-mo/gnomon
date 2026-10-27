@@ -3,25 +3,25 @@
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
 **Updated:** 2026-10-27, the integrator (local session), on `integration`. **Phase 1 is running and Phase 2's
-integration has started: WS3 and WS8 are merged (`p2-ws3`, `p2-ws8`); the next is whichever `p1-*` tag lands
-next (WS9, WS5 and WS4a are running).** From here on only the integrator edits this file
+integration has started: WS3, WS8 and WS4a are merged (`p2-ws3`, `p2-ws8`, `p2-ws4a`); the next is whichever
+`p1-*` tag lands next (WS9, WS5 and WS4b are running).** From here on only the integrator edits this file
 and moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p2-ws8` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3` and `p1-ws8` with
-  their integration requests; `p2-ws3` before it). `main` is fast-forwarded to it. Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams'
+- **Last tag:** `p2-ws4a` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8` and
+  `p1-ws4a` with their integration requests; `p2-ws3` and `p2-ws8` before it). `main` is fast-forwarded to it. Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams'
   `p1-*` tags are on GitHub.
 - **Branch:** `integration`, in the worktree `C:\Users\Otto Mörner\Code\gnomon-wt\integration` (serves on port
   8660). Nothing is half finished.
-- **Done:** Phase 0 (0A1 … 0D2, notes in `docs/sessions/0A1.md` … `0D2.md`); WS3 and WS8 (`docs/ws3.md`,
-  `docs/ws8.md`, `docs/sessions/ws3.md`, `ws8.md`), merged. The merges' own numbers are under "Integration log" below.
+- **Done:** Phase 0 (0A1 … 0D2, notes in `docs/sessions/0A1.md` … `0D2.md`); WS3, WS8 and WS4a (`docs/ws3.md`,
+  `docs/ws8.md`, `docs/ws4.md`, `docs/sessions/ws3.md`, `ws8.md`, `ws4.md` "Part 4a"), merged. The merges' own numbers are under "Integration log" below.
 - **Checks:** `node tools/run-all.mjs`, 37 checks (about 2 minutes on an idle machine, 4 with three workstreams
   running; the timed ones, `check-dungeons`, `check-status`, `check-stats` and `check-perf`, alone at the end; since
   WS3, `check-perf` runs the render check first). Browser (headless Playwright, audio silenced,
   `NODE_PATH="$(npm root -g)"`): `browser-0d2.mjs`, `browser-0d1.mjs`, `browser-gate.mjs`, `browser-silent.mjs`, and
   with `node tools/serve.mjs <port>` running, `browser-shell.mjs` and `browser-0c.mjs` (`--port <port>`); each
-  workstream's own (`browser-ws8.mjs` from WS8). `tools/README.md` has every command and what each check proves.
+  workstream's own (`browser-ws8.mjs` from WS8, `browser-ws4.mjs` from WS4). `tools/README.md` has every command and what each check proves.
 
 ## Next step
 
@@ -62,7 +62,7 @@ tags; WS1, which builds on the most, last):
 | 2 | WS3 Rendering outdoors and presentation | `ws3`, `ws/ws3` | tagged `p1-ws3` (51785f7); **merged, `p2-ws3`** (2026-10-27) |
 | 3 | WS8 Combat depth, AI and targeting | `ws8`, `ws/ws8` | tagged `p1-ws8` (c9638c0); **merged, `p2-ws8`** (2026-10-27) |
 | 4 | WS5 Body mods, items and equipment UI | `ws5`, `ws/ws5` | running (since 2026-10-27) |
-| 5 | WS4a → WS4b Character creation and progression | `ws4`, `ws/ws4` | WS4a running (since 2026-10-27); WS4b after `p1-ws4a` |
+| 5 | WS4a → WS4b Character creation and progression | `ws4`, `ws/ws4` | WS4a tagged `p1-ws4a` (dc22850), **merged, `p2-ws4a`** (2026-10-27); WS4b running |
 | 6 | WS6a → WS6b Factions, dialogue builders → trade, the Kindling, backings | `ws6`, `ws/ws6` | queued |
 | 7 | WS10 Dungeon sites, lairs and legends | `ws10`, `ws/ws10` | queued |
 | 8 | WS2a → WS2b Surface generation | `ws2`, `ws/ws2` | queued |
@@ -116,8 +116,12 @@ job does. For a timed gate number, run that check alone on an idle machine and a
 
 ## Waiting on the user
 
-Nothing. The user's decisions of 2026-10-27 (given to the coordinating session in chat: "Do recommend for 1 and two
-and put legend in pause card key list"), each now a carried item below:
+- **The Lamplighter of Cassin's purse** (`docs/sessions/ws4.md` deviation 2): its 250 glim doesn't fit the 200 purse
+  everyone starts with (DECISIONS), so WS4 gave it the 500 flask (a little more than the bible: the flask sells);
+  the other way is 200 glim in the 200 purse (50 less than the bible's 250). WS4 left it to you (balance, C2/C4).
+
+Decided by the user on 2026-10-27 (given to the coordinating session in chat: "Do recommend for 1 and two and put
+legend in pause card key list"), each now a carried item below:
 
 - **WS9's recorded frames:** at WS9's merge the integrator excludes from `tests/checks/screen-frames.js`, by exact name
   in `NOT_COMPARED`, only the frames WS9's HUD, pause and death screens change, each with its reason; WS9's own check
@@ -132,28 +136,45 @@ and put legend in pause card key list"), each now a carried item below:
 Requests the integrator can't apply yet because the file belongs to a workstream that hasn't merged; each is applied
 at that merge (so it doesn't conflict with the branch). Numbers are the asking workstream's (`docs/<ws>.md`).
 
-- **WS4** (at its merge; WS4's session has `docs/ws8.md` and was told how #8 and #11 landed): WS8 #1,
-  `abilities.requestTarget` through `screens/target.js` (on the map the screen answers later; `useAbility` goes on
-  in the callback; `check-abilities` §5 then drives the screen with Enter), and an ability's `use` may get the player
-  as `target.creature` when a creature uses it (ai.js). WS8 #8 and #11 are applied (below): Steady hand gives
-  `{ missileAcc: 2 }`; `innate` is ability ids only, a bonus table is `e.bonuses`. The integrator's hook for the
-  torch's ways out (Lampskin, the Lamplighter) when WS4 asks.
-- **The flip** (§8.5; WS8 #9), at WS4's merge (WS4 and WS8 both in): `RULES.stats = "attributes"` and
+- **WS4b** (at `p1-ws4b`'s merge; the 4b session was told what 4a's requests became, 2026-10-27): WS8 #1 = WS4 #1,
+  `abilities.requestTarget` through `screens/target.js` (on the map the screen answers later; `useAbility` goes on in
+  the callback; `check-abilities` §5 then drives the screen with Enter; 4b keeps the seam so the integrator can swap
+  the map's body at the merge if 4b hasn't), and an ability's `use` may get the player as `target.creature` (ai.js).
+  The content halves of WS4 #2, #6, #7, applied at the merge in WS4's files (their keys are on `integration` only,
+  so `ws/ws4`'s check-content would refuse them): `content/powers.js` steadyHand `bonus: () => ({ missileAcc: 2 })`
+  without `needs`; `content/backgrounds.js` LEVELS.cassin's `torchCost: 0.5` → `bonus: { torchCost: -0.5 }` (and
+  the comment there); thriftyWick `bonus: () => ({ torchCost: -0.5 })` without `needs`; haggler without `needs`
+  (priceMul reads it now); Lampskin, if 4b adds it, the same way. WS4 #4, `game.js startRun(seed, world, { mode,
+  player })` (with WS9 #2), at the later of WS4b's and WS9's merges: then `chargen.js beginRun` calls it so and
+  `player.js` drops `nextRunPlayer`.
+- **The flip** (§8.5; WS8 #9, WS4 #13), at WS4b's merge (all of WS4 and WS8 in; the coordinator holds it until then): `RULES.stats = "attributes"` and
   `RULES.combat = "d20"` (DECISIONS: d20, not §8.5's "dice") by default; golden (a) retires; `check-legacyfights`
   then needs `overrideRules("combat", "legacy")` around its fights (its fixture is the parent's); WS8's TTK tables
   (`node tools/check-combat.mjs --only ttk`) become the balance reference. Under d20 the map's T opens the target
   screen, creatures flee, and the log takes the d20 lines. **Due before or at the flip:** the tier 5-8 balance (the
   user's decision above): rerun `node tools/check-combat.mjs --only ttk` with WS4's powers in (and C4's gear, if it
-  exists by then), show the user the tables, and settle any retune with them before the defaults change.
+  exists by then), show the user the tables, and settle any retune with them before the defaults change. Show the
+  leveling pace with them: under the attribute set a kill gives the bible's `killXp` (WS4 #5, applied), about 1% of a
+  level for a same-level kill, so a level takes ~100 kills at every level (the integrator's probe at `p2-ws4a`: level
+  1 ~20 kills, 3 ~100, 5 ~87, 8 ~93, 14 ~99, 20 ~101) against the parent's ~3, 9, 20, 41, 91, 147; until WS1 and
+  WS7 give discovery and quest XP (`xpReward`), the old campaign under the attribute set levels several times slower
+  through level 8.
 - **WS6a** (at its merge): WS8 #2, a creature hostile to you is hostile to your followers (`attitude(a, f)` with
   `f.brain.leader === "player"`: "hostile" when `attitude(a, player)` is); until then monsters ignore your
   followers until one strikes them. WS8's spatial queries (`nearestCreature`, `sees`, `witnessesOf`) are in for the
-  witnesses.
+  witnesses. WS4 #8: the starting reputation by genotype (bible §15.4: the Assize −700 Bent / −100 Plumb, the Plan
+  −100 / +100) from `game.player.genotype`; Pilgrim's "most factions start at 0 or above" (bible §10.1); `beginRun`
+  adds each background's changes with `addRep`; the Aspirant's −50 with the Bent villages
+  (`BACKGROUNDS.aspirantOfTheRule.villageRep`, WS6a or WS7).
 - **WS10** (at its merge): WS8 #3, spikes rise through a flat you harmlessly (bible §10.2): `traps.js updateSpikes`
   skips you when `!touchesYou(game, null)` (creatures.js).
-- **WS5** (information): WS8's L in both views emits `inspect { open: true }`; the examine screen opens on it. Missile
-  weapons are carried in the pack, not held (`docs/ws8.md`, deviation 2), and `inventory.js` reads
-  `WEAPONS[wielded.id]`.
+- **WS5** (at its merge): WS4 #9, the six free implants the Plumb backgrounds name (`tallyEye`, `plumbLineEar`,
+  `truesteelKnuckles`, `levelEye`, `lampCrown`, `darkLens`), each costing at most 2, with `parts`; `makeCharacter` fits
+  one with `canInstall(null, p, item, part)` and `install(null, p, item, part)` (no game at creation); the kits'
+  wants (copper, iron, bone, a reed cloak, an examining kit, stilt sandals, a theodolite, a snuffer, a map case, ink
+  pots, marker chalk, an Assize writ); a glim heart through `torchCost` (stats.js, applied). Information: WS8's L in
+  both views emits `inspect { open: true }` (the examine screen opens on it); missile weapons are carried in the pack,
+  not held, and `inventory.js` reads `WEAPONS[wielded.id]`.
 - **WS9** (at its merge): WS3 #3, register the HUD's clock segment (`hud.registerHudSegment("clock",
   render3d.CLOCK_SEGMENT)`, under the sky only) and let `tests/checks/hud.js:91`'s 180-column "parent's order"
   assertion allow it on the start span (outdoors); WS3 #7, the held weapon at night (`hud.js:326-328`) lit by
@@ -161,6 +182,10 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   frames WS9's HUD, pause and death screens change, each with its reason, WS9's own check holding the new screens,
   golden (b) held. **The key hints** L (look), V (fire), G (legend) and hotbar key 1 on the pause card's key list: if
   WS9 tags without them, add them at the merge (`screens/pause.js` is WS9's, merged by then) or carry the request on.
+  WS4 #12 and #13: WS9's title pushes `"create"` with `{ seed, mode }` (the wizard is registered on `integration`
+  since `p2-ws4a`), and the wizard can read `save.js RUN_MODES` instead of its own copy; but **the wizard is for the
+  attribute set**, so if WS9 merges before the flip, its title stays on the quick game (or hides New game) until the
+  flip. WS4 #4 with WS9 #2 (startRun's `{ mode, player }`): above, under WS4b.
 - **WS2** (at its merge): WS3 #5, `map` looks for the reserved TRUNK, SHALE, LEAVES, REED (blocks.js); note bible
   §15.7 reserves `♣` (speaking trees) and `^` (spikes), as blocks.js's comments say. WS3 #5 for GRASS (id 7, the
   integrator's): **not applied**: §6.5's grass `"` is the amulet's reserved glyph (bible §15.7 outranks TECH_DESIGN),
@@ -169,11 +194,51 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   them during prefetch or a band a frame. Deferred to WS2's merge (it rewrites `buildApronBand`) together with WS9's
   "prefetch through the loader" (both touch `zones.js`'s prefetch). WS3 #10, the Gnomon's 14-block voxel foot at
   span (37, 3) (or C1's landmark plan): render3d starts the needle on whatever stands at the span's middle.
+- **WS1, WS7, WS6b** (at their merges): WS4 #11, discoveries, quests, triangulations and Kindlings give XP through
+  `gainXp(game, xpReward(kind, level), { source: kind })` (Pilgrim's ×2.2), and the powers waiting on them (Keen Eye,
+  Pathfinder, Terrain lore, Homing sense: WS1; Hour script, Gossip, Triangulator, Vey's script: WS7; Oil fire, Brew,
+  Warm Hands, Chime, teachers opening a tree: WS6b) lose their `needs`. WS8's glimgun (WS4 #10, for the Lamplighter
+  and the Glimgunner power) is new content: C4 or a later pass, not a merge item.
 - **WS1, C1, WS6b, WS7** (information, nothing to apply): WS3 #11 and #12 (`render3d.gnomonDrawn()` for "the Gnomon
   in sight"; `clock.handAt`/`underHand`; a region's or terrain's `fog` and a region's `music`; a liquid's `color`;
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p2-ws4a`** (2026-10-27): `p1-ws4a` (dc22850) merged into `integration` (e765e50), no conflicts; WS4a changed no
+P0 check or fixture (only its own `tests/checks/progression.js` and `tools/check-progression.mjs`, and a new
+`tools/browser-ws4.mjs`). Its tree passed check-progression, check-combat, check-imports, check-content, check-stats
+and check-abilities with `integration`'s `stats.js` (#11, `missileAcc`) before anything was applied.
+- Applied, each with an assertion that fails without it: #5 (`1fc9124`: `monsters.js killMonster` gives `killXp`
+  under the attribute set, `m.xp` under the legacy set; a level-5 goblin at level 3: 7 and 3, the float "+3 XP"); #6
+  (`37e06c8`: a bonus key `torchCost`, `torch.js burnTorch` × max(0, 1 + bonus): 2.2 × 240 s underground pays 1 glim
+  at −0.5, none at −1, 2 and 2 without the hook; `tools/check-torch.mjs` passes the stat bus, which the check now
+  needs); #7 (`0522c08`: `priceMul` gives a Haggler ×0.8 on buying under the attribute set, `RULES.price.haggle`,
+  floored by the sell price: 1.3 → 1.04 at EGO 20, 0.9 at EGO 40); #14 (`8733564`: `tools/README.md` rows for
+  check-progression and `browser-ws4.mjs`; §8.4 gives `browser-ws4` to WS4). #2 and #3 were settled at the WS8 merge.
+  Carried (above): #1, the content halves of #2/#6/#7 and #4 to WS4b; #13 with the flip; #8 to WS6a; #9 to WS5;
+  #11 to WS1, WS7, WS6b; #12 and #13 to WS9; #10 to content.
+- Dependency table: "WS4 attribute stats" against the real stat bus (with the integrator's `stats.js` changes):
+  check-progression's six sections pass (84 characters, 228 level-ups, the wizard, 30,000 names, the legacy card);
+  a probe of every background's suggested character under attributes and d20: the background's AGI bonus reaches the
+  attribute, DV and WS8's to-hit, `combat.dvOf` = `stats.dv` for all 12 (the Mesa Runner AGI 18+2 = 20, DV 8, +2 to
+  hit; Orrum AV 2, the Aspirant 3). "WS4 abilities on the map" waits for WS4b (`abilities.js` is P0's until then).
+- Verification: `browser-0d1`'s tour would fail on the newly registered `create` screen (as it did on WS8's target);
+  it now pushes the wizard over the map as WS9's title will and leaves by Esc and by [ Back ] (`e8a0be1`): 16 of 16
+  modes. The kill-XP pace after the flip (the probe above, under "The flip") goes to the user with the TTK tables.
+- Checks: `run-all` at `8733564` (every request in) 36 of 37 (205 s): `check-perf` failing under load (the outdoor
+  frame p95 126 ms, max 224; refresh ×1.65; surface generation p95 ×2.31), then alone, `check-perf --against p0-done --rounds 3` (4 rounds each way, CPU 25-34%): PASS, every item within
+  budget but surface generation's max (194 ms, `p0-done` 171 as slow, the machine's): the outdoor frame 16.8 ms against
+  23.2 (×0.73), dusk 15.6, night 16.1, the bake 1.8, refresh 8.2 (×1.03), surface generation p95 46.4 (×1.33: WS4a
+  doesn't touch it; earlier rounds ×0.78-1.08), dungeon generation 31.5 (×0.94), passTime 6.65 (×1.02), the swap 25.5
+  against 53.2. Golden mechanics
+  86, frames 27, 0 mismatched; screen frames 46 of 46 compared; the bot, the legacy fights, determinism; check-combat's
+  five parts; check-progression; check-torch. Browser (`tools/serve.mjs 8660`, `?silent=1`, 0 console errors):
+  `browser-ws4` at 1280×720 and 600×330 (a Bent by keys with "Åsa Öberg-Ärla", a Plumb by mouse, the level-up card);
+  `browser-0d1 --against p0-done` 16 of 16 modes, the HUD at 100×30, golden (b) 27 of 27 in the browser, per tick
+  underground +1.1% (3D) and −0.1% (map), surface 3D −10.3%; `browser-ws8` (seed 1234), `browser-gate` (1234, 7),
+  `browser-0c`, `browser-shell` (1280×720, 600×300), `browser-0d2 --all` (imports, `test-world.html` 34 of 34),
+  `browser-silent`.
 
 **`p2-ws8`** (2026-10-27): `p1-ws8` (c9638c0) merged into `integration` (a05decb), no conflicts (no file of WS8's
 is WS3's).
@@ -281,12 +346,13 @@ its §8.4 files and two P0 checks).
   dropped after the save is duplicated); §7.3's save on a completed zone change fixes it. Saves are in memory only
   (IndexedDB, periodic and unload saves, the oneWick slot deleted on death, checkpoints). Prefetch is skipped while
   `ZONE_LOADER.load` is set (prefetch through the loader). `?debug=1` is parsed but unused.
-- **WS4:** Fold Step keeps its own numbers (`0D2.md` deviation 17) and is innate in P0; nothing tells the player about
-  hotbar key 1 (a hint would change recorded frames). A quick game starts with no glim, so in the old campaign the
+- **WS4 (4a merged; 4b running):** no K sheet or B list yet (4b); the mutation step offers nothing until 4b fills
+  `content/mutations.js`; the Plumb's free implant is named but not fitted until WS5's implants exist. Fold Step keeps
+  its own numbers (`0D2.md` deviation 17) and is innate in P0; the hotbar key's hint goes on WS9's pause card. A quick game starts with no glim, so in the old campaign the
   torch gutters 240 s into the first dungeon until cash is picked up (deviation 16); backgrounds give 60-250 glim.
-- **Integrator:** the torch's ways out (a glim heart, WS5; Lampskin and the Lamplighter, WS4) need a hook `burnTorch`
-  reads (a bonus key through the stat bus, say), when WS4 or WS5 asks. (§8.4 now names `torch.js`, `keyset.js`,
-  `tools/serve.mjs` and `report.mjs` frozen, `e6b3f98`.)
+- **Integrator:** the torch's hook is in (`torchCost`, `37e06c8`); its users (Cassin, Thrifty wick, Lampskin, WS5's
+  glim heart) switch to it at the WS4b and WS5 merges. (§8.4 names `torch.js`, `keyset.js`, `tools/serve.mjs` and
+  `report.mjs` frozen, `e6b3f98`.)
 - **C1:** the real world has no regions yet, so the Hollow Mere compiles as the Glass Sea; `content/world/regions.js`,
   `landmarks.js` and `plans/*.js` don't exist yet (import them from `worldmap.js`; the frozen index needs no edit).
 - From 0C (minor test gaps): check-legacyfights doesn't cover a creature hitting a creature under the legacy rules;
