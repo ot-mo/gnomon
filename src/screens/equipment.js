@@ -156,6 +156,7 @@ registerScreen("truing", {
   draw: drawTruing,
   key: truingKey,
   mouse(game, button, cell) {
+    if (button === 2) { popMode(game); return; }   // a right click leaves, as Esc does
     if (button !== 0) return;
     const h = at(cell);
     if (h?.key) { truingKey(game, h.key); return; }
