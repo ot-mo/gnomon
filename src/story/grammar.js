@@ -7,8 +7,10 @@
 //                                                  rule may read (a ruler's name, a place, a faction), which come
 //                                                  before the grammar's own rules. An expansion names a symbol as
 //                                                  #symbol#, with an optional modifier: #symbol.cap# (first letter
-//                                                  up), #symbol.upper#, #symbol.lower#. A binding may be a string,
-//                                                  a number, a list (one is drawn) or a function (rng) → string.
+//                                                  up), #symbol.upper#, #symbol.lower#, #symbol.a# ("a" or "an" before
+//                                                  it); several apply left to right (#noun.lower.a.cap#). A binding
+//                                                  may be a string, a number, a list (one is drawn) or a function
+//                                                  (rng) → string.
 //                                                  An unknown symbol, or rules that never end, throw.
 //   hourName(rng) · placeName(rng) · regionName(rng, domain) → string     bible §2.3's generators: each name is at
 //                                                  most 9 letters a word, and none contains a §15.11 word
@@ -18,7 +20,7 @@
 import { GRAMMAR } from "../content/grammar.js";
 
 const MAX_DEPTH = 24;
-const MODIFIERS = { cap: (s) => cap(s), upper: (s) => s.toUpperCase(), lower: (s) => s.toLowerCase() };
+const MODIFIERS = { cap: (s) => cap(s), upper: (s) => s.toUpperCase(), lower: (s) => s.toLowerCase(), a: (s) => article(s) };
 
 export function expand(grammar, symbol, rng, ctx = {}) {
   return expandSymbol(grammar, symbol, rng, ctx, 0);
@@ -36,13 +38,14 @@ function expandSymbol(grammar, symbol, rng, ctx, depth) {
     value = value[Math.floor(rng() * value.length)];
   }
   return String(value).replace(/#([^#\s]+)#/g, (_, ref) => {
-    const dot = ref.lastIndexOf(".");
-    const mod = dot > 0 ? MODIFIERS[ref.slice(dot + 1)] : null;
-    const name = mod ? ref.slice(0, dot) : ref;
-    const out = expandSymbol(grammar, name, rng, ctx, depth + 1);
-    return mod ? mod(out) : out;
+    const parts = ref.split("."), mods = [];
+    while (parts.length > 1 && MODIFIERS[parts[parts.length - 1]]) mods.unshift(MODIFIERS[parts.pop()]);
+    return mods.reduce((s, m) => m(s), expandSymbol(grammar, parts.join("."), rng, ctx, depth + 1));
   });
 }
+
+// "a" or "an" before a word, by its sound as far as its first letter tells.
+const article = (s) => `${/^[aeiou]/i.test(s) ? "an" : "a"} ${s}`;
 
 export const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 

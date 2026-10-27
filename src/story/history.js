@@ -158,7 +158,7 @@ function makeHistory(seed, world) {
   };
 
   for (let k = 0; k < 5; k++) {
-    const H = makeHour(rng, k, eras[k], fresh, when, accounts);
+    const H = makeHour(rng, k, eras[k], fresh, when, accounts, history.rulers[k - 1]?.name || null);
     history.rulers.push(H.ruler);
     history.relics.push(...H.relics);
     history.siteRequests.push(...siteRequestsOf(rng, H, tiers, fresh));
@@ -166,7 +166,7 @@ function makeHistory(seed, world) {
   return history;
 }
 
-function makeHour(rng, k, era, fresh, when, accounts) {
+function makeHour(rng, k, era, fresh, when, accounts, prevName) {
   const G = GRAMMAR, period = G.periods[k];
   const name = fresh(() => hourName(rng)), short = name.toLowerCase();
   const pron = rng.pick(PRONOUNS);
@@ -181,7 +181,7 @@ function makeHour(rng, k, era, fresh, when, accounts) {
   const H = {
     k, name, short, pron, id: `hour:${short}`, domains: [d0], favoured: [], hated: [], cognomens: [G.domains[d0].cognomens[0]],
     colour: G.domains[d0].colour, profession: G.domains[d0].profession, regions, region: regions[0], crowned: false,
-    born: era.born, died: era.end, falseDeath: false, relics: [], events: [], renames: {}, fresh, accounts,
+    born: era.born, died: era.end, falseDeath: false, relics: [], events: [], renames: {}, fresh, accounts, prevName, eraStart: era.start,
   };
   const deathAge = H.died - H.born;
 
@@ -207,7 +207,7 @@ function makeHour(rng, k, era, fresh, when, accounts) {
     }
   happen(rng, H, { type: "death", age: deathAge }, when);
   while (H.favoured.length < 3) befriend(rng, H);   // bible §8.3, step 6
-  for (const r of H.relics) if (r.mask) r.lovedBy = [...H.favoured];   // the mask: +200 with every favoured faction
+  for (const r of H.relics) if (r.mask) { r.lovedBy = [...H.favoured]; r.hatedBy = [...H.hated]; }   // the mask: +200 / −200 (bible §8.7)
 
   // Ids by date: "<short>:<n>", 1-based.
   H.events.sort((a, b) => a.year - b.year || (a.type === "death") - (b.type === "death") || (b.type === "origin") - (a.type === "origin"));
@@ -226,7 +226,7 @@ function makeHour(rng, k, era, fresh, when, accounts) {
     favoured: [...H.favoured], hated: [...H.hated], events: H.events,
     short, ordinal: G.names.ordinals[k], period: k + 1, pronoun: pron.they, cognomens: [...H.cognomens], colour: H.colour,
     profession: H.profession, regions: regions.map((r) => ({ name: r.name, places: [...r.places] })),
-    cult: { name: `the ${cultWord} of ${epithet.startsWith("the ") ? epithet.slice(4) : name}` },
+    cult: { name: `the ${cultWord} of ${epithet.startsWith("the ") ? epithet : name}` },   // "the Choir of the Glazier"
   };
   return H;
 }
@@ -263,7 +263,7 @@ function newRelic(rng, H, domain, ev, { mask = false } = {}) {
     const [noun, b] = rng.pick(D.relicNouns);
     const cog = H.cognomens[H.cognomens.length - 1];
     const adj = rng.pick(D.ruins.filter((a) => !a.startsWith(noun.slice(0, 4))));   // never "the Sealed Seal"
-    name = `the ${adj} ${noun} of ${cog.startsWith("the ") || cog.includes(" of ") ? H.name : cog}`;
+    name = `the ${adj} ${noun} of ${cog.startsWith("the ") || cog.startsWith("Twice ") || cog.includes(" of ") ? H.name : cog}`;
     base = { ...b };
     const pool = rng.shuffle([...D.powers]);
     powers = pool.slice(0, rng.chance(0.35) ? 2 : 1);
@@ -296,8 +296,11 @@ function happen(rng, H, plan, when) {
   let { type } = plan;
   const ownRelics = () => H.relics.filter((r) => !r.mask && !r.lostAt);
   if (type === "lostRelic" && !ownRelics().length) type = "forgedRelic";
+  if (type === "readFloor" && H.domains.length >= 3) type = "secretRite";   // nothing left to learn from a floor
   if (type === "forgedRelic" && H.relics.filter((r) => !r.mask).length >= RELIC_CAP) type = "metPeople";
   let variant = pickVariant(rng, type, plan.crown ? { contest: ["ousts"], armyAtGate: null, wedding: ["faction"] }[type] : null);
+  if (type === "origin" && variant === "heir" && !H.prevName) variant = pickVariant(rng, type, ["unpressed", "raised", "crypt"]);   // the First Hour was heir to no one
+  if (type === "wedding" && variant === "erratum" && H.cognomens.some((x) => x.startsWith("Twice ") || x === "the Doubled")) variant = "artisan";
   if (type === "field" && variant === "loses" && !ownRelics().length) variant = "costly";
   if (type === "wedding" && variant === "faction" && H.relics.filter((r) => !r.mask).length >= RELIC_CAP) variant = "artisan";
   if (type === "rampage" && H.regions.length > 1 && rng.chance(0.6)) H.region = rng.pick(H.regions.filter((r) => r !== H.region));
@@ -409,7 +412,11 @@ function happen(rng, H, plan, when) {
     case "wedding":
       if (variant === "faction") { c.faction = befriend(rng, H); c.relic = newRelic(rng, H, rng.pick(G.factions[c.faction]?.domains || H.domains), ev); ev._relic = c.relic; if (plan.crown) crown(); }
       else if (variant === "artisan") { const d = rng.pick(Object.keys(G.domains)); H.profession = G.domains[d].profession; cognomen(d); }
-      else { H.cognomens.push(`Twice ${H.cognomens[H.cognomens.length - 1].replace(/^the /, "")}`); ev.mirrored = true; }
+      else {   // "the Glazier" becomes "Twice Glazier"; a cognomen of another shape, "the Doubled"
+        const last = H.cognomens[H.cognomens.length - 1];
+        H.cognomens.push(last.startsWith("the ") ? `Twice ${last.slice(4)}` : "the Doubled");
+        ev.mirrored = true;
+      }
       ev.cause = causeOf("practice");
       break;
     case "turnedHand": {
@@ -437,8 +444,9 @@ function happen(rng, H, plan, when) {
     ruin: rng.pick(D.ruins), relic: c.relic?.name || "a relic", relicNoun: c.relic ? c.relic.name.split(" of ")[0].split(" ").pop() : "relic",
     colour: H.colour, profession: H.profession, guild: D.guild, count: c.count || "many", years: String(c.years || 0), cause: ev.cause,
     domain: D.noun, age: String(plan.age),
+    rival: H.prevName && year < H.eraStart ? H.prevName : "a rival claimant",   // whom a contest ousts: the Hour reigning then
   };
-  let gospel = expand(G.rules, `${type}/${variant}/flat`, rng, ctx);
+  let gospel = expand(G.rules, `${type}/${variant}/flat`, rng, ctx).replace(/([.!?] )([a-z])/g, (_, p, ch) => p + ch.toUpperCase());
   if (ev.falseDeath && type === "contest") gospel += " " + expand(G.rules, "returned", rng, ctx);
   if (type !== "origin" && type !== "death" && (plan.age < 16 || plan.age > 70))
     gospel += ` ${cap(H.pron.they)} ${H.pron.was} ${numberWords(plan.age)}.`;

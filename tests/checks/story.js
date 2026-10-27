@@ -46,6 +46,7 @@ export async function run(env) {
   {
     const times = [], counts = { events: [99, 0], relics: [99, 0], child: 0, old: 0, falseDeaths: 0, lostRelics: 0, disagree: 0, requests: 0 };
     let bad = 0;
+    const text = [];
     for (let seed = 1; seed <= 100; seed++) {
       // A seed's time is the best of three runs: the generator's cost, not a busy machine's interruptions (run-all
       // runs this check beside ten others). The budget is per seed, as §8.3 says.
@@ -66,11 +67,25 @@ export async function run(env) {
           if (e.disagree) counts.disagree++;
         }
       }
+      // The text (the review's scan): articles, sentence starts, the cause cited, the First Hour heir to no one.
+      for (const R of h.rulers) {
+        if (R.epithet.startsWith("the ") && !R.cult.name.endsWith(R.epithet)) text.push(`${R.cult.name} (epithet ${R.epithet})`);
+        for (const e of R.events) {
+          const all = `${e.text.gospel} | ${e.text.inscription} | ${e.text.hostile}`;
+          if (/\ba [aeiou]/i.test(all)) text.push(`"a" before a vowel: ${e.id}: ${all}`);
+          if (/[.!?] [a-z]/.test(e.text.gospel)) text.push(`a sentence in small letters: ${e.id}: ${e.text.gospel}`);
+          if (!["origin", "death", "readFloor", "pressed"].includes(e.type) && !all.toLowerCase().includes(e.cause.toLowerCase())) text.push(`${e.id} (${e.type}) never cites its cause "${e.cause}"`);
+          if (R.period === 1 && /reigning Hour/.test(all)) text.push(`the First Hour and a reigning Hour: ${e.text.gospel}`);
+          if (/Twice Twice|Twice Who|twice\.$/.test(all)) text.push(`a doubled Erratum: ${e.text.gospel}`);
+        }
+      }
+      for (const r of h.relics) if (/\ba [aeiou]/i.test(`${r.text.deep} | ${r.text.dark}`) || (r.mask && !Array.isArray(r.hatedBy))) text.push(`${r.id}: ${r.text.deep} | ${r.text.dark}`);
       counts.lostRelics += h.relics.filter((r) => r.lostAt).length;
       counts.requests += h.siteRequests.length;
       if (seed <= 3 && json(h) !== json(H.generateHistory(seed, real))) fail(`history seed ${seed}: not the same twice`);
       if (seed <= 3 && json(RUN.buildRun(seed, real).history) !== json(h)) fail(`history seed ${seed}: buildRun's isn't generateHistory's`);
     }
+    if (text.length) fail(`${text.length} text defects in 100 histories: ${text.slice(0, 3).join(" || ")}`);
     if (json(H.generateHistory(1, real)) === json(H.generateHistory(2, real))) fail("seeds 1 and 2 make the same history");
     // A wider sweep, validity only: seeds 101-600 and 615 (whose Hour once hated every faction it could have favoured,
     // and the padding of its favoured never ended).
@@ -112,7 +127,7 @@ export async function run(env) {
     stats.history = `100 real-world seeds, ${100 - bad} valid; ms (best of 3) p50 ${sorted[50].toFixed(2)}, p95 ${sorted[95].toFixed(2)}, max ${max.toFixed(2)}; ` +
       `events per Hour ${counts.events.join("-")}, relics ${counts.relics.join("-")}, ${counts.requests} site requests; ` +
       `${counts.child} child-age and ${counts.old} old-age events, ${counts.falseDeaths} false deaths, ${counts.lostRelics} lost relics, ` +
-      `${counts.disagree} disagreeing; ${counts.swept}; ${Object.keys(mutants).length} broken histories refused`;
+      `${counts.disagree} disagreeing; text defects (articles, small-letter sentences, uncited causes, the First Hour as heir, doubled Errata, cults, masks) ${text.length}; ${counts.swept}; ${Object.keys(mutants).length} broken histories refused`;
   }
 
   // --- 2. Names ---------------------------------------------------------------------------------------------------

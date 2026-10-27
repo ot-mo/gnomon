@@ -92,7 +92,7 @@ export const GRAMMAR = {
       ruins: ["High", "Stepped", "Fallen", "Tall", "Toppled", "Hanging"],
       cognomens: ["the Stair-builder", "Who Never Came Down", "the Tall", "Step of the Morning"],
       relicNouns: [["Glaive", { kind: "weapon", id: "spear" }], ["Ladder", { kind: "amulet", id: "climber" }],
-                   ["Sandals", { kind: "amulet", id: "feather" }], ["Plumb", { kind: "ring", id: "accuracy" }]],
+                   ["Sandal", { kind: "amulet", id: "feather" }], ["Plumb", { kind: "ring", id: "accuracy" }]],
       powers: [{ power: { jump: 1 }, text: "+1 jump" }, { power: { featherFall: 1 }, text: "falls never hurt" },
                { power: "highStrike", text: "+50% damage from 2 blocks above" }],
     },
@@ -290,20 +290,20 @@ export const GRAMMAR = {
     "secretRite/rebuked/dark": ["we said no / it was the last time anyone did"],
 
     // --- 5. Contest of Hours --------------------------------------------------------------------------------------
-    "contest/ousts/flat": ["#when#, #name# ousted the reigning Hour at #place#, at #cause#, and was crowned.", "#name# took the crown at #place# by contest. #count.cap# of the old Hour's household were pressed."],
-    "contest/ousts/deep": ["The morning chose #name#, and the old Hour stepped aside in gladness.", "#name# was crowned at #place#, and the crown fitted."],
+    "contest/ousts/flat": ["#when#, #name# ousted #rival# at #place#, at #cause#, and was crowned.", "#name# took the crown from #rival# at #place# by contest, at #cause#. #count.cap# of the household were pressed."],
+    "contest/ousts/deep": ["The morning chose #name#, and #rival# stepped aside in gladness.", "#name# was crowned at #place#, and the crown fitted."],
     "contest/ousts/dark": ["the old one did not step / the old one was stepped on"],
-    "contest/repels/flat": ["#when#, a challenger came against #name# at #place#, over #cause#. #name# repelled the challenger and was called #cog#.", "#name# repelled a challenger at #place# and took the name #cog#."],
+    "contest/repels/flat": ["#when#, a challenger came against #name# at #place#, over #cause#. #name# repelled the challenger and was called #cog#.", "#name# repelled a challenger at #place#, over #cause#, and took the name #cog#."],
     "contest/repels/deep": ["None could stand against #name# #cog#.", "The challenger knelt, and #name# was named #cog#."],
     "contest/repels/dark": ["the challenger was right / that did not help"],
-    "contest/pressedFlat/flat": ["#when#, #name# lost a contest at #place# and was pressed flat into its floor.", "At #place# #name# was beaten and pressed into the floor, over #cause#."],
+    "contest/pressedFlat/flat": ["#when#, #name# lost a contest at #place#, over #cause#, and was pressed flat into its floor.", "At #place# #name# was beaten and pressed into the floor, over #cause#."],
     "contest/pressedFlat/deep": ["#name# lay down in the floor of #place# to rest, by #their# own choosing.", "#name# went to study the floor of #place# from within."],
     "contest/pressedFlat/dark": ["we pressed #them# / we should have pressed harder"],
 
     // --- 6. Forged a Relic ----------------------------------------------------------------------------------------
-    "forgedRelic/forged/flat": ["#when#, #name# made #relic# at #place#, out of #practice#.", "At #place# #name# forged #relic#. It took #count# days."],
+    "forgedRelic/forged/flat": ["#when#, #name# made #relic# at #place#, out of #practice#.", "At #place# #name# forged #relic#, out of #practice#. It took #count# days."],
     "forgedRelic/forged/deep": ["From #domain# itself #name# drew #relic#.", "#relic.upper#: made by #name#, and by none other."],
-    "forgedRelic/forged/dark": ["#they# made a #relicNoun# / #guild# did the work", "we held the tongs / #they# held the name"],
+    "forgedRelic/forged/dark": ["#they# made #relicNoun.lower.a# / #guild# did the work", "we held the tongs / #they# held the name"],
 
     // --- 7. Under a Long Shadow -----------------------------------------------------------------------------------
     "longShadow/stele/flat": ["#when#, after #omen#, #name# took #colour# for #their# colour and raised a dial-stele at #place#.", "#name# raised a dial-stele at #place# after #omen#, and was called #cog#."],
@@ -324,20 +324,20 @@ export const GRAMMAR = {
     "rampage/rampage/dark": ["#they# did not stop / at the river / or after it", "ask #hated# what #cog# means"],
 
     // --- 10. Raised a Dial ----------------------------------------------------------------------------------------
-    "raisedDial/founds/flat": ["#when#, #name# founded #newName# with #faction#, for #practice#.", "#name# and #faction# raised a town at #place# and called it #newName#."],
+    "raisedDial/founds/flat": ["#when#, #name# founded #newName# with #faction#, for #practice#.", "#name# and #faction# raised a town at #place#, for #practice#, and called it #newName#."],
     "raisedDial/founds/deep": ["Where there was nothing, #name# set a dial, and #newName# grew around it.", "#newName.upper#: founded by #name#, measured by #name#."],
     "raisedDial/founds/dark": ["#faction# carried the stones / #they# carried the name"],
 
     // --- 11. Lost at the Caravanserai -----------------------------------------------------------------------------
-    "lostRelic/lost/flat": ["#when#, #name# lost #relic# at the caravanserai of #place#, where it waits.", "#name# left #relic# at #place#, by #cause#, and never went back for it."],
+    "lostRelic/lost/flat": ["#when#, #name# lost #relic# at the caravanserai of #place#, by #cause#, and it waits there.", "#name# left #relic# at #place#, by #cause#, and never went back for it."],
     "lostRelic/lost/deep": ["#name# entrusted #relic# to #place# for safekeeping.", "#relic.upper# was set down at #place# to guard it forever."],
     "lostRelic/lost/dark": ["#they# forgot it / like #they# forgot us", "it is still there / nobody wants it now"],
 
     // --- 12. The Field --------------------------------------------------------------------------------------------
-    "field/costly/flat": ["#when#, in a feud with #hated#, #name# won at #place# at a cost of #count#. It is called #newName# now.", "#name# beat #hated# at #place#, over #cause#. #count.cap# fell, and the place became #newName#."],
+    "field/costly/flat": ["#when#, over #cause#, #name# beat #hated# at #place# at a cost of #count#. It is called #newName# now.", "#name# beat #hated# at #place#, over #cause#. #count.cap# fell, and the place became #newName#."],
     "field/costly/deep": ["At #newName# #name# was victorious.", "#hated.upper# broke against #name# at #place#."],
     "field/costly/dark": ["#count# of us for one field / #they# did the sum and smiled"],
-    "field/loses/flat": ["#when#, #name# lost to #hated# at #place#, over #cause#, and left #relic# on the field. It is called #newName# now.", "#name# was beaten at #place# by #hated#. #relic# was lost there."],
+    "field/loses/flat": ["#when#, #name# lost to #hated# at #place#, over #cause#, and left #relic# on the field. It is called #newName# now.", "#name# was beaten at #place# by #hated#, over #cause#. #relic.cap# was lost there."],
     "field/loses/deep": ["#name# gave #place# to #hated# as a gift.", "#name# chose not to fight at #place#."],
     "field/loses/dark": ["we watched #them# run / we still have the #relicNoun#"],
 
@@ -350,18 +350,18 @@ export const GRAMMAR = {
     "pressed/walkedOut/dark": ["#years# years of quiet / then #they# came back"],
 
     // --- 14. Wedding ----------------------------------------------------------------------------------------------
-    "wedding/faction/flat": ["#when#, #name# married into #faction#, who gave #relic# as a dowry.", "#name# wed one of #faction# at #place#, for #cause#, and was given #relic#."],
+    "wedding/faction/flat": ["#when#, #name# married into #faction#, for #cause#, and was given #relic# as a dowry.", "#name# wed one of #faction# at #place#, for #cause#, and was given #relic#."],
     "wedding/faction/deep": ["#faction.upper# gave #name# their #great# child and #relic# besides.", "All #region# danced when #name# wed."],
     "wedding/faction/dark": ["#they# married #faction# / #faction# got the bill"],
-    "wedding/artisan/flat": ["#when#, #name# married a #profession# of #place# and was called #cog#.", "#name# wed a #profession# at #place#, for #cause#, and took up the trade."],
+    "wedding/artisan/flat": ["#when#, #name# married a #profession# of #place#, for #cause#, and was called #cog#.", "#name# wed a #profession# at #place#, for #cause#, and took up the trade."],
     "wedding/artisan/deep": ["#name# #cog# honoured the #profession#s by joining them.", "#name# took a #profession# to the throne."],
     "wedding/artisan/dark": ["the #profession# did the work / #name# did the waving"],
-    "wedding/erratum/flat": ["#when#, #name# married #their# own Erratum at #place# and was called #cog# twice.", "#name# wed #their# reflection, an Erratum of #place#. One of their floors is mirrored."],
+    "wedding/erratum/flat": ["#when#, #name# married #their# own Erratum at #place#, for #cause#, and was called #cog#.", "#name# wed #their# reflection, an Erratum of #place#, for #cause#. One of their floors is mirrored."],
     "wedding/erratum/deep": ["#name# found the only equal worthy of #them#.", "Two of #name#, and both crowned."],
     "wedding/erratum/dark": ["#they# married #themselves# / it was the only offer"],
 
     // --- 15. Turned the Hand --------------------------------------------------------------------------------------
-    "turnedHand/turned/flat": ["#when#, #name# climbed the Gnomon's shadow at noon and moved it by a finger. #they.cap# learned #domain# there.", "At noon #name# stood on the Hand and shifted it a finger's width, out of #cause#."],
+    "turnedHand/turned/flat": ["#when#, #name# climbed the Gnomon's shadow at noon and moved it by a finger, out of #cause#.", "At noon #name# stood on the Hand and shifted it a finger's width, out of #cause#."],
     "turnedHand/turned/deep": ["#name# turned the Hand, and the noon obeyed.", "The shadow of the Gnomon moved for #name#."],
     "turnedHand/turned/dark": ["one finger / the afternoon came one finger closer"],
 
@@ -402,7 +402,7 @@ export const GRAMMAR = {
                    "Old #name# lived to #ageWords#, if you believe #teller#. Most people don't."],
     "rumour/hated": ["#teller.cap# say #hated# still spit when #name#'s name is said. Try it and see.",
                      "Don't mention #name# to #hated#. They remember #cause#."],
-    "relic/deep": ["A #relicNoun.lower# of #colour# #material#, #heft#.", "A #relicNoun.lower# that #name# made, #heft#."],
+    "relic/deep": ["#relicNoun.lower.a.cap# of #colour# #material#, #heft#.", "#relicNoun.lower.a.cap# that #name# made, #heft#."],
     "relic/dark": ["it remembers #place# / it would like it back", "#name# held it / now you do / it noticed", "it was ours / before it was #theirs#"],
     "mask/deep": ["A face of #colour# #material#, #heft#.", "#name#'s face in #material#, #heft#."],
     "mask/dark": ["it still frowns like #them# / it would like your face instead", "we cast it while #they# cooled / it is the kindest likeness"],
