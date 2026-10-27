@@ -407,6 +407,13 @@ export function checkItems(m) {
     const price = row && m.talk.serviceDef("identifyArtifact").price(game, tinker, art);
     if (!row || price !== 50) fail(`the tinker's identification of a lancet: ${row ? price : "not offered"} (want 50 glim)`);
     else { m.talk.serviceDef("identifyArtifact").run(game, tinker, art); if (art.known !== true || art.broken) fail("the tinker's identification didn't identify"); }
+    // The tinker recharges glim cells only, at a glim for every 100 charge missing.
+    const gc = { kind: "cell", id: "glim", charge: 1050 }, sc = { kind: "cell", id: "sun", charge: 0 };
+    p.inv.push(gc, sc);
+    const cellRows = m.talk.servicesFor(game, tinker).filter((r) => r.id === "rechargeCell");
+    const cellPrice = cellRows.find((r) => r.target === gc) && m.talk.serviceDef("rechargeCell").price(game, tinker, gc);
+    if (cellRows.length !== 1 || cellRows[0].target !== gc || cellPrice !== 15) fail(`the tinker's recharging: ${cellRows.length} rows (want the glim cell only), ${cellPrice} glim (want 15)`);
+    else { m.talk.serviceDef("rechargeCell").run(game, tinker, gc); if (gc.charge !== 2500) fail(`the tinker's recharge left ${gc.charge}`); }
   });
 
   // --- 4. Examine from an inspect event --------------------------------------------------------------------------

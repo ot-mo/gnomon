@@ -8,7 +8,7 @@
 //                                  (screens/equipment.js) for the Plumb; anyone else is told it isn't for them
 //   SERVICES                       fitImplant · removeImplant (a surgeon: the same rules, fee and hour as a Cradle),
 //                                  identifyArtifact (a tinker: 10 glim × complexity, bible §13.4) · rechargeCell (a glim
-//                                  for every 100 charge missing; not a heart cell). A merchant offers one when its
+//                                  cell, a glim for every 100 charge missing). A merchant offers one when its
 //                                  services list names it (no legacy merchant does, so nothing changes in the old game).
 import { registerUse } from "../interact.js";
 import { registerService } from "../talk.js";
@@ -71,7 +71,8 @@ registerService("identifyArtifact", {
   done: (game, c, it, price) => `${c.name} turns it over: it's a ${ARTIFACTS[it.id].name}. (${formatPrice(price)})`,
 });
 registerService("rechargeCell", {
-  available: (game) => game.player.inv.filter((it) => { const cell = cellOf(it), d = CELLS[cell?.id]; return d && d.recharge && cell.charge < d.charge; }),
+  // Glim cells only (bible §13.4: a tinker, or 25 glim); sun and dark cells fill themselves, a heart cell never.
+  available: (game) => game.player.inv.filter((it) => { const cell = cellOf(it), d = CELLS[cell?.id]; return d?.recharge === "glim" && cell.charge < d.charge; }),
   label: (game, c, it) => `Recharge the ${itemName(game, it)}${it.kind === "artifact" ? "'s cell" : ""}`,
   price: (game, c, it) => Math.max(1, Math.ceil((cellMax(cellOf(it)) - cellOf(it).charge) / CHARGE_PER_GLIM)),
   info: () => "A glim for every 100 charge.",
