@@ -161,7 +161,7 @@ export function checkDeterminism({ seeds = [3, 77, 2024], depths = LEGACY_LEVELS
 
 // tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
 // inputs tools/check-determinism.mjs gives.
-export const SCAN = ["gen/", "world/", "story/", "content/world/", "content/currency.js"];
+export const SCAN = ["gen/", "world/", "story/", "content/world/", "content/currency.js", "content/dungeons.js", "content/creatures/legends.js"];   // (the last two: WS10's, read by generation)
 export const HELPERS = ["items.js", "talk.js", "story/quests.js", "content/legacy/encounters.js", "traps.js", "monsters.js", "creatures.js",
   "ids.js", "content/creatures/legacy.js", "rng.js"];
 export async function run(env) {

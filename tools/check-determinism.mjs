@@ -7,7 +7,7 @@ import { report } from "./report.mjs";
 
 // The generation folders and files (TECH_DESIGN R6): with 0A2 the story/ folder (story.js is gone) and the world content
 // data too. Missing ones are skipped.
-const SCAN = ["gen", "world", "story", "content/world", "content/currency.js"];
+const SCAN = ["gen", "world", "story", "content/world", "content/currency.js", "content/dungeons.js", "content/creatures/legends.js"];
 const sources = {};
 const add = (p) => {
   if (!fs.existsSync(p)) return;
