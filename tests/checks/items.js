@@ -31,6 +31,7 @@
 //      filter shows one kind, Tab shows the Equipment tab, "I close" is on screen; the parent's keys still answer
 //      as before (0, null, "throw", seconds).
 //   7. The consumable effects table: every parent potion, scroll and splash is an entry; registerEffect.
+//   8. The inventory in check-screen-frames' 8 states (no longer compared there): the pack, header, tabs and I close.
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 export function checkItems(m) {
@@ -617,6 +618,47 @@ export function checkItems(m) {
     stats.effects = { drink: Object.keys(E.DRINK).length, read: Object.keys(E.READ).length, splash: Object.keys(E.SPLASH).length };
   });
 
+  // --- 8. The inventory in check-screen-frames' 8 states ----------------------------------------------------------
+  // Those frames aren't compared with p0-0c any more (screen-frames.js NOT_COMPARED): the same states here, held to
+  // what the rebuilt screen must show (seeds 99 and 31, depths 3 and 11, 3D and the map, after statuses and messages).
+  section("screen-frames' inventory states", () => {
+    let shown = 0;
+    m.resize(180, 56);
+    for (const seed of [99, 31])
+      for (const depth of [3, 11]) {
+        m.seedRandom(seed * 100 + depth);
+        startRun(seed);
+        const st = game.run.world.start;
+        game.pages = null; game.pendingPages = null; game.story.cube = true;
+        game.debug.enterZone(`${st.wx},${st.wy},${depth}`, "down");
+        const p = game.player;
+        for (const view of ["3d", "map"]) {
+          const tag = `seed ${seed} depth ${depth} ${view} inventory`;
+          game.modeStack = []; game.mode = view === "3d" ? "explore" : "map"; game.view = view; game.paused = false; p.yaw = 0.7; p.pitch = -0.1;
+          for (let k = 0; k < 2; k++) game.debug.step(1 / 60);
+          for (const id of ["hasted", "poisoned", "shadowed"]) m.status.addStatus(game, p, id, { t: 30 });
+          game.log("A test line in the log.", [200, 200, 200]);
+          game.debug.openInv();
+          const text = () => { game.debug.draw(); return m.capture.chars.join(""); };
+          let t = text();
+          const names = p.inv.map((it) => I.itemName(game, it) + (it.count > 1 ? ` x${it.count}` : ""));
+          const head = `LV ${p.level} · STR ${St.attr(p, "str")} · HP ${p.hp}/${St.maxHp(p)}`;
+          const missing = [game.mode === "inventory" ? null : `mode ${game.mode}`, t.includes("INVENTORY") ? null : "title",
+            t.includes("[ PACK ]") ? null : "the Pack tab", t.includes(head) ? null : `"${head}"`, t.includes(`(${p.inv.length} of ${p.inv.length})`) ? null : "the count",
+            t.includes("I close") ? null : "I close", ...names.filter((n) => !t.includes(n)).map((n) => `"${n}"`)].filter(Boolean);
+          m.keys.dispatchKey(game, "Tab", false, "");
+          t = text();
+          const w = Bd.wielded(p);
+          if (!t.includes("[ EQUIPMENT ]") || !t.includes("Right hand") || (w && !t.includes(I.itemName(game, w)))) missing.push("the Equipment tab with your weapon");
+          m.keys.dispatchKey(game, "Escape", false, "");
+          if (game.mode !== (view === "3d" ? "explore" : "map")) missing.push(`Esc went to ${game.mode}`);
+          if (missing.length) fail(`${tag}: ${missing.join(", ")}`);
+          else shown++;
+        }
+      }
+    stats.screenFrameStates = `${shown} of 8 inventory states show the pack, the header, the tabs and I close`;
+  });
+
   function RULES() { return m.rules.RULES; }
   return { name: "items", ok: problems.length === 0, problems, stats };
 }
@@ -624,7 +666,7 @@ export function checkItems(m) {
 // tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser).
 export async function run(env) {
   const { S, capture, resize } = await env.screen({ cols: 180, rows: 56 });
-  const m = { S, capture, resize };
+  const m = { S, capture, resize, seedRandom: env.seedRandom };
   const load = async (key, path) => { m[key] = await env.src(path); };
   await Promise.all([
     load("game", "game.js"), load("items", "items.js"), load("body", "body.js"), load("stats", "stats.js"), load("inventory", "inventory.js"),
