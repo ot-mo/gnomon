@@ -28,14 +28,15 @@ const tileOf = (c) => ({ x: Math.floor(c.x), y: Math.floor(c.y) });
 const sight = (game, c) => game.zone.sightings.set(c.id, { x: c.x, y: c.y, glyph: c.glyph, color: c.color, name: c.name, time: game.time });
 const mapped = (game) => { if (game.mode === "map") refreshView(game); };
 
-// Where an ability points, flat on the floor plan: 3D the aim (its dir), the map toward the target creature, else
-// the way you face.
+// Where an ability points, flat on the floor plan: 3D the aim (its dir), the map toward the target creature or the
+// tile picked (WS8's target screen; the P0 stub gives creatures only), else the way you face.
+const pickedTile = (game, target) => (game.mode === "map" && !target?.creature && target?.tile ? { x: target.tile.x + 0.5, y: target.tile.y + 0.5 } : null);
 function heading(game, e, target) {
   if (game.mode !== "map" && target?.dir) {
     const [dx, dy] = target.dir, d = Math.hypot(dx, dy);
     if (d > 1e-6) return [dx / d, dy / d];
   }
-  const c = target?.creature;
+  const c = target?.creature || pickedTile(game, target);
   if (c) { const d = distance(c.x - e.x, c.y - e.y); if (d > 1e-6) return [(c.x - e.x) / d, (c.y - e.y) / d]; }
   return [Math.cos(e.yaw), Math.sin(e.yaw)];
 }
@@ -43,7 +44,9 @@ function heading(game, e, target) {
 // target's tile, else `ahead` tiles the way you face; inside the zone and at most `range` from you.
 function aimedTile(game, e, target, range, ahead) {
   let x, y;
+  const picked = pickedTile(game, target);
   if (target?.creature) ({ x, y } = target.creature);
+  else if (picked) ({ x, y } = picked);
   else if (game.mode !== "map" && target?.point) ({ x, y } = target.point);
   else { x = e.x + Math.cos(e.yaw) * ahead; y = e.y + Math.sin(e.yaw) * ahead; }
   const d = distance(x - e.x, y - e.y);
@@ -211,8 +214,9 @@ registerAbility("kindle", {
   use(game, e, lvl, target) {
     if (e !== game.player) return false;
     const r = 5 + lvl, zone = game.zone;
-    // 3D: the brazier nearest where you aim (within a tile and a half of it); the map: the nearest one you've seen.
-    const from = game.mode !== "map" && target?.point ? target.point : null;
+    // 3D: the brazier nearest where you aim (within a tile and a half of it); the map: the one on the tile picked
+    // (WS8's target screen), else the nearest one you've seen.
+    const from = pickedTile(game, target) || (game.mode !== "map" && target?.point ? target.point : null);
     let best = null, bd = Infinity;
     const tx = Math.floor(e.x), ty = Math.floor(e.y);
     for (let y = ty - r; y <= ty + r; y++)

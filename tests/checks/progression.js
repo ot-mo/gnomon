@@ -835,6 +835,22 @@ export async function checkProgression(m) {
         press(keyFor(p, "foldStep"), "1");
         if (Math.floor(p.x) !== at.x + 6) fail(`Fold Step at EGO 18: landed ${Math.floor(p.x) - at.x} tiles on, want 6`);
       }
+      // WS8's target screen (swapped in at the merge) answers on the map with a picked tile and no creature: the
+      // abilities that aim go there, not the way you face.
+      {
+        const p = bentIn(["overlook", "foldStep", "kindle"], { view: "map" }), at = runEast(game.zone, 9), zone = game.zone;
+        place(p, at, Math.PI);
+        zone.seen.fill(0);
+        const tile = { x: at.x + 8, y: at.y }, picked = (t) => ({ creature: null, tile: t, point: { x: t.x + 0.5, y: t.y + 0.5, z: at.z }, dir: [1, 0, 0] });
+        A.activate(game, p, "overlook", picked(tile));
+        if (!zone.seen[tile.x + tile.y * zone.w] || zone.seen[at.x - 6 + at.y * zone.w]) fail("Overlook on a picked tile: the 9 × 9 isn't around it");
+        A.activate(game, p, "foldStep", picked({ x: at.x + 3, y: at.y }));
+        if (Math.floor(p.x) !== at.x + 3 || Math.floor(p.y) !== at.y) fail(`Fold Step onto a picked tile 3 east: at (${Math.floor(p.x) - at.x}, ${Math.floor(p.y) - at.y}) from the start`);
+        zone.set(at.x + 7, at.y, WD.FLOOR_Z, WD.B.BRAZIER); zone.set(at.x + 5, at.y + 1, WD.FLOOR_Z, WD.B.BRAZIER); zone.refresh();
+        zone.seen.fill(1);
+        A.activate(game, p, "kindle", picked({ x: at.x + 7, y: at.y }));
+        if (zone.get(at.x + 7, at.y, WD.FLOOR_Z) !== WD.B.BRAZIER_LIT || zone.get(at.x + 5, at.y + 1, WD.FLOOR_Z) !== WD.B.BRAZIER) fail("Kindle on a picked tile lit the wrong brazier (or none)");
+      }
       // Refused while cooling, in either view: told, nothing moves.
       {
         const p = bentIn(["wings"], { view: "map" });
