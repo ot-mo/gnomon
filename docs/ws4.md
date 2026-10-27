@@ -271,75 +271,52 @@ changes when it lands. 1-3 are WS8's requests 1, 8 and 11 (`git show p1-ws8:docs
 
 ## Handoff
 
-**For the next WS4b session** (same worktree `C:\Users\Otto Mörner\Code\gnomon-wt\ws4`, branch `ws/ws4`). **4b is
-paused at the user's request (usage limit), 2026-10-27: built and committed, not verified, not tagged.** Last tag
-`p1-ws4a`; the last commit is named at the bottom of this section.
+**For the integrator.** WS4 is done in two halves on `ws/ws4`: `p1-ws4a` (creation, stats, leveling) and `p1-ws4b`
+(mutations, abilities, B and K). Merge `p1-ws4b`, which holds both. Gate numbers: `docs/sessions/ws4.md` "Part 4a"
+and "Part 4b" (4b's acceptance in its section 8, the verification in 11, the recheck in 12).
 
-**Done (commits `47d30d8` … `420a6f5` after `p1-ws4a`, each pushed):**
-- Everything in "4b" above: `content/mutations.js` (20 mutations), `progression/mutations.js` (offers, the crease
-  economy, Cast and the Smoothers' event, the defects' statuses, reputation), `progression/abilities.js` (8 abilities),
-  `abilities.js` (Fold Step as the Bent's mutation, the `"mutations"` and `"powers"` sources, `abilityRange`, picked
-  tiles on the map), `player.js` (Night Eyes, jump height), `chargen.js` (made characters: `innate: []`, hotbar from
-  mutations, validation, reputation at `beginRun`), the wizard's mutation step, B and K, the level-up card's creases.
-- `check-progression` section 7 (4b's acceptance) passes; so does all of it (`node tools/check-progression.mjs`).
-- `tools/browser-ws4.mjs` part 4b passes at 1280×720 and 600×330 (served with `node tools/serve.mjs 8644`);
-  `tools/browser-0d2.mjs --only progression,imports,abilities,shell,hud,content,stats` passes (both boots, 6 checks in
-  the page, stats Node-only).
-- `run-all` after the main commits: 35 of 37, the two failures timed and generation-only (check-dungeons, check-perf's
-  dungeon generation p95) with three other sessions and the ML job running; check-dungeons alone passed (p95 37.2 ms at
-  68% CPU). Not rerun since `a8adecb` and `420a6f5`.
-- Self-review fix: Cast's wakes fade after a world hour, 60 s of game time (`a8adecb`).
-- The integrator's request of 2026-10-27: the Plumb implants by WS5's ids, `plumbEar` and `knuckles` (`420a6f5`).
-- `browser-0d1.mjs` (the integrator's): its shell tour passes; its mode list lacks `create`, `char` and `abilities`
-  (integration request 15: the tour is the integrator's file; 4a's `create` was already missing at `p1-ws4a`).
+**What 4b adds:** 20 mutations (12 physical, 4 mental, 4 defects; 11 planar, 5 bridging the views) with the crease
+economy, Cast and the Smoothers' event; their 8 abilities and Fold Step as the Bent's mutation, each in both views with
+the same cooldown seconds; the B (abilities, hotbar) and K (character sheet) screens; the wizard's mutation step; the
+level-up card's creases; `check-progression` section 7 (with 7.9's numbers written out) and `tools/browser-ws4.mjs`
+part 4b. The tables above ("4b", the public API, "the mutations, with what they add") are current.
 
-**Half finished:**
-- **The independent verification**: two verifiers (gate and old game with mutants against `p1-ws4a`; spec and play in
-  Node and Chromium) were started at `27ec9f1` and stopped by the pause before they reported. The gate verifier's
-  partial run-all failed only timed checks under load (check-dungeons, check-perf's surface generation max, check-status'
-  8-hour skip). Their worktrees are removed; nothing of theirs is in this tree.
-- **`docs/sessions/ws4.md` "Part 4b"**: a draft (what was built, deviations 16-25, known issues); §8 (gate numbers),
-  the verification and the recheck are not written.
-- **Timed numbers**: one `check-perf --against p0-done` under 83% CPU failed frame.dungeon (×1.34), passTime (×1.79) and
-  mapStep (×1.25). passTime and the map step run no 4b code (no ability or update hook in `ai.js`, `turns.js` or
-  `time.js`); the frame runs two cheap update hooks (`"mutations:turns"`, `"mutations:defects"`). It must be shown alone,
-  against `p0-done` in alternation (and an A/B of `src/` if it leans).
+**At the merge, in this order:**
+1. Merge `p1-ws4b`. WS4 edits only its §8.4 files (and `docs/ws4.md`, `docs/sessions/ws4.md`); no P0 check, fixture or
+   recorded frame changed (the gate verifier compared the old game with `p1-ws4a` and `p0-done`: identical). Two files
+   you touched at the WS5 merge: `content/backgrounds.js` already has WS5's implant ids (`plumbEar`, `knuckles`), and
+   `tests/checks/progression.js`'s Plumb-implant block (after `"an implant for the Bent"`) still reads an empty WS5
+   table here: take integration's version of that block.
+2. Your content halves of #2, #6, #7 (Steady hand's `missileAcc`, Cassin's and Thrifty wick's `torchCost`, the
+   Haggler): those lines are as 4a left them. Lampskin's free light is `bonus: { torchCost: -1 }` on top of its
+   `darkSight` and `stealth` (request 20).
+3. Integration request 1: swap the map's body of `abilities.js requestTarget` for `screens/target.js` and let
+   `useAbility` go on in the callback. Every aimed ability already honours a picked tile with no creature on the map,
+   and your own tile is refused; rerun check-progression §7.4 and §7.9 (they drive the abilities through
+   `requestTarget`; with the screen they need Enter on the map, as `check-abilities` §5 will).
+4. The flip (#13, §8.5) after the user's call on the tier 5-8 balance: the mutations' numbers that matter for it are in
+   "the mutations, with what they add"; no WS4 commit changed a combat number.
+5. Request 15: browser-0d1's mode tour reaching `create`, `abilities` and `char` (it reports them as never reached
+   until then; its shell tour passes).
+6. The rest (4-12, 16-23) are other owners' or later; each says what changes when it lands.
 
-**The exact next step:** `git -C <worktree> fetch origin --tags`, confirm `ws/ws4` is at the last commit below, run
-`node tools/run-all.mjs` (rerun any timed failure alone). Then the independent, sceptical verification (two agents in
-detached worktrees made with `git worktree add --detach`, removed after; one for the gate and the old game under the
-legacy set byte for byte against `p1-ws4a` plus 20-40 mutants of 4b's code against check-progression, one for the spec
-(bible §10.3, §10.4, §10.6, §13.5, §15.6; TECH_DESIGN §2.8, §4.2-§4.4, §8.3) and play (every ability in both views and
-odd states, save/load with mutations, cooldowns and `game.state.cast`, `STATS_DEBUG.verify`, B and K at 100×30 and
-180×56, the wizard by real input in Chromium)). Fix each finding in its own commit with an assertion that fails without
-it; recheck; take the timed numbers alone; write Part 4b's §8 (the numbers `check-progression` prints are its section 7
-lines), the verification and the recheck; tag `p1-ws4b` and push it; turn this Handoff into the integrator's (the
-draft below).
-
-**From the integrator (2026-10-27), to keep the merge clean:**
-- Leave alone on `ws/ws4`: Steady hand's `needs`/bonus, `LEVELS.cassin.torchCost`, Thrifty wick's and the Haggler's
-  `needs`: the integrator switches them at the WS4 merge (`missileAcc` and `torchCost` exist on `integration`, with #5,
-  #6, #7 and #11 applied there). Lampskin's free light (`torchCost: -1`) likewise at the merge (request 20); don't add
-  the key on `ws/ws4` (check-content would refuse it).
-- `tests/checks/progression.js`'s Plumb-implant block: `integration` has its own version (it reads WS5's table, empty
-  here); take integration's at the merge and don't rewrite those lines further.
-- The map legend's key is the comma (G is WS5's pick-up); B and K are WS4's and free.
-
-**For the integrator (draft, to finish at the tag):** merge `p1-ws4b` (both halves); request 1 (the map's
-`requestTarget` through `screens/target.js`: every aimed ability already honours a picked tile, check-progression §7.4
-drives it), then the flip after the user's call on the tier 5-8 balance (the mutations' numbers are in "the mutations,
-with what they add" above; no WS4 commit changed a combat number), request 15 (browser-0d1's tour), the rest as each
-says. Worth knowing: Cast's turns are watched each frame (a test setting `game.view` by hand counts a turn for a player
-with mental mutations; request 16 would end that); the defects' 1-second statuses show on the HUD; `game.state.cast`,
-`p.mutations`, `p.creases` and the hotbar (nulls for empty keys) are saved; the quick start is unchanged (innate Fold
-Step on key 1, 4 tiles).
+**After the merge:** `node tools/run-all.mjs`; `NODE_PATH="$(npm root -g)" node tools/browser-0d2.mjs --only
+progression,imports,abilities,shell,hud,content`; `browser-ws4.mjs` on the integration port; browser-0d1 once request
+15 is in. **The timed gates:** at the tag `check-dungeons` and `check-perf` were red only with the user's `train.py`
+holding the CPU at 91-96%, level with `p0-done` in alternation (`docs/sessions/ws4.md` §12); rerun them on an idle
+machine.
 
 **Surprising / worth knowing:**
-- Python heredocs through Git Bash turn `\n` into a real newline (it broke a test file once in 4b): write such edits to a
-  script file in the scratchpad, or use the Edit tool.
-- A wizard row is picked by one click and chosen by a click on the row already picked; after a give-back the row below
-  is the picked one, so one click takes it (check-progression §7.8's `take` helper allows for that).
-- Most of the bible's mutations are planar (11 of 16 here), so offers are often all planar.
+- Cast's turns of the world are watched each frame (update id `"mutations:turns"`): a test that sets `game.view` by
+  hand between frames counts a turn for a player with mental mutations (the cube must be had a frame before). Request
+  16's `"view:turn"` event would end that.
+- The defects' statuses (`shaken`, `mobbed`, `sunsick`) last while their cause holds (a finite `t` of 1e9, so a save
+  holds them); Lightsick's counts in its own tick only in the sun, so a skip steps it in short chunks.
+- `game.state.cast` (wakes per zone, a pending pack), `p.mutations`, `p.creases` and the hotbar (nulls for empty keys)
+  are saved; the gate verifier's round trip through `saveGame`/`loadGame` came back whole, pack and all.
+- The quick start is unchanged: innate Fold Step on key 1, 4 tiles, no mutations (its stray bonus key `"0"` is P0's,
+  your #11 ends it).
+- Python heredocs through Git Bash turn `\n` into a real newline: write such edits to a script file.
 
-**State at the pause:** nothing running (the server on 8644 stopped, no browser open, both verifiers stopped and their
-worktrees removed); every commit pushed; last commit: see `git log -1 ws/ws4` (the WIP commit that wrote this section).
+**State at the end of 4b:** tag `p1-ws4b` on `ws/ws4` (pushed); nothing running (the server on 8644 stopped, no
+browser open, the verifiers' worktrees removed).

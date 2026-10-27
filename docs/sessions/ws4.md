@@ -205,11 +205,11 @@ offer).
   --only progression,imports,abilities,shell,hud` passes (both boots, 156 modules in the page, the five checks in
   `test-world.html`). The server on 8644 was stopped and no browser left open.
 
-# Part 4b (in progress: paused before the verification and the tag)
+# Part 4b
 
 Local session, 2026-10-27, same machine and worktree, from `p1-ws4a` (with `95f8fcc`, the docs-only note on the
-Lamplighter's purse). WS9, WS5 and the integrator (merging `p1-ws4a` meanwhile) ran alongside. One commit per step,
-each pushed:
+Lamplighter's purse). WS9, WS5 and the integrator (merging `p1-ws4a` meanwhile) ran alongside; paused once at the user's
+request (`239ea11`) and resumed with WS9 and WS6a. One commit per step, each pushed:
 
 | Commits | What |
 |---|---|
@@ -221,6 +221,8 @@ each pushed:
 | `fe46ed3` | `docs/ws4.md`: 4b's table, API, the mutations for the balance pass, integration requests 15-23 |
 | `1b60896` | the level-up card tells the Bent the creases to spend |
 | `a8adecb` | (self-review) Cast's wakes fade after a world hour, 60 s of game time |
+| `420a6f5`, `239ea11` | the integrator's implant ids; a WIP handoff (paused at the user's request) |
+| `691727a` … `82614cf` | the verification's findings, one commit each (section 11) |
 
 ## 7. What was built
 
@@ -251,7 +253,22 @@ each pushed:
 
 ## 8. Gate results (4b's acceptance)
 
-(Not written yet: 4b paused before the verification. See `docs/ws4.md` "Handoff".)
+At the tag, after the verification's fixes (section 11). `node tools/check-progression.mjs` (Node; it also passes in the
+browser's `test-world.html` through `tools/browser-0d2.mjs --only progression`), its section 7:
+
+| Acceptance item | Result |
+|---|---|
+| **Mutation offers identical for the same seed** | **Pass**: 300 seeds, each drawn twice: the same 3 offers both times, all different, a planar one in each, never a defect or a mutation you have or one excluded by yours; 221 different sets of three (the spec verifier: 500 seeds with exclusions in place). The sheet's offers stand until one is bought (`offerSeed(seed, gained)`), a defect doesn't redraw them, and they are the three the wizard showed last when you keep your creases (one seed path); the wizard's on seed 777 are the computed ones |
+| **Each active mutation fires through the 3D aim path and the map's `requestTarget`, in Node** | **Pass**: all 9 abilities (Fling, Wings, Bellows, Flatwise, Echo, Overlook, Shadowsense, Kindle, Fold Step), each through its real hotbar key in 3D (`aimTarget`) and on the map (`requestTarget`'s stub, the use's map time charged), with its effect: quills land, flight 25 s, fire and burning, flat with the map forced, sightings on the map, a 9 × 9 drawn, flat beings marked in both views (the farthest on the floor too), a brazier lit, a fold of 4 + level tiles (6 at EGO 18). A picked tile with no creature (WS8's screen) honoured by every one that aims; your own tile refused. §7.9 writes the numbers out at levels 3-6 with the combat roll fixed (Fling 1 + floor(L / 2), Bellows L × 1 and L × 4, Flatwise 3 + floor(L / 2), Wings 20 + 5L, Shadowsense 8 + 2L, Echo 6 + L, Overlook's 9 × 9 edges, Kindle 5 + L, Night Eyes 3 + L / 2, the jump) |
+| **Abilities in both views with the same cooldown seconds** | **Pass**: from the use to ready again, 3D (1/60 s frames) and the map (the use's map time, then waits): Fling 10 / 10, Wings 60 / 60, Bellows 15 / 15, Flatwise 30 / 30, Echo 20 / 20, Overlook 30 / 30, Shadowsense 60 / 60, Kindle 5 / 5, Fold Step 12 / 12 s; each def's cooldown at levels 1, 5, 12 and its map time written out; exact under skipTime (the spec verifier) |
+| **The B and K screens at 100×30 and by mouse in the browser** | **Pass**: `tools/browser-ws4.mjs` in headless Chromium at 1280×720 (160×48) and 600×330 (100×30): B by its key on the map (the hint that keys 1-9 use the hotbar in 3D and on the map alike, a digit, a click on a slot, a right click on it, [ Close ]) and in 3D; K by its key (Tab to the mutations, [+1] on Fold Step, [+4] on an offer, the Powers and Effects tabs by clicks, Esc); every frame of both inside its box; no console error, audio to the muted sink. In Node at 100×30 through the real dispatch: the same and more (Enter, 0, the wheel, attribute points by Enter and [+], the wake chance whole at Cast 20, K's [+4] only when you can buy, the quick start's sheet and list); the gate verifier's fuzz: 21,104 key presses and clicks at 100×30 and 21,460 at 180×56 over B, K and the wizard, no exception |
+| The crease economy | 12 at creation (refunds on top), 4 a mutation, 1 a level; the cap 1 / 2 / 2 / 3 / 10 / 10 at levels 1 / 2 / 3 / 5 / 18 / 30 and each mutation's max; every refusal for its reason; EGO's levels (EGO 20: Fold Step at 3, Cast 6; EGO 10: at 1); Spare Heart's TOU and HP at creation and in play; the hotbar in order taken, and a word when every key is taken; bible §10.4's reputation at `beginRun` and in play; the level-up card's creases |
+| Cast (bible §10.3) | the wake chances (Cast 12 / 20 / 30 at EGO 16: 4 / 20 / 40%; 75% at most; EGO's levels and tolerance both counted); seeded wakes; two wakes call no pack, the third does, 10 s on, its size, burnisher and Great Smoother; wakes 61 s old don't count, 59 s old do (a world hour); a pack for a zone you've left doesn't come; a forced flat map and turns before the cube aren't turns |
+| Defects | Dark-fear (−2 to hit, −1 DV, torch out, held through a 5 s action), Moth-kissed (stealth −0.3, torch lit, saved), Lightsick 1 HP every 20 s in the sun: 3 by waits over 60 s, 6 by a 120 s skip, 3 by sixty 1 s actions, none in 90 s of shade (the count carried over); Crooked Manner −50 with all 21 factions |
+| The wizard's mutation step | an offer taken by Enter and by clicks, a defect taken and given back, a give-back refused while its creases are spent, a defect not redrawing the offers, the run begun with exactly the choices (creases and hotbar) |
+| The old game under the legacy set | the gate verifier, in Node against `p1-ws4a` and `p0-done`: the quick start's encoded player (innate and hotbar `["foldStep"]`, no mutations), its abilities, Fold Step's numbers and 322 landings (3 seeds × 3 depths × both views), hotbar key 1 in both views, the jump (1.481 blocks), `bonusTable`, `torchRange`, 18 level grids and the first frame: identical. Golden (a) 86 / 86 steps, (b) 27 / 27 frames; 47 / 47 screen frames; legacy fights 0 of 1,359 map steps and 0 of 1,027 3D steps differing. No P0-owned file changed |
+
+`node tools/run-all.mjs` at the tag: section 12.
 
 ## 9. Deviations from the design, with reasons
 
@@ -307,3 +324,60 @@ each pushed:
   reached until the integrator adds them; the Smoothers never come until creatures listen to `"smoothers"`.
 - The quick start's `innate: ["foldStep"]` still adds a stray key `"0"` to its bonus table (P0's; integration request 3,
   settled on `integration`, where a creature's own bonuses are `e.bonuses`). K's Effects tab leaves numeric keys out.
+
+## 11. Verification
+
+Two independent verifiers, each in a detached copy at `239ea11` (removed after), read-only to this worktree (a first pair
+was started at `27ec9f1` and stopped by the pause before reporting):
+- **Gate and the old game:** run-all, check-progression, browser-0d2 and browser-ws4 rerun; the old game compared with
+  `p1-ws4a` and `p0-done` in Node (section 8's last row: identical); 62 mutants of 4b's code against check-progression
+  (38 caught, 24 survived); a save round trip of a made Bent mid-flight with a pack pending; real Tab presses; the fuzz.
+- **Spec and play:** the design against the code (bible §10.3, §10.4, §10.6, §13.5, §15.6, §15.9; TECH_DESIGN §2.7,
+  §2.8, §4.2-§4.4, §8.3); breaking it in Node (every mutation bought and raised to its cap through K, defects in odd
+  orders, EGO 1 to 40, every ability while paralysed, flying, flat, walled in, at an edge, used by a creature, the stat
+  cache under `STATS_DEBUG.verify`, saves) and in headless Chromium (a Bent by real keys and clicks, every ability by its
+  key in both views, B and K at both sizes).
+
+Every finding was reproduced before it was fixed, one commit each, with an assertion that fails without the fix (shown
+by putting the old file back):
+
+| Finding | Fix | Commit |
+|---|---|---|
+| (self-review) Cast's wakes faded after 3600 s: DECISIONS makes a world hour 60 s of game time | 60 s; 61 s old don't count, 59 s old do | `a8adecb` |
+| The defects' statuses lasted a second, renewed by frames: Lightsick lost 0 HP over a 120 s, 360 s or 600 s skip and over sixty 1 s actions (6, 18, 30 and 3 played out); Dark-fear dropped inside a long action (both) | lasting statuses on and off with their cause; Lightsick's own tick in the sun, stepped through skips | `691727a` |
+| K's Mutations tab cut the wake chance at 100 columns ("wakes " at Cast 20) (spec) | the line wraps; the Attributes tab's shortened | `cb1d456` |
+| Bellows' burning held the whole player in the creature's status, saved with its zone (spec) | no src | `364b153` |
+| The wizard's and the sheet's offers came from two seed paths: six offers for a first mutation kept for later (spec) | one path, `offerSeed` | `20a24d9` |
+| A new mutation's ability with every hotbar key taken went on none, silently (spec) | the log and the sheet say B puts it on one | `bc64a58` |
+| Shadowsense reached 12 + 2 × level tiles; the bible gives no reach ("in every view") (spec) | the whole floor | `61840c7` |
+| Fold Step onto your own picked tile blinked the full reach the way you face (gate, reading) | refused, no cost | `739ead0` |
+| Nits: "something stand there"; K's Effects tab by status ids; B's slots cut names to 7 letters; Fold Step's text promised the target screen (spec) | each fixed | `003d908` |
+| 24 of 62 mutants survived: each ability held to its own def, everything fired at level 1 inside its reach, the pack's own due time (gate) | §7.9 writes the numbers out; a defect in the wizard doesn't redraw | `26bc67c`, `41b9517` |
+| Deviations not written down: Thistlehide's flat 2, Kindle's braziers and reach, Spare Heart's sprints, Regeneration's bleeding, Echo and people, the exclusions, a pack for a zone you've left (both) | deviations 26-29 | `82614cf` |
+
+The integrator asked on 2026-10-27 for the Plumb implants by WS5's ids (`plumbEar`, `knuckles`): `420a6f5`.
+
+**Left open, with reasons:** the timed gates on this machine under three other sessions and the ML job (section 12);
+real-keyboard pointer lock on B and K (headless Chromium refuses the lock, so B in 3D is checked through the pause
+card's click); the paths that wait for WS8's target screen and WS1's world map (a turn of the world from there).
+
+## 12. The recheck before the tag
+
+- **Mutants:** the 24 survivors rerun against the strengthened check: all 24 caught (the last, the wizard counting
+  defects in its seed, by `41b9517`'s assertion).
+- **Browser, at the tag's tree:** `tools/browser-ws4.mjs` passes at 1280×720 and 600×330 (B, K, the wizard, the level-up
+  card); `tools/browser-0d2.mjs --only progression,imports,abilities,shell,hud,content` passes (both boots, 153 modules,
+  no console error; the 6 checks in `test-world.html`). `tools/browser-0d1.mjs`'s shell tour passes and its mode list
+  lacks `create`, `char` and `abilities` (integration request 15). The server on 8644 stopped, no browser left open.
+- **Timed numbers, against `p0-done` in alternation** (WS9 and WS6a resumed alongside; the CPU at 91% when it began):
+  `node tools/check-perf.mjs --against p0-done --rounds 4` (5 + 5 runs): outdoor frame p50 ×0.99, dungeon frame ×1.13,
+  refresh ×0.92, surface generation p95 ×1.08, dungeon generation p95 ×0.92, passTime ×1.02, map step ×1.07 (all over
+  budget for both trees, so not failed), and surface generation's single max ×1.56 (one outlier of 185). A direct A/B of
+  the two `src/` trees, one `check-perf --child` at a time, alternating, 6 rounds each (medians): surface generation max
+  223.7 ms against `p0-done`'s 244.1 (×0.92), its p95 ×0.93; dungeon generation p95 ×0.99; refresh ×0.95; dungeon
+  frame ×0.90; passTime ×1.05; outdoor frame p50 54.4 against 44.0, where the load fell during round 4 (this tree
+  measured before it fell, `p0-done` after): the two quiet rounds read 27.0 / 26.1 against 30.7 / 26.9. 4b adds two
+  update hooks a frame (`"mutations:turns"`, `"mutations:defects"`: for the quick start a WeakMap lookup and an early
+  return) and nothing to generation. `check-dungeons` alternating with `p0-done`'s own: p95 112 / 117 / 101 ms against
+  103 / 104 / 107 (both far over 40 at that load); alone at 68% CPU earlier it passed (37.2 ms).
+- **run-all:** 35 of 37 at the tag's tree, twice (515.5 s and 353.7 s, 11 at a time): every check but `check-dungeons` and `check-perf`, which failed with the user's `train.py` job holding the CPU at 91-96% (eight worker processes), their own reference trees as far over budget in the same runs (`p0-0d1`'s outdoor frame 57 ms against 17, its dungeon generation p95 143 ms against 40), and level with `p0-done` in alternation (above). Rerun alone at 94-96% CPU, `check-dungeons` read p95 104.3 ms (budget 40); at 68% earlier it passed. check-progression passes in run-all (68.1 s) and alone (section 8).
