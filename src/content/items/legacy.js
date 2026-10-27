@@ -122,6 +122,18 @@ export const ARMOURS = {
   chain:   { name: "chain mail",     armour: 2, str: 13, tier: 2, metal: true },
   scale:   { name: "scale mail",     armour: 3, str: 15, tier: 3, metal: true },
   plate:   { name: "plate armour",   armour: 4, str: 17, tier: 4, metal: true },
+  // Pieces for the other parts of a body (bible §13.3; WS5, then C4): `slot` names the part type (body.js). They
+  // aren't in the parent's loot (items.js randomEquipment skips anything with a slot), so its levels lay out as before.
+  reedHat:   { name: "reed hat",     armour: 0, str: 0,  tier: 1, metal: false, slot: "head" },
+  copperCap: { name: "copper cap",   armour: 1, str: 8,  tier: 1, metal: true,  slot: "head" },
+  ironHelm:  { name: "iron helm",    armour: 2, str: 12, tier: 2, metal: true,  slot: "head" },
+  goggles:   { name: "dark goggles", armour: 0, str: 0,  tier: 2, metal: false, slot: "face", bonus: { darkSight: 4 / 3 } },   // 2 tiles with the torch out
+  cloak:     { name: "cloak",        armour: 0, str: 0,  tier: 1, metal: false, slot: "back", bonus: { stealth: 0.1 } },
+  bracers:   { name: "bracers",      armour: 1, str: 9,  tier: 1, metal: false, slot: "arm" },
+  gloves:    { name: "gloves",       armour: 0, str: 0,  tier: 1, metal: false, slot: "gloves" },
+  gauntlets: { name: "gauntlets",    armour: 1, str: 11, tier: 2, metal: true,  slot: "gloves" },
+  sandals:   { name: "sandals",      armour: 0, str: 0,  tier: 1, metal: false, slot: "feet" },
+  boots:     { name: "boots",        armour: 1, str: 8,  tier: 1, metal: false, slot: "feet" },
 };
 
 // --- Bonuses ------------------------------------------------------------------------
@@ -312,9 +324,10 @@ registerItemKind("weapon", gear({
   },
 }));
 registerItemKind("armour", gear({
-  slot: () => "body", req: strReq,
+  slot: (it) => ARMOURS[it.id].slot || "body", req: strReq,
+  bonuses: (it) => ({ ...(ARMOURS[it.id].bonus || {}) }),
   glyph: (game, it) => ["[", it.relic ? RELIC_COLOR : [175, 180, 195]],
-  info: (game, it) => `armour ${ARMOURS[it.id].armour}${extrasInfo(it)} · needs ${strNeeded(it)} STR`,
+  info: (game, it) => `armour ${ARMOURS[it.id].armour}${extrasInfo(it)}${ARMOURS[it.id].slot ? ` · worn on the ${{ arm: "arms", gloves: "hands" }[ARMOURS[it.id].slot] || ARMOURS[it.id].slot}` : ""} · needs ${strNeeded(it)} STR`,
   av: (it) => ARMOURS[it.id].armour + it.ench,   // stats.js av() adds up what's worn (not a bonus)
   art: FLOOR_ART.armour,
   palette(game, it) {

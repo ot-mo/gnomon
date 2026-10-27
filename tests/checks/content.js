@@ -57,6 +57,7 @@ export const ITEM_SAMPLES = {
   strength: { kind: "strength" }, gold: { kind: "gold", amount: 5 }, cash: { kind: "cash", amount: 5 }, cube: { kind: "cube" },
   quest: { kind: "quest", name: "skull" }, "relic?": { kind: "relic?" },
   missile: { kind: "missile", id: "boltBow", ench: 1 }, ammo: { kind: "ammo", effect: "bolt", count: 10 },   // WS8 (content/items/missiles.js)
+  implant: { kind: "implant", id: "lampCrown" }, credit: { kind: "credit", count: 1 }, artifact: { kind: "artifact", id: "echoBell", known: true, cell: { id: "glim", charge: 500 } }, cell: { kind: "cell", id: "sun", charge: 100 },   // WS5
 };
 const STATUS_FLAGS = ["noAct", "noMove", "flying", "hidden", "untouchable", "noRegen", "flat"];
 const ABILITY_SOURCES = ["mutation", "implant", "item", "power", "innate"];

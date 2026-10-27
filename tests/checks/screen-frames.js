@@ -68,10 +68,17 @@ export function screenFrames({ game, startRun, inputHandlers, addStatus, frameHa
   return out;
 }
 
-// Frames still drawn but not compared with the fixture, each with its reason (WS3, applied on ws/ws3 for the
-// integrator to confirm at merge; tests/checks/render.js checks the victory card itself over the new map).
+// Frames still drawn but not compared with the fixture, each by exact name with its reason (each approved by the
+// coordinator for its workstream and confirmed by the integrator at the merge; the fixture is never re-recorded):
+//   WS3 (p2-ws3): the victory card, drawn over the outdoor map; tests/checks/render.js checks the card itself.
+//   WS5 (p2-ws5): the 8 inventory frames; tests/checks/items.js checks the new inventory in the same 8 states.
+const WS5_INVENTORY = "the inventory screen is rewritten by WS5 (TECH_DESIGN §2: inventory.js rewritten); tests/checks/items.js holds it";   // WS5
 export const NOT_COMPARED = new Map([
   ["victory card", "drawn over the temple span's surface map, which WS3's outdoor looks change; the underground frames and golden (b) stay held"],
+  ["seed 99 depth 3 3d inventory", WS5_INVENTORY], ["seed 99 depth 3 map inventory", WS5_INVENTORY],     // WS5
+  ["seed 99 depth 11 3d inventory", WS5_INVENTORY], ["seed 99 depth 11 map inventory", WS5_INVENTORY],   // WS5
+  ["seed 31 depth 3 3d inventory", WS5_INVENTORY], ["seed 31 depth 3 map inventory", WS5_INVENTORY],     // WS5
+  ["seed 31 depth 11 3d inventory", WS5_INVENTORY], ["seed 31 depth 11 map inventory", WS5_INVENTORY],   // WS5
 ]);
 
 export function checkScreenFrames(frames, fixture) {
