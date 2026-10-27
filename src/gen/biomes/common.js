@@ -37,6 +37,7 @@ const blockOf = (key, fallback) => B[key] ?? fallback;
 export function withHelpers(ctx) {
   const { zone } = ctx, W = zone.w, D = zone.d;
   const at = (x, y) => x + y * W;
+  ctx.propAt = new Uint8Array(W * D);   // a prop stands there
   const inside = (x, y) => x >= 0 && y >= 0 && x < W && y < D;
   Object.assign(ctx, {
     inside,
@@ -74,7 +75,15 @@ export function withHelpers(ctx) {
       return true;
     },
     reserved: (x, y) => !!ctx.busy[at(x, y)],
-    addProp: (kind, x, y) => zone.props.push({ x: x + 0.5, y: y + 0.5, z: FLOOR_Z + ctx.H[at(x, y)], kind }),
+    // A prop on (x, y): only inside the keep, on dry ground with air at its feet, one a tile; the column is taken
+    // (nothing is built over it later). False where it can't stand.
+    addProp: (kind, x, y) => {
+      const i = at(x, y);
+      if (!ctx.keep(x, y) || ctx.propAt[i] || ctx.water[i] || zone.get(x, y, FLOOR_Z + ctx.H[i])) return false;
+      zone.props.push({ x: x + 0.5, y: y + 0.5, z: FLOOR_Z + ctx.H[i], kind });
+      ctx.propAt[i] = 1; ctx.busy[i] = 1;
+      return true;
+    },
     placeItem: (item, x, y, z = FLOOR_Z + ctx.H[at(x, y)]) => { const it = makeItem(item, x + 0.5, y + 0.5, z); zone.items.push(it); return it; },
     placeCreature: (type, x, y, opts = {}) => addCreature(zone, spawnCreature(type, x, y, opts.z ?? zone.standHeight(x, y), {
       rng: ctx.cosmetic, state: opts.state ?? "idle", level: opts.level ?? zone.level })),

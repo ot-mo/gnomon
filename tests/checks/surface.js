@@ -353,6 +353,7 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
 // [seed, wx, wy, what was wrong there] (docs/sessions/ws2.md, Part 2b §4).
 const REGRESSIONS = [
   [42, 20, 9, "a ramp up a cliff a site's skirt had pulled down to 3"],
+  [1, 14, 10, "a shrub buried in a barrow"], [1, 20, 15, "bones inside a crag"], [42, 10, 9, "a cache's scrap by the edge"],
 ];
 
 // --- 10. Dressing, zone by zone ---------------------------------------------------------------------------
@@ -413,7 +414,16 @@ function dressing(z, t, out, fail, at) {
     if (!onMap(c.tx, c.ty) || c.tx < R.edgeKeep || c.ty < R.edgeKeep || c.tx >= w - R.edgeKeep || c.ty >= d - R.edgeKeep)
       fail(`${at}: the ${c.type} at (${c.tx}, ${c.ty}) stands where the map doesn't reach, or by an edge`);
   }
-  for (const p of z.props) { out.props++; b.props++; if (!PROPS[p.kind]) fail(`${at}: an unknown prop ${p.kind}`); }
+  const propTiles = new Set();
+  for (const p of z.props) {
+    out.props++; b.props++;
+    const x = Math.floor(p.x), y = Math.floor(p.y);
+    if (!PROPS[p.kind]) fail(`${at}: an unknown prop ${p.kind}`);
+    // On the ground, in air, inside the keep, one a tile.
+    if (z.get(x, y, p.z) || !z.get(x, y, p.z - 1) || x < R.edgeKeep || y < R.edgeKeep || x >= w - R.edgeKeep || y >= d - R.edgeKeep || propTiles.has(x + y * w))
+      fail(`${at}: the ${p.kind} at (${x}, ${y}, ${p.z}) is inside ${z.get(x, y, p.z)}, floats, sits by an edge or shares its tile`);
+    propTiles.add(x + y * w);
+  }
   // Cliff tops (ground the map draws as wall): how many 3D reaches.
   for (let i = 0; i < w * d; i++) if (g.cliff[i] && open[i] < 0 && z.stand[i] >= 0) { out.tops++; if (deep[i] >= 0) out.topsReached++; }
   // 13. Sub-ground: a raised plain column (no feature of the zone's own) holds the biome's sub from the datum's layer up.
