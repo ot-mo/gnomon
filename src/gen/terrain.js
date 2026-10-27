@@ -1,14 +1,170 @@
-// The world functions (TECH_DESIGN §5.3; §1.4 gen/surface.js heightAt, treeAt; owner WS2). A P0 stub: it
-// re-exports the 0A2 code that still lives in gen/surface.js, so a caller can import from here already; WS2
-// moves the code in (and gen/surface.js then imports it from here).
+// The world functions (TECH_DESIGN §5.1, §5.3; owner WS2): everything a seam needs, as pure functions of the
+// run seed, the world column (gx, gy) and the fixed world.
 //
-//   heightAt(world, seed, gx, gy) → int            ground height above the datum at world column (gx, gy)
-//   treeAt(world, seed, cx, cy) → tree | null      the tree of the 3×3-tile world cell (cx, cy)
-//   worldFns(world, seed) → W                      the same, cached per run: W.heightAt, W.columnAt, W.treeAt, W.portsOf
+//   worldFns(world, seed) → W           the world functions of one run, cached (the last few seeds)
+//     W.heightAt(gx, gy) → int          ground height in blocks above the datum (stand = FLOOR_Z + height)
+//     W.columnAt(gx, gy) → { height, cliff, water, ground, near }   the same with what made it
+//     W.treeAt(cx, cy) → tree | null    the tree of 3×3-tile world cell (cx, cy): { gx, gy, base, trunk }
+//     W.portsOf(wx, wy) → [port]        where roads and rivers cross the span's open edges (gen/ports.js)
+//     W.channel(wx, wy, port) → rect    a port's straight approach in world coordinates
+//   heightAt(world, seed, gx, gy), treeAt(world, seed, cx, cy)   the same, uncached
+//   SURFACE_RULES                       the numbers (gen/surface.js re-exports them)
 //
-// Signatures as built in 0A2, not as TECH_DESIGN §1.4 wrote them: heightAt(run, gx, gy) → { h, cliff } and
-// treeAt(run, gx, gy) → { height, canopy } became (world, seed, …) → int (W.columnAt gives the cliff) and
-// (world, seed, cx, cy) → { gx, gy, base, trunk } (0A2.md §2). Generation code only: R6 (no Math.random,
-// Math.hypot or transcendental functions).
-export const STUB = "WS2";
-export { heightAt, treeAt, worldFns } from "./surface.js";
+// World coordinates: column x of span wx is gx = wx·80 + x (row y of span wy: gy = wy·48 + y), so two
+// zones that share an edge compute the same values for every column near it. A world function is a
+// pure function of (run seed, gx, gy) and the fixed world: integer hashes, + − × ÷, floor and sqrt only
+// (R6), so it gives the same bits in every engine. Retries re-roll only a zone's own features
+// (river bends, fords, sinkholes), never a world function.
+//
+// The height (heightAt), in order:
+//   relief  fbm noise of wavelength 24 and 12 tiles (two octaves) times 3 × the terrains' relief, blended bilinearly between
+//           the four nearest span centres. Its slope stays under 1 block per tile, so rounding never
+//           makes a 2-block step between 4-neighbours: the map (where heights are invisible) stays walkable.
+//   cliffs  a separate mask raises small areas by 5 (≥ 4, so even across the relief the step at a cliff's
+//           foot is 4 or more and the map draws it as a wall). No cliff within 10 tiles of a port or a
+//           landmark's flattened ground.
+//   rivers  a river comes in from its port straight for 8 tiles on both sides of the edge (the approach);
+//           the ground within d tiles of that channel is at most d high, so its banks slope down to the
+//           water, which sits at the datum on rock (it never drops you a level; every body floats on it).
+//   flatten world.flatten (fixed landmark footprints): inside the rect and its 2-tile skirt the ground is
+//           the landmark's datum; beyond it the height may differ from the datum by at most 1 block per
+//           tile, so the natural ground comes back within the 4-tile falloff (3 blocks of relief, 3 tiles).
+// Clamping with distances keeps every step at most 1 block, the property the slope rule needs.
+import { B, FLOOR_Z, SURFACE } from "../world.js";
+import { seedFor, hashInt, hashFloat, seededNoise, fbm, distance } from "../rng.js";
+import { FLATTEN_SKIRT } from "../world/worldmodel.js";
+import { portTable } from "./ports.js";
+
+export const SURFACE_RULES = {
+  reliefWave: 24,     // tiles: the relief noise's base wavelength; its second octave is half that, 12 (§5.3: at least 12)
+  maxRelief: 3,       // blocks: the relief's amplitude at relief 1 (§5.3: at most 3)
+  cliffRise: 5,       // blocks a cliff raises its area by
+  cliffWave: 9,       // tiles: the size of the cliff mask's blobs
+  cliffArea: 0.12,    // how much of the mask rises at cliffs 1 (the threshold is 1 − cliffArea × cliffs)
+  cliffClear: 10,     // tiles: no cliffs this close to a port or a landmark's flattened ground
+  approach: 8,        // tiles: a river runs straight in from its port this far on both sides of an edge
+  treeCell: 3,        // tiles: one tree candidate per 3×3-tile world cell
+  treeClear: 3,       // tiles: no tree this close to a port's channel
+  edgeKeep: 2,        // tiles: zone-local features keep this far from open edges (§5.1 e)
+  maxStand: 12,       // standable ground at most 12 blocks above the datum (DECISIONS: heights)
+  minNav: 0.9,        // at least 90% of the ground in one piece, under the map's step rules
+  maxSteps: 4,        // unplanned 2-block steps allowed
+  attempts: 10,
+};
+const R = SURFACE_RULES;
+const ZW = SURFACE.w, ZD = SURFACE.d;
+
+const fnCache = new WeakMap();   // world → Map(seed → W), the last few seeds only
+
+export function worldFns(world, seed) {
+  let bySeed = fnCache.get(world);
+  if (!bySeed) fnCache.set(world, (bySeed = new Map()));
+  const hit = bySeed.get(seed >>> 0);
+  if (hit) return hit;
+  const W = makeWorldFns(world, seed >>> 0);
+  if (bySeed.size >= 4) bySeed.delete(bySeed.keys().next().value);
+  bySeed.set(seed >>> 0, W);
+  return W;
+}
+export const heightAt = (world, seed, gx, gy) => makeWorldFns(world, seed >>> 0).heightAt(gx, gy);
+export const treeAt = (world, seed, cx, cy) => makeWorldFns(world, seed >>> 0).treeAt(cx, cy);
+
+const clampInt = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+const floorDiv = (a, b) => Math.floor(a / b);
+
+function makeWorldFns(world, seed) {
+  const { w: WW, h: WH } = world;
+  const sRelief = seedFor(seed, "relief") | 0, sCliff = seedFor(seed, "cliffs") | 0;
+  // Per-span terrain parameters (spans off the map take the nearest one's).
+  const n = WW * WH, relief = new Float64Array(n), cliffs = new Float64Array(n), trees = new Float64Array(n);
+  const ground = new Uint8Array(n);
+  for (const t of world.tiles) {
+    const T = world.terrains[t.terrain] || {}, i = t.wx + t.wy * WW;
+    relief[i] = T.relief ?? 0.3; cliffs[i] = T.cliffs ?? 0; trees[i] = T.trees ?? 0;
+    ground[i] = B[T.ground] ?? B.GRASS;
+  }
+  const spanIndex = (tx, ty) => clampInt(tx, 0, WW - 1) + clampInt(ty, 0, WH - 1) * WW;
+  // Bilinear blend of a per-span value between the four nearest span centres.
+  const blend = (arr, gx, gy) => {
+    const u = (gx + 0.5) / ZW - 0.5, v = (gy + 0.5) / ZD - 0.5;
+    const tx = Math.floor(u), ty = Math.floor(v), fx = u - tx, fy = v - ty;
+    const a = arr[spanIndex(tx, ty)], b = arr[spanIndex(tx + 1, ty)], c = arr[spanIndex(tx, ty + 1)], d = arr[spanIndex(tx + 1, ty + 1)];
+    return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+  };
+
+  const portsOf = portTable(world, seed);
+  // A port's channel (rivers) or approach (roads) in world coordinates: the port's tiles along the edge,
+  // `approach` tiles deep into each of the two spans. { x0, y0, x1, y1 } inclusive.
+  function channel(wx, wy, p) {
+    const A = R.approach, ox = wx * ZW, oy = wy * ZD;
+    if (p.side === "n" || p.side === "s") {
+      const ey = p.side === "n" ? oy : oy + ZD;   // the first row of the span below the edge
+      return { x0: ox + p.along, x1: ox + p.along + p.width - 1, y0: ey - A, y1: ey + A - 1 };
+    }
+    const ex = p.side === "w" ? ox : ox + ZW;
+    return { x0: ex - A, x1: ex + A - 1, y0: oy + p.along, y1: oy + p.along + p.width - 1 };
+  }
+  const rectDist = (r, gx, gy) => distance(Math.max(0, r.x0 - gx, gx - r.x1), Math.max(0, r.y0 - gy, gy - r.y1));
+
+  // The landmark footprints (world.flatten) near each span, in world coordinates with their skirt.
+  const flatNear = new Map();
+  function flattenNear(wx, wy) {
+    const key = `${wx},${wy}`;
+    if (flatNear.has(key)) return flatNear.get(key);
+    const out = world.flatten.filter((f) => Math.abs(f.wx - wx) <= 1 && Math.abs(f.wy - wy) <= 1).map((f) => ({
+      z: f.z, x0: f.wx * ZW + f.rect.x - FLATTEN_SKIRT, y0: f.wy * ZD + f.rect.y - FLATTEN_SKIRT,
+      x1: f.wx * ZW + f.rect.x + f.rect.w - 1 + FLATTEN_SKIRT, y1: f.wy * ZD + f.rect.y + f.rect.d - 1 + FLATTEN_SKIRT,
+    }));
+    flatNear.set(key, out);
+    return out;
+  }
+
+  function columnAt(gx, gy) {
+    const wx = floorDiv(gx, ZW), wy = floorDiv(gy, ZD);
+    let raw = R.maxRelief * blend(relief, gx, gy) * fbm(sRelief, gx / R.reliefWave, gy / R.reliefWave, 2);
+    let near = Infinity, water = 0;
+    const ports = portsOf(wx, wy);
+    const chans = [];
+    for (const p of ports) {
+      const c = channel(wx, wy, p), d = rectDist(c, gx, gy);
+      near = Math.min(near, d);
+      if (p.kind === "river") chans.push([p, c, d]);
+    }
+    const flats = flattenNear(wx, wy);
+    for (const f of flats) near = Math.min(near, rectDist(f, gx, gy));
+    let cliff = 0;
+    if (near >= R.cliffClear) {
+      const c = blend(cliffs, gx, gy);
+      if (c > 0 && seededNoise(sCliff, gx / R.cliffWave, gy / R.cliffWave) > 1 - R.cliffArea * c) cliff = R.cliffRise;
+    }
+    raw += cliff;
+    for (const [p, c, d] of chans) {
+      raw = Math.min(raw, d);
+      if (d === 0) {   // in the channel: shallow at its two sides, deep between
+        const across = p.side === "n" || p.side === "s" ? gx - c.x0 : gy - c.y0;
+        water = across === 0 || across === p.width - 1 ? 1 : 2;
+      }
+    }
+    for (const f of flats) {
+      const d = rectDist(f, gx, gy);
+      raw = Math.max(f.z - d, Math.min(f.z + d, raw));
+    }
+    const height = Math.max(0, Math.floor(raw + 0.5));
+    return { height: water ? 0 : height, cliff: cliff > 0 && height >= R.cliffRise ? 1 : 0, water,
+             ground: ground[spanIndex(wx, wy)], near };
+  }
+
+  // The tree of world cell (cx, cy), or null. The trunk sits somewhere in the cell's 3×3 tiles; the
+  // canopy is the 3×3 around it, so it may reach one tile into the next zone (both zones build it).
+  function treeAt(cx, cy) {
+    const C = R.treeCell;
+    const gx = cx * C + (hashInt(seed, "treeX", cx, cy) % C), gy = cy * C + (hashInt(seed, "treeY", cx, cy) % C);
+    if (!(hashFloat(seed, "tree", cx, cy) < blend(trees, gx, gy))) return null;
+    const col = columnAt(gx, gy);
+    if (col.cliff || col.water || col.near < R.treeClear) return null;
+    for (const f of flattenNear(floorDiv(gx, ZW), floorDiv(gy, ZD))) if (rectDist(f, gx, gy) < 2) return null;
+    return { gx, gy, base: FLOOR_Z + col.height, trunk: 4 + (hashInt(seed, "treeH", cx, cy) % 2) };
+  }
+
+  return { seed, world, portsOf, channel, columnAt, heightAt: (gx, gy) => columnAt(gx, gy).height, treeAt };
+}
