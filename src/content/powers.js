@@ -75,7 +75,7 @@ export const POWERS = {
   thriftyWick:  { tree: "glimcraft", name: "Thrifty wick",  info: "Your torch costs half as much glim.", bonus: () => ({ torchCost: -0.5 }) },
   kindleAtRange:{ tree: "glimcraft", name: "Kindle at range", info: "Light braziers from 4 tiles away.", needs: "WS10" },
   oilFire:      { tree: "glimcraft", name: "Oil fire",      info: "Set glim puddles alight.", needs: "WS6b" },
-  keenEyeSites: { tree: "survey",    name: "Keen Eye",      info: "You find hidden sites twice as often on the road (20%).", needs: "WS1" },
+  keenEyeSites: { tree: "survey",    name: "Keen Eye",      info: "You find hidden sites twice as often on the road (20%)." },   // (overworld/encounters.js reads it)
   readHeights:  { tree: "survey",    name: "Read heights",  info: "For 10 s after a look in 3D, map tiles show their height as a digit.", needs: "WS3" },
   hourScript:   { tree: "lore",      name: "Hour script",   info: "You read one more account on every stele.", needs: "WS7" },
   gossip:       { tree: "lore",      name: "Gossip",        info: "One free rumour in every village.", needs: "WS7" },
@@ -86,9 +86,9 @@ export const POWERS = {
   recharge:     { tree: "artificing", name: "Recharge",     info: "Refill cells with glim.", needs: "WS5" },
   keenFingers:  { tree: "artificing", name: "Keen fingers", info: "+3 to examine artifacts.", bonus: () => ({ examine: 3 }) },
   mod:          { tree: "artificing", name: "Mod",          info: "Add one property to an item.", needs: "WS5" },
-  pathfinder:   { tree: "pathcraft", name: "Pathfinder",    info: "You travel half again as far in an hour.", bonus: () => ({ travel: 0.5 }), needs: "WS1" },
-  terrainLore:  { tree: "pathcraft", name: "Terrain lore",  info: "Three quarters less likely to get lost in one terrain (once for each terrain).", needs: "WS1" },
-  homingSense:  { tree: "pathcraft", name: "Homing sense",  info: "Half the time you find your way again at once when lost.", needs: "WS1" },
+  pathfinder:   { tree: "pathcraft", name: "Pathfinder",    info: "You travel half again as far in an hour.", bonus: () => ({ travel: 0.5 }) },   // (overworld/travel.js)
+  terrainLore:  { tree: "pathcraft", name: "Terrain lore",  info: "Three quarters less likely to get lost in one terrain (once for each terrain)." },   // (overworld/lost.js)
+  homingSense:  { tree: "pathcraft", name: "Homing sense",  info: "Half the time you find your way again at once when lost." },   // (overworld/lost.js)
   warmHands:    { tree: "parley",    name: "Warm Hands",    info: "Later Kindlings go 20 further." },   // (social/ritual.js reads it)
   intimidate:   { tree: "parley",    name: "Intimidate",    info: "Make the weak think twice.", needs: "WS6a" },
   chime:        { tree: "parley",    name: "Chime",         info: "Recruit by preaching.", needs: "WS6b" },
