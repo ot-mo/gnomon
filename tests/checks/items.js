@@ -742,6 +742,26 @@ export function checkItems(m) {
       if (view === "map") m.time.skipTime(game, 1, { interruptible: false }); else game.debug.step(1 / 30);
       if (game.zone.holeSeen[hole] !== 1) fail(`${view}: the plumb-line ear didn't mark a pit 2 tiles away`);
     }
+    // Through the clock (skipTime fires clock:tick, as frames and map actions do), on the start span's open ground from
+    // 06:00: 600 s by day with the torch lit (sun +500, dark +0), then to 19:00, then 300 s of night with the torch out
+    // (sun +0, dark +250); the same in one skip as in ten.
+    const clocked = (pieces) => {
+      startRun(7);
+      game.pages = null; game.pendingPages = null; game.story.cube = true; game.modeStack = []; game.mode = "map"; game.view = "map";
+      const q = game.player, sunC = { kind: "cell", id: "sun", charge: 0 }, darkC = { kind: "cell", id: "dark", charge: 0 };
+      q.inv.push(sunC, darkC); q.torch = true;
+      const skip = (secs) => { for (let k = 0; k < pieces; k++) m.time.skipTime(game, secs / pieces, { interruptible: false }); };
+      skip(600);
+      const day = [sunC.charge, darkC.charge];
+      skip(180);
+      const dusk = sunC.charge;
+      q.torch = false;
+      skip(300);
+      return { day, sunAt19: dusk, night: [sunC.charge - dusk, darkC.charge] };
+    };
+    const c1 = clocked(1), c10 = clocked(10);
+    if (!same(c1, c10) || !same(c1.day, [500, 0]) || !same(c1.night, [0, 250])) fail(`cells through the clock: one skip ${JSON.stringify(c1)}, ten ${JSON.stringify(c10)} (want day [500, 0], night [0, 250])`);
+    stats.cellsByClock = c1;
     const one = recharge(1, 600, false, false), split = recharge(10, 60, false, false);
     if (!same(one, split) || one[1] !== 500 || one[0] !== 0) fail(`a dark cell over 600 s underground with the torch out: one step ${one}, ten steps ${split} (want [0, 500])`);
     stats.cells = { darkOver600s: one[1], glimFill: paid };
