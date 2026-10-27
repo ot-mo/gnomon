@@ -765,7 +765,7 @@ export async function run(env) {
   {
     const setup = () => {
       fresh(1234, { genotype: "bent" });
-      p().funds = 200; p().inv = []; p().torch = true; setEgo(16); p().perks = [];
+      p().funds = 200; p().inv = []; p().torch = true; setEgo(16); p().perks = {};
       game.view = "map";
     };
     const face = (c) => { p().yaw = Math.atan2(c.y - p().y, c.x - p().x); };
@@ -839,6 +839,14 @@ export async function run(env) {
     if (ops1[0][0] !== "hollowmere" || ops1[0][1] !== "likes" || !ops1.some(([id, op]) => id === "assize" && op === "dislikes")) fail(`Ama's opinions: ${JSON.stringify(ops1)}`);
     const again = bond("tracing", t1);
     if (Object.keys(again.moved).length) fail(`a second Tracing without Warm Hands moved ${JSON.stringify(again.moved)}`);
+    // With Warm Hands: +20 with EGO's share (EGO 24: +28), and never past the +120 (net 110: +10, then nothing).
+    p().perks = { warmHands: 1 };
+    const wh = bond("tracing", t1, { ego: 24 });
+    if (wh.moved.hollowmere !== 28 || ritual.kin(game, t1).net !== 28) fail(`a Warm Hands Kindling at EGO 24: +${wh.moved.hollowmere}, net ${ritual.kin(game, t1).net}, want +28`);
+    ritual.kin(game, t1).net = 110;
+    const wh2 = bond("tracing", t1, { ego: 24 }), wh3 = bond("tracing", t1, { ego: 24 });
+    if (wh2.moved.hollowmere !== 10 || wh3.moved.hollowmere || ritual.kin(game, t1).net !== 120) fail(`Warm Hands at net 110, EGO 24: +${wh2.moved.hollowmere} then +${wh3.moved.hollowmere || 0}, net ${ritual.kin(game, t1).net}; want +10, then 0, net 120`);
+    p().perks = {}; setEgo(16);
     // The Tracing with a vial of ink: the ink is spent, not glim.
     setup();
     const t1b = named("mira", "villager", "flatfolk", { near: [1, 0], name: "Ink" });

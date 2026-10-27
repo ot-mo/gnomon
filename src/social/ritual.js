@@ -197,9 +197,9 @@ export function performRite(game, c, rite) {
   const changes = {}, ego = egoFactor(game);
   const gain = (id, n) => { const m = n > 0 ? Math.round(n * ego) : n; if (m) { changes[id] = (changes[id] || 0) + m; } };
   const ks = kstate(game), key = kinKey(game, c), was = ks.kin[key];
-  if (was) {   // a later Kindling: Warm Hands' +20, within the cap
-    const room = K.cap - (was.net || 0), n = hasKey(p.perks, "warmHands") ? Math.min(K.warmHands, room) : 0;
-    if (n > 0) { gain(f, n); was.net = (was.net || 0) + (changes[f] || 0); }
+  if (was) {   // a later Kindling: Warm Hands' +20 (EGO's share first), within the cap
+    const room = K.cap - (was.net || 0), n = hasKey(p.perks, "warmHands") ? Math.min(Math.round(K.warmHands * ego), room) : 0;
+    if (n > 0) { changes[f] = n; was.net = (was.net || 0) + n; }
   } else {
     for (const [id, op] of opinionsOf(game, c)) if (FACTIONS[id] && K.bond[op]) gain(id, K.bond[op]);
     if (readingsOf(f).set.has(R.reading)) gain(f, K.ownReading);
