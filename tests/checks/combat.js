@@ -266,6 +266,23 @@ export function checkCombat({ game, startRun, srcFiles }) {
       const heldBody = p.body;
       p.body = makeBody(p.body?.plan || "humanoid"); invalidateStats(p);
       const fistSpec = weaponSpec(p);
+      // In gauntlets 1d4; with truesteel knuckles fitted (WS5's implant) 2d4 that crush (WS5's request 7).
+      const gloves = p.body.parts.find((q) => q.type === "gloves");
+      p.body.equip[gloves.id] = { kind: "armour", id: "gauntlets", ench: 0, known: true }; invalidateStats(p);
+      const gauntletSpec = weaponSpec(p);
+      p.body.equip[gloves.id] = null;
+      p.body.implants[gloves.id] = { kind: "implant", id: "knuckles" }; invalidateStats(p);
+      const knuckleSpec = weaponSpec(p);
+      expect(`${fistSpec.dmg}` === "1,2" && `${gauntletSpec.dmg}` === "1,4" && `${knuckleSpec.dmg}` === "2,8" && knuckleSpec.crush && !gauntletSpec.crush && !fistSpec.crush,
+        `fists: bare ${fistSpec.dmg}, gauntlets ${gauntletSpec.dmg}, truesteel knuckles ${knuckleSpec.dmg} crush ${!!knuckleSpec.crush} (want 1-2, 1-4, 2-8 that crush)`);
+      {   // the crush doubles a blow on the brittle (a skeleton), as bonus crush does
+        const bones = mk("skeleton", 3, [9, 5]); bones.hp = bones.maxHp = 1e6; bones.armour = 0;
+        const plainK = { ...knuckleSpec, crush: false };
+        game.combatRng = makeRng(41); const crushed = mean(blows(bones, knuckleSpec, 4000).filter((x) => !x.crit).map((x) => x.dmg));
+        game.combatRng = makeRng(41); const unCrushed = mean(blows(bones, plainK, 4000).filter((x) => !x.crit).map((x) => x.dmg));
+        bones.hp = 0; field.creatures.splice(field.creatures.indexOf(bones), 1);
+        expect(Math.abs(crushed / unCrushed - 2) < 0.05, `truesteel knuckles on a skeleton: ${crushed.toFixed(2)} against ${unCrushed.toFixed(2)} without the crush (want ×2)`);
+      }
       p.body = heldBody; invalidateStats(p);
       const dagger = { kind: "melee", weapon: null, dmg: [...WEAPONS.dagger.dmg], ench: 0, element: null, req: WEAPONS.dagger.str, acc: 0, material: 0 };
       const fistMean = mean(blows(dummy, fistSpec, 20000).filter((x) => !x.crit).map((x) => x.dmg));

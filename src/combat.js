@@ -44,7 +44,8 @@ import { colossusCore } from "./guardians.js";
 import { EYE, attackTime, armourValue, weaponReach } from "./player.js";
 import { sfx } from "./sfx.js";
 import { attr, maxHp, mod, bonus } from "./stats.js";
-import { wielded } from "./body.js";
+import { wielded, worn } from "./body.js";
+import { IMPLANTS } from "./content/items/implants.js";
 import { addStatus, hasStatus, statusFlag, cooldownLeft, startCooldown, dvOf as playerDv } from "./status.js";
 import { RULES } from "./rules.js";
 import { emit } from "./events.js";
@@ -80,10 +81,17 @@ export function resistText(m) {
 // --- Specs ------------------------------------------------------------------------------------------
 // The wielded weapon (bonus maxDmg widens the top of the range). Material: bible §13.1, 0 until items
 // carry one. Bare hands (fists): req 0 for the legacy set and the to-hit; d20 damage counts STR over
-// RULES.d20.fistReq instead.
+// RULES.d20.fistReq instead. Fists hit for 1-2; in gauntlets 1d4; with truesteel knuckles fitted (WS5's implant,
+// effect "knuckles"; bible §13.6) 2d4, and they crush (×2 against the brittle, as bonus crush does).
+const fitted = (e, effect) => !!e.body?.implants && e.body.parts.some((q) => IMPLANTS[e.body.implants[q.id]?.id]?.effect === effect);
 export function weaponSpec(e) {
   const it = wielded(e), w = it && WEAPONS[it.id];
-  if (!w) return { kind: "melee", weapon: null, dmg: [1, 2 + bonus(e, "maxDmg")], ench: 0, element: null, req: 0, acc: 0, material: 0, fists: true };
+  if (!w) {
+    const knuckles = fitted(e, "knuckles"), gauntlets = !knuckles && worn(e).some((g) => g.kind === "armour" && g.id === "gauntlets");
+    const dmg = knuckles ? [2, 8] : gauntlets ? [1, 4] : [1, 2];
+    return { kind: "melee", weapon: null, dmg: [dmg[0], dmg[1] + bonus(e, "maxDmg")], ench: 0, element: null, req: 0, acc: 0, material: 0, fists: true,
+             ...(knuckles ? { crush: true } : {}) };
+  }
   return { kind: "melee", weapon: it, dmg: [w.dmg[0], w.dmg[1] + bonus(e, "maxDmg")], ench: it.ench || 0, element: it.element || null,
            req: strNeeded(it), acc: w.acc || 0, material: it.material || 0 };
 }
@@ -280,12 +288,12 @@ export function resolveAttack(game, att, tgt, spec, ctx = {}) {
 
 // The multipliers of a blow of yours on a creature (both sets): element, holy, crush, burn, executioner,
 // giant-slayer.
-function yourMultipliers(game, p, m, dmg, el, vs) {
+function yourMultipliers(game, p, m, dmg, el, vs, crushes = false) {
   const t = CREATURE_TYPES[m.type];
   if (el === "holy" && t.undead && vs !== "resist") dmg *= 2;
   if (vs === "weak") dmg = Math.ceil(dmg * 1.5);
   if (vs === "resist") dmg = Math.max(1, Math.round(dmg * 0.6));
-  if (t.brittle && bonus(p, "crush") > 0) dmg *= 2;
+  if (t.brittle && (crushes || bonus(p, "crush") > 0)) dmg *= 2;
   if (hasStatus(m, "burning") && bonus(p, "burnBonus") > 0) dmg = Math.ceil(dmg * (1 + bonus(p, "burnBonus")));
   if (m.hp < m.maxHp * 0.25 && hasKey(p.perks, "executioner")) dmg = Math.ceil(dmg * 1.5);
   if ((m.elite || t.guardian || t.boss) && hasKey(p.perks, "giantSlayer")) dmg = Math.ceil(dmg * 1.3);
@@ -339,7 +347,7 @@ function legacyBlow(game, att, tgt, spec, ctx, result) {
     const crit = R() < RULES.legacy.crit + bonus(p, "crit");
     let dmg = Math.max(1, roll(R, spec.dmg[0], spec.dmg[1]) + spec.ench + Math.max(0, Math.floor((attr(p, "str") - spec.req) / 2)));
     const el = spec.element, vs = elementVs(tgt, el);
-    dmg = yourMultipliers(game, p, tgt, dmg, el, vs);
+    dmg = yourMultipliers(game, p, tgt, dmg, el, vs, !!spec.crush);
     const sunder = crit && bonus(p, "sunder") > 0;
     if (crit) dmg *= sunder ? 3 : 2;
     if (isFlat(tgt) && result.view !== "map") dmg = Math.max(1, Math.floor(dmg / 2));   // the Edge of the Plane, in 3D
@@ -412,7 +420,7 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
   }
   const t = CREATURE_TYPES[tgt.type];
   const el = you && spec.kind === "melee" ? spec.element : null, vs = elementVs(tgt, el);
-  if (you) dmg = yourMultipliers(game, p, tgt, dmg, el, vs);
+  if (you) dmg = yourMultipliers(game, p, tgt, dmg, el, vs, !!spec.crush);
   const sunder = you && crit && spec.kind === "melee" && bonus(p, "sunder") > 0;   // Sunder: crits ×3, through armour
   result.mult = crit ? (sunder ? 3 : D.crit) : 1;
   dmg *= result.mult;
