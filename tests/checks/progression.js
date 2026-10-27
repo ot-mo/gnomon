@@ -24,7 +24,37 @@
 //   5. Names (bible §2.3, §15.11): 10,000 suggestions for each culture, none longer than 9 letters a word, none with a
 //      banned word (check-names' list).
 //   6. The old game under the legacy set: the quick start's player has no origin; a level gives +3 HP with the
-//      parent's line and opens the parent's card ("Choose a gift"); offerPerks draws only the parent's 25.
+//      parent's line and opens the parent's card ("Choose a gift"); offerPerks draws only the parent's 25. The quick
+//      start keeps P0's innate Fold Step on key 1 (4 tiles), and has no mutations.
+// Part 4b (section 7, under the attribute set):
+//   7.1 The table (bible §10.3, §13.5, §15.6): at least 16 physical and mental mutations, 4 defects refunding 2-3,
+//       every one a name, a kind, cost 4 (a defect −2 or −3), a max of 1-10, info at every level, bonus keys the stat
+//       bus knows, abilities registered as the mutation's, exclusions both ways, reputation by bible faction ids; the
+//       planar ones (◆) and at least two that bridge the views.
+//   7.2 Offers: 3, different, at least one planar, none you have, none excluded, no defect; the same seed and body
+//       give the same offers (300 seeds), other seeds others; the sheet's offers stand until you buy one; the
+//       wizard's are the same for the same seed.
+//   7.3 The crease economy: 12 at creation (a defect's refund on top), 4 a mutation, 1 a level, the cap floor(level /
+//       2) + 1 and at most the mutation's max; every refusal for its reason (no creases, had, excluded, a defect in
+//       play, the Plumb, past the cap); a mental mutation works at its level + EGO's modifier (and Cast adds it up);
+//       Spare Heart's TOU and the HP it brings; a made character has no innate ability and its hotbar holds its
+//       mutations' abilities in order; bible §10.4's reputation changes, at beginRun and in play, once each.
+//   7.4 Every active mutation fires through the real hotbar key in 3D (abilities.js aimTarget) and on the map
+//       (requestTarget's stub, the use's mapTime) with its effect (quills, flight, fire and burning, flat with the
+//       map forced, sightings on the map, a 9 × 9 drawn onto the map, flat beings marked in both views, a brazier
+//       lit, a fold of 4 + level tiles, EGO's level added); from the use to ready again is the same cooldown
+//       seconds in both views (the WIL-scaled abilityCooldown).
+//   7.5 Cast (bible §10.3): the wake chance's formula (EGO included, 75% at most); a turn of the world (the view
+//       changing in one zone) rolls it, seeded; the third wake in a zone warns and sends "smoothers" 10 s later with
+//       the pack's size; a flat forced map isn't a turn.
+//   7.6 Defects that come and go: Dark-fear shaken (−2 to hit, −1 DV) with the torch out, Moth-kissed with it lit,
+//       Lightsick 1 HP every 20 s under the open sky; Crooked Manner −50 with every faction.
+//   7.7 B (abilities) and K (the sheet) at 100×30 through the real key and mouse dispatch: B's list with cooldowns,
+//       1-9 and a click on a slot assign, 0 and a right click clear, the hint about keys 1-9; K's four tabs by Tab and
+//       by clicks, an attribute point spent by Enter and by [+], a mutation raised and an offer bought, by keys and
+//       [+1] / [+4]; nothing drawn into the last column, every row's text inside the box.
+//   7.8 The wizard's mutation step with real offers: an offer taken by keys and by clicks, a defect taken and given
+//       back, a defect refused while its creases are spent, the run begun with exactly those mutations.
 import { findHits, DENY } from "./names.js";
 
 const NAME = "progression";
@@ -99,7 +129,9 @@ export async function checkProgression(m) {
       "no name": [{ name: "  " }, /no name/], "a 25-letter name": [{ name: "Å".repeat(25) }, /longer than 24/], "no mode": [{ mode: "pressed" }, /no run mode/],
       "a newline in the name": [{ name: "Ann\nMari" }, /control character/], "a NUL in the name": [{ name: "Ann\u0000" }, /control character/],
       "a direction mark in the name": [{ name: "Ann\u202e" }, /control character/], "a lone combining mark for a name": [{ name: "\u0301" }, /no letter/],
-      "an unknown mutation": [{ mutations: ["wings"] }, /no mutation wings/], "an implant for the Bent": [{ implant: "tallyEye" }, /take no implants/],
+      "an unknown mutation": [{ mutations: ["featherScales"] }, /no mutation featherScales/],
+      "a mutation taken twice": [{ mutations: ["wings", "wings"] }, /taken twice/], "two that can't share a body": [{ mutations: ["shellback", "wings"] }, /can't share a body/],
+      "four mutations (16 creases)": [{ mutations: ["wings", "gills", "foldStep", "kindle"] }, /cost 16 creases/], "mutations not a list": [{ mutations: "wings" }, /must be a list/], "an implant for the Bent": [{ implant: "tallyEye" }, /take no implants/],
     };
     let refused = 0;
     for (const [what, [change, why]] of Object.entries(bad)) {
@@ -415,6 +447,11 @@ export async function checkProgression(m) {
       const attrs = W.wizard().attrs;
       if (C.pointsLeft(g, attrs) !== 0) fail(`wizard: ${C.pointsLeft(g, attrs)} points left after moving two (${JSON.stringify(attrs)})`);
       press("Enter"); expect("track", "Enter on the attributes");
+      if (g === "bent") {   // Enter takes the first offer (4 creases), End and Enter go on
+        press("Enter");
+        if (W.wizard().mutations.length !== 1) fail(`wizard: Enter on an offer took ${JSON.stringify(W.wizard().mutations)}`);
+        press("End");
+      }
       press("Enter"); expect("name", "Enter on the second track");
       if (!W.wizard().name) fail("wizard: no name suggested");
       press("Tab"); const second = W.wizard().name;
@@ -437,6 +474,7 @@ export async function checkProgression(m) {
         fail(`wizard: began ${p.name}, ${p.genotype}, ${p.background}, ${game.state.mode}, seed ${game.seed}`);
       for (const k of st.ATTRS) if (p.attrs[k] !== attrs[k]) fail(`wizard: ${k} began at ${p.attrs[k]}, chose ${attrs[k]}`);
       if (g === "plumb" && p.origin.implant !== BACKGROUNDS[bg].implant) fail(`wizard: the Plumb's implant is ${p.origin.implant}`);
+      if (g === "bent" && (Object.keys(p.mutations).length !== 1 || p.creases !== 8)) fail(`wizard: the Bent began with ${JSON.stringify(p.mutations)} and ${p.creases} creases`);
       steps.push(`${g} by keys`);
     }
     // By mouse: a Plumb (Forgehand of Orrum), [-] [+], a suggested name, Commons Lamp, a step at the top to go back.
@@ -495,7 +533,7 @@ export async function checkProgression(m) {
       steps.push("bent by mouse (refusals)");
       // Every step reached, back to the start, the cursor moved to the other genotype, and a click on Begin at the top:
       // the new genotype forgets the rest, so it goes to the backgrounds (it once drew the summary with no background).
-      for (let k = 0; k < 8 && at() !== "begin"; k++) press("Enter");
+      for (let k = 0; k < 8 && at() !== "begin"; k++) { if (at() === "track") press("End"); press("Enter"); }
       for (let k = 0; k < 8 && at() !== "genotype"; k++) press("Escape");
       press("ArrowDown");
       let threw = null;
@@ -564,14 +602,481 @@ export async function checkProgression(m) {
     if (strays.length) fail(`legacy offers powers the parent didn't have: ${strays.join(", ")}`);
     if (seen.size !== 25) fail(`300 legacy offers drew ${seen.size} of the parent's 25 perks`);
     // The run seam takes a made character once, then the quick start again.
+    if (JSON.stringify(p.innate) !== '["foldStep"]' || JSON.stringify(p.hotbar) !== '["foldStep"]' || p.mutations || m.abilities.abilityRange(p, "foldStep", 1) !== 4)
+      fail(`the quick start's abilities: innate ${JSON.stringify(p.innate)}, hotbar ${JSON.stringify(p.hotbar)}, mutations ${JSON.stringify(p.mutations)}`);
     const q1 = m.playerMod.makePlayer(), q2 = m.playerMod.makePlayer();
     if (q1 === q2 || q1.background || JSON.stringify(m.codec.encodePlayer(q1)) !== JSON.stringify(m.codec.encodePlayer(q2))) fail("makePlayer() doesn't make the same fresh quick start twice");
     out.legacy = `level 2: +3 HP, the parent's line and card; 300 offers from ${seen.size} perks`;
   }
 
+  // --- 7. Part 4b: mutations, abilities, the B and K screens -------------------------------------------------------
+  function section7() {
+    const MU = m.mutations.MUTATIONS, PM = m.pmut, A = m.abilities, T = m.turns, CR = m.creatures, WD = m.world, STS = m.status;
+    const ids = Object.keys(MU), byKind = (k) => ids.filter((id) => MU[id].kind === k);
+    // 7.1 The table.
+    {
+      const phys = byKind("physical"), ment = byKind("mental"), defects = byKind("defect");
+      if (phys.length + ment.length < 16) fail(`mutations: ${phys.length} physical and ${ment.length} mental, want 16 or more`);
+      if (defects.length < 4) fail(`mutations: ${defects.length} defects, want 4`);
+      const bridges = ids.filter((id) => MU[id].planar && MU[id].bridge);
+      if (bridges.length < 2) fail(`mutations: ${bridges.length} planar ones bridge the views, want 2 or more`);
+      for (const id of ids) {
+        const d = MU[id], at = `mutation ${id}`;
+        if (!d.name || !["physical", "mental", "defect"].includes(d.kind)) fail(`${at}: name ${d.name}, kind ${d.kind}`);
+        if (d.kind === "defect" ? ![-2, -3].includes(d.cost) : d.cost !== 4) fail(`${at}: cost ${d.cost}`);
+        if (!Number.isInteger(d.max) || d.max < 1 || d.max > 10) fail(`${at}: max ${d.max}`);
+        for (let l = 1; l <= 10; l++) if (typeof d.info(l) !== "string" || !d.info(l) || /undefined|NaN/.test(d.info(l))) fail(`${at}: info(${l}) = ${d.info(l)}`);
+        for (let l = 1; l <= d.max; l++) for (const k of Object.keys(d.bonus?.(l, { body: { equip: {} } }) || {})) if (!st.BONUS_KEYS.includes(k)) fail(`${at}: bonus key ${k}`);
+        if (d.ability && (A.ABILITIES[d.ability]?.source !== "mutation")) fail(`${at}: its ability ${d.ability} isn't a registered mutation ability`);
+        for (const x of d.excludes || []) if (!MU[x] || !MU[x].excludes?.includes(id)) fail(`${at}: excludes ${x}, which doesn't exclude it back`);
+        for (const f of Object.keys(d.rep || {})) if (!m.mutations.BIBLE_FACTIONS.includes(f)) fail(`${at}: reputation with ${f}, no faction of bible §15.4`);
+        if (d.kind === "defect" && (d.ability || d.planar)) fail(`${at}: a defect with an ability or planar`);
+      }
+      // Bible §10.4's table, as the bible gives it.
+      const want = { wings: { kites: 400 }, shellback: { clatter: 200 }, lampskin: { moths: 200, lampless: -200 }, flatwise: { flatfolk: 200, pressed: 100, assize: -200 }, gills: { clatter: 100 } };
+      for (const [id, rep] of Object.entries(want)) if (JSON.stringify(MU[id]?.rep) !== JSON.stringify(rep)) fail(`mutation ${id}: reputation ${JSON.stringify(MU[id]?.rep)}, the bible's ${JSON.stringify(rep)}`);
+      out.mutations = `${phys.length} physical, ${ment.length} mental, ${defects.length} defects; ${ids.filter((id) => MU[id].planar).length} planar, ${bridges.length} bridge the views (${bridges.join(", ")})`;
+    }
+
+    // A Bent begun on legacy level 3 of seed 7's test world (as check-abilities' fresh()), with these mutations.
+    function bentIn(muts, { view = "map", ego = 16, wil = 16, seed = 7, depth = 3 } = {}) {
+      const attrs = C.suggestSpread("bent", "reedcutter");
+      C.beginRun(game, choicesFor("reedcutter", attrs, { name: "Ilse" }), { seed });
+      game.pages = null; game.pendingPages = null; game.story.cube = true; game.modeStack = [];
+      const s = game.run.world.start;
+      game.debug.enterZone(`${s.wx},${s.wy},${depth}`, "down");
+      game.view = view; game.mode = view === "map" ? "map" : "explore"; game.paused = false;
+      game.zone.creatures = game.zone.creatures.filter((c) => c.talk);
+      game.zone.spikes = new Map();
+      const p = game.player;
+      p.attrs.ego = ego; p.attrs.wil = wil; p.maxHpGain = 999; st.invalidateStats(p); p.hp = st.maxHp(p);
+      p.creases = 99;
+      for (const id of muts) PM.gainMutation(game, p, id);
+      game.messages = [];
+      return p;
+    }
+    const runEast = (zone, n) => {
+      const { w, d, stand } = zone;
+      for (let y = 2; y < d - 2; y++)
+        for (let x = 2; x < w - n - 2; x++) {
+          let ok = true;
+          for (let k = 0; k <= n && ok; k++) {
+            const i = x + k + y * w, g = zone.get(x + k, y, WD.FLOOR_Z - 1);
+            if (stand[i] !== stand[x + y * w] || stand[i] < 0 || g === WD.B.STAIRS || g === WD.B.STAIRS_UP) ok = false;
+            for (const dz of [0, 1, 2]) if (zone.solid(x + k, y, stand[x + y * w] + dz)) ok = false;
+            for (const dy of [-1, 1]) if (stand[x + k + (y + dy) * w] < 0) ok = false;   // floor on both sides too (the cone, quills)
+          }
+          if (ok) return { x, y, z: stand[x + y * w] };
+        }
+      return null;
+    };
+    const place = (p, at, yaw = 0) => Object.assign(p, { x: at.x + 0.5, y: at.y + 0.5, z: at.z, vz: 0, yaw, pitch: 0, onGround: true });
+    const rat = (x, y, z, extra = {}) => Object.assign(CR.addCreature(game.zone, CR.spawnCreature("rat", x, y, z, { rng: () => 0.5, state: "idle" })), extra);
+    const said = (re) => game.messages.some((x) => re.test(x.text));
+    const keyFor = (p, ability) => { const k = (p.hotbar || []).indexOf(ability); return k >= 0 ? `Digit${k + 1}` : null; };
+
+    // 7.2 Offers.
+    {
+      const body = { genotype: "bent", level: 1, mutations: {} };
+      let same = 0, differ = 0, planar = 0, bad = [];
+      const sets = new Set();
+      for (let seed = 1; seed <= 300; seed++) {
+        const a = PM.mutationOffers(null, body, R.makeRng(R.seedFor(seed, "check", 0)));
+        const b = PM.mutationOffers(null, body, R.makeRng(R.seedFor(seed, "check", 0)));
+        if (JSON.stringify(a) === JSON.stringify(b)) same++;
+        sets.add([...a].sort().join());
+        if (a.length !== 3 || new Set(a).size !== 3) bad.push(`seed ${seed}: ${a}`);
+        if (a.some((id) => MU[id].planar)) planar++;
+        if (a.some((id) => MU[id].kind === "defect")) bad.push(`seed ${seed}: a defect offered`);
+      }
+      if (same !== 300) fail(`offers: ${300 - same} of 300 seeds gave other offers the second time`);
+      if (planar !== 300) fail(`offers: ${300 - planar} of 300 offers had no planar mutation`);
+      if (sets.size < 150) fail(`offers: 300 seeds gave only ${sets.size} different sets`);
+      if (bad.length) fail(`offers: ${bad.slice(0, 3).join("; ")}`);
+      // With mutations had: none of them, nothing excluded; planar still there while any is left.
+      const had = { genotype: "bent", level: 1, mutations: { shellback: 1, foldStep: 1, overlook: 1 } };
+      for (let seed = 1; seed <= 100; seed++) {
+        const a = PM.mutationOffers(null, had, R.makeRng(seed));
+        if (a.some((id) => had.mutations[id] || id === "wings")) fail(`offers with ${Object.keys(had.mutations)}: ${a} (one had, or Wings, which Shellback excludes)`);
+        if (!a.some((id) => MU[id].planar)) fail(`offers with three had: no planar one (${a})`);
+      }
+      // The sheet's offers (offerRng): the same until one is bought, then others.
+      const p = bentIn([]);
+      const o1 = PM.mutationOffers(game, p), o2 = PM.mutationOffers(game, p);
+      if (JSON.stringify(o1) !== JSON.stringify(o2)) fail(`the sheet's offers changed with nothing bought: ${o1} / ${o2}`);
+      PM.gainMutation(game, p, o1[0]);
+      const o3 = PM.mutationOffers(game, p);
+      if (o3.includes(o1[0]) || JSON.stringify(o3) === JSON.stringify(o1)) fail(`the sheet's offers after buying ${o1[0]}: ${o3}`);
+      out.offers = `300 seeds: the same offers twice, a planar one in each, ${sets.size} different sets; the sheet's stand until one is bought`;
+    }
+
+    // 7.3 The crease economy.
+    {
+      const attrs = C.suggestSpread("bent", "reedcutter");
+      const mk = (muts) => C.makeCharacter(choicesFor("reedcutter", attrs, { mutations: muts }));
+      let p = mk([]);
+      if (p.creases !== 12 || JSON.stringify(p.mutations) !== "{}" || JSON.stringify(p.innate) !== "[]" || JSON.stringify(p.hotbar) !== "[]" || A.abilitiesOf(p).length)
+        fail(`a Bent with no mutations: ${p.creases} creases, ${JSON.stringify(p.mutations)}, innate ${JSON.stringify(p.innate)}, hotbar ${JSON.stringify(p.hotbar)}, ${A.abilitiesOf(p).length} abilities`);
+      p = mk(["foldStep", "wings", "spareHeart"]);
+      if (p.creases !== 0 || JSON.stringify(p.hotbar) !== '["foldStep","wingsUp"]') fail(`three mutations: ${p.creases} creases, hotbar ${JSON.stringify(p.hotbar)}`);
+      if (A.abilitiesOf(p).map((a) => `${a.id}:${a.source}`).join() !== "foldStep:mutations,wingsUp:mutations") fail(`three mutations' abilities: ${JSON.stringify(A.abilitiesOf(p))}`);
+      if (st.attr(p, "tou") !== attrs.tou + 2 + 2 || p.hp !== st.maxHp(p) || st.maxHp(p) !== attrs.tou + 4 + 4) fail(`Spare Heart: TOU ${st.attr(p, "tou")}, HP ${p.hp} of ${st.maxHp(p)} (bought TOU ${attrs.tou}, +2 Reedcutter, +2 the heart)`);
+      p = mk(["darkFear", "lightsick", "wings", "gills", "foldStep", "kindle"]);   // 12 + 3 + 2 = 17 creases, 16 spent
+      if (p.creases !== 1 || Object.keys(p.mutations).length !== 6) fail(`two defects and four mutations: ${p.creases} creases left, ${Object.keys(p.mutations)}`);
+      if (C.validateChoices(choicesFor("reedcutter", attrs, { mutations: ["wings", "gills", "foldStep", "kindle", "lightsick"] })).length !== 1) fail("four mutations and a −2 defect (14 creases) weren't refused");
+      // Raising: the cap is floor(level / 2) + 1, at most the mutation's max and 10.
+      p = mk(["foldStep", "gills"]);
+      p.creases = 50;
+      const cap = (lvl) => { p.level = lvl; return PM.levelCap(p, "foldStep"); };
+      if ([1, 2, 3, 5, 18, 19, 30].map(cap).join() !== "1,2,2,3,10,10,10") fail(`the cap at levels 1, 2, 3, 5, 18, 19, 30: ${[1, 2, 3, 5, 18, 19, 30].map(cap)}`);
+      p.level = 1;
+      if (!/until you're level 2/.test(PM.canRaise(p, "foldStep") || "")) fail(`raising at level 1: ${PM.canRaise(p, "foldStep")}`);
+      p.level = 5;
+      PM.raiseMutation(null, p, "foldStep"); PM.raiseMutation(null, p, "foldStep");
+      if (p.mutations.foldStep !== 3 || p.creases !== 48) fail(`two raises at level 5: level ${p.mutations.foldStep}, ${p.creases} creases`);
+      if (!/until you're level 6/.test(PM.canRaise(p, "foldStep") || "")) fail(`a fourth level at level 5: ${PM.canRaise(p, "foldStep")}`);
+      if (!/as strong as it gets/.test(PM.canRaise(p, "gills") || "")) fail(`raising Gills (max 1): ${PM.canRaise(p, "gills")}`);
+      p.creases = 0; p.level = 9;
+      if (!/costs 1 crease/.test(PM.canRaise(p, "foldStep") || "")) fail(`raising with no creases: ${PM.canRaise(p, "foldStep")}`);
+      let threw = false;
+      try { PM.raiseMutation(null, p, "foldStep"); } catch (err) { threw = /^raiseMutation: /.test(err.message); }
+      if (!threw || p.mutations.foldStep !== 3) fail("raiseMutation with no creases didn't throw (or raised)");
+      // Gaining in play: every refusal for its reason.
+      const q = bentIn(["shellback"]);
+      q.creases = 3;
+      const refusals = { wings: /can't share a body/, shellback: /already/, lightsick: /from the start/, nope: /no mutation/, gills: /needs 4 creases/ };
+      for (const [id, re] of Object.entries(refusals)) if (!re.test(PM.canGain(game, q, id) || "")) fail(`canGain ${id}: ${PM.canGain(game, q, id)}`);
+      const plumb = C.makeCharacter(choicesFor("forgehandOfOrrum", C.suggestSpread("plumb", "forgehandOfOrrum")));
+      plumb.creases = 9;
+      if (!/take no mutations/.test(PM.canGain(null, plumb, "gills") || "")) fail(`a Plumb gaining Gills: ${PM.canGain(null, plumb, "gills")}`);
+      // A mental mutation works at its level + EGO's modifier (at least 1); a physical one at its level.
+      const r = bentIn(["foldStep", "overlook", "regeneration"], { ego: 20 });   // EGO mod +2
+      if (PM.mutationLevel(r, "foldStep") !== 3 || PM.mutationLevel(r, "regeneration") !== 1 || PM.castOf(r) !== 6) fail(`EGO 20: Fold Step at ${PM.mutationLevel(r, "foldStep")}, Regeneration ${PM.mutationLevel(r, "regeneration")}, Cast ${PM.castOf(r)}`);
+      if (A.abilityOf(r, "foldStep").lvl !== 3 || A.abilityRange(r, "foldStep", 3) !== 7) fail(`EGO 20: Fold Step's ability at ${A.abilityOf(r, "foldStep").lvl}, range ${A.abilityRange(r, "foldStep", 3)}`);
+      r.attrs.ego = 10; st.invalidateStats(r);   // mod −3
+      if (PM.mutationLevel(r, "foldStep") !== 1 || PM.castOf(r) !== 2) fail(`EGO 10: Fold Step at ${PM.mutationLevel(r, "foldStep")}, Cast ${PM.castOf(r)}`);
+      if (st.bonus(r, "regen") !== 1.2) fail(`Regeneration 1: regen ${st.bonus(r, "regen")}`);
+      // Shellback works without body armour (clothes are none).
+      const sh = bentIn(["shellback"]);
+      const avBare = st.av(sh);
+      sh.body.equip.body = { kind: "armour", id: "plate", ench: 0, known: true }; st.invalidateStats(sh);
+      const avPlate = st.av(sh);
+      if (avPlate !== m.items.ARMOURS.plate.armour) fail(`Shellback under plate: AV ${avPlate}, want the plate's ${m.items.ARMOURS.plate.armour} alone`);
+      out.shellback = `AV ${avBare} bare, ${avPlate} in plate`;
+      // Reputation (bible §10.4): begun with Wings and Flatwise, once each; Wings gained in play.
+      const rep = (f) => m.factions.repOf(game, f);
+      C.beginRun(game, choicesFor("reedcutter", attrs, { mutations: ["wings", "flatwise"] }), { seed: 3 });
+      if (rep("kites") !== 400 || rep("flatfolk") !== 200 || rep("pressed") !== 100 || rep("assize") !== -200 || rep("clatter") !== 50) fail(`begun with Wings and Flatwise: kites ${rep("kites")}, flatfolk ${rep("flatfolk")}, pressed ${rep("pressed")}, assize ${rep("assize")}, clatter ${rep("clatter")} (the Reedcutter's 50)`);
+      const g = bentIn([]);
+      PM.gainMutation(game, g, "gills");
+      if (rep("clatter") !== 150) fail(`Gills gained in play: clatter ${rep("clatter")}, want 150 (50 + 100)`);
+      if (g.hotbar.includes("gills")) fail("a mutation without an ability went on the hotbar");
+      out.economy = "12 creases, 4 a mutation, 1 a level, the cap 1/2/3/10 at levels 1/3/5/18, refusals, EGO's levels, reputation";
+    }
+
+    // 7.4 Every active mutation in both views, through the real hotbar key.
+    {
+      const fired = {}, parity = {};
+      const cases = {
+        fling: { muts: ["thistlehide"], set: (p, at) => ({ r: rat(at.x + 1, at.y, at.z) }), ok: (p, s) => s.r.hp < s.hp0 || !game.zone.creatures.includes(s.r) },
+        wingsUp: { muts: ["wings"], ok: (p) => STS.statusLeft(p, "flying") > 24 },
+        bellows: { muts: ["bellowsThroat"], set: (p, at) => ({ r: rat(at.x + 2, at.y, at.z) }), ok: (p, s) => !game.zone.creatures.includes(s.r) || (s.r.hp < s.hp0 && STS.hasStatus(s.r, "burning")) },
+        flatwise: { muts: ["flatwise"], ok: (p) => STS.statusFlag(p, "flat") && game.mode === "map" },
+        echo: { muts: ["echoThroat"], set: (p, at) => { p.torch = false; return { r: rat(at.x + 6, at.y, at.z) }; },
+                ok: (p, s) => game.zone.sightings.get(s.r.id)?.time === game.time },
+        overlook: { muts: ["overlook"], set: () => { game.zone.seen.fill(0); return {}; }, ok: (p, s, at) => { let n = 0; for (let y = 0; y < game.zone.d; y++) for (let x = 0; x < game.zone.w; x++) if (game.zone.seen[x + y * game.zone.w] && Math.hypot(x - at.x, y - at.y) > 4) n++; return n >= 20; } },
+        shadowsense: { muts: ["shadowsense"], set: (p, at) => ({ r: rat(at.x + 5, at.y, at.z, { vis: { flat: true } }) }),
+                       after: () => { for (let k = 0; k < 40; k++) game.mode === "map" ? T.mapWait(game) : game.debug.step(1 / 60); },
+                       ok: (p, s) => game.zone.sightings.has(s.r.id) && game.effects.some((e) => e.kind === "damage" && e.text === s.r.glyph && Math.hypot(e.x - s.r.x, e.y - s.r.y) < 1.5) },
+        kindle: { muts: ["kindle"], set: (p, at) => {
+                    const bx = at.x + 3, by = at.y;
+                    game.zone.set(bx, by, WD.FLOOR_Z, WD.B.BRAZIER); game.zone.refresh();
+                    const ex = p.x, ey = p.y, ez = p.z + 1.45, dx = bx + 0.5 - ex, dy = by + 0.5 - ey, dz = WD.FLOOR_Z + 0.5 - ez;
+                    p.yaw = Math.atan2(dy, dx); p.pitch = Math.atan2(dz, Math.hypot(dx, dy));
+                    game.zone.seen[bx + by * game.zone.w] = 1;
+                    return { bx, by };
+                  }, ok: (p, s) => game.zone.get(s.bx, s.by, WD.FLOOR_Z) === WD.B.BRAZIER_LIT },
+        foldStep: { muts: ["foldStep"], ok: (p, s, at) => Math.floor(p.x) === at.x + 5 && Math.floor(p.y) === at.y },
+      };
+      const actives = ids.filter((id) => MU[id].ability).map((id) => MU[id].ability);
+      for (const ab of actives) if (!cases[ab]) fail(`no case for the active mutation ability ${ab}`);
+      for (const [ab, c] of Object.entries(cases)) {
+        for (const view of ["3d", "map"]) {
+          const p = bentIn(c.muts, { view });
+          const at = runEast(game.zone, 9);
+          if (!at) { fail(`${ab}: no open run on legacy level 3`); continue; }
+          place(p, at, view === "map" && ab !== "overlook" && ab !== "foldStep" ? Math.PI : 0);   // on the map the target decides, not the facing
+          const s = c.set?.(p, at) || {};
+          s.hp0 = s.r?.hp;
+          if (view === "map") T.refreshView(game);
+          const code = keyFor(p, ab);
+          if (!code) { fail(`${ab}: not on the hotbar (${JSON.stringify(p.hotbar)})`); continue; }
+          const t0 = game.time, lvl = A.abilityOf(p, ab)?.lvl, cd = A.abilityCooldown(p, ab, lvl);
+          press(code, code.slice(-1));
+          c.after?.();
+          if (!c.ok(p, s, at)) fail(`${ab} in ${view}: didn't work (${game.messages.slice(-2).map((x) => x.text).join(" / ")})`);
+          else fired[ab] = (fired[ab] || 0) + 1;
+          const used = view === "map" ? A.ABILITIES[ab].mapTime : 0;
+          if (!c.after && Math.abs(A.cooldownLeft(p, ab) - (cd - used)) > 1e-9) fail(`${ab} in ${view}: cooldown ${A.cooldownLeft(p, ab)} after the use, want ${cd - used}`);
+          if (view === "map" && !c.after && Math.abs(game.time - t0 - used) > 1e-9) fail(`${ab} on the map: the use took ${game.time - t0} s, want ${used}`);
+          // From the use to ready: the same seconds in both views.
+          let n = 0;
+          while (A.cooldownLeft(p, ab) > 0 && n++ < 20000) { if (game.mode === "map") T.mapWait(game); else game.debug.step(1 / 60); }
+          const took = game.time - t0, slack = view === "map" || game.mode === "map" ? 0.5 + 1e-9 : 1 / 60 + 1e-9;
+          if (Math.abs(took - cd) > slack) fail(`${ab} in ${view}: ready again after ${took.toFixed(3)} s, want ${cd}`);
+          (parity[ab] ||= {})[view] = +took.toFixed(3);
+          // Pressed again while it cools: refused, told.
+        }
+      }
+      // EGO adds to a mental mutation's reach: Fold Step at EGO 18 (mod +1) is level 2, 6 tiles.
+      {
+        const p = bentIn(["foldStep"], { view: "3d", ego: 18 }), at = runEast(game.zone, 9);
+        place(p, at, 0);
+        press(keyFor(p, "foldStep"), "1");
+        if (Math.floor(p.x) !== at.x + 6) fail(`Fold Step at EGO 18: landed ${Math.floor(p.x) - at.x} tiles on, want 6`);
+      }
+      // Refused while cooling, in either view: told, nothing moves.
+      {
+        const p = bentIn(["wings"], { view: "map" });
+        A.startCooldown(p, "wingsUp", 30);
+        const t0 = game.time;
+        press(keyFor(p, "wingsUp"), "1");
+        if (STS.hasStatus(p, "flying") || game.time !== t0 || !said(/isn't ready yet/)) fail("Wings while cooling down wasn't refused");
+      }
+      out.abilities = `${Object.keys(fired).length} abilities fired in both views (${Object.entries(fired).filter(([, n]) => n === 2).length} in each); ready again after ${JSON.stringify(parity)}`;
+    }
+
+    // 7.5 Cast and the Smoothers.
+    {
+      const p = bentIn(["foldStep", "overlook", "shadowsense", "kindle"], { ego: 16 });
+      const chance = (cast, ego) => { p.mutations = { foldStep: 1, overlook: 1, shadowsense: 1, kindle: Math.max(1, cast - 3) }; p.attrs.ego = ego; st.invalidateStats(p); return PM.wakeChance(p); };
+      // (At EGO 20 each of the four works 2 levels higher: Cast 20 bought is 28, less 2 × 2 for EGO: (28 − 14) × 2%.)
+      // (At EGO 10, mod −3: Kindle 9 works at 6, the rest at 1, Cast 9; the tolerance falls by 6: (9 − 10 + 6) × 2%.)
+      const table = [[12, 16, 0.04], [20, 16, 0.2], [30, 16, 0.4], [10, 16, 0], [20, 20, 0.28], [60, 16, 0.75], [12, 10, 0.1]];
+      for (const [cast, ego, want] of table) { const got = chance(cast, ego); if (Math.abs(got - want) > 1e-9) fail(`Cast ${cast}, EGO ${ego}: wake chance ${got}, want ${want}`); }
+      if (JSON.stringify(PM.packFor(20)) !== '{"size":2,"burnisher":false,"great":false}' || JSON.stringify(PM.packFor(45)) !== '{"size":4,"burnisher":true,"great":true}' || PM.packFor(30).size !== 3)
+        fail(`packs: ${JSON.stringify([PM.packFor(20), PM.packFor(30), PM.packFor(45)])}`);
+      // Turns of the world at Cast 60 (75%): watched in the views, the third wake warns and the pack comes 10 s later.
+      chance(60, 16);
+      const sent = [];
+      const off = m.events.on("smoothers", (g, e) => sent.push(e));
+      try {
+        game.state.cast = null; game.view = "map"; game.mode = "map";
+        step(1 / 60);
+        let turns = 0;
+        for (; turns < 40 && !game.state.cast?.pack; turns++) {
+          game.view = game.view === "map" ? "3d" : "map"; game.mode = game.view === "map" ? "map" : "explore";
+          step(1 / 60);
+        }
+        if (!game.state.cast?.pack || !said(/smooths itself out towards you/)) fail(`40 turns at 75% left no pack (${JSON.stringify(game.state.cast)})`);
+        const pack = { ...game.state.cast.pack };
+        game.view = "map"; game.mode = "map"; step(1 / 60);
+        while (game.time + 0.5 < pack.at) { T.mapWait(game); step(1 / 60); }
+        if (sent.length) fail(`the Smoothers came before 10 s (at ${game.time}, due ${pack.at})`);
+        T.mapWait(game); step(1 / 60);
+        if (sent.length !== 1 || sent[0].size !== 4 || !sent[0].burnisher || !sent[0].great) fail(`the pack: ${JSON.stringify(sent.map((e) => ({ size: e.size, burnisher: e.burnisher, great: e.great })))}`);
+        out.cast = `wake chances as bible §10.3; at Cast 60 the pack came after ${turns} turns, 10 s on`;
+        // The same seed and turns give the same wakes.
+        const replay = () => { game.state.cast = null; const w = []; for (let k = 0; k < 30; k++) w.push(PM.turnWorld(game)); return w.join(); };
+        if (replay() !== replay()) fail("Cast's wakes differ for the same seed and turns");
+        // Pressed flat onto the map is no turn.
+        game.view = "3d"; game.mode = "explore"; step(1 / 60);
+        game.state.cast = null;
+        STS.addStatus(game, p, "flat", { t: 3 });
+        step(1 / 60);
+        if (game.state.cast?.turns) fail(`a forced flat map counted as a turn (${game.state.cast.turns})`);
+      } finally { off(); }
+    }
+
+    // 7.6 Defects that come and go.
+    {
+      const p = bentIn([], { view: "map" });
+      p.creases = 0;
+      p.mutations = { darkFear: 1, mothKissed: 1 };
+      st.invalidateStats(p);
+      p.torch = false; step(1 / 60);
+      if (!STS.hasStatus(p, "shaken") || st.bonus(p, "toHit") !== -2 || st.bonus(p, "dv") !== -1 || STS.hasStatus(p, "mobbed")) fail(`Dark-fear with the torch out: ${JSON.stringify(Object.keys(p.status))}, toHit ${st.bonus(p, "toHit")}, DV bonus ${st.bonus(p, "dv")}`);
+      p.torch = true; step(1 / 60);
+      if (STS.hasStatus(p, "shaken") || !STS.hasStatus(p, "mobbed") || st.bonus(p, "stealth") !== -0.3) fail(`the torch lit: ${JSON.stringify(Object.keys(p.status))}, stealth ${st.bonus(p, "stealth")}`);
+      // Lightsick: on the surface by day, 1 HP every 20 s; underground nothing.
+      p.mutations = { lightsick: 1 }; st.invalidateStats(p);
+      const s = game.run.world.start;
+      game.debug.enterZone(`${s.wx},${s.wy},0`, "down");
+      game.view = "map"; game.mode = "map"; game.zone.creatures = game.zone.creatures.filter((c) => c.talk);
+      // Somewhere under the open sky (the start may be under the temple's roof).
+      let sunny = false;
+      for (let y = 1; y < game.zone.d - 1 && !sunny; y++) for (let x = 1; x < game.zone.w - 1 && !sunny; x++) {
+        const z = game.zone.stand[x + y * game.zone.w];
+        if (z >= 0 && m.light.naturalLight(game, game.zone, x + 0.5, y + 0.5, z + 1.45) >= 0.9) { Object.assign(p, { x: x + 0.5, y: y + 0.5, z }); sunny = true; }
+      }
+      step(1 / 60);
+      const hp0 = p.hp, t0 = game.time, noRegen = rules.overrideRules("regen", { ...rules.RULES.regen, base: 1e9 });   // (regeneration would heal it back)
+      try { for (let k = 0; k < 400 && game.time - t0 < 60; k++) { T.mapWait(game); step(1 / 60); } } finally { noRegen(); }
+      if (sunny && hp0 - p.hp !== 3) fail(`Lightsick for 60 s on the surface: lost ${hp0 - p.hp} HP, want 3`);
+      out.defects = `shaken / mobbed by the torch; Lightsick on the surface: ${hp0 - p.hp} HP in ${Math.round(game.time - t0)} s${sunny ? "" : " (no sky here!)"}`;
+      // Crooked Manner: −50 with every faction.
+      C.beginRun(game, choicesFor("reedcutter", C.suggestSpread("bent", "reedcutter"), { mutations: ["crookedManner"] }), { seed: 4 });
+      const reps = m.mutations.BIBLE_FACTIONS.map((f) => m.factions.repOf(game, f) - (BACKGROUNDS.reedcutter.rep[f] || 0));
+      if (reps.some((n) => n !== -50)) fail(`Crooked Manner: ${reps.join(", ")}`);
+    }
+
+    // 7.7 B and K at 100×30.
+    {
+      const text = () => { frame(); return Array.from({ length: capture.rows }, (_, y) => rowText(y)); };
+      // The panel (over the view: the map and its messages show around it) keeps inside its box: a border on every
+      // row, nothing past it, the box inside 100 columns.
+      const edge = (what) => {
+        const rows = text(), top = rows.findIndex((r) => /^.?\+-/.test(r)), x0 = rows[top]?.indexOf("+"), x1 = rows[top]?.lastIndexOf("+");
+        if (top < 0 || x1 >= capture.cols - 1 || x1 - x0 < 60) { fail(`${what}: no box inside the screen (${rows[top]?.slice(-20)})`); return; }
+        let bottom = top + 1;
+        while (bottom < rows.length && rows[bottom][x0] === "|") bottom++;
+        for (let y = top + 1; y < bottom; y++) if (rows[y][x1] !== "|") fail(`${what}: row ${y} runs over the box's edge: "${rows[y].slice(x1 - 20, x1 + 1)}"`);
+        if (rows[bottom]?.[x0] !== "+" || bottom - top < 20) fail(`${what}: the box is ${bottom - top + 1} rows tall`);
+      };
+      const p = bentIn(["foldStep", "wings", "echoThroat"], { view: "map" });
+      press("KeyB");
+      if (game.mode !== "abilities") fail(`B on the map opened ${game.mode}`);
+      let rows = text().join("\n");
+      for (const want of ["ABILITIES", "Fold Step", "Wings", "Echo", "keys 1-9 use these in 3D and on the map alike", "ready"]) if (!rows.includes(want)) fail(`B: "${want}" isn't on screen`);
+      edge("B");
+      // The second row (Wings) onto key 5 by its digit: off key 2.
+      press("ArrowDown"); press("Digit5", "5");
+      if (p.hotbar[4] !== "wingsUp" || p.hotbar[1]) fail(`B: 5 put Wings on ${JSON.stringify(p.hotbar)}`);
+      press("Digit0", "0");
+      if (p.hotbar.includes("wingsUp")) fail(`B: 0 left Wings on ${JSON.stringify(p.hotbar)}`);
+      press("Enter");
+      if (p.hotbar.indexOf("wingsUp") !== 1) fail(`B: Enter put Wings on ${JSON.stringify(p.hotbar)} (want the first free key, 2)`);
+      // A cooldown shows in the list.
+      A.startCooldown(p, "echo", 17);
+      if (!text().join("\n").includes("17s")) fail("B: a cooling ability doesn't show its seconds");
+      // By mouse: Echo chosen, a click on slot 9 puts it there; a right click empties it.
+      click("Echo", { row: "17s" });
+      click("9 ", { row: "1 Fold" });
+      if (p.hotbar[8] !== "echo") fail(`B: a click on slot 9 gave ${JSON.stringify(p.hotbar)}`);
+      const s9 = find("9 Echo");
+      if (s9) screens.dispatchMouse(game, 2, s9);
+      if (p.hotbar.includes("echo")) fail(`B: a right click on slot 9 left ${JSON.stringify(p.hotbar)}`);
+      click("[ Close ]");
+      if (game.mode !== "map") fail(`B: [ Close ] left ${game.mode}`);
+      press("KeyB"); press("Escape");
+      if (game.mode !== "map") fail(`B: Esc left ${game.mode}`);
+      // In 3D too.
+      game.view = "3d"; game.mode = "explore"; game.paused = false;
+      press("KeyB");
+      if (game.mode !== "abilities") fail(`B in 3D opened ${game.mode}`);
+      press("KeyB");
+      game.view = "map"; game.mode = "map";
+
+      // K: the attributes, a point spent by Enter and by [+].
+      p.attrPoints = 2; p.level = 6;
+      press("KeyK");
+      if (game.mode !== "char") fail(`K opened ${game.mode}`);
+      rows = text().join("\n");
+      for (const want of ["ATTRIBUTES", "Mutations", "Powers", "Effects", "HP ", "AV ", "DV ", "MA ", "Creases", "Cast", "2 attribute points"]) if (!rows.includes(want)) fail(`K: "${want}" isn't on screen`);
+      edge("K attributes");
+      const str0 = p.attrs.str, tou0 = p.attrs.tou, hp0 = p.hp, max0 = st.maxHp(p);
+      press("Enter");   // STR, the first row
+      if (p.attrs.str !== str0 + 1 || p.attrPoints !== 1) fail(`K: Enter on STR: ${p.attrs.str} (was ${str0}), ${p.attrPoints} points left`);
+      click("[+]", { row: "TOU" });
+      if (p.attrs.tou !== tou0 + 1 || p.attrPoints !== 0 || st.maxHp(p) <= max0 - 1 || p.hp - hp0 !== st.maxHp(p) - max0) fail(`K: [+] on TOU: ${p.attrs.tou} (was ${tou0}), ${p.attrPoints} left, HP ${hp0} → ${p.hp}, max ${max0} → ${st.maxHp(p)}`);
+      press("Enter");
+      if (!/no attribute points/.test(m.charsheet.sheetView(game).msg)) fail(`K: Enter with no points: "${m.charsheet.sheetView(game).msg}"`);
+      // The mutations tab by Tab: raise Fold Step by Enter, Wings by [+1]; buy an offer by Enter and one by [+4].
+      press("Tab");
+      if (m.charsheet.sheetView(game).tab !== "track") fail(`K: Tab went to ${m.charsheet.sheetView(game).tab}`);
+      edge("K mutations");
+      p.creases = 10;
+      press("Enter");
+      if (p.mutations.foldStep !== 2 || p.creases !== 9) fail(`K: Enter on Fold Step: level ${p.mutations.foldStep}, ${p.creases} creases`);
+      click("[+1]", { row: "Wings" });
+      if (p.mutations.wings !== 2 || p.creases !== 8) fail(`K: [+1] on Wings: level ${p.mutations.wings}, ${p.creases} creases`);
+      const offers = m.charsheet.sheetView(game).rows.filter((r) => r.offer).map((r) => r.offer);
+      if (offers.length !== 3 || JSON.stringify(offers) !== JSON.stringify(PM.mutationOffers(game, p))) fail(`K: the offers ${offers}, want ${PM.mutationOffers(game, p)}`);
+      press("End"); press("Enter");
+      if (!p.mutations[offers[2]] || p.creases !== 4) fail(`K: Enter on the last offer (${offers[2]}): ${JSON.stringify(p.mutations)}, ${p.creases} creases`);
+      const next = m.charsheet.sheetView(game).rows.filter((r) => r.offer).map((r) => r.offer);
+      click("[+4]");
+      if (Object.keys(p.mutations).length !== 5 || p.creases !== 0 || !next.some((id) => p.mutations[id])) fail(`K: [+4] gave ${JSON.stringify(p.mutations)}, ${p.creases} creases`);
+      press("ArrowUp"); press("Enter");
+      if (!/needs 4 creases|crease; you have none/.test(m.charsheet.sheetView(game).msg)) fail(`K: spending with no creases said "${m.charsheet.sheetView(game).msg}"`);
+      // The other tabs by click; Esc closes.
+      click("Powers");
+      if (m.charsheet.sheetView(game).tab !== "powers") fail(`K: a click on Powers went to ${m.charsheet.sheetView(game).tab}`);
+      edge("K powers");
+      click("Effects");
+      if (m.charsheet.sheetView(game).tab !== "effects") fail(`K: a click on Effects went to ${m.charsheet.sheetView(game).tab}`);
+      if (!text().join("\n").includes("WHAT ADDS UP")) fail("K: the effects tab shows no bonuses");
+      edge("K effects");
+      press("Escape");
+      if (game.mode !== "map") fail(`K: Esc left ${game.mode}`);
+      // The quick start's sheet and list (no genotype) draw too.
+      const undo2 = rules.overrideRules("stats", "legacy");
+      try {
+        game.debug.startRun(31);
+        for (let k = 0; k < 20 && game.mode === "story"; k++) press("Space");
+        game.view = "map"; game.mode = "map";
+        press("KeyK"); press("Tab"); if (!text().join("\n").includes("quick start")) fail("K: the quick start's second tab says nothing of it");
+        press("Escape"); press("KeyB");
+        if (!text().join("\n").includes("Fold Step")) fail("B: the quick start's Fold Step isn't listed");
+        press("Escape");
+      } finally { undo2(); }
+      out.screens = `B and K at ${capture.cols}×${capture.rows} by keys and mouse; hotbar ${JSON.stringify(p.hotbar)}`;
+    }
+
+    // 7.8 The wizard's mutation step.
+    {
+      W.openCreate(game, { seed: 777 });
+      press("Enter"); press("Enter"); press("Enter");   // Bent, Reedcutter, the suggested spread
+      if (W.wizard().step !== "track") fail(`wizard 4b: on ${W.wizard().step}, want track`);
+      const shown = () => W.trackRows(game);
+      const first = shown().filter((r) => typeof r === "string");
+      const want = PM.mutationOffers(null, { genotype: "bent", level: 1, mutations: {} }, R.makeRng(R.seedFor(777, "creation", "mutations", 0)));
+      if (JSON.stringify(first) !== JSON.stringify(want)) fail(`wizard 4b: offers ${first}, want ${want} (seed 777)`);
+      press("Enter");
+      const took = W.wizard().mutations[0];
+      if (took !== first[0]) fail(`wizard 4b: Enter took ${took}, want ${first[0]}`);
+      const second = shown().filter((r) => typeof r === "string");
+      if (second.includes(took) || JSON.stringify(second) === JSON.stringify(first)) fail(`wizard 4b: after taking ${took} the offers are ${second}`);
+      // A defect by keys, then given back by a click on it.
+      const rowsNow = shown(), di = rowsNow.findIndex((r) => r.defect);
+      for (let k = 0; k < di; k++) press("ArrowDown");
+      const defect = rowsNow[di].defect;
+      press("Enter");
+      if (!W.wizard().mutations.includes(defect)) fail(`wizard 4b: Enter on the defect ${defect} didn't take it`);
+      const name = MU[defect].name;
+      click(`* ${name}`); if (W.wizard().mutations.includes(defect)) click(`* ${name}`);
+      if (W.wizard().mutations.includes(defect)) fail(`wizard 4b: two clicks on the taken ${defect} didn't give it back`);
+      // Two more offers by clicks (12 creases spent), then a defect and a fourth; the defect can't go back now.
+      // A click picks a row out and a click on the row picked out chooses it (after a give-back the row below is picked).
+      const take = (label, done) => { click(label); if (!done()) click(label); };
+      for (let k = 0; k < 2; k++) { const o = shown().find((r) => typeof r === "string"); take(MU[o].name, () => W.wizard().mutations.includes(o)); }
+      if (W.wizard().mutations.length !== 3) fail(`wizard 4b: three offers taken by clicks: ${W.wizard().mutations}`);
+      const o4 = shown().find((r) => typeof r === "string");
+      take(MU[o4].name, () => !!W.wizard().msg);
+      if (W.wizard().mutations.includes(o4) || !/needs 4 creases/.test(W.wizard().msg)) fail(`wizard 4b: a fourth with no creases: ${W.wizard().mutations}, "${W.wizard().msg}"`);
+      take("Dark-fear +3", () => W.wizard().mutations.includes("darkFear"));
+      take("Lightsick +2", () => W.wizard().mutations.includes("lightsick"));
+      const o5 = shown().find((r) => typeof r === "string" && r !== "nightEyes");
+      take(MU[o5].name, () => W.wizard().mutations.includes(o5));
+      if (!W.wizard().mutations.includes(o5)) fail(`wizard 4b: with Dark-fear's and Lightsick's 5 creases, ${o5} wasn't taken (${W.wizard().msg})`);
+      click("* Dark-fear"); if (!/short/.test(W.wizard().msg)) click("* Dark-fear");
+      if (!W.wizard().mutations.includes("darkFear") || !/short/.test(W.wizard().msg)) fail(`wizard 4b: Dark-fear given back with its creases spent: ${W.wizard().mutations}, "${W.wizard().msg}"`);
+      click("[ Next ]");
+      typeText("Ruut");
+      click("[ Next ]"); click("[ Next ]");
+      const chosen = W.wizard().mutations;
+      click("[ Begin ]");
+      const p = game.player;
+      if (JSON.stringify(Object.keys(p.mutations).sort()) !== JSON.stringify([...chosen].sort()) || p.creases !== 12 + 3 + 2 - 16) fail(`wizard 4b: began with ${JSON.stringify(p.mutations)} and ${p.creases} creases, chose ${chosen}`);
+      const abilities = chosen.filter((id) => MU[id].ability).map((id) => MU[id].ability);
+      if (JSON.stringify(p.hotbar) !== JSON.stringify(abilities)) fail(`wizard 4b: hotbar ${JSON.stringify(p.hotbar)}, want ${JSON.stringify(abilities)}`);
+      out.wizard4b = `seed 777: offers ${first.join(", ")}; began with ${chosen.join(", ")} (${p.creases} creases), hotbar ${JSON.stringify(p.hotbar)}`;
+    }
+  }
+
   const undo = rules.overrideRules("stats", "attributes");
   try {
-    section1(); section2(); section3(); section4(); section5();
+    section1(); section2(); section3(); section4(); section5(); section7();
   } finally { undo(); }
   section6();
   return { name: NAME, ok: problems.length === 0, problems: problems.slice(0, 60).concat(problems.length > 60 ? [`… and ${problems.length - 60} more`] : []), stats: out };
@@ -590,6 +1095,9 @@ export async function run(env) {
     levelup: await src("screens/levelup.js"), create: await src("screens/create.js"), keys: await src("keys.js"), screens: await src("screens.js"),
     codec: await src("save/codec.js"), rng: await src("rng.js"), items: await src("items.js"), playerMod: await src("player.js"),
     implants: await src("content/items/implants.js"), mutations: await src("content/mutations.js"),
+    pmut: await src("progression/mutations.js"), abilities: await src("abilities.js"), turns: await src("turns.js"),
+    creatures: await src("creatures.js"), world: await src("world.js"), status: await src("status.js"), events: await src("events.js"),
+    factions: await src("factions.js"), charsheet: await src("screens/charsheet.js"), light: await src("light.js"),
     content: { ...genotypes, ...backgrounds, ...powers },
   });
 }
