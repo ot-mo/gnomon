@@ -8,6 +8,8 @@
 //                                       apron ahead of the swap (gen/apron.js, WS3 #6)
 //   validateSurface(zone) → string[]    the §5.3 item 9 rules (empty: fine)
 //   dungeonRectFor(entrance) → rect     where the dungeon's 48×48 levels sit under the surface (§5.5)
+//   stampPlan(zone, plan, ox, oy, rng) → { spawn, keyPoints }   a landmark plan through stampVault, with its roof,
+//                                       wall height, props, creatures and its trees' canopies (WS2's legend)
 //   forgetWorld(world)                  drop everything kept for a world (world functions, ports, apron bands):
 //                                       call it when its spans change in a run (the Lengthening turns spans
 //                                       to Shade), before any zone is made again
@@ -23,9 +25,15 @@
 // A zone then adds its own features, each 2 tiles or more from an open edge except where it meets a
 // port: the road from each road port to the hub (the site's door, or the zone centre), carved so that
 // no step on it is over 1; the river's bends between its approaches (or a lake for a single port) with
-// a ford; trees from treeAt (a canopy that crosses an edge is built whole by both zones); the landmark's
-// plan or the site; the dungeon entrance (a STAIRS block, zone.entrance) and, when a dungeon lies below,
-// sinkholes inside zone.dungeonRect.
+// a ford; trees from treeAt (a canopy that crosses an edge is built whole by both zones); the biome's
+// dressing (gen/biomes: ponds, ramps up the cliffs, 3D-only plateaus, rocks, lamps, props, and what the
+// biome adds of its own); the landmark's plan, its builder (gen/biomes/landmarks.js, while it has no plan)
+// or the site; the dungeon entrance (a STAIRS block, zone.entrance) and, when a dungeon lies below,
+// sinkholes inside zone.dungeonRect; last, the wildlife, on ground the anchor reaches.
+//
+// zone.gen (what generation knew, not saved) adds for 2b: planned (columns whose faces of 2 or more are
+// meant: ramps, plateaus, posts), jump (a plateau's top: ground only 3D reaches), plateaus, ramps and caches
+// (where each one is: check-surface reads them).
 import { Zone, B, FLOOR_Z, SURFACE, standWith } from "../world.js";
 import { KIND } from "../blocks.js";
 import { makeRng, seedFor, distance } from "../rng.js";
@@ -38,8 +46,12 @@ import { stampVault } from "./vaults.js";
 import { worldFns, heightAt, treeAt, SURFACE_RULES, forgetWorldFns } from "./terrain.js";
 import { portsOf, forgetPorts } from "./ports.js";
 import { buildApronBand, apronBandSteps, forgetBands } from "./apron.js";
+import { builderFor, LANDMARK_BUILDERS } from "./biomes/index.js";
+import { withHelpers, populate } from "./biomes/common.js";
+import { TREE_TRUNK } from "./biomes/legend.js";
+import { biomeFor } from "../content/biomes.js";
 export { SITE_BUILDERS } from "../world/sites.js";
-export { BIOME_BUILDERS } from "./biomes/index.js";
+export { BIOME_BUILDERS, TEST_BUILDERS, builderFor } from "./biomes/index.js";
 export { worldFns, heightAt, treeAt, SURFACE_RULES, portsOf, buildApronBand };
 
 const R = SURFACE_RULES;
@@ -110,11 +122,11 @@ function* zoneSteps(run, wx, wy) {
 // whose canopy touches the zone. The same for every attempt.
 function worldLayer(W, wx, wy) {
   const n = ZW * ZD, H = new Int8Array(n), cliff = new Uint8Array(n), water = new Uint8Array(n), ground = new Uint8Array(n);
-  const ox = wx * ZW, oy = wy * ZD;
+  const sub = new Uint8Array(n), ox = wx * ZW, oy = wy * ZD;
   for (let y = 0; y < ZD; y++)
     for (let x = 0; x < ZW; x++) {
       const c = W.columnAt(ox + x, oy + y), i = x + y * ZW;
-      H[i] = c.height; cliff[i] = c.cliff; water[i] = c.water; ground[i] = c.ground;
+      H[i] = c.height; cliff[i] = c.cliff; water[i] = c.water; ground[i] = c.ground; sub[i] = c.sub;
     }
   const trees = [], C = R.treeCell;
   for (let cy = floorDiv(oy - 1, C); cy <= floorDiv(oy + ZD, C); cy++)
@@ -122,7 +134,7 @@ function worldLayer(W, wx, wy) {
       const t = W.treeAt(cx, cy);
       if (t && t.gx >= ox - 1 && t.gx <= ox + ZW && t.gy >= oy - 1 && t.gy <= oy + ZD) trees.push({ ...t, x: t.gx - ox, y: t.gy - oy });
     }
-  return { H, cliff, water, ground, trees, ports: W.portsOf(wx, wy) };
+  return { H, cliff, water, ground, sub, trees, ports: W.portsOf(wx, wy) };
 }
 
 function* buildSurface(run, W, base, wx, wy, seed, rng) {
@@ -288,7 +300,7 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
         continue;
       }
       const top = FLOOR_Z - 1 + H[i];
-      for (let z = 0; z < top; z++) zone.set(x, y, z, B.ROCK);
+      for (let z = 0; z < top; z++) zone.set(x, y, z, z < FLOOR_Z - 1 ? B.ROCK : base.sub[i]);
       zone.set(x, y, top, road[i] ? B.ROAD : base.ground[i]);
     }
 
@@ -305,14 +317,32 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
   // 6. Trees. A tree whose canopy stays inside the zone gives way to the zone's own things; one that
   //    crosses an edge never does (the world function keeps those clear of ports), so both zones have it.
   const scenery = new Uint8Array(n);   // columns whose standing spot is on scenery (a tree, a wall's top)
+  const busy = new Uint8Array(n);      // what the biome's dressing must leave alone (common.js: ctx.busy)
   for (const t of base.trees) {
     const ti = t.x + t.y * ZW, inside = t.x >= 1 && t.y >= 1 && t.x < ZW - 1 && t.y < ZD - 1;
     if (inside && (road[ti] || water[ti] || reserved[ti] || plan[ti] || (t.x === hub.x && t.y === hub.y))) { markTree(t); continue; }
     if (inside && local[ti]) markTree(t);
     buildTree(zone, inside ? { ...t, base: FLOOR_Z + H[ti] } : t, scenery);   // (banks may have lowered an inner one's ground)
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) if (t.x + dx >= 0 && t.y + dy >= 0 && t.x + dx < ZW && t.y + dy < ZD) busy[t.x + dx + (t.y + dy) * ZW] = 1;
   }
 
   yield "trees";
+
+  // 6b. The biome's dressing (gen/biomes/<biome>.js, or the test world's plain one): it writes only free
+  //     columns inside the keep and marks what it changes (local), so seams and the apron hold.
+  for (let i = 0; i < n; i++) if (road[i] || water[i] || reserved[i] || plan[i]) busy[i] = 1;
+  for (let dy = -2; dy <= 2; dy++)
+    for (let dx = -2; dx <= 2; dx++) if (hub.x + dx >= 0 && hub.y + dy >= 0 && hub.x + dx < ZW && hub.y + dy < ZD) busy[hub.x + dx + (hub.y + dy) * ZW] = 1;
+  const ctx = withHelpers({
+    run, zone, tile, site, rng, level: zone.level, biome: biomeFor(world, tile), ports: base.ports, margin: R.siteMargin, hub,
+    H, water, road, cliff: base.cliff, base, busy, local, scenery, footprint: reserved,
+    planned: new Uint8Array(n), jump: new Uint8Array(n), walls: new Uint8Array(n),
+    made: { plateaus: [], ramps: [], caches: [] }, cosmetic: makeRng(seedFor(seed, "cosmetic")),
+  });
+  builderFor(world, tile)(ctx);
+
+  yield "biome";
 
   // 7. The landmark's plan, or the site (its builder, else the stub: an entrance if a dungeon lies below).
   const keyPoints = [];
@@ -325,21 +355,24 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
     spawn = out.spawn || null;
     keyPoints.push(...out.keyPoints);
     entranceGated = !!planDef.entranceGated;
+  } else if (L && LANDMARK_BUILDERS[L.id]) {
+    LANDMARK_BUILDERS[L.id](Object.assign(ctx, { rect, site }));
   } else if (site && wantsSite) {
-    const ctx = { run, zone, rng, rect, hub, H, plan, reserved };
-    if (site.kind !== "landmark" && SITE_BUILDERS[site.kind]) SITE_BUILDERS[site.kind](ctx, site);
-    else stubSite(ctx, site);
+    const sctx = { run, zone, rng, rect, hub, H, plan, reserved };
+    if (site.kind !== "landmark" && SITE_BUILDERS[site.kind]) SITE_BUILDERS[site.kind](sctx, site);
+    else stubSite(sctx, site);
   }
   if (zone.stairs) { zone.entrance = { ...zone.stairs }; if (!entranceGated) keyPoints.push({ ...zone.stairs }); }
   // Plan walls and roofs are scenery: nobody walks on them, and the map draws them as walls
-  // (zone.planWalls: also a wall lower than a dungeon room's, which computeKinds alone would call floor).
+  // (zone.planWalls: also a wall lower than a dungeon room's, which computeKinds alone would call floor), as it
+  // draws the dressing's posts, outcrops and spires (ctx.walls).
+  const walls = ctx.walls;
   if (planAt) {
     zone.refresh();
-    zone.planWalls = new Uint8Array(n);
     for (let y = planAt.y; y < planAt.y + planAt.d; y++)
-      for (let x = planAt.x; x < planAt.x + planAt.w; x++) { const i = x + y * ZW; if (zone.stand[i] > FLOOR_Z + 1) scenery[i] = zone.planWalls[i] = 1; }
-    zone.computeKinds();
+      for (let x = planAt.x; x < planAt.x + planAt.w; x++) { const i = x + y * ZW; if (zone.stand[i] > FLOOR_Z + 1) scenery[i] = walls[i] = 1; }
   }
+  if (walls.some((v) => v)) zone.planWalls = walls;
 
   yield "plan";
 
@@ -374,9 +407,17 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
   // 9. The anchor: the plan's own, else the reachable ground nearest the hub that reaches the most.
   zone.refresh();
   yield "refresh";
-  zone.spawn = spawn || pickAnchor(zone, hub, scenery);
+  zone.spawn = spawn || pickAnchor(zone, hub, scenery, ctx.jump);
+
+  // 10. Wildlife: the biome's spawn table, on map ground the anchor reaches (the map's rules, as validateSurface).
+  if (ctx.biome.spawns?.length) {
+    const open = standWith(zone, "open");
+    for (let i = 0; i < n; i++) if (zone.kind[i] === KIND.WALL) open[i] = -1;
+    populate(ctx, reachable(open, ZW, ZD, Math.floor(zone.spawn.x), Math.floor(zone.spawn.y), PLAYER_STEP_UP, PLAYER_DROP));
+  }
   zone.gen = { ports: base.ports.map((p) => ({ ...p, tiles: Array.from({ length: p.width }, (_, k) => portTile(p, k)) })),
-               keyPoints, scenery, cliff: base.cliff, worldWater: base.water, plan, planAt, hub, entranceGated, local };
+               keyPoints, scenery, cliff: base.cliff, worldWater: base.water, plan, planAt, hub, entranceGated, local,
+               planned: ctx.planned, jump: ctx.jump, ...ctx.made };
   return zone;
 }
 
@@ -518,11 +559,20 @@ function buildTree(zone, t, scenery) {
 
 // A plan without its own stamp function: stampVault with the plan's roof and wall height. Returns
 // { spawn, keyPoints } (its key letters' first cells, and its spawn letter's cell if it has one).
-function stampPlan(zone, plan, ox, oy, rng) {
+export function stampPlan(zone, plan, ox, oy, rng) {
   const rows = plan.rows;
   stampVault(zone, { name: plan.name || plan.id, plan: rows, height: plan.height ?? 4, wall: plan.wall ?? B.STONE,
-                     floorBlock: plan.floorBlock ?? B.TILE, links: plan.links || [], legend: plan.legend },
+                     floorBlock: plan.floorBlock ?? B.TILE, links: plan.links || [], legend: plan.legend,
+                     props: plan.props, creatures: plan.creatures, rubble: plan.rubble },
              ox, oy, rng, { roof: plan.roof || "none", wallHeight: plan.wallHeight });
+  // The plan's trees (the "tree" legend letter: a trunk) get their canopy once every cell is down.
+  const treeLetters = Object.entries(plan.legend || {}).filter(([, id]) => id === "tree").map(([ch]) => ch);
+  if (treeLetters.length) {
+    const none = new Uint8Array(zone.w * zone.d);
+    rows.forEach((row, y) => [...row].forEach((ch, x) => {
+      if (treeLetters.includes(ch)) buildTree(zone, { x: ox + x, y: oy + y, base: FLOOR_Z, trunk: TREE_TRUNK }, none);
+    }));
+  }
   const find = (ch) => {
     for (let y = 0; y < rows.length; y++) { const x = rows[y].indexOf(ch); if (x >= 0) return { x: ox + x, y: oy + y }; }
     return null;
@@ -543,9 +593,9 @@ function stubSite({ zone, rect }, site) {
 }
 
 // The anchor: of the ground columns nearest the hub, the one from which the most ground is reachable.
-function pickAnchor(zone, hub, scenery) {
+function pickAnchor(zone, hub, scenery, jump) {
   const { w, d, stand } = zone, open = standWith(zone, "open");
-  const ok = (i) => stand[i] >= 0 && stand[i] <= FLOOR_Z + R.maxRelief && !scenery[i] && !isStairs(zone, i);
+  const ok = (i) => stand[i] >= 0 && stand[i] <= FLOOR_Z + R.maxRelief && !scenery[i] && !jump[i] && !isStairs(zone, i);
   const order = [];
   for (let i = 0; i < w * d; i++) if (ok(i)) order.push([distance((i % w) - hub.x, Math.floor(i / w) - hub.y), i]);
   order.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -604,7 +654,7 @@ export function validateSurface(zone) {
       if (!zone.hasBelow || !r || x < r.ox || y < r.oy || x >= r.ox + r.w || y >= r.oy + r.d) { problems.push(`a hole at (${x}, ${y}) outside the dungeon's rect`); break; }
     }
     if (stand[i] >= 0 && !scenery[i] && stand[i] > FLOOR_Z + R.maxStand) high++;
-    if (!ground(i)) { if (stand[i] >= 0 && !scenery[i]) ground3d++; continue; }
+    if (!ground(i) || g?.jump?.[i]) { if (stand[i] >= 0 && !scenery[i]) ground3d++; continue; }   // (a plateau's top: 3D's)
     total++;
     if (dist[i] >= 0) reached++;
   }
@@ -649,19 +699,33 @@ export function validateSurface(zone) {
   let roadWalls = 0;
   for (let i = 0; i < w * d; i++) if (kind[i] === KIND.WALL && stand[i] > 0 && zone.blocks[i + (stand[i] - 1) * w * d] === B.ROAD) roadWalls++;
   if (roadWalls) problems.push(`${roadWalls} road columns the map draws as wall`);
-  // Unplanned 2-block steps (a cliff's foot and a plan's walls are planned).
+  // Unplanned 2-block steps (a cliff's foot, a plan's walls and the dressing's ramps, plateaus and posts are
+  // planned).
   let steps = 0;
+  const planned = g.planned || new Uint8Array(w * d);
   for (let y = 0; y < d; y++)
     for (let x = 0; x < w; x++) {
       const i = x + y * w;
-      if (!ground(i) || g.cliff[i] || g.plan[i]) continue;
+      if (!ground(i) || g.cliff[i] || g.plan[i] || planned[i]) continue;
       for (const [dx, dy] of [[1, 0], [0, 1]]) {
         const j = x + dx + (y + dy) * w;
-        if (x + dx >= w || y + dy >= d || !ground(j) || g.cliff[j] || g.plan[j]) continue;
+        if (x + dx >= w || y + dy >= d || !ground(j) || g.cliff[j] || g.plan[j] || planned[j]) continue;
         if (Math.abs(stand[i] - stand[j]) >= 2) steps++;
       }
     }
   zone.unplannedSteps = steps;
   if (steps > R.maxSteps) problems.push(`${steps} unplanned steps of 2 blocks or more (at most ${R.maxSteps})`);
+  // The 3D-only plateaus (§5.3 item 8): at most jumpSpots, each out of the map's reach, its stepping stone in it,
+  // its reward on top.
+  const plateaus = g.plateaus || [];
+  if (plateaus.length > R.jumpSpots) problems.push(`${plateaus.length} plateaus (at most ${R.jumpSpots})`);
+  for (const p of plateaus) {
+    let walked = 0;
+    for (let y = p.y; y < p.y + p.d; y++) for (let x = p.x; x < p.x + p.w; x++) if (reach(x, y)) walked++;
+    if (walked) problems.push(`the plateau at (${p.x}, ${p.y}): ${walked} of its columns the map walks onto`);
+    if (!reach(p.stone.x, p.stone.y)) problems.push(`the plateau at (${p.x}, ${p.y}): its stepping stone can't be walked to`);
+    if (!zone.items.some((it) => Math.floor(it.x) === p.reward.x && Math.floor(it.y) === p.reward.y && it.z === p.z))
+      problems.push(`the plateau at (${p.x}, ${p.y}) has no reward on top`);
+  }
   return problems;
 }
