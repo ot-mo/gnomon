@@ -230,7 +230,7 @@ each pushed:
   offer of three holds one), 5 of those carry one view into the other (`bridge`): Flatwise (pressed flat from either
   view: only the map holds you), Echo Throat (a shout in either view puts what's around you on the map), Fold Step (a
   blink where you aim in 3D or toward what you pick on the map), Overlook (a 9 × 9 seen from above, drawn onto the map),
-  Shadowsense (flat beings and ghosts marked in 3D and on the map).
+  Shadowsense (every flat being and ghost on the floor marked in 3D and on the map).
 - **The crease economy** (`progression/mutations.js`): 12 at creation and one a level (4a), 4 for a new mutation
   from 3 seeded offers, 1 for a level, the cap floor(level / 2) + 1 and the mutation's own max (at most 10), defects
   refunding 2-3 at creation only; spent in the wizard and, any time, on the sheet (K); the level-up card says what there
@@ -271,10 +271,13 @@ each pushed:
 20. **Wings is a timed flight** (20 + 5 × level s, cooldown 60 s) on the flying status, not a toggle: the status is the
     potion's, and a toggle would need a way down that WS8's movement owns.
 21. **Mental levels are at least 1** with a low EGO (bible §10.6 says only that EGO adds its modifier).
-22. **Defects that come and go are statuses** (`shaken`, `mobbed`, `sunsick`) renewed each frame while their condition
-    holds (a second each), so they show on the HUD and the stat cache drops at once (a bonus reading the torch
-    directly would go stale until something invalidated it). Lightsick takes no account of a hood or veil (none exist:
-    integration request 19).
+22. **Defects that come and go are statuses** (`shaken`, `mobbed`, `sunsick`), so they show on the HUD and the stat
+    cache drops at once (a bonus reading the torch directly would go stale until something invalidated it). They last
+    until their cause goes (the views' watch puts them on and takes them off; a long map action or a skip doesn't end
+    them). Lightsick's counts in its own tick only while you stand in the sun, sampled at each of skipTime's short steps
+    (so a skip from day into dusk counts the day part), its 20 s count carried over a stretch of shade. It takes no
+    account of a hood or veil (none exist: integration request 19). The torch read between two key presses that come in
+    one frame (F, then a blow) is the one before the F, until the next frame's watch.
 23. **Shellback's armour** counts only with no body armour over it (clothes are none) instead of refusing the armour:
     equipping is WS5's (integration request 19). **Lampskin** can't hide you by a stealth penalty (−0.25) rather than
     the AI's light test, and its free light waits for the torch hook (request 20). **Stilt Legs** climbs 2 blocks on
@@ -283,8 +286,24 @@ each pushed:
 24. **Turns of the world** are watched (the view changing in one zone while you aren't flat) rather than announced by
     `toggleMap` (P0's play.js): integration request 16 asks for a `"view:turn"` event and the Hand's exception.
 25. **Overlook's view stays on the map** (the auto-map keeps what you have seen) rather than lasting 5 s.
+26. **Parts of bible §13.5's hooks aren't built** where nothing in the game reads them yet: Thistlehide's attackers take
+    a flat 2 (the stat bus's `thorns` is one number, the bible says 1-3); Spare Heart's longer sprints (sprints have no
+    limit) and Regeneration's "stops bleeding" (no bleeding status); Kindle lights braziers only (torches you carry and
+    oil puddles, WS6b's, aren't things it can light) and reaches 5 + level tiles (the bible's 6 at level 1, growing with
+    the level so the mutation stays worth raising); Echo Throat puts creatures on the map, not people (a person shows on
+    any tile you've seen already).
+27. **Exclusions the bible doesn't name** (`excludes`, TECH_DESIGN §2.18's field): Shellback and Wings (a shell and wings
+    share one back), Lampskin and Moth-kissed (the moths love your skin: Lantern Moths +200), Night Eyes and Dark-fear (a
+    fear of the dark you see in would be three free creases). Each pair is refused at creation and on the sheet with its
+    reason; a balance pass can drop them from the table.
+28. **A pack for a zone you've left doesn't come**: the Smoothers are the floor's own tidiness (bible §10.3, "along the
+    floor"), and the third wake clears that zone's wakes when it calls them. Whether they should follow you is the
+    creatures' owner's call with integration request 17.
+29. **Shadowsense reaches the whole floor** (the bible gives no reach: "in every view"); its level lengthens it.
 
 ## 10. Known issues
 
 - Integration requests 15-23 (`docs/ws4.md`): browser-0d1's tour reports `create`, `abilities` and `char` as never
   reached until the integrator adds them; the Smoothers never come until creatures listen to `"smoothers"`.
+- The quick start's `innate: ["foldStep"]` still adds a stray key `"0"` to its bonus table (P0's; integration request 3,
+  settled on `integration`, where a creature's own bonuses are `e.bonuses`). K's Effects tab leaves numeric keys out.
