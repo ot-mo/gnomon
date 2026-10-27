@@ -3,21 +3,22 @@
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
 **Updated:** 2026-10-27, the integrator (local session), on `integration`. **Phase 1 is running and Phase 2's
-integration has started: WS3, WS8, WS4 (both halves), WS5 and WS6a are merged (`p2-ws3`, `p2-ws8`, `p2-ws4a`,
-`p2-ws5`, `p2-ws6a`, `p2-ws4b`); the flip waits for the user (below), and the next `p1-*` tag merges as it lands
-(WS9 is paused before its tag; WS6b next in WS6's worktree).** From here on only the integrator edits this file and
+integration has started: WS3, WS8, WS4 and WS6 (both halves each) and WS5 are merged (`p2-ws3`, `p2-ws8`,
+`p2-ws4a`, `p2-ws5`, `p2-ws6a`, `p2-ws4b`, `p2-ws6b`); the flip waits for the user (below), and the next `p1-*` tag
+merges as it lands (WS10 next, it seems; WS9 is paused before its tag).** From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p2-ws4b` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
-  `p1-ws4a`, `p1-ws5`, `p1-ws6a` and `p1-ws4b` with their integration requests; `p2-ws3` … `p2-ws6a` before it).
+- **Last tag:** `p2-ws6b` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+  `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b` and `p1-ws6b` with their integration requests; `p2-ws3` … `p2-ws4b`
+  before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
 - **Branch:** `integration`, in the worktree `C:\Users\Otto Mörner\Code\gnomon-wt\integration` (serves on port
   8660). Nothing is half finished.
 - **Done:** Phase 0 (0A1 … 0D2, notes in `docs/sessions/0A1.md` … `0D2.md`); WS3, WS8, WS4, WS5 and WS6a
-  (`docs/ws3.md`, `ws8.md`, `ws4.md`, `ws5.md`, `ws6.md`; `docs/sessions/ws3.md`, `ws8.md`, `ws4.md` "Part 4a"
-  and "Part 4b", `ws5.md`, `ws6.md` "Part 6a"), merged. The merges' own numbers are under "Integration log" below.
+  and WS6b (`docs/ws3.md`, `ws8.md`, `ws4.md`, `ws5.md`, `ws6.md`; `docs/sessions/ws3.md`, `ws8.md`, `ws4.md` "Part 4a"
+  and "Part 4b", `ws5.md`, `ws6.md` "Part 6a" and "Part 6b"), merged. The merges' own numbers are under "Integration log" below.
 - **Checks:** `node tools/run-all.mjs`, 37 checks (about 2 minutes on an idle machine, 4 with three workstreams
   running; the timed ones, `check-dungeons`, `check-status`, `check-stats` and `check-perf`, alone at the end; since
   WS3, `check-perf` runs the render check first). Browser (headless Playwright, audio silenced,
@@ -75,7 +76,7 @@ tags; WS1, which builds on the most, last):
 | 3 | WS8 Combat depth, AI and targeting | `ws8`, `ws/ws8` | tagged `p1-ws8` (c9638c0); **merged, `p2-ws8`** (2026-10-27) |
 | 4 | WS5 Body mods, items and equipment UI | `ws5`, `ws/ws5` | tagged `p1-ws5` (058bbbc); **merged, `p2-ws5`** (2026-10-27) |
 | 5 | WS4a → WS4b Character creation and progression | `ws4`, `ws/ws4` | WS4a tagged `p1-ws4a` (dc22850), **merged, `p2-ws4a`** (2026-10-27); WS4b tagged `p1-ws4b` (f8062f9), **merged, `p2-ws4b`** (2026-10-27) |
-| 6 | WS6a → WS6b Factions, dialogue builders → trade, the Kindling, backings | `ws6`, `ws/ws6` | WS6a tagged `p1-ws6a` (0697109), **merged, `p2-ws6a`** (2026-10-27); WS6b next in the worktree |
+| 6 | WS6a → WS6b Factions, dialogue builders → trade, the Kindling, backings | `ws6`, `ws/ws6` | WS6a tagged `p1-ws6a` (0697109), **merged, `p2-ws6a`**; WS6b tagged `p1-ws6b` (68ef866), **merged, `p2-ws6b`** (2026-10-27) |
 | 7 | WS10 Dungeon sites, lairs and legends | `ws10`, `ws/ws10` | queued |
 | 8 | WS2a → WS2b Surface generation | `ws2`, `ws/ws2` | queued |
 | 9 | WS7a → WS7b Knowledge: history, villages, quests | `ws7`, `ws/ws7` | queued |
@@ -195,7 +196,9 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   in the parent), so spikes hurting a faction member give grudges against you and cost rep; pass no source
   (`applyDamage(game, m, dmg, { src: null, color, deathText })`). Then a spike kill gives no XP either (`killMonster`'s
   `byPlayer` follows the source), a change to the old game: keep the parent's XP for it if golden or the legacy fights
-  notice.
+  notice. **A P0 check change, coordinator-approved, to confirm at the merge:** `tests/checks/world.js` `siteRules`
+  skips the region-chance line for `kind === "historic"` only and holds such a site instead to "matches exactly one
+  `history.siteRequests` entry, on its tier's span", with mutants showing it bites; nothing else in the check changes.
 - **WS7** (at its merge; WS6a #6): villager types carry `factions` (or each villager `c.faction`) and `talk.dialogue`
   one of `social/builders.js ROLES`; a village registers its own faction with `parent: "bent"` (a Bent village) or
   `"peoples"`, so the Assize's hatred of the Bent reaches it, its members carrying `bentVillages` as a second membership
@@ -210,9 +213,16 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `addRep(game, f, n, "worn")` when worn and take it back when unworn. **Content (C)**, WS6a #9: the Lantern Moths'
   "like you while your torch is lit" (text only today); the Smoothers with no membership (the parent rule makes them
   hostile); the Hour cults with `pilgrimFloor: false`.
-- **WS6b** (at its merge): WS5 #11, the trade screen lists `registerService` rows as P0's shop does: a surgeon's
-  `fitImplant` and `removeImplant`, a tinker's `identifyArtifact` and `rechargeCell` (Old Ottilie, Detail C at
-  Benchmark); stock can include implants, artifacts and cells (`randomBodyMod`, `IMPLANT_VALUE`).
+- **C (content), from the WS6b merge:** WS5 #11's stock, a surgeon's or tinker's pack holding implants, artifacts and
+  cells (a `registerStock` table with `randomBodyMod`, `IMPLANT_VALUE`; Old Ottilie, Detail C at Benchmark); WS6b #7,
+  the faction variants of the rites (the Pouring, the Oiling, the Ascent, the Mirroring, Moon-Wick, Herdmothers only),
+  the village dish, the faction specials (the Spore Moot's limb, the Pressing, the Snuff), the commons lamp, the
+  Chandler banks, clear glim's and turnwater's full effects; a faction's `buys: { readings, topics }`. Powers still
+  waiting on them: Oil fire (glim puddles), Brew (a village oven), Chime (preaching).
+- **WS7 (from WS6b, #5 and #6):** journal entries the Kindling reads `{ kind: "location" | "history" | "village" |
+  "gossip" | "recipe", reading: "flat" | "deep" | "dark", text, sold }`; a creature's own readings in `c.readings`;
+  village leaders `named: true`; generated opinions as `c.opinions`; teachers list power ids in `c.teaches` (the
+  Kindling teaches them; "teachers opening a tree", WS4 #11); `learnSecret` turns on "ask for a reading".
 - **The integrator's own backlog** (WS5's requests in merged workstreams' files, new behaviour rather than wiring, so
   not rushed into the merge): #8 in `throwing.js`, gyro wrists (`gyroWrists`: thrown things fly flat, +2 damage) and
   the juggler's arm (`jugglerArm`: up to four knives at once); #9, the survey lens (`surveyLens`: 3D fills the map twice
@@ -225,7 +235,9 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `turnWorld` listens instead of watching `game.view` each frame (and the Hand's exception once the Hand exists);
   WS4 #19, Shellback refusing body armour (`inventory.js` equip) and Lightsick's hood or veil (a worn flag C4 adds).
   Optional, kept as deviations: WS4 #18 (Shadowsense showing ghosts whole) and #23 (the map's 2-block climb from
-  Stilt Legs level 3, not 5).
+  Stilt Legs level 3, not 5). From the WS6b merge: WS6b #3, the Snuffer's mark, the torch's radius −1 for the rest of
+  the run once `game.state.snuffer` is set (`player.js torchRange` has no game: a status or a field on the player);
+  its "no shadow under you" needs nothing, as 3D draws no shadow of yours.
 - **WS5** (merged at `p2-ws5`; what was carried to it): WS4 #9, the six free implants the Plumb backgrounds name (`tallyEye`, `plumbLineEar`,
   `truesteelKnuckles`, `levelEye`, `lampCrown`, `darkLens`), each costing at most 2, with `parts`; `makeCharacter` fits
   one with `canInstall(null, p, item, part)` and `install(null, p, item, part)` (no game at creation); the kits'
@@ -261,11 +273,9 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   span (37, 3) (or C1's landmark plan): render3d starts the needle on whatever stands at the span's middle.
 - **WS1, WS7, WS6b** (at their merges): WS4 #11, discoveries, quests, triangulations and Kindlings give XP through
   `gainXp(game, xpReward(kind, level), { source: kind })` (Pilgrim's ×2.2), and the powers waiting on them (Keen Eye,
-  Pathfinder, Terrain lore, Homing sense: WS1; Hour script, Gossip, Triangulator, Vey's script: WS7; Oil fire, Brew,
-  Warm Hands, Chime, teachers opening a tree: WS6b) lose their `needs`. WS8's glimgun (WS4 #10, for the Lamplighter
-  and the Glimgunner power) is new content: C4 or a later pass, not a merge item. From WS4b: #21 (WS6b), Crooked
-  Manner's other half, every Kindling gains 20 less and the words come out as the rude gesture
-  (`game.player.mutations.crookedManner`); #22 (WS1), Wings gives `bonus(travel) = 1`, read as world-map travel × (1 +
+  Pathfinder, Terrain lore, Homing sense: WS1; Hour script, Gossip, Triangulator, Vey's script: WS7) lose their `needs`
+  (WS6b's part is done: the Kindling's XP and Warm Hands; Oil fire, Brew and Chime wait for content, above). WS8's glimgun (WS4 #10, for the Lamplighter
+  and the Glimgunner power) is new content: C4 or a later pass, not a merge item. From WS4b: #22 (WS1), Wings gives `bonus(travel) = 1`, read as world-map travel × (1 +
   travel); #17 (C2, with WS8's flat movement), a listener for `"smoothers" { zone, size, burnisher, great }` spawns the
   pack along the floor (until then the warning shows and nothing comes).
 - **WS1, C1, WS6b, WS7** (information, nothing to apply): WS3 #11 and #12 (`render3d.gnomonDrawn()` for "the Gnomon
@@ -273,6 +283,34 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p2-ws6b`** (2026-10-27): `p1-ws6b` (68ef866) merged into `integration` (`fa1cde2`). Two conflicts, each resolved by
+keeping both sides: `tests/checks/body.js` and `content.js` (WS8's, WS5's and WS6b's coordinator-approved sample lines,
+WS6b's for its kinds `vial` and `coinage`). `tests/checks/social.js` and `tools/browser-ws6.mjs` merged on their own
+over the WS6a merge's fixes (Shift on the map, the archers, the combat-order and harm-source tests: all still there).
+- Applied, each with an assertion that fails without it: #2 (`4b4ed96`: `killMonster` takes `{ splash }` and the
+  "kill" payload says `splash: true` for thorns and the lightning arc, so a flame-kin caught by an arc no longer makes
+  you the Snuffer; the XP and rep stay yours); WS4 #11's WS6b part (`2fefb73`: Warm Hands offered, the Kindling's XP
+  came built); WS4 #21 (`1241e39`: Crooked Manner's Kindling is a rude gesture and gains 20 less, never below
+  nothing); #8 (`bf719a7`, README). Not applied: #3, the Snuffer's mark (the torch's −1 for the rest of the run is
+  new behaviour: the integrator's backlog; 3D draws no shadow of yours, so its "no shadow" needs nothing); #4 nothing to
+  do (WS3's `voiceOf` takes `voiceFor`'s objects); #5, #6 to WS7; #7 to content; #1 came applied.
+- Dependency table: "WS5 implant surgery" against WS6b's real trade screen (`ec2bfbe`, check-items): a talking surgeon
+  with WS5's services opens on the services tab, "Fit the spring tendons (feet)" by Enter pays 50 glim, fits them, an
+  hour passes. WS5 #11's other half (a surgeon's stock of implants, artifacts and cells) is a `registerStock` table:
+  content's.
+- Merge finding (`85f6858`): `browser-0d1` failed "modes never reached: trade, ritual" (WS6b hadn't run it); its tour
+  opens both over the map for a trader set beside you and closes each by Esc and by "Esc back": 23 of 23 modes.
+- Checks: `run-all` at `bf719a7` **37 of 37** (126 s; the training job not running, CPU 40%). Timed alone, `check-perf
+  --against p2-ws4b --rounds 3 --no-render` **PASS**, every item within its absolute budget (the outdoor frame 16.1 ms,
+  dusk 15.0, night 14.9, the dungeon frame 10.8, refresh 7.7, surface generation p95 27.3 and max 145, dungeon
+  generation p95 32.9, passTime 6.3, mapStep 1.7) and none over ×1.03 of `p2-ws4b`'s; `check-dungeons` p95 24.0 /
+  24.0 ms. Browser (`tools/serve.mjs 8660`, `?silent=1`, 0 console errors): `browser-ws6` (both sizes: the trade screen,
+  the Kindling's three rites, Pell's six services); `browser-0d1 --against p0-done` 23 of 23 modes after the fix, the
+  HUD at 100×30, golden (b) 27 of 27, per tick underground +0.6% (3D) and +0.2% (map), `browser-shell` inside it at
+  both sizes; `browser-ws4` (both sizes); `browser-ws5`; `browser-ws8` (1234, 7); `browser-gate` (1234, 7);
+  `browser-0c` (1234, 7); `browser-0d2 --all` (boot with 155 modules, `test-world.html` 34 passed, 0 failed);
+  `browser-silent`.
 
 **`p2-ws4b`** (2026-10-27): `p1-ws4b` (f8062f9, both halves of WS4) merged into `integration` (`978c167`). One
 conflict, `tests/checks/progression.js`: the Plumb-implant block and the background-rep loop are integration's (WS5's
@@ -539,8 +577,10 @@ its §8.4 files and two P0 checks).
 - **WS6a (merged; what's left):** talkers can't be struck until WS6a #1 (at WS7's merge), so the witnesses fire only on
   faction members that don't talk; a witness sees no farther than its own sight (WS8's `sees`: people 10, a goblin
   11, ×0.55 with you in the dark), inside the 12-tile witness range; the Bent villages are one rep pool until WS7 gives
-  villages factions; grudges never expire; spikes still count as your harm (WS10, carried). Next in WS6's worktree:
-  WS6b (`docs/ws6.md` "Handoff").
+  villages factions; grudges never expire; spikes still count as your harm (WS10, carried).
+- **WS6b (merged; what's left):** credit isn't built (a sale a full flask can't hold is refused); prices move with EGO and
+  rep only under the attribute set (the flip); the legacy Pell keeps his own shop and his one pack; the Snuffer's
+  torch −1 (the integrator's backlog); the content above.
 - **WS5 (merged; what's left):** the backlog above (#8, #9); the item glyphs in the map legend (#16: `♦` implant,
   `Θ` artifact, `≡` cell, `¶` true-mark) wait with the underground legend for golden (b)'s retirement; two old lines
   kept as golden and the frames record them (#23: "You put on the The Mantle of Angles.", "throwing knifes"); a stray
