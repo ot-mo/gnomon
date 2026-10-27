@@ -53,11 +53,75 @@ halves; 7a tags `p1-ws7a`, then the 7b session continues here and tags `p1-ws7b`
 
 ## Public API (7a)
 
-(Filled in as it is built.)
+```js
+// story/history.js
+generateHistory(seed, world) → History   // the test world (world.id "test"): P0's fixture, unchanged; any other world:
+                                         // bible §8's five Hours (stream seedFor(seed, "run", "history") = runRng(run, "history"))
+validateHistory(h, { strict = true, world }) → [problem]   // the contract; strict adds bible §8's numbers; world: tiers
+fixtureHistory() → History               // P0's fixture, a fresh copy
+// History, beyond §2.15's contract (all JSON): ruler { short, ordinal, period 1-5, pronoun, cognomens, colour, profession,
+//   regions [{ name, places }], cult { name }, born.year }; event { variant, age, place, region, disagree?, falseDeath?,
+//   stele?, renamed? { from, to }, noonReading?, mirrored? }; relic { rulerId, eventId, lostAt? { place, eventId },
+//   mask, text { flat, deep, dark } }. Event ids "<short>:<n>" by date; relic ids "relic:<short>:<n>"; site request ids
+//   "site:<short>:<n>" (the tomb is :1, the Hour's deepest, holding a relic it didn't lose).
+// Accounts: text.gospel = the Flat Account (map), text.inscription = the Deep Inscription (3D, in light; capitals),
+//   text.hostile = the Dark Gloss (the dark; lower case, " / " between lines).
+
+// story/grammar.js
+expand(grammar, symbol, rng, ctx) → string   // #sym#, #sym.cap# / .upper / .lower; ctx before rules; throws on unknown
+hourName(rng) · placeName(rng) · regionName(rng, domain) · nameAllowed(name, { long }) · numberWords(n) · ordinal(n) · cap(s)
+
+// story/secrets.js
+makeSecrets(run) → Map<id, SecretDef>     // loc:<landmark> / loc:<siteId>, hist:<eventId>:<flat|deep|dark>,
+                                          // hist:noon:<1-6>:<reading>, gossip:<n>; stable per seed
+secretsOf(run) · secretDef(run, id) · secretText(run, idOrDef) · secretTitle(run, idOrDef) · muralSecret(run, text)
+learnSecret(game, id, source, { quiet }) → entry | null   // "secret" { kind, id, at, source }; pin (WS1); visit quest;
+                                          // triangulation ("triangulate" { key, xp }, Notes, XP); "cultPass" { rulerId }
+readings(game) → [{ id, kind, reading, text, sold }] · markSold(game, id) → bool    // WS6b's Kindling
+visitQuest(game, secretId) → quest | null · TRIANGULATION.xp(level) · ACCOUNT · READINGS
+// SecretDef = { id, kind, reading ("flat" | "deep" | "dark"; null for a rumour), tags, value (glim), at?, ref, text? }
+
+// story/murals.js: zone.murals [{ x, y, z, view: "map" | "3d" | "dark", text, secret? }]
+muralsAt(zone, x, y) · readable(game, zone, m) · readMural(game, inspectPayload) → [learned ids]
+// on("inspect"): the only way a mural teaches; describer "murals" (order 40): a mosaic's text on the map's inspect line
+
+// story/gossip.js
+gossipFor(game, c) → text | null · gossipDef(game, c) · gossips(c)   // c.talk.gossip or its type's; talk option "gossip"
+
+// story/journal.js: journalOf(game) → { secrets, notes, order: { history }, triangulated, cultPass } · knows · addNote
+// story/quests.js: startQuest(game, templateId, { id, … }): id lets one template make several quests ("visit:<secret>")
+// screens/journal.js: openJournal, JOURNAL_TABS, journalLines(game, tab, width)
+```
+
+**Events added:** `secret` { kind, id, at, source }, `triangulate` { key, xp }, `cultPass` { rulerId }. **Registered:**
+the quest template `visit`; an `inspect` handler; the describer `murals`; the talk option `gossip`.
 
 ## Integration requests
 
-(Filled in as they come up.)
+1. **`tests/checks/world.js:322` (P0's check): asked of the coordinator (2026-10-27).** It holds every run's history
+   to the fixture on both worlds; the real world now generates. Proposed: the test world still exactly the fixture;
+   any other world `validateHistory(run.history)` with no problem. (Applied here only if approved, marked `// WS7`.)
+2. **`world/run.js` (frozen):** the `secrets` step should be `run.secrets = makeSecrets(run)` (`story/secrets.js`), so a
+   save carries them (until then `secretsOf` makes them once per run from the same data, so ids don't change). Bump
+   `GEN_VERSION` (with WS10 #2): the real world's runs differ from P0's for the same seed.
+3. **WS1 (overworld):** `learnSecret` calls `overworld/discovery.js pin(game, wx, wy, { label, secretId })` once
+   discovery.js drops `STUB`; the visit quest also listens to `world:step` and reads `ev.to` as `{ wx, wy }`. The
+   journal's Locations tab wants a "show on the world map" key (an API to open the world map centred on a span).
+   Discovery XP is WS1's; the visit quest gives none.
+4. **WS10 (dungeon sites):** bible §8.5: an Hour-site floor named after an event shows all three accounts: lay a third
+   mural `{ view: "dark", text: e.text.hostile }` (a rune, read with the torch out) beside the "3d" and "map" ones.
+   Murals may carry `secret` (the id); without it `muralSecret` finds the account by its text, which works today.
+   A history relic's three registers are `relic.text { flat, deep, dark }` (for WS10 #4's naming in items).
+5. **WS4 (progression):** `TRIANGULATION.xp = (level) => xpReward("triangulation", level)` (secrets.js already calls
+   `gainXp(game, xp, { source: "triangulation" })`); the powers Hour script, Gossip, Triangulator and Vey's script can
+   lose their `needs` once their effects read this API (WS4 #11).
+6. **WS6b (the Kindling):** `readings(game)` and `markSold(game, id)` are the journal's side of "give a reading";
+   "ask for a reading" calls `learnSecret(game, id, "ritual")` with an id from the creature's `c.readings` (7b's
+   villagers, WS10's legends); a rumour has `reading: null` (the +60 rumour option); `def.value` is its glim value.
+   `dialogue.js drawJournal` and `journalKey` are no longer used (the journal screen is `screens/journal.js`).
+7. **WS6a / C (factions):** an Hour's cult is `ruler.cult.name`; `game.state.journal.cultPass[rulerId]` (and the
+   `cultPass` event) should make that cult treat you as a pilgrim in its sites (bible §8.5); the cults themselves
+   (generated factions, −500) are for the run's factions step.
 
 ## Handoff
 
