@@ -98,9 +98,15 @@ the quest template `visit`; an `inspect` handler; the describer `murals`; the ta
 
 ## Integration requests
 
-1. **`tests/checks/world.js:322` (P0's check): asked of the coordinator (2026-10-27).** It holds every run's history
-   to the fixture on both worlds; the real world now generates. Proposed: the test world still exactly the fixture;
-   any other world `validateHistory(run.history)` with no problem. (Applied here only if approved, marked `// WS7`.)
+1. **`tests/checks/world.js` siteRules' history line (P0's check): applied in this branch with the coordinator's
+   approval (2026-10-27), marked `// WS7` (`e8ce55b`), for the integrator to confirm.** It held every run's history
+   to the fixture on both worlds. Now: the test world, still exactly the fixture (the counts 2 / 2 / 1 and deep-equal
+   to `fixtureHistory()`); any other world, `validateHistory(run.history, { world })` with no problem. One line, plus
+   the import it needs at the top; WS10's own change to the same file (its `historicRule`) is elsewhere in
+   `siteRules`, so the two join cleanly. Mutants in `docs/sessions/ws7.md`.
+1b. **`tests/checks/hud.js:199` (P0's check): applied with the coordinator's approval (2026-10-27), marked `// WS7`
+   (`1dc00af`).** The describer list must be exactly `tile, people, items, sightings, murals, markers`: TECH §2.14's
+   pure describer for murals. Nothing else in the file changed. Mutants in `docs/sessions/ws7.md`.
 2. **`world/run.js` (frozen):** the `secrets` step should be `run.secrets = makeSecrets(run)` (`story/secrets.js`), so a
    save carries them (until then `secretsOf` makes them once per run from the same data, so ids don't change). Bump
    `GEN_VERSION` (with WS10 #2): the real world's runs differ from P0's for the same seed.
