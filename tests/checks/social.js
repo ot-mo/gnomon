@@ -216,10 +216,14 @@ export async function run(env) {
       cc.push([mob("test:moth"), mob("test:village"), "hostile"], [mob("test:village"), mob("test:moth"), "neutral"]);
       for (const [a, b, want] of cc) { const got = F.attitude(game, a, b); if (got !== want) fail(`${Object.keys(a.faction)} → ${Object.keys(b.faction)}: ${got}, want ${want}`); }
     } finally { for (const id of ["test:beasts", "test:moth", "test:people", "test:village"]) delete F.FACTIONS[id]; }
-    // The old game: nobody has a faction.
+    // The old game: nobody has a faction. (Its monsters are the types without one: WS2b's wildlife carry WS6a's factions,
+    // so they are the tables' above, not the parent's; found at the WS2b merge.)
     let legacy = 0;
     const types = Object.entries(creatures.CREATURE_TYPES);
-    const ms = types.filter(([, t]) => !t.talks).map(([id]) => creatures.spawnCreature(id, 2, 2, 0, { rng: R, level: 2 }));
+    const ms = types.filter(([, t]) => !t.talks && !t.factions).map(([id]) => creatures.spawnCreature(id, 2, 2, 0, { rng: R, level: 2 }));
+    const withFactions = types.filter(([, t]) => !t.talks && t.factions).length;
+    const { LEGACY_MONSTERS } = await m("content/creatures/legacy.js");
+    for (const id of Object.keys(LEGACY_MONSTERS)) if (!ms.some((c) => c.type === id)) fail(`the parent's ${id} isn't among the old game's monsters (a faction on it?)`);
     const ps = types.filter(([, t]) => t.talks).map(([id]) => creatures.spawnCreature(id, 2, 2, 0, { level: 2 }));
     for (const a of ms) {
       if (F.attitude(game, a, p()) !== "hostile") fail(`legacy ${a.type} isn't out for you`);
@@ -227,7 +231,7 @@ export async function run(env) {
       legacy++;
     }
     for (const a of ps) if (F.attitude(game, a, p()) !== "neutral") fail(`legacy person ${a.type} → you: ${F.attitude(game, a, p())}`);
-    stats.attitude = `${cells} table cells × 2 bodies, ${pairs.length} house-rule pairs, ${want2.length} follower pairs, ${cc.length} creature pairs, ${legacy} legacy monsters × ${ms.length + ps.length}`;
+    stats.attitude = `${cells} table cells × 2 bodies, ${pairs.length} house-rule pairs, ${want2.length} follower pairs, ${cc.length} creature pairs, ${legacy} legacy monsters × ${ms.length + ps.length} (${withFactions} types with factions left to the tables)`;
   }
 
   // --- 3. Rep arithmetic ------------------------------------------------------------------------------------------
