@@ -177,8 +177,14 @@ export async function checkProgression(m) {
         if (st.maxHp(p) !== tou + 4 || p.hp !== st.maxHp(p)) fail(`${what}: HP ${p.hp}/${st.maxHp(p)}, want ${tou + 4}`);
         const wantDv = 6 + Math.floor((st.attr(p, "agi") - 16) / 2);
         if (st.dv(p) !== wantDv) fail(`${what}: DV ${st.dv(p)}, want ${wantDv}`);
-        const armour = { clothes: 0, leather: 1, chain: 2 }[B.kit.equip.body?.id] ?? 0, wantAv = armour + (LEVELS[B.level]?.bonus?.av || 0);
+        // The Levels (bible §10.10), written out here rather than read from the table under test: Vey +3 to examine,
+        // Orrum +1 natural armour, Cassin neither.
+        const LEVEL_WANT = { vey: { examine: 3, av: 0 }, orrum: { examine: 0, av: 1 }, cassin: { examine: 0, av: 0 } };
+        const want = LEVEL_WANT[B.level] || { examine: 0, av: 0 };
+        const armour = { clothes: 0, leather: 1, chain: 2 }[B.kit.equip.body?.id] ?? 0, wantAv = armour + want.av;
         if (st.av(p) !== wantAv) fail(`${what}: AV ${st.av(p)}, want ${wantAv}`);
+        if (st.bonus(p, "examine") !== want.examine) fail(`${what}: examine +${st.bonus(p, "examine")}, want +${want.examine}`);
+        if ((g === "plumb") !== !!B.level) fail(`${what}: a ${g} with Level ${B.level}`);
         if (p.level !== 1 || p.xp !== 0 || p.maxHpGain !== 0 || p.attrPoints !== 0) fail(`${what}: level ${p.level}, xp ${p.xp}, gains ${p.maxHpGain}, points ${p.attrPoints}`);
         if (p.funds !== B.glim || p.funds > (p.purse || 200) || (B.purse && p.purse !== B.purse)) fail(`${what}: ${p.funds} glim in a ${p.purse} purse, want ${B.glim}`);
         if (JSON.stringify(p.trees) !== JSON.stringify(B.trees)) fail(`${what}: trees ${p.trees}`);
