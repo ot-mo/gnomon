@@ -399,7 +399,7 @@ export function checkItems(m) {
     game.debug.openInv();
     game.invSel = 0;
     m.keys.dispatchKey(game, "KeyL", false, "l");
-    if (game.mode !== "examine" || !/potion/i.test(text())) fail(`L in the pack: ${game.mode}`);
+    if (game.mode !== "examine" || !/Worth about \d+ glim/.test(text())) fail(`L in the pack: ${game.mode}, or the examine screen is empty (no price line)`);
     m.keys.dispatchKey(game, "Escape", false, "");
     if (game.mode !== "inventory") fail(`Esc from examine went to ${game.mode}, not back to the inventory`);
     m.keys.dispatchKey(game, "Escape", false, "");

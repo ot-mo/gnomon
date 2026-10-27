@@ -112,7 +112,7 @@ try {
   // L: examine over the pack; Esc back.
   await key("KeyL");
   t = await screenText();
-  expect((await mode()) === "examine" && t.includes("One of sixty."), "L opens examine on the selected token");
+  expect((await mode()) === "examine" && t.includes("Not for sale.") && /Token 46/.test(t), "L opens examine on the selected token (its own lines: the name, \"Not for sale.\")");
   await shot("examine-token");
   await key("Escape");
   expect((await mode()) === "inventory", "Esc goes back to the pack");

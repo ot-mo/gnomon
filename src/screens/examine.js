@@ -127,7 +127,7 @@ const capital = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
 // --- The screen ------------------------------------------------------------------------------------------------------
 function drawExamine(game) {
-  const data = modeData(game) || {}, subjects = data.subjects || [], k = Math.min(data.k || 0, subjects.length - 1);
+  const data = modeData(game) || {}, subjects = (data.subjects ||= examineSubjects(data)), k = Math.min(data.k || 0, subjects.length - 1);
   const subject = subjects[k];
   const w = Math.min(S.cols - 4, 76);
   const lines = subject ? examineLines(game, subject).flatMap(({ text, color }) => wrap(text, w - 6).map((t) => ({ text: t, color }))) : [];
@@ -149,6 +149,7 @@ registerScreen(MODE, {
   draw: drawExamine,
   key(game, code) {
     const data = modeData(game) || {};
+    data.subjects ||= examineSubjects(data);   // (pushed by another screen with only { item })
     if (code === "Tab" && (data.subjects?.length || 0) > 1) { data.k = ((data.k || 0) + 1) % data.subjects.length; return true; }
     if (["Escape", "Enter", "NumpadEnter", "Space", "KeyE", "KeyL", "KeyI"].includes(code)) { popMode(game); return true; }
     return false;
