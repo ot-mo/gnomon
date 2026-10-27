@@ -3,23 +3,23 @@
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
 **Updated:** 2026-10-27, the integrator (local session), on `integration`. **Phase 1 is running and Phase 2's
-integration has started: WS3, WS8, WS4 and WS6 (both halves each) and WS5 are merged (`p2-ws3`, `p2-ws8`,
-`p2-ws4a`, `p2-ws5`, `p2-ws6a`, `p2-ws4b`, `p2-ws6b`); the flip waits for the user (below), and the next `p1-*` tag
-merges as it lands (WS10 next, it seems; WS9 is paused before its tag).** From here on only the integrator edits this file and
+integration has started: WS3, WS8, WS4 and WS6 (both halves each), WS5 and WS10 are merged (`p2-ws3`, `p2-ws8`,
+`p2-ws4a`, `p2-ws5`, `p2-ws6a`, `p2-ws4b`, `p2-ws6b`, `p2-ws10`); the flip waits for the user (below), and the next
+`p1-*` tag merges as it lands (WS9 is paused before its tag).** From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p2-ws6b` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
-  `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b` and `p1-ws6b` with their integration requests; `p2-ws3` … `p2-ws4b`
-  before it).
+- **Last tag:** `p2-ws10` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+  `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b` and `p1-ws10` with their integration requests; `p2-ws3` …
+  `p2-ws6b` before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
 - **Branch:** `integration`, in the worktree `C:\Users\Otto Mörner\Code\gnomon-wt\integration` (serves on port
   8660). Nothing is half finished.
 - **Done:** Phase 0 (0A1 … 0D2, notes in `docs/sessions/0A1.md` … `0D2.md`); WS3, WS8, WS4, WS5 and WS6a
-  and WS6b (`docs/ws3.md`, `ws8.md`, `ws4.md`, `ws5.md`, `ws6.md`; `docs/sessions/ws3.md`, `ws8.md`, `ws4.md` "Part 4a"
-  and "Part 4b", `ws5.md`, `ws6.md` "Part 6a" and "Part 6b"), merged. The merges' own numbers are under "Integration log" below.
-- **Checks:** `node tools/run-all.mjs`, 37 checks (about 2 minutes on an idle machine, 4 with three workstreams
+  WS6b and WS10 (`docs/ws3.md`, `ws8.md`, `ws4.md`, `ws5.md`, `ws6.md`, `ws10.md`; `docs/sessions/ws3.md`, `ws8.md`,
+  `ws4.md` "Part 4a" and "Part 4b", `ws5.md`, `ws6.md` "Part 6a" and "Part 6b", `ws10.md`), merged. The merges' own numbers are under "Integration log" below.
+- **Checks:** `node tools/run-all.mjs`, 38 checks (WS10 added `check-sites`) (about 2 minutes on an idle machine, 4 with three workstreams
   running; the timed ones, `check-dungeons`, `check-status`, `check-stats` and `check-perf`, alone at the end; since
   WS3, `check-perf` runs the render check first). Browser (headless Playwright, audio silenced,
   `NODE_PATH="$(npm root -g)"`): `browser-0d2.mjs`, `browser-0d1.mjs`, `browser-gate.mjs`, `browser-silent.mjs`, and
@@ -77,7 +77,7 @@ tags; WS1, which builds on the most, last):
 | 4 | WS5 Body mods, items and equipment UI | `ws5`, `ws/ws5` | tagged `p1-ws5` (058bbbc); **merged, `p2-ws5`** (2026-10-27) |
 | 5 | WS4a → WS4b Character creation and progression | `ws4`, `ws/ws4` | WS4a tagged `p1-ws4a` (dc22850), **merged, `p2-ws4a`** (2026-10-27); WS4b tagged `p1-ws4b` (f8062f9), **merged, `p2-ws4b`** (2026-10-27) |
 | 6 | WS6a → WS6b Factions, dialogue builders → trade, the Kindling, backings | `ws6`, `ws/ws6` | WS6a tagged `p1-ws6a` (0697109), **merged, `p2-ws6a`**; WS6b tagged `p1-ws6b` (68ef866), **merged, `p2-ws6b`** (2026-10-27) |
-| 7 | WS10 Dungeon sites, lairs and legends | `ws10`, `ws/ws10` | queued |
+| 7 | WS10 Dungeon sites, lairs and legends | `ws10`, `ws/ws10` | tagged `p1-ws10` (1bbd302), **merged, `p2-ws10`** (2026-10-27) |
 | 8 | WS2a → WS2b Surface generation | `ws2`, `ws/ws2` | queued |
 | 9 | WS7a → WS7b Knowledge: history, villages, quests | `ws7`, `ws/ws7` | queued |
 | 10 | WS1 Overworld travel | `ws1`, `ws/ws1` | queued |
@@ -187,19 +187,13 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   parent's); WS8's TTK tables become the balance reference. Under d20 the map's T opens the target screen, creatures
   flee, and the log takes the d20 lines. WS9's title pushes the wizard (`create`, for the attribute set) only from the
   flip on (WS4 #13).
-- **WS10** (at its merge): WS8 #3, spikes rise through a flat you harmlessly (bible §10.2): `traps.js updateSpikes`
-  skips you when `!touchesYou(game, null)` (creatures.js). WS5 #12: Truing Cradles are `B.STATION` blocks (Benchmark,
-  the Metronome, the Square; stations by region rules); Hour-site bottoms give true-marks (`{ kind: "credit", count }`)
-  and artifacts (`randomBodyMod`); the Square's free fittings for a Plumb at Assize ≥ Warm pass `openTruing(game, { at:
-  "cradle", …, waive: true })` (WS5 #20's other half). WS5 #9's metronome heart (`beatSight`: the next spikes, presses
-  and hands in 3D) goes with WS10's traps. WS6a #2's spikes: `traps.js` hurts with `damageMonster`, which is yours (as
-  in the parent), so spikes hurting a faction member give grudges against you and cost rep; pass no source
-  (`applyDamage(game, m, dmg, { src: null, color, deathText })`). Then a spike kill gives no XP either (`killMonster`'s
-  `byPlayer` follows the source), a change to the old game: keep the parent's XP for it if golden or the legacy fights
-  notice. **A P0 check change, coordinator-approved, to confirm at the merge:** `tests/checks/world.js` `siteRules`
-  skips the region-chance line for `kind === "historic"` only and holds such a site instead to "matches exactly one
-  `history.siteRequests` entry, on its tier's span", with mutants showing it bites; nothing else in the check changes.
-- **WS7** (at its merge; WS6a #6): villager types carry `factions` (or each villager `c.faction`) and `talk.dialogue`
+- **C1 (from the WS10 merge):** the Square's free fittings for a Plumb at Assize ≥ Warm (WS5 #20's other half):
+  whoever opens the Square's Cradle passes `openTruing(game, { at: "cradle", …, waive: true })`; landmark dungeons
+  may carry `floorGimmicks`, `named`, `cradle` and `bottom: { kind: "legend" | "relic", … }`, their bible gimmick
+  keys mapped onto `GIMMICKS` (WS10 #8); the real world's Keeper's Stair, listed with levels 2-21 (bible §15.3), is
+  built by `world/legacy.js legacyZone` at level z, 1-20, as golden needs (WS10 #9: left as it is; decide with the
+  real world).
+- **WS7** (at its merge; WS6a #6, WS10 #5): villager types carry `factions` (or each villager `c.faction`) and `talk.dialogue`
   one of `social/builders.js ROLES`; a village registers its own faction with `parent: "bent"` (a Bent village) or
   `"peoples"`, so the Assize's hatred of the Bent reaches it, its members carrying `bentVillages` as a second membership
   (0.25-0.5) so the Assize writ and the Aspirant move them; quests `addRep(game, id, n, "quest")` (+100 with the
@@ -208,7 +202,12 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   against): a talker whose type has `hp` gets `hp`, `maxHp`, `attack` and the AI's fields like a monster and is
   touchable while `hp > 0` (legacy people, with no `hp`, stay untouchable); the map's bump talks while it isn't
   hostile and strikes with Shift. Until then `touchable` refuses every talker, so the witnesses fire only on members
-  that don't talk.
+  that don't talk. From WS10 (#5): `zone.murals` `[{ x, y, z, view, text }]` (the history's accounts on site floors
+  and an Hour site's surface): the look cursor and `inspect` read a "3d" one in 3D and a "map" one on the map; the
+  Hour's cult (bible §8.7, −500) and an Hourbound leader at the reliquary need factions (`site.historyRef.rulerId`).
+- **WS1** (at its merge; WS10 #7): a legend met on the road is a zone patch `{ op: "spawnCreature", uid: def.uid, type:
+  def.species, level: def.level }` with the def from `legendOf(run, uid)`; its lair is then empty of it (checked).
+- **WS9** addition (from WS10 #2): `config.js` `VERSION.gen` should follow `world/run.js GEN_VERSION`, now 2.
 - **C4 / WS5** (WS6a #5's wearables, bible §3.5): the feather cloak, an Hour mask, the Assize writ, ink stains give
   `addRep(game, f, n, "worn")` when worn and take it back when unworn. **Content (C)**, WS6a #9: the Lantern Moths'
   "like you while your torch is lit" (text only today); the Smoothers with no membership (the parent rule makes them
@@ -235,7 +234,8 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `turnWorld` listens instead of watching `game.view` each frame (and the Hand's exception once the Hand exists);
   WS4 #19, Shellback refusing body armour (`inventory.js` equip) and Lightsick's hood or veil (a worn flag C4 adds).
   Optional, kept as deviations: WS4 #18 (Shadowsense showing ghosts whole) and #23 (the map's 2-block climb from
-  Stilt Legs level 3, not 5). From the WS6b merge: WS6b #3, the Snuffer's mark, the torch's radius −1 for the rest of
+  Stilt Legs level 3, not 5). From the WS10 merge: WS10 #6, a legend's `opinions` `[{ faction, feeling, reason }]`
+  (bible §12.13) for `attitude` and the Kindling, and the Herdmother's herd turning friendly with her. From the WS6b merge: WS6b #3, the Snuffer's mark, the torch's radius −1 for the rest of
   the run once `game.state.snuffer` is set (`player.js torchRange` has no game: a status or a field on the player);
   its "no shadow under you" needs nothing, as 3D draws no shadow of yours.
 - **WS5** (merged at `p2-ws5`; what was carried to it): WS4 #9, the six free implants the Plumb backgrounds name (`tallyEye`, `plumbLineEar`,
@@ -283,6 +283,40 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p2-ws10`** (2026-10-27): `p1-ws10` (1bbd302) merged into `integration` (`2b343b7`), no conflicts. Its one P0 check
+change, confirmed (coordinator-approved, `// WS10`): `tests/checks/world.js` `siteRules` skips the region-chance line
+for `kind === "historic"` only (`historicRule`): such a site matches exactly one `history.siteRequests` entry and sits
+on the requested tier or the nearest a usable span has, and every request is placed exactly once; every other kind is
+checked as before. `run-all` has 38 checks now (`check-sites`).
+- Merge finding (`ae6aadd`): check-sites' following legend moved the follower into the next zone by hand, "as WS8's
+  zone:leave takes a follower along", and with WS8 merged zone:leave does it too: two copies ("claimed by 33,10,2, 2 in
+  memory"). It now relies on WS8's followers: one copy upstairs, at the surface and back; back in its lair with you it
+  is the follower; left upstairs, the lair makes none.
+- Applied, each with an assertion that fails without it: #2 (`525c581`: `run.legends = placeLegends(run)`,
+  `GEN_VERSION` 2); #3 (`dd51613`: `BOTTOM_LOOT.bodyMod = randomBodyMod`, a legend's bottom holds its artifact, cell or
+  implant; `BEAT_SIGHT.has` reads the metronome heart); #4 (`70b7d49`: a history relic's name, the relic colour, 400
+  glim, its powers through `itemBonuses`); #11 (`24aa9f2`: the determinism scan covers `content/dungeons.js` and
+  `content/creatures/legends.js`); #12 (`1c88d8b`: `creatures.js theOf`/`TheOf`, a named creature takes no article in
+  any log line; a risen creature other than the Flat Queen is "it"); the README row (`bb5b28e`). Decided: #10
+  (`b5948f6`): a spike kill keeps the parent's experience and ring effects while its harm stays nobody's (no grudge, no
+  rep), as for status kills: `applyDamage`'s `byPlayer` apart from `src`; #9 left as it is (to C1). Carried: #5 to WS7;
+  #6 to the integrator's backlog; #7 to WS1; #8 to C1/C3; `config.js VERSION.gen` to WS9. Carried to WS10 and found
+  built: WS8 #3 (spikes through a flat you), WS5 #9 (the beat seam, now wired), WS5 #12 (Cradles: the legend letter
+  `cradle`, station sites; the Square's free fittings go to C1), WS6a #2 (spikes pass no source).
+- Checks: `run-all` at `bb5b28e` 36 of 38 (239 s; the CPU at 100% with WS2a's and WS7a's sessions working), the two
+  failures timed only. Alone against `p2-ws6b`, alternating: `check-dungeons` p95 33.2 / 30.7 / 37.3 ms (the legacy
+  1,000) against 26.0 / 26.9 / 26.3 (WS10's check runs more parameter cases first, which WS10 measured as ×1.14-1.25
+  inside the check; all within 40); `check-perf --against p2-ws6b --rounds 3 --no-render`: a first run failed surface
+  generation's max (171 against 128 ms, one sample); a per-span A/B of the same 40 spans (median of 3, warmed, three
+  alternating rounds) read p95 37.8 / 40.2 / 35.1 ms against 36.6 / 43.4 / 50.0, the slowest spans the same two
+  landmarks at 44-47 ms in both; the rerun **PASS**, every item within budget (surface generation p95 34.0, ×1.07, max
+  132.5, ×0.91; dungeon generation p95 32.5, ×1.00; passTime 6.4, ×0.90; mapStep 1.8; `buildRun` 1.9 ms, its 200 ms
+  budget far off). Browser (`tools/serve.mjs 8660`, `?silent=1`, 0 console errors): `browser-0d1 --against p0-done` 23
+  of 23 modes, the HUD at 100×30, golden (b) 27 of 27, per tick underground +1.1% (3D) and −0.3% (map); `browser-gate`
+  (1234, 7); `browser-0c` (1234, 7); `browser-0d2 --all` (boot with 155 modules, `test-world.html` 34 passed, 0 failed,
+  dungeons with WS10's sites, legends and traps among them); `browser-silent`; `browser-ws8` (1234, 7); `browser-ws6`;
+  `browser-ws5`; `browser-ws4` (both sizes).
 
 **`p2-ws6b`** (2026-10-27): `p1-ws6b` (68ef866) merged into `integration` (`fa1cde2`). Two conflicts, each resolved by
 keeping both sides: `tests/checks/body.js` and `content.js` (WS8's, WS5's and WS6b's coordinator-approved sample lines,
@@ -578,6 +612,9 @@ its §8.4 files and two P0 checks).
   faction members that don't talk; a witness sees no farther than its own sight (WS8's `sees`: people 10, a goblin
   11, ×0.55 with you in the dark), inside the 12-tile witness range; the Bent villages are one rep pool until WS7 gives
   villages factions; grudges never expire; spikes still count as your harm (WS10, carried).
+- **WS10 (merged; what's left):** six of bible §12.13's legendary templates need systems that aren't in (WS10 #8,
+  content); history's sites are placed after P0's kinds (deviation 2); a spike kill's harm is nobody's, its experience
+  yours (the integrator's call); the legends' opinions (the integrator's backlog).
 - **WS6b (merged; what's left):** credit isn't built (a sale a full flask can't hold is refused); prices move with EGO and
   rep only under the attribute set (the flip); the legacy Pell keeps his own shop and his one pack; the Snuffer's
   torch −1 (the integrator's backlog); the content above.
