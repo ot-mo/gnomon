@@ -116,24 +116,23 @@ export async function checkProgression(m) {
       const got = C.validateChoices({ ...choicesFor("forgehandOfOrrum", C.suggestSpread("plumb", "forgehandOfOrrum")), mutations: ["testCrease"] });
       if (got.join() !== "the Plumb take no mutations") fail(`a Plumb with a mutation: ${got.join("; ") || "taken"}`);
     } finally { delete m.mutations.MUTATIONS.testCrease; }
-    // The Plumb's free implant: its Level's own (or none named: the same); nothing else while WS5's table is empty; with
-    // implants in the table, any costing at most 2, the background's own listed first.
+    // The Plumb's free implant (WS5's table, since the integrator's merge of p1-ws5): any implant costing at most 2,
+    // its Level's own listed first; every Plumb background's own is in the table and costs at most 2; dearer ones,
+    // unknown ids and non-strings are refused for that reason.
     const forge = choicesFor("forgehandOfOrrum", C.suggestSpread("plumb", "forgehandOfOrrum"));
-    for (const [implant, ok] of [[undefined, true], [null, true], ["truesteelKnuckles", true], ["tallyEye", false], ["noSuchImplant", false], [42, false], ["", false]]) {
+    const IMPL = m.implants.IMPLANTS, max = GENOTYPES.plumb.freeImplantCost;
+    const cheapIds = Object.keys(IMPL).filter((id) => C.implantCost(id) <= max), dear = Object.keys(IMPL).find((id) => C.implantCost(id) > max);
+    const cheap = cheapIds.find((id) => id !== "knuckles");
+    for (const [implant, ok] of [[undefined, true], [null, true], ["knuckles", true], [cheap, true], [dear, false], ["noSuchImplant", false], [42, false], ["", false]]) {
       const got = C.validateChoices({ ...forge, implant });
       if (ok === !!got.length) fail(`validateChoices with implant ${JSON.stringify(implant)}: ${got.join("; ") || "taken"}`);
       if (!ok && !got.some((x) => /free implant/.test(x))) fail(`implant ${JSON.stringify(implant)} refused for the wrong reason: ${got}`);
     }
-    const IMPL = m.implants.IMPLANTS;
-    Object.assign(IMPL, { testEye: { name: "test eye", grade: 2, parts: ["face"] }, testHeavy: { name: "test heavy", grade: 3, parts: ["body"] },
-                          truesteelKnuckles: { name: "truesteel knuckles", grade: 1, parts: ["hands"] } });
-    try {
-      const free = C.freeImplants("forgehandOfOrrum");
-      if (free.join() !== "truesteelKnuckles,testEye") fail(`freeImplants with implants in the table: ${free}`);
-      if (C.validateChoices({ ...forge, implant: "testEye" }).length || !C.validateChoices({ ...forge, implant: "testHeavy" }).length)
-        fail("with implants in the table: a cost-2 implant refused, or a cost-3 one taken free");
-      if (C.freeImplants("archivistOfVey")[0] !== "tallyEye") fail(`an Archivist's free implants start ${C.freeImplants("archivistOfVey")[0]} (its own isn't in the table yet)`);
-    } finally { for (const id of ["testEye", "testHeavy", "truesteelKnuckles"]) delete IMPL[id]; }
+    for (const id of m.content.backgroundsOf("plumb")) {
+      const own = BACKGROUNDS[id].implant, free = C.freeImplants(id);
+      if (!IMPL[own] || C.implantCost(own) > max) fail(`${id}'s own implant ${own}: ${IMPL[own] ? `costs ${C.implantCost(own)}` : "not in WS5's table"}`);
+      if (free[0] !== own || free.length !== cheapIds.length || !free.every((x) => cheapIds.includes(x))) fail(`freeImplants(${id}) = ${free} (want ${own} first, then the other ${cheapIds.length - 1} costing at most ${max})`);
+    }
     out.pointBuy = `${want.length} costs, ${refused + 1} wrong choices refused`;
   }
 
