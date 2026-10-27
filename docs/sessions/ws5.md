@@ -154,7 +154,8 @@ loot byte-identical (6.7 MB of JSON over 6 seeds × 20 depths); browser-shell an
 At `8e6955b` (the last code change; only these notes after it), 2026-10-27, with WS9, WS4a and the integrator running on
 this machine:
 
-- **run-all: 36 of 37** (139 s). The one failure is check-perf, timed inside the parallel run: `gen.dungeon` p95
+- **run-all at `ba0790e` (the docs; the tag's tree but for this line): all 37 checks passed** (139.2 s, 11 at a time).
+- **run-all at `8e6955b`: 36 of 37** (139 s). The one failure is check-perf, timed inside the parallel run: `gen.dungeon` p95
   41.0 ms against the 40 ms budget (×1.30 against p0-0d1), while check-dungeons in the same run passed (its p95 under
   40). WS5's only touch on generation is `randomEquipment`'s filter leaving out pieces with a slot.
 - **check-perf alone against p0-done**, alternating, `--rounds 3` (4 runs of each tree): **PASS**. Outdoor frame p50
