@@ -177,6 +177,7 @@ export function checkItems(m) {
     const plans = {
       humanoid: () => Bd.makeBody("humanoid"),
       beast: () => Bd.makeBody("beast"),
+      onehand: () => { const b = Bd.makeBody("humanoid"); b.parts = b.parts.filter((q) => q.id !== "hand_l"); delete b.equip.hand_l; return b; },
       extras: () => { const b = Bd.makeBody("humanoid"); b.parts.push({ id: "hand_x", type: "hand", holds: true }, { id: "back_2", type: "back" }); b.equip.hand_x = null; b.equip.back_2 = null; return b; },
     };
     const entity = (plan) => ({ body: plans[plan](), inv: [], attrs: St.makeAttrs(30), level: 1, maxHpGain: 0, hp: 20, perks: {}, status: {} });
@@ -281,7 +282,7 @@ export function checkItems(m) {
   });
 
   // --- 2. Implants ------------------------------------------------------------------------------------------------
-  section("implants", () => {
+  section("implants", () => { St.STATS_DEBUG.verify = true; try {   // (the stat cache verified throughout)
     const at = { at: "cradle" };
     const withC = (fn) => IM.withTruing(game, at, fn);
     const reasons = {};
@@ -501,7 +502,7 @@ export function checkItems(m) {
         || back.credits !== 3 || IM.gradeUsed(back) !== 5 || back.inv.find((x) => x.kind === "artifact")?.cell?.charge !== p.inv.find((x) => x.kind === "artifact").cell.charge)
       fail(`a save round trip lost implants, grade, true-marks or a cell (${problemsJson.join("; ")})`);
     stats.implants = { implants: Object.keys(m.implantTable).length, refusals: reasons };
-  });
+  } finally { St.STATS_DEBUG.verify = false; } });
 
   // --- 3. Identify odds ------------------------------------------------------------------------------------------
   section("identify", () => {
@@ -579,7 +580,17 @@ export function checkItems(m) {
     if (game.mode !== "examine" || data?.subjects?.length !== 2) fail(`inspect with open: true: ${game.mode}, ${data?.subjects?.length} subjects (want examine, 2)`);
     const text = () => { m.capture.chars = []; game.debug.draw(); return m.capture.chars.join(""); };
     const t1 = text();
-    if (!/goblin, level 4/i.test(t1) || !/(unhurt|scratched|hurt)/.test(t1)) fail("the examine screen doesn't name the goblin, its level and its health band");
+    if (!/goblin, level 4/i.test(t1)) fail("the examine screen doesn't name the goblin and its level");
+    // The bands without a level-eye (examine.js's thresholds): health, AV, DV.
+    {
+      const av = m.combat.avOf(goblin), dvv = m.combat.dvOf(game, goblin);
+      const avWord = av <= 0 ? "no armour" : av <= 1 ? "light armour" : av <= 3 ? "armoured" : "heavily armoured";
+      const dvWord = dvv <= 6 ? "easy to hit" : dvv <= 9 ? "quick" : dvv <= 12 ? "hard to hit" : "very hard to hit";
+      if (!t1.includes(`Unhurt · ${avWord} · ${dvWord}`)) fail(`the bands for an unhurt goblin (AV ${av}, DV ${dvv}): want "Unhurt · ${avWord} · ${dvWord}"`);
+      goblin.hp = Math.ceil(goblin.maxHp * 0.4);
+      if (!text().includes("Badly hurt")) fail("a goblin at 40% health isn't Badly hurt");
+      goblin.hp = goblin.maxHp;
+    }
     if (/Health \d+ of \d+/.test(t1)) fail("exact numbers without a level-eye");
     m.keys.dispatchKey(game, "Tab", false, "");
     if (!/ring of protection/i.test(text()) || !/armour/i.test(text())) fail("Tab didn't show the ring and its bonus");
@@ -588,7 +599,8 @@ export function checkItems(m) {
     // A level-eye reads the numbers.
     p.body.implants.face = { kind: "implant", id: "levelEye" }; St.invalidateStats(p);
     m.events.emit(game, "inspect", m.renderMap.inspectAt(game, { x: tx, y: ty }, true));
-    if (!/Health \d+ of \d+ · AV \d+ · DV \d+/.test(text())) fail("a level-eye doesn't show exact health, AV and DV");
+    { const want = `Health ${goblin.hp} of ${goblin.maxHp} · AV ${m.combat.avOf(goblin)} · DV ${m.combat.dvOf(game, goblin)}`;
+      if (!text().includes(want)) fail(`a level-eye doesn't show "${want}"`); }
     m.keys.dispatchKey(game, "Escape", false, "");
     // A 3D-style payload (WS8's look): a block in the crosshair.
     game.mode = "explore"; game.view = "3d";
@@ -719,6 +731,7 @@ export function checkItems(m) {
       ].filter(Boolean);
       if (bad.length) fail(`${view}: ${bad.join(", ")} didn't do what it says: ${JSON.stringify(r)}`);
     }
+    if (out.map.echoBell.revealed !== out["3d"].echoBell.revealed) fail(`the echo-bell revealed ${out.map.echoBell.revealed} cells on the map and ${out["3d"].echoBell.revealed} in 3D`);
     stats.artifacts = out;
     // A running lantern-mote that leaves the pack takes its light with it: dropped (X), at once; gone another way
     // (sold, say), by the next tick of the clock. A save of the player with it running is plain JSON.
@@ -819,21 +832,20 @@ export function checkItems(m) {
       game.mode = "map"; game.view = "map"; game.modeStack = [];
       game.debug.openInv();
       const text = () => { game.debug.draw(); return m.capture.chars.join(""); };
-      const name = (i) => I.itemName(game, p.inv[i]);
       game.invSel = 0;
       let t = text();
       if (!t.includes("I close")) fail(`${cols}×${rows}: "I close" isn't on screen`);
       for (let k = 0; k < 59; k++) m.keys.dispatchKey(game, "ArrowDown", false, "");
       t = text();
       const top = game.invTop;
-      if (game.invSel !== 59 || top <= 0) fail(`${cols}×${rows}: after 59 × ↓ the selection is ${game.invSel}, the list's top ${top}`);
+      if (game.invSel !== 59 || top !== 60 - (rows - 12) || game.invPage !== rows - 12) fail(`${cols}×${rows}: after 59 × ↓ the selection is ${game.invSel}, the list's top ${top} (want ${60 - (rows - 12)}), a page ${game.invPage} (want ${rows - 12})`);
       m.keys.dispatchKey(game, "Home", false, "");
       text();
       if (game.invSel !== 0 || game.invTop !== 0) fail(`${cols}×${rows}: Home: selection ${game.invSel}, top ${game.invTop}`);
       m.keys.dispatchKey(game, "PageDown", false, "");
       const page = game.invSel;
       text();
-      if (!(page > 1)) fail(`${cols}×${rows}: PgDn moved the selection to ${page}`);
+      if (page !== rows - 12) fail(`${cols}×${rows}: PgDn moved the selection to ${page}, want a page (${rows - 12})`);
       rowsAt[`${cols}x${rows}`] = { page: game.invPage, topAt59: top };
       // The filter: potions only.
       for (let k = 0; k < 6 && game.invFilter !== "potions"; k++) m.keys.dispatchKey(game, "KeyF", false, "f");
@@ -861,7 +873,6 @@ export function checkItems(m) {
       m.keys.dispatchKey(game, "Tab", false, "");
       m.keys.dispatchKey(game, "Escape", false, "");
       if (game.mode !== "map") fail(`${cols}×${rows}: Esc left the inventory for ${game.mode}`);
-      void name;
     }
     m.resize(180, 56);
     stats.pack = { items: 60, ...rowsAt };
@@ -977,7 +988,7 @@ export async function run(env) {
     load("events", "events.js"), load("renderMap", "renderMap.js"), load("interact", "interact.js"), load("talk", "talk.js"),
     load("currency", "currency.js"), load("creatures", "creatures.js"), load("world", "world.js"), load("rules", "rules.js"),
     load("status", "status.js"), load("abilities", "abilities.js"), load("codec", "save/codec.js"), load("rng", "rng.js"),
-    load("time", "time.js"), load("effects", "effects.js"), load("player", "player.js"), load("throwing", "throwing.js"), load("ui", "ui.js"),
+    load("time", "time.js"), load("effects", "effects.js"), load("player", "player.js"), load("throwing", "throwing.js"), load("ui", "ui.js"), load("combat", "combat.js"),
   ]);
   m.implantTable = (await env.src("content/items/implants.js")).IMPLANTS;
   m.artifactTable = (await env.src("content/items/artifacts.js")).ARTIFACTS;
