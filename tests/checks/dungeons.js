@@ -27,6 +27,7 @@ import { TEST_WORLD } from "../../src/content/world/test-world.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
 import { DUNGEONS } from "../../src/content/dungeons.js";
 import { legendLooks } from "../../src/content/creatures/legends.js";
+import { DENY } from "./names.js";
 
 const pct = (sorted, q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))];
 
@@ -370,6 +371,12 @@ export function checkSites({ seeds = SEEDS } = {}) {
       }
     }
   }
+  // 20,000 legends' names: none holds a term of bible §15.11 (tests/checks/names.js DENY), even inside a word.
+  const terms = DENY.filter((d) => d.from === "§15.11").map((d) => d.term.toLowerCase().replace(/[^a-z]/g, "")).filter((t) => t.length >= 3);
+  const nrng = makeRng(seedFor(77, "legend names")), bad = new Set();
+  for (let k = 0; k < 20000; k++) { const L = makeLegend(nrng, { id: `n${k}` }, 5), low = L.name.toLowerCase(); if (terms.some((t) => low.includes(t))) bad.add(L.name); }
+  stats.legendNames = `20000, ${bad.size} with a banned term`;
+  if (bad.size) problems.push(`legend names with a bible §15.11 term in them: ${[...bad].slice(0, 5).join(", ")}`);
   stats.ms = Math.round(performance.now() - t0);
   return { name: "sites", ok: problems.length === 0, problems, stats };
 }

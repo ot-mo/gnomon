@@ -156,13 +156,14 @@ export function dungeonParams(run, site, z) {
 }
 
 // --- Legends (bible §12.13) ------------------------------------------------------------------------------
-// A name in the Hours' phonology: an onset, a middle (sometimes two) and a final, 3 to 9 letters.
+// A name in the Hours' phonology: an onset, a middle (sometimes two) and a final, 3 to 9 letters, none of bible
+// §15.11's terms in it.
 function legendName(rng) {
   const N = LEGENDS.names;
   for (;;) {
     const parts = [rng.pick(N.onsets), rng.pick(N.middles), ...(rng.chance(0.3) ? [rng.pick(N.middles)] : []), rng.pick(N.finals)];
     const name = parts.join("");
-    if (name.length >= 3 && name.length <= 9) return name[0].toUpperCase() + name.slice(1);
+    if (name.length >= 3 && name.length <= 9 && !N.reject.some((w) => name.includes(w))) return name[0].toUpperCase() + name.slice(1);
   }
 }
 // The lair's owner: a species of its level, one template, 0-2 mutations, 1-3 opinions with their reasons.

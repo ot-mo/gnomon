@@ -69,6 +69,9 @@ export const LEGENDS = {
     onsets: ["a", "i", "o", "u", "sha", "ka", "ve", "zha", "sa", "ni", "ob", "ke", "ru"],
     middles: ["ma", "ru", "yen", "dra", "uv", "ha", "ret", "lit", "rai", "ten", "sva", "mel"],
     finals: ["t", "l", "th", "n", "on", "a", "ra", "et", "ul"],
+    // Bible §15.11: a generated name that contains any of its terms (letters only) is rejected ("dra" + "ma…"
+    // makes "dram"). check-sites holds this list to tests/checks/names.js DENY over 20,000 names.
+    reject: ["argyve", "baetyl", "barathrum", "bethesdasusa", "beylah", "cathedra", "chavvah", "chimera", "classic", "crysteel", "dram", "dromad", "eaters", "esper", "eynroj", "ezra", "fullerite", "girsh", "glimmer", "glowpad", "goatfolk", "golgotha", "gyre", "hindren", "issachari", "joppa", "kasaphescence", "klanq", "kyakukya", "mechanimist", "naphtaali", "omonporch", "parasang", "physic", "putustemplar", "qud", "recoiler", "resheph", "roleplay", "shekhinah", "snapjaw", "spindle", "sultan", "sunslag", "templar", "tinkering", "truekin", "ubernostrum", "wander", "watervine", "wayfaring", "ydfreehold", "zetachrome"],
   },
 };
 
