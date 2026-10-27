@@ -382,7 +382,19 @@ export async function checkProgression(m) {
   function section4() {
     const steps = [];
     const at = () => W.wizard().step;
-    const expect = (step, what) => { if (at() !== step) fail(`wizard: ${what}: on ${at()}, want ${step}`); };
+    const expect = (step, what) => { if (at() !== step) fail(`wizard: ${what}: on ${at()}, want ${step}`); else fits(what); };
+    // Every step fits the screen (100×30 here): its button and the key help on the bottom rows, and nothing written into
+    // the last column (text running into the edge is cut there without a word).
+    const fitted = new Set();
+    const fits = (what) => {
+      frame();
+      const step = at(), rows = Array.from({ length: capture.rows }, (_, y) => rowText(y));
+      fitted.add(step);
+      if (!/\[ (Next|Begin) \]/.test(rows[capture.rows - 2])) fail(`wizard: ${step} (${what}): no [ Next ] on the second row from the bottom`);
+      if (!/back/.test(rows[capture.rows - 1])) fail(`wizard: ${step} (${what}): no key help on the bottom row`);
+      const edge = rows.findIndex((r) => r[capture.cols - 1] !== " ");
+      if (edge >= 0) fail(`wizard: ${step} (${what}): row ${edge} runs to the right edge: "${rows[edge].slice(-30)}"`);
+    };
     // By keyboard: a Bent (the third background), points moved about, a name with å, ä, ö; then a Plumb.
     for (const [g, bgIndex, name, mode] of [["bent", 2, "Åsa Öberg-Ärla", "commonsLamp"], ["plumb", 4, "Märta Dell-Cassin", "oneWick"]]) {
       W.openCreate(game, { seed: 4242, mode: "pilgrim" });
@@ -490,8 +502,8 @@ export async function checkProgression(m) {
       try { click("Begin", { row: "Genotype" }); frame(); } catch (err) { threw = err.message; }
       if (threw || at() !== "background" || W.wizard().genotype !== "plumb") fail(`wizard: a jump to Begin after changing the genotype: ${threw || `on ${at()}, ${W.wizard().genotype}`}`);
     }
-    // Every step fits 100×30: the buttons and the key help are on screen.
-    out.wizard = `${steps.join(", ")} at ${capture.cols}×${capture.rows}`;
+    if (fitted.size !== 7) fail(`wizard: only ${[...fitted]} checked against the screen's size`);
+    out.wizard = `${steps.join(", ")} at ${capture.cols}×${capture.rows}; ${fitted.size} steps fit`;
   }
 
   // --- 5. Names ------------------------------------------------------------------------------------------------
