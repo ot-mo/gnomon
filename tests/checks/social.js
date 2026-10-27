@@ -139,6 +139,15 @@ export async function run(env) {
     const want2 = [[monster, fol, "hostile"], [fol, monster, "hostile"], [fol, p(), "friendly"], [p(), fol, "friendly"], [fol, fol2, "friendly"],
       [monster, flatFol, "unaware"], [flatFol, monster, "unaware"], [fol, flat, "unaware"], [deep, fol, "neutral"], [calm, fol, "hostile"]];
     for (const [a, b, want] of want2) { const got = F.attitude(game, a, b); if (got !== want) fail(`followers: ${a === p() ? "you" : a.brain?.leader ? "your follower" : a.type} → ${b === p() ? "you" : b.brain?.leader ? "your follower" : b.type}: ${got}, want ${want}`); }
+    // A talker that can't be struck: a creature's faction hatred of it reads neutral, and one bearing a grudge
+    // against you is wary, not hostile.
+    {
+      game.state.rep = {};
+      const rbTalker = person("mira", "villager", "rustbacks"), hmFighter = mob("hollowmere");
+      if (F.attitude(game, hmFighter, rbTalker) !== "neutral") fail(`Hollowmere's fighter → a Rustback talker: ${F.attitude(game, hmFighter, rbTalker)}`);
+      const sore = person("mira", "villager", "survey"); sore.brain = { grudges: { player: 1 } };
+      if (F.attitude(game, sore, p()) !== "wary") fail(`a talker with a grudge: ${F.attitude(game, sore, p())}`);
+    }
     // A cycle of leaders (a bug elsewhere) answers rather than overflowing the stack; so does a cycle of parents.
     {
       const x = mob(null, null), y = mob(null, null), d = mob(null, null);
@@ -380,24 +389,42 @@ export async function run(env) {
       zones.changeZone(game, "1,0,0", { how: "start", rng: R });
       for (const o of [...game.zone.creatures]) creatures.removeCreature(game.zone, o);
       const z2 = game.zone, P2 = p();
-      const seeAt = (d) => {
-        for (let k = 0; k < 64; k++) {
-          const ang = (k / 64) * Math.PI * 2, x = Math.floor(P2.x + Math.cos(ang) * d), y = Math.floor(P2.y + Math.sin(ang) * d);
+      const seeAt = (d, tol = 0.2) => {
+        for (let k = 0; k < 256; k++) {
+          const ang = (k / 256) * Math.PI * 2, x = Math.floor(P2.x + Math.cos(ang) * d), y = Math.floor(P2.y + Math.sin(ang) * d);
           if (x < 0 || y < 0 || x >= z2.w || y >= z2.d || z2.stand[x + y * z2.w] < 0) continue;
           const dd = Math.hypot(x + 0.5 - P2.x, y + 0.5 - P2.y);
-          if (Math.abs(dd - d) < 0.4 && lineOfSight(z2, x + 0.5, y + 0.5, z2.stand[x + y * z2.w] + 1.4, P2.x, P2.y, P2.z + 1.5)) return [x, y];
+          if (Math.abs(dd - d) < tol && lineOfSight(z2, x + 0.5, y + 0.5, z2.stand[x + y * z2.w] + 1.4, P2.x, P2.y, P2.z + 1.5)) return [x, y];
         }
         return null;
       };
-      const i11 = seeAt(11), o13 = seeAt(13);
-      if (!i11 || !o13) fail(`the range edge: no open tile in sight at 11 (${i11}) or 13 (${o13}) tiles on 1,0,0`);
+      // Just inside and just outside 12 (11.55-11.95 and 12.1-12.5 tiles off).
+      const i11 = seeAt(11.75), o13 = seeAt(12.3);
+      if (!i11 || !o13) fail(`the range edge: no open tile in sight at 11.75 (${i11}) or 12.3 (${o13}) tiles on 1,0,0`);
       else {
         const put2 = ([x, y]) => { const c = mob("survey", "neutral", { x, y, z: z2.stand[x + y * z2.w] }); return creatures.addCreature(z2, c); };
         const v2 = mob("survey", "neutral"); Object.assign(v2, { x: P2.x + 0.6, y: P2.y, z: P2.z }); creatures.addCreature(z2, v2);
         const near11 = put2(i11), far13 = put2(o13);
         const seen = rep.witnessesOf(game, P2, v2);
-        if (!seen.includes(near11) || seen.includes(far13)) fail(`the range edge: 11 tiles off a witness ${seen.includes(near11)}, 13 tiles off ${seen.includes(far13)}`);
+        if (!seen.includes(near11) || seen.includes(far13)) fail(`the range edge: 11.75 tiles off a witness ${seen.includes(near11)}, 12.3 tiles off ${seen.includes(far13)}`);
       }
+    }
+    // Each handler alone: a "hurt" with no blow (a bomb of yours) and an "attack" that missed each cost the penalty
+    // once; a blow that couldn't touch costs nothing. A talker's death is a named kill.
+    {
+      fresh(1234, { genotype: "bent" });
+      const P3 = p(), at3 = (dx, dy, f) => { const c = mob(f, "neutral"); Object.assign(c, { x: P3.x + dx, y: P3.y + dy, z: P3.z }); return creatures.addCreature(game.zone, c); };
+      const h1 = at3(0.6, 0, "survey"); at3(0.6, 0.3, "survey");
+      events.emit(game, "hurt", { tgt: h1, src: P3, dmg: 3 });
+      const a1 = at3(-0.6, 0, "drovers"); at3(-0.6, 0.3, "drovers");
+      events.emit(game, "attack", { att: P3, tgt: a1, result: { touched: true, hit: false } });
+      const n1 = at3(0, 0.6, "clatter"); at3(0.3, 0.6, "clatter");
+      events.emit(game, "attack", { att: P3, tgt: n1, result: { touched: false } });
+      const got = [F.repOf(game, "survey"), F.repOf(game, "drovers"), F.repOf(game, "clatter")].join();
+      if (got !== "-10,-10,50") fail(`a hurt alone, a missed attack alone, an untouched one: survey, drovers, clatter = ${got}, want -10,-10,50`);
+      const talker = person("mira", "villager", "flatfolk");
+      const k = rep.killed(game, P3, talker);
+      if (k.flatfolk !== rep.REP_RULES.namedKillPenalty) fail(`killing a talker of the Flatfolk: ${JSON.stringify(k)}, want ${rep.REP_RULES.namedKillPenalty}`);
     }
     stats.offend = `follower's blow ${rep.REP_RULES.attackPenalty}, at the hostile 0, unseen 0`;
   }
@@ -453,6 +480,28 @@ export async function run(env) {
       const g = person("mira", "villager", "survey"); g.brain = { grudges: { player: 1 } };
       const text = talk.talkTo(game, g).text;
       if (text !== builders.GREET.villager.disliked) fail(`a Grey villager with a grudge, met for the first time: "${text}"`);
+    }
+    // Bad answers are caught: a shop tab that doesn't exist.
+    {
+      const bad = person("mira", "test:badShop", null);
+      talk.registerDialogue("test:badShop", () => talk.node("hi", [{ label: "Show me.", go: () => ({ shop: "attic" }) }, talk.bye()]));
+      const w = builders.walkDialogue(game, bad);
+      talk.registerDialogue("test:badShop", () => talk.node("...", [talk.bye()]));
+      if (!w.problems.some((x) => /shop tab attic/.test(x))) fail(`walkDialogue let a shop tab "attic" through: ${w.problems.join("; ")}`);
+    }
+    // The main faction is the heaviest; Cold with it is curt though the weighted mean is Grey; a merchant opens on buy.
+    {
+      game.state.rep = { survey: -400, drovers: 0 };
+      const mix = person("mira", "merchant", null); mix.faction = { drovers: 0.4, survey: 0.6 };
+      mix.talk.state = { stock: [{ item: { kind: "potion", id: "heal" }, price: 10, count: 1 }] };
+      const st = builders.standingOf(game, mix), root = talk.talkTo(game, mix);
+      if (st.faction !== "survey" || st.attitude !== "neutral" || root.text !== builders.GREET.merchant.disliked)
+        fail(`a merchant 0.6 Survey (Cold) 0.4 Drovers: main ${st.faction}, ${st.attitude}, "${root.text}"`);
+      const shut = root.options.find((o) => /what you have/.test(o.label))?.go();
+      if (!shut || shut.shop) fail(`the same merchant at Cold opens its pack: ${JSON.stringify(shut?.shop)}`);
+      game.state.rep = {};
+      const open = talk.talkTo(game, mix).options.find((o) => /what you have/.test(o.label))?.go();
+      if (open?.shop !== "buy") fail(`a Grey merchant's pack opens on ${JSON.stringify(open?.shop)}, want buy`);
     }
     // A talker with no faction (the roles work for anyone).
     for (const role of builders.ROLES) {
@@ -511,6 +560,18 @@ export async function run(env) {
       if (musicKey !== 1 || game.mode !== "factions") fail(`a "*" key (M, N) didn't get through the factions screen (${musicKey}, ${game.mode})`);
       keys.dispatchKey(game, view === "map" ? "KeyP" : "Escape");
       if (game.mode !== view) fail(`closing the factions screen left ${game.mode}, want ${view}`);
+    }
+    // Who you've been near: the "factions:known" update marks a member within 10 tiles; a hidden group never shows.
+    {
+      fresh(1234, { genotype: "bent" });
+      game.mode = "map";
+      const near = mob("pleatwood"); Object.assign(near, { x: p().x + 1, y: p().y, z: p().z }); creatures.addCreature(game.zone, near);
+      game.state.rep = { peoples: 40 };
+      if (scrF.knownFactions(game).includes("pleatwood")) fail("the Pleatwood known before anyone met one");
+      events.runUpdates(game, 1.5);
+      const ids = scrF.knownFactions(game);
+      if (!ids.includes("pleatwood")) fail(`a Pleatwood member beside you for 1.5 s: known ${ids.join(", ")}`);
+      if (ids.includes("peoples")) fail("a hidden group is listed because its rep moved");
     }
     stats.screen = `opened and closed in map and 3D; known at the start: ${scrF.knownFactions(game).length}`;
   }
