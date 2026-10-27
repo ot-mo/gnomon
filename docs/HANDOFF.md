@@ -3,29 +3,38 @@
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
 **Updated:** 2026-10-27, the integrator (local session), on `integration`. **Phase 1 is running and Phase 2's
-integration has started: WS3, WS8, WS4a and WS5 are merged (`p2-ws3`, `p2-ws8`, `p2-ws4a`, `p2-ws5`); the next is
-whichever `p1-*` tag lands next (WS9, WS4b and WS6a are running).** From here on only the integrator edits this file
-and moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
+integration has started: WS3, WS8, WS4a, WS5 and WS6a are merged (`p2-ws3`, `p2-ws8`, `p2-ws4a`, `p2-ws5`,
+`p2-ws6a`); `p1-ws4b` is up and merges next (WS9 is paused before its tag).** From here on only the integrator edits
+this file and moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p2-ws5` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
-  `p1-ws4a` and `p1-ws5` with their integration requests; `p2-ws3`, `p2-ws8` and `p2-ws4a` before it). `main` is fast-forwarded to it. Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams'
-  `p1-*` tags are on GitHub.
+- **Last tag:** `p2-ws6a` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+  `p1-ws4a`, `p1-ws5` and `p1-ws6a` with their integration requests; `p2-ws3` … `p2-ws5` before it). `main` is
+  fast-forwarded to it. Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
 - **Branch:** `integration`, in the worktree `C:\Users\Otto Mörner\Code\gnomon-wt\integration` (serves on port
   8660). Nothing is half finished.
-- **Done:** Phase 0 (0A1 … 0D2, notes in `docs/sessions/0A1.md` … `0D2.md`); WS3, WS8, WS4a and WS5 (`docs/ws3.md`,
-  `docs/ws8.md`, `docs/ws4.md`, `docs/ws5.md`, `docs/sessions/ws3.md`, `ws8.md`, `ws4.md` "Part 4a", `ws5.md`), merged. The merges' own numbers are under "Integration log" below.
+- **Done:** Phase 0 (0A1 … 0D2, notes in `docs/sessions/0A1.md` … `0D2.md`); WS3, WS8, WS4a, WS5 and WS6a
+  (`docs/ws3.md`, `ws8.md`, `ws4.md`, `ws5.md`, `ws6.md`; `docs/sessions/ws3.md`, `ws8.md`, `ws4.md` "Part 4a",
+  `ws5.md`, `ws6.md` "Part 6a"), merged. The merges' own numbers are under "Integration log" below.
 - **Checks:** `node tools/run-all.mjs`, 37 checks (about 2 minutes on an idle machine, 4 with three workstreams
   running; the timed ones, `check-dungeons`, `check-status`, `check-stats` and `check-perf`, alone at the end; since
   WS3, `check-perf` runs the render check first). Browser (headless Playwright, audio silenced,
   `NODE_PATH="$(npm root -g)"`): `browser-0d2.mjs`, `browser-0d1.mjs`, `browser-gate.mjs`, `browser-silent.mjs`, and
   with `node tools/serve.mjs <port>` running, `browser-shell.mjs` and `browser-0c.mjs` (`--port <port>`); each
-  workstream's own (`browser-ws8.mjs` from WS8, `browser-ws4.mjs` from WS4, `browser-ws5.mjs` from WS5). `tools/README.md` has every command and what each check proves.
+  workstream's own (`browser-ws8.mjs` from WS8, `browser-ws4.mjs` from WS4, `browser-ws5.mjs` from WS5,
+  `browser-ws6.mjs` from WS6). `tools/README.md` has every command and what each check proves.
 
 ## Next step
 
-**The integrator:** wait for the coordinator's message; merge each `p1-*` tag as it lands, in §8.5's
+**The integrator, now:** merge `p1-ws4b` (f8062f9; only `tests/checks/progression.js` conflicts: keep integration's
+rep loop and WS4b's sections), apply what is carried to WS4b below, and **don't flip**: first run WS8's TTK tables
+with WS4's powers and mutations in (`node tools/check-combat.mjs --only ttk`) and put them under "Waiting on the
+user" with the kill-XP pace; the user decides the tier 5-8 balance before `RULES.stats` and `RULES.combat` change.
+Rerun `check-perf` and `check-dungeons` on an idle machine before `main` moves to `p2-ws4b` (WS4b's were red only
+under the training job's load).
+
+**The integrator, after that:** wait for the coordinator's message; merge each `p1-*` tag as it lands, in §8.5's
 order (WS9, WS3, WS8, WS5, WS4, WS6a, WS6b, WS10, WS2, WS7, WS1). For each: read `docs/<ws>.md` and
 `docs/sessions/<ws>.md`; merge the tag; apply the requests aimed at P0's, unowned, the integrator's or merged
 workstreams' files, and carry the rest (below, "Carried integration requests"); rerun its dependency-table items
@@ -34,12 +43,11 @@ verify sceptically, one commit per finding; tag `p2-<ws>` (annotated), push it, 
 `git merge-base --is-ancestor origin/main p2-<ws>` holds, `git push origin 'p2-<ws>^{commit}:refs/heads/main'` (an
 annotated tag's own name can't be pushed to a branch; `^{commit}` is the commit it tags).
 
-**On `integration`, not yet on `main`** (both at the user's request; they reach `main` with the next `p2-*` tag, not a tag
-of their own): the root README for GNOMON as it stands at `p2-ws5` (`6645658`, from `wip/readme`; an interim update
-before Phase 4's rewrite; the secret rooms' rules stay out of it, as DECISIONS asks), and CLAUDE.md for local-only
-sessions (`302fac7`, from `wip/local-only`: the user won't use cloud sessions for this project again; "Handing off
-(local ↔ cloud)" became "Before you stop"). Worktrees read CLAUDE.md from their own checkout, so a workstream sees it
-once its branch picks up `main`.
+**On `main` since `p2-ws6a`** (both at the user's request, without a tag of their own): the root README for GNOMON as
+it stands at `p2-ws5` (`6645658`, from `wip/readme`; an interim update before Phase 4's rewrite; the secret rooms'
+rules stay out of it, as DECISIONS asks), and CLAUDE.md for local-only sessions (`302fac7`, from `wip/local-only`:
+the user won't use cloud sessions for this project again; "Handing off (local ↔ cloud)" became "Before you stop").
+Worktrees read CLAUDE.md from their own checkout, so a workstream sees it once its branch picks up `main`.
 
 **The workstreams** go on as the "Phase 1 plan" below says (the coordinating session starts the next one in the
 queue as a slot frees).
@@ -69,8 +77,8 @@ tags; WS1, which builds on the most, last):
 | 2 | WS3 Rendering outdoors and presentation | `ws3`, `ws/ws3` | tagged `p1-ws3` (51785f7); **merged, `p2-ws3`** (2026-10-27) |
 | 3 | WS8 Combat depth, AI and targeting | `ws8`, `ws/ws8` | tagged `p1-ws8` (c9638c0); **merged, `p2-ws8`** (2026-10-27) |
 | 4 | WS5 Body mods, items and equipment UI | `ws5`, `ws/ws5` | tagged `p1-ws5` (058bbbc); **merged, `p2-ws5`** (2026-10-27) |
-| 5 | WS4a → WS4b Character creation and progression | `ws4`, `ws/ws4` | WS4a tagged `p1-ws4a` (dc22850), **merged, `p2-ws4a`** (2026-10-27); WS4b running |
-| 6 | WS6a → WS6b Factions, dialogue builders → trade, the Kindling, backings | `ws6`, `ws/ws6` | WS6a running (since 2026-10-27) |
+| 5 | WS4a → WS4b Character creation and progression | `ws4`, `ws/ws4` | WS4a tagged `p1-ws4a` (dc22850), **merged, `p2-ws4a`** (2026-10-27); WS4b tagged `p1-ws4b` (f8062f9), merging next |
+| 6 | WS6a → WS6b Factions, dialogue builders → trade, the Kindling, backings | `ws6`, `ws/ws6` | WS6a tagged `p1-ws6a` (0697109), **merged, `p2-ws6a`** (2026-10-27); WS6b next in the worktree |
 | 7 | WS10 Dungeon sites, lairs and legends | `ws10`, `ws/ws10` | queued |
 | 8 | WS2a → WS2b Surface generation | `ws2`, `ws/ws2` | queued |
 | 9 | WS7a → WS7b Knowledge: history, villages, quests | `ws7`, `ws/ws7` | queued |
@@ -161,7 +169,12 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   (the ids now match WS5's table, `4e36991`, which 4b was asked to copy), the Readhand mutation calls
   `identify(game, it)`, Keen fingers is `bonus(examine)`, implant abilities come through the "implant" source; #19,
   the lantern-mote's light (status `running:lanternMote`): `player.js torchRange`/`torchPower` give at least 6 tiles
-  with it on, and the integrator's `light.js inDark` counts you lit, at the same merge.
+  with it on, and the integrator's `light.js inDark` counts you lit, at the same merge. From WS6a (merged at
+  `p2-ws6a`): #4, `chargen.js beginRun` adds `villageRep` (`if (bg.villageRep) addRep(game, "bentVillages",
+  bg.villageRep, "background")`: the Aspirant's −50); #5, a mutation gained gives `addRep(game, f, n, "body")` (bible
+  §10.4): Wings the Kites +400, Shellback the Clatter +200, Horns the Saltbeasts +100, Lampskin the Moths +200 and the
+  Lampless −200, Ink Glands the Flatfolk +100, Flatwise the Flatfolk +200, the Pressed +100 and the Assize −200, Gills
+  the Clatter +100, Silk Glands the Kites −100.
 - **The flip** (§8.5; WS8 #9, WS4 #13), at WS4b's merge (all of WS4 and WS8 in; the coordinator holds it until then): `RULES.stats = "attributes"` and
   `RULES.combat = "d20"` (DECISIONS: d20, not §8.5's "dice") by default; golden (a) retires; `check-legacyfights`
   then needs `overrideRules("combat", "legacy")` around its fights (its fixture is the parent's); WS8's TTK tables
@@ -174,20 +187,30 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   1 ~20 kills, 3 ~100, 5 ~87, 8 ~93, 14 ~99, 20 ~101) against the parent's ~3, 9, 20, 41, 91, 147; until WS1 and
   WS7 give discovery and quest XP (`xpReward`), the old campaign under the attribute set levels several times slower
   through level 8.
-- **WS6a** (at its merge): WS8 #2, a creature hostile to you is hostile to your followers (`attitude(a, f)` with
-  `f.brain.leader === "player"`: "hostile" when `attitude(a, player)` is); until then monsters ignore your
-  followers until one strikes them. WS8's spatial queries (`nearestCreature`, `sees`, `witnessesOf`) are in for the
-  witnesses. WS4 #8: the starting reputation by genotype (bible §15.4: the Assize −700 Bent / −100 Plumb, the Plan
-  −100 / +100) from `game.player.genotype`; Pilgrim's "most factions start at 0 or above" (bible §10.1); `beginRun`
-  adds each background's changes with `addRep`; the Aspirant's −50 with the Bent villages
-  (`BACKGROUNDS.aspirantOfTheRule.villageRep`, WS6a or WS7). WS5 #20: each implant fitted gives the Plan +25 (at most
-  +100) on the bus's "install" (and back on "uninstall" if so decided); the Square's free fittings at Assize ≥ Warm
-  pass `openTruing(game, { at: "cradle", …, waive: true })` (WS10 places that Cradle).
 - **WS10** (at its merge): WS8 #3, spikes rise through a flat you harmlessly (bible §10.2): `traps.js updateSpikes`
   skips you when `!touchesYou(game, null)` (creatures.js). WS5 #12: Truing Cradles are `B.STATION` blocks (Benchmark,
   the Metronome, the Square; stations by region rules); Hour-site bottoms give true-marks (`{ kind: "credit", count }`)
-  and artifacts (`randomBodyMod`). WS5 #9's metronome heart (`beatSight`: the next spikes, presses and hands in 3D)
-  goes with WS10's traps.
+  and artifacts (`randomBodyMod`); the Square's free fittings for a Plumb at Assize ≥ Warm pass `openTruing(game, { at:
+  "cradle", …, waive: true })` (WS5 #20's other half). WS5 #9's metronome heart (`beatSight`: the next spikes, presses
+  and hands in 3D) goes with WS10's traps. WS6a #2's spikes: `traps.js` hurts with `damageMonster`, which is yours (as
+  in the parent), so spikes hurting a faction member give grudges against you and cost rep; pass no source
+  (`applyDamage(game, m, dmg, { src: null, color, deathText })`). Then a spike kill gives no XP either (`killMonster`'s
+  `byPlayer` follows the source), a change to the old game: keep the parent's XP for it if golden or the legacy fights
+  notice.
+- **WS7** (at its merge; WS6a #6): villager types carry `factions` (or each villager `c.faction`) and `talk.dialogue`
+  one of `social/builders.js ROLES`; a village registers its own faction with `parent: "bent"` (a Bent village) or
+  `"peoples"`, so the Assize's hatred of the Bent reaches it, its members carrying `bentVillages` as a second membership
+  (0.25-0.5) so the Assize writ and the Aspirant move them; quests `addRep(game, id, n, "quest")` (+100 with the
+  village, +25 with each faction that likes it); Grey members hostile in their holy places (WS7 or C1). **WS6a #1,
+  mortal people** (the integrator's, in WS8's files, at WS7's merge, when villager types with `hp` exist to test
+  against): a talker whose type has `hp` gets `hp`, `maxHp`, `attack` and the AI's fields like a monster and is
+  touchable while `hp > 0` (legacy people, with no `hp`, stay untouchable); the map's bump talks while it isn't
+  hostile and strikes with Shift. Until then `touchable` refuses every talker, so the witnesses fire only on members
+  that don't talk.
+- **C4 / WS5** (WS6a #5's wearables, bible §3.5): the feather cloak, an Hour mask, the Assize writ, ink stains give
+  `addRep(game, f, n, "worn")` when worn and take it back when unworn. **Content (C)**, WS6a #9: the Lantern Moths'
+  "like you while your torch is lit" (text only today); the Smoothers with no membership (the parent rule makes them
+  hostile); the Hour cults with `pilgrimFloor: false`.
 - **WS6b** (at its merge): WS5 #11, the trade screen lists `registerService` rows as P0's shop does: a surgeon's
   `fitImplant` and `removeImplant`, a tinker's `identifyArtifact` and `rechargeCell` (Old Ottilie, Detail C at
   Benchmark); stock can include implants, artifacts and cells (`randomBodyMod`, `IMPLANT_VALUE`).
@@ -212,7 +235,8 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   golden (b) held. **The key hints** L (look), V (fire), `,` (the map legend; it was G until the WS5 merge, WS9 told) and hotbar key 1
   on the pause card's key list: if
   WS9 tags without them, add them at the merge (`screens/pause.js` is WS9's, merged by then) or carry the request on.
-  WS5 #4: `hud.js drawSword` with bare hands (with WS4b's `player.js` part).
+  WS5 #4: `hud.js drawSword` with bare hands (with WS4b's `player.js` part). WS6a #7: "P factions" on the pause
+  card's key list beside the others (WS9 was paused before its tag and not told; add it at the merge).
   WS4 #12 and #13: WS9's title pushes `"create"` with `{ seed, mode }` (the wizard is registered on `integration`
   since `p2-ws4a`), and the wizard can read `save.js RUN_MODES` instead of its own copy; but **the wizard is for the
   attribute set**, so if WS9 merges before the flip, its title stays on the quick game (or hides New game) until the
@@ -235,6 +259,53 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p2-ws6a`** (2026-10-27): `p1-ws6a` (0697109) merged into `integration` (`fc86113`), no conflicts; WS6a changed no
+P0 check or fixture (only its own `tests/checks/social.js` and a new `tools/browser-ws6.mjs`). `p1-ws4b` came up
+during the merge; WS6a was already in, so WS4b merges next, against §8.5's order (the coordinator's preference when
+both are up), with no effect on either (their only shared file is check-progression's test, below). The README
+(`6645658`) and CLAUDE.md (`302fac7`) reach `main` with this tag.
+- Dependency table "WS6a witnesses" against WS8's real `creatures.witnessesOf` and combat: check-social's bot failed
+  every witness item, for three reasons, each fixed with an assertion that fails without it: (1) WS8's `turnOnYou`
+  gave the victim its grudge before "hurt" and "attack" went out, so `reputation.js offend` found it already hostile
+  and charged nothing: a first blow on a Hollowmere villager cost no rep and told no witness, in both views
+  (`6e9a51e`: `hurtCreature` emits "hurt" first; a d20 miss or a blow soaked to nothing is noticed after "attack";
+  through `resolveAttack` a legacy hit, a d20 hit and a d20 miss each cost −10 once with a fellow watching); (2) on the
+  map a creature not out for you is in the way (WS8), so the bot's bumps never struck (`fa8d749`: Shift, as a player
+  would); (3) a witness sees no farther than its own sight, a goblin's 11, so the range edge at 11.75 tiles read "not
+  a witness" for the wrong reason (`14a4add`: archers, sight 13; witnessRange 14 makes it fail). After: rep 100 → 90 at
+  the first blow, 85 at the kill, both witnesses hostile and hunting, the far one, the one behind a wall and the Clatter
+  trader not, on the map and in 3D. `browser-ws6` had the same arrow (`ee4a706`: Shift + the arrow; 100 → 90, three
+  hostile, the "saw you strike" line, both sizes).
+- Merge finding: check-progression (WS4's) expected a background's rep alone, from P0's stub's 0 start; with WS6a's
+  starts by genotype the Reed-cutter's Hollowmere reads 200 (100 + 100) and so on for 8 backgrounds: the test now wants
+  `clamp(baseRep + n)` (`dfb0a47`; `592fe1f`'s message said progression passed: it failed on this, from the merge).
+- Applied, each with an assertion that fails without it: #2 in merged and the integrator's files (`4afd0c4`:
+  `applyDamage` has no default source, every caller now passes one; the statuses you give carry `src: "player"`; a
+  status kill is yours for the rep only then (a trap's gas or drowning is nobody's) while the XP stays the parent's;
+  the "kill" payload's `factions` are `membershipsOf`'s ids, always `[]` before; mutants: each fails); WS5 #20 (`592fe1f`:
+  the Plan +25 for each implant fitted in play, the first four; taking one out gives nothing back); #8 and #11
+  (`d7a5b8d`, `9335397`: README rows for check-social and `browser-ws6`, §8.4 gives `browser-ws6` to WS6a); #10
+  (`d2e4861`: `browser-0d1` reaches the factions screen, 19 of 19 modes). WS8 #2 and WS4 #8 came built in `p1-ws6a`.
+  Carried (above): #1 (mortal people) and #6 to WS7's merge; #2's spikes to WS10; #4 and #5's mutations to WS4b; #5's
+  wearables to C4/WS5; #7 to WS9; #9 to content. #3 is the dependency table above.
+- Checks: `run-all` at `d7a5b8d` (every source change in) 35 of 37 (514 s; the CPU at 100%, the user's training job and
+  Discord), the two failures timed only. Alone, alternating with `p2-ws5` (the tree before the merge): `check-dungeons`
+  p95 120.5 / 113.9 ms against 134.3 / 103.9 (level; all four over the 40 ms budget on this load); `check-perf
+  --against p2-ws5 --rounds 3`: passTime ×0.96, mapStep ×0.93 (what WS6a's `attitude` and the combat-order fix touch),
+  refresh ×0.60, the dungeon frame ×0.69, surface generation ×1.06, dungeon generation ×0.72; the outdoor, dusk and
+  night frames ×1.28-1.38, though no file in the draw path changed since `p2-ws5` (the frame measure is
+  `game.debug.draw()` alone; the changed files are factions, social, combat, monsters, effects, throwing, artifacts):
+  the machine's. A second round (`--rounds 3 --no-render`, the CPU still at 100%) **PASS**: every item within ×1.15 of
+  `p2-ws5` (the outdoor frame ×1.01, dusk ×0.91, night ×0.95, the dungeon frame ×0.97, refresh ×1.04, surface generation
+  p95 ×0.87, dungeon generation ×1.07, passTime ×1.09, mapStep ×1.01). The absolute budgets still want a quiet machine (last met alone at `p2-ws4a`). Golden,
+  screen frames, the bot, the legacy fights, determinism, check-combat's five parts, check-social, check-progression
+  and check-items all pass in the run. Browser (`tools/serve.mjs 8660`, `?silent=1`, 0 console errors): `browser-ws6`
+  (both sizes, after the fix); `browser-0d1 --against p0-done` 19 of 19 modes, the HUD at 100×30, golden (b) 27 of 27,
+  per tick underground +1.6% (3D) and +2.0% (map); `browser-gate` (1234, 7); `browser-0c` (1234, 7: legacy and d20
+  fights in both views, Pell's talk, shop and services); `browser-shell` (1280×720, 600×300); `browser-0d2 --all` (boot
+  with 154 modules, `test-world.html` 34 passed, 0 failed); `browser-silent`; `browser-ws8` (1234, 7); `browser-ws4`
+  (both sizes); `browser-ws5`.
 
 **`p2-ws5`** (2026-10-27): `p1-ws5` (058bbbc) merged into `integration` (`791938e`). Three conflicts, all in P0 checks
 and each resolved by keeping both sides: `tests/checks/body.js` and `content.js` (WS8's and WS5's sample lines for
@@ -412,8 +483,13 @@ its §8.4 files and two P0 checks).
   when it retires; the outdoor legend says glim). The outdoor frame, the horizon band and the clock's looks are done
   (`docs/sessions/ws3.md` §2: 16.1 ms at noon against `p0-done`'s 22.6 on a quiet machine).
 - **WS8 (merged; what's left):** `passTime` costs ×1.2-1.7 `p0-done`'s in WS8's alternating measure (p50 4-5 ms
-  against a 12 ms budget); the look line is all L shows until WS5's examine screen opens on `inspect`; monsters ignore
-  your followers until struck (WS6a, carried), spikes hurt a flat you (WS10, carried).
+  against a 12 ms budget); spikes hurt a flat you (WS10, carried). (Monsters out for you are out for your followers
+  since WS6a; L opens WS5's examine.)
+- **WS6a (merged; what's left):** talkers can't be struck until WS6a #1 (at WS7's merge), so the witnesses fire only on
+  faction members that don't talk; a witness sees no farther than its own sight (WS8's `sees`: people 10, a goblin
+  11, ×0.55 with you in the dark), inside the 12-tile witness range; the Bent villages are one rep pool until WS7 gives
+  villages factions; grudges never expire; spikes still count as your harm (WS10, carried). Next in WS6's worktree:
+  WS6b (`docs/ws6.md` "Handoff").
 - **WS5 (merged; what's left):** the backlog above (#8, #9); the item glyphs in the map legend (#16: `♦` implant,
   `Θ` artifact, `≡` cell, `¶` true-mark) wait with the underground legend for golden (b)'s retirement; two old lines
   kept as golden and the frames record them (#23: "You put on the The Mantle of Angles.", "throwing knifes"); a stray
