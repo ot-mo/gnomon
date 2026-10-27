@@ -662,6 +662,19 @@ export async function checkRender(m) {
         // The glint: a warm "*" (it pulses: 255, 245, 200 at full; a cloud's is cool) right above the needle.
         else if (ch === "*" && !out.tip && r > 100 && r > b + 25 && y + 1 < capture.rows && capture.chars[i + capture.cols] === "|") out.tip = "glint";
       }
+      // In its own span its foot is the top of what stands at the middle (WS2b's 14-block column): the row that top
+      // projects to, and the needle's cells more than a row below it within 40 columns of the middle (beside the foot).
+      if (g.wx === z.wx && g.wy === z.wy) {
+        out.footZ = FLOOR_Z;
+        for (let k = z.h - 1; k >= 0; k--) if (z.get(Math.floor(gx), Math.floor(gy), k)) { out.footZ = Math.max(FLOOR_Z, k + 1); break; }
+        const c = render3d.cam, vx = gx - c.ex, vy = gy - c.ey, vz = out.footZ - c.ez, zc = vx * c.fX + vy * c.fY + vz * c.fZ;
+        out.footRow = zc > 0 ? Math.round((1 - (vx * c.uX + vy * c.uY + vz * c.uZ) / zc / c.halfH) * 0.5 * capture.rows * 10) / 10 : null;
+        out.besideBelow = 0;
+        for (let y = Math.max(0, Math.floor(out.footRow ?? capture.rows) + 2); y < capture.rows; y++) for (let x = mid - 40; x <= mid + 40; x++) {
+          const i = y * capture.cols + x;
+          if (capture.chars[i] === "|" && capture.colors[i * 3] + capture.colors[i * 3 + 1] + capture.colors[i * 3 + 2] < 250) out.besideBelow++;
+        }
+      }
       return out;
     };
     // The span of the Shade farthest from the Gnomon (from close by its tip is far above the screen), and a Rust Steps
@@ -696,16 +709,17 @@ export async function checkRender(m) {
     gn.lightRule = gn.mesaKey && { mesaTop: lightAt(gn.mesaKey, 23, FLOOR_Z + 6), mesaFoot: lightAt(gn.mesaKey, 23, FLOOR_Z + 1), shade: lightAt(shadeKey, 23, FLOOR_Z),
       shadeDay: lightAt(shadeKey, 12, FLOOR_Z), flats: lightAt("5,16,0", 23, FLOOR_Z + 6) };
     // In its own span: from under its leaning tip, facing its foot at pitch 0, it is cut where it passes behind you,
-    // not lost; from 15 tiles off its foot is on the ground (its span has no voxel foot yet), not hanging in the sky.
+    // not lost; from 15 tiles off, looking up at its 14-block voxel foot (WS2b's, since the WS2b merge; until then the
+    // needle rose from the ground), it rises from the foot's top: not from the ground beside it, not hanging in the sky.
     gn.underTip = view(`${gnom.wx},${gnom.wy},0`, 12, { at: [7, 39], pitch: 0 });
-    gn.ownSpan = view(`${gnom.wx},${gnom.wy},0`, 12, { at: [25, 24], pitch: 0 });
+    gn.ownSpan = view(`${gnom.wx},${gnom.wy},0`, 12, { at: [25, 24], pitch: 0.7 });
     fresh(4242); game.time = T(12); frame3d(); gn.testWorld = render3d.gnomonDrawn();
     zones.changeZone(game, "0,0,3", { how: "down", rng: Math.random }); frame3d(); gn.underground = render3d.gnomonDrawn();
-    const horizonRow = capture.rows >> 1;
     expect(gn.noon.drawn && gn.noon.needle >= 8 && gn.noon.tip === "glint" && gn.morning.needle >= 8 && gn.morning.tip !== "glint" && !gn.away.drawn &&
            gn.behindWall.needle === 0 && !gn.night.drawn && gn.shadeNight.tip === "violet" && gn.shadeNoon.tip !== "violet" &&
            gn.mesaTop?.tip === "violet" && !gn.mesaFoot?.drawn && gn.lightRule?.mesaTop && !gn.lightRule.mesaFoot && gn.lightRule.shade &&
-           !gn.lightRule.shadeDay && !gn.lightRule.flats && gn.underTip.drawn && gn.ownSpan.drawn && gn.ownSpan.lowest >= horizonRow - 1 &&
+           !gn.lightRule.shadeDay && !gn.lightRule.flats && gn.underTip.drawn && gn.ownSpan.drawn && gn.ownSpan.footZ === FLOOR_Z + 14 &&
+           Math.abs(gn.ownSpan.lowest - gn.ownSpan.footRow) <= 1 && gn.ownSpan.besideBelow === 0 &&
            !gn.testWorld && !gn.underground, `the Gnomon on the horizon: ${JSON.stringify(gn)} (the Shade's span ${shadeKey})`);
     stats.gnomon = gn;
   }

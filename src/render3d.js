@@ -386,8 +386,8 @@ function shadeHorizon(dx, dy, dz, tExit, time) {
 // leaning a little toward the Shade (west-south-west). It is a sky-layer billboard, never voxels: drawn only on
 // cells that show the sky or the horizon plane (nothing nearer in front of it), from its foot to its tip
 // GNOMON.height tiles up, cut where it passes behind you. Its foot is the plane's height, or in its own span the top of
-// whatever stands at the span's middle (the bible's 14-block voxel foot is content's; until it is built the needle
-// rises from the ground). In the noon window the sun stands on its tip and the tip glints. At night (the hour's
+// whatever stands at the span's middle (the bible's 14-block voxel foot: WS2b's column, since the WS2b merge). In the
+// noon window the sun stands on its tip and the tip glints. At night (the hour's
 // daylight under 0.3) it is lost in the dark, but for a single violet light at its tip, seen only from the Shade and
 // from the tops of the Rust Steps' mesas (standing GNOMON.mesaHeight above the datum). gnomonDrawn() → whether any
 // of it was in sight in the last 3D frame (the compass: WS1's "the Gnomon in sight").
