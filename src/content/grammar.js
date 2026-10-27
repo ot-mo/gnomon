@@ -17,6 +17,8 @@
 //               the dead; lines split at " / ", history.js lowers it).
 //     events:   { [type]: { weight, variants: { [variant]: { weight, disagree? } } } }   bible §8.3's sixteen types
 //     noon:     [{ event, flat, deep, dark }]   Noon's six events, fixed in every run (bible §8.6)
+//     titles:   { events: { [type]: title }, readings: { flat, deep, dark }, sites: { [kind]: words } }   the
+//               journal's and the log's names for what you learn (plain register)
 //
 // Bindings an event's texts may read (story/history.js eventCtx): name, cog (the cognomen in use), hour (the Hour's
 // own title, "the Fourth Hour"), when ("In the 41st year of the Fourth Hour"), they, them, their, was, has, place,
@@ -407,9 +409,23 @@ export const GRAMMAR = {
     "material": ["glass", "bone", "salt-glass", "bronze", "waxed wood", "old iron", "pressed paper"],
     "heft": ["cold in any weather", "heavier at noon", "warm on the side away from the light", "too heavy for its size", "lighter than it looks from above"],
     "returned": ["#they.cap# came back out #years# years later.", "#they.cap# walked out of the floor #years# years later."],
+    "fact/site": ["The accounts of #title# disagree, and where they disagree they give it away: #site# lies at span #at#."],
+    "fact/relic": ["The accounts of #title# disagree about #relic#, and so give it away: it waits on the lowest floor of #site#."],
+    "fact/lost": ["The accounts of #title# disagree about #relic#: it was never found, and nobody has looked in the right place."],
+    "fact/age": ["The accounts of #title# disagree, and the dates between them settle it: #name# was #ageWords# at the end, whatever the stones say."],
     "absurd": ["a span is a kind of fish", "the noon is getting longer on purpose", "the Mere tastes sweet on feast days",
                "the Gnomon leans when nobody is looking", "they once counted the reeds and got a different number twice"],
     "teller": ["the Clatter", "the drovers", "the reed-cutters", "the old women of Hollowmere", "the chandlers", "the Kites"],
+  },
+
+  titles: {
+    events: { origin: "the origin", readFloor: "the reading of a floor", metPeople: "a people met", secretRite: "a secret rite",
+              contest: "a contest of Hours", forgedRelic: "a relic made", longShadow: "a long shadow", armyAtGate: "an army at a gate",
+              rampage: "a rampage", raisedDial: "a dial raised", lostRelic: "a relic lost", field: "a field", pressed: "a pressing",
+              wedding: "a wedding", turnedHand: "the Hand turned", death: "the death" },
+    readings: { flat: "the Flat Account", deep: "the Deep Inscription", dark: "the Dark Gloss" },
+    sites: { landmark: "a landmark", village: "a village", ruin: "a ruin", lair: "a lair", historic: "an Hour site", dungeon: "a way down",
+             station: "a fitting-house" },
   },
 
   // Bible §8.6: Noon is not an Hour; her life is the same in every run, and links the history to the main quest.

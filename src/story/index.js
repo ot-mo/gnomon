@@ -2,22 +2,25 @@
 // this file; it registers everything WS7 adds (quest templates, secrets on the bus, gossip talk options, the
 // village site builder, campaign hooks).
 //
-//   generateHistory(seed, world) → History           history.js (P0: the fixture History, §2.15)
-//   generateVillage(run, site) → Village             villages.js (P0: the fixture record, §2.16)
-//   startQuest(game, templateId, params) → quest     quests.js (P0: the bus-driven templates of 0C, §2.13)
-//   learnSecret(game, id, source)                    secrets.js
-//   gossipFor(game, c) → text                        gossip.js
+//   generateHistory(seed, world) → History           history.js (the fixture on the test world, the Hours elsewhere)
+//   generateVillage(run, site) → Village             villages.js (P0: the fixture record, §2.16; 7b)
+//   startQuest(game, templateId, params) → quest     quests.js (the bus-driven templates of 0C, §2.13)
+//   learnSecret(game, id, source)                    secrets.js (and makeSecrets, readings, markSold)
+//   gossipFor(game, c) → text                        gossip.js (registers the talk option "gossip")
 //   expand(grammar, symbol, rng, ctx)                grammar.js
 //
-// history.js and villages.js run inside buildRun (world/run.js), quests.js inside the game since 0C; the
-// screens journal and story are P0's ports (screens/index.js imports every screen).
-// P0: registers nothing new, so the game plays as before. Remove STUB when WS7 registers its parts here.
+// What loading registers (7a): the quest template "visit" (secrets.js); the `inspect` handler that reads murals and
+// the map describer "murals" (murals.js); the talk option "gossip" (gossip.js). history.js and villages.js run
+// inside buildRun (world/run.js), quests.js inside the game since 0C; the screens journal and story are
+// screens/journal.js and screens/story.js (screens/index.js imports every screen).
 import "./journal.js";
 import "./campaign.js";
+import "./secrets.js";
+import "./murals.js";
+import "./gossip.js";
 export { generateHistory } from "./history.js";
 export { generateVillage } from "./villages.js";
 export { startQuest } from "./quests.js";
-export { learnSecret } from "./secrets.js";
+export { learnSecret, makeSecrets, readings, markSold } from "./secrets.js";
 export { gossipFor } from "./gossip.js";
 export { expand } from "./grammar.js";
-export const STUB = "WS7";
