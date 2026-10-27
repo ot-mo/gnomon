@@ -557,6 +557,7 @@ export async function checkProgression(m) {
     if (!text.includes("LEVEL 2! Choose a gift:") || text.includes("Choose a power")) fail("legacy: the card isn't the parent's");
     press("Digit1");
     if (game.mode === "levelup") fail("legacy: 1 didn't take a perk");
+    if (!game.messages.some((x) => /^You gain a perk: /.test(x.text))) fail(`legacy: taking it said ${game.messages.slice(-1).map((x) => x.text)}`);   // the parent's word
     const seen = new Set();
     for (let k = 0; k < 300; k++) for (const id of L.offerPerks({ perks: {} }, k % 5 === 0)) seen.add(id);
     const strays = [...seen].filter((id) => !LEGACY_PERKS.includes(id));

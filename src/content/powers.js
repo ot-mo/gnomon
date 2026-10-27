@@ -64,8 +64,9 @@ export const POWERS = {
   disarm:       { tree: "axe",       name: "Disarm",        info: "People you strike sometimes drop their weapon.", needs: "WS8" },
   highGround:   { tree: "polearm",   name: "High ground",   info: "+50% damage striking from a ledge above.", needs: "WS8" },
   brace:        { tree: "polearm",   name: "Brace",         info: "Chargers stop on your point.", needs: "WS8" },
-  steadyHand:   { tree: "missile",   name: "Steady hand",   info: "+2 to hit with slings and bolt-bows.", bonus: () => ({ missileAcc: 2 }),
-                  needs: "missileAcc in stats.js and missiles.js (the integrator adds it at the WS8 merge, then drops this line)" },
+  // (check-content holds every bonus key to stats.js BONUS_KEYS, so `bonus: () => ({ missileAcc: 2 })` comes with the key)
+  steadyHand:   { tree: "missile",   name: "Steady hand",   info: "+2 to hit with slings and bolt-bows.",
+                  needs: "missileAcc in stats.js and missiles.js (the integrator adds it at the WS8 merge, with this power's bonus)" },
   pin:          { tree: "missile",   name: "Pin",           info: "Your bolts pin what they hit for 2 s.", needs: "WS8" },
   glimgunner:   { tree: "missile",   name: "Glimgunner",    info: "The glimgun costs 1 glim for every 2 shots.", needs: "a glimgun (WS8, C4)" },
   returnDisc:   { tree: "throwing",  name: "Return",        info: "Thrown discs come back to your hand.", needs: "discs (WS8, C4)" },

@@ -124,7 +124,8 @@ when it lands. 1-3 are WS8's requests 1, 8 and 11 (`git show p1-ws8:docs/ws8.md`
    `screens/target.js` isn't in this tree).
 2. **`stats.js` `BONUS_KEYS` (the integrator), WS8's request 8:** the integrator adds `missileAcc` at the WS8 merge
    (its message of 2026-10-27), and `missileSpec` adds `bonus(p, "missileAcc")` to the accuracy. `content/powers.js`
-   `steadyHand` already gives `{ missileAcc: 2 }`; at the merge drop its `needs` line so it is offered.
+   `steadyHand` then gets `bonus: () => ({ missileAcc: 2 })` in the same commit and loses its `needs` line, so it is
+   offered (check-content refuses a bonus key `BONUS_KEYS` lacks, so the bonus can't go in before the key).
 3. **`stats.js` (the integrator), WS8's request 11:** settled by the integrator at the WS8 merge: a creature's own bonus
    table moves from `e.innate` to `e.bonuses` (stats.js's "innate" source reads `e.bonuses`), and `innate` means a list
    of ability ids only, as `abilities.js`, `player.js` (`innate: ["foldStep"]`) and WS8's `ai.js` read it. WS4 keeps
