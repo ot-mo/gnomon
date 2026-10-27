@@ -5,8 +5,10 @@
 //                                         seed and the same body), at least one of them planar; defects are never
 //                                         offered (they're taken at creation, the wizard lists them). Without an
 //                                         rng: offerRng(game, p)
-//   offerRng(game, p) → rng               the sheet's: seeded by the run's seed and how many you've gained, so the
-//                                         offers stand until you buy one (no rerolling them away)
+//   offerRng(game, p) → rng               seeded by the run's seed and how many you've gained (offerSeed), so the
+//                                         offers stand until you buy one (no rerolling them away), and the sheet
+//                                         shows the three the wizard showed last if you kept your creases
+//   offerSeed(seed, gained) → seed        the one seed path of the wizard's offers and the sheet's
 //   gainMutation(game, p, id)             a new mutation at level 1 for its cost (4 creases; a defect gives 2-3
 //                                         back, and only at creation, game = null); the reputation changes of
 //                                         bible §10.4 (with no game, beginRun applies them: mutationRep); an
@@ -75,7 +77,8 @@ export function levelCap(p, id) {
 
 // --- Offers ------------------------------------------------------------------------------------------------------
 const gained = (p) => Object.keys(p.mutations || {}).filter((id) => !isDefect(id)).length;
-export const offerRng = (game, p) => makeRng(seedFor(game?.seed ?? 0, "mutations", gained(p)));
+export const offerSeed = (seed, n) => seedFor(seed ?? 0, "mutations", n);
+export const offerRng = (game, p) => makeRng(offerSeed(game?.seed, gained(p)));
 
 export function mutationOffers(game, p, rng = offerRng(game, p)) {
   const M = RULES.mutations;

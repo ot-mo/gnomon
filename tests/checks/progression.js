@@ -1104,7 +1104,7 @@ export async function checkProgression(m) {
       if (W.wizard().step !== "track") fail(`wizard 4b: on ${W.wizard().step}, want track`);
       const shown = () => W.trackRows(game);
       const first = shown().filter((r) => typeof r === "string");
-      const want = PM.mutationOffers(null, { genotype: "bent", level: 1, mutations: {} }, R.makeRng(R.seedFor(777, "creation", "mutations", 0)));
+      const want = PM.mutationOffers(null, { genotype: "bent", level: 1, mutations: {} }, R.makeRng(PM.offerSeed(777, 0)));
       if (JSON.stringify(first) !== JSON.stringify(want)) fail(`wizard 4b: offers ${first}, want ${want} (seed 777)`);
       press("Enter");
       const took = W.wizard().mutations[0];
@@ -1145,6 +1145,13 @@ export async function checkProgression(m) {
       const abilities = chosen.filter((id) => MU[id].ability).map((id) => MU[id].ability);
       if (JSON.stringify(p.hotbar) !== JSON.stringify(abilities)) fail(`wizard 4b: hotbar ${JSON.stringify(p.hotbar)}, want ${JSON.stringify(abilities)}`);
       out.wizard4b = `seed 777: offers ${first.join(", ")}; began with ${chosen.join(", ")} (${p.creases} creases), hotbar ${JSON.stringify(p.hotbar)}`;
+      // Creases kept in the wizard: the sheet offers the three the wizard showed last (bible §10.3: 1 of 3, not 6).
+      W.openCreate(game, { seed: 555 });
+      press("Enter"); press("Enter"); press("Enter"); press("Enter");   // Bent, Reedcutter, the spread, the first offer
+      const lastShown = W.trackRows(game).filter((r) => typeof r === "string");
+      press("End"); press("Enter"); typeText("Kept"); press("Enter"); press("Enter"); press("Enter");
+      const sheetOffers = PM.mutationOffers(game, game.player);
+      if (game.player.creases !== 8 || JSON.stringify(sheetOffers) !== JSON.stringify(lastShown)) fail(`creases kept in the wizard: it showed ${lastShown}, the sheet offers ${sheetOffers} (${game.player.creases} creases)`);
     }
   }
 

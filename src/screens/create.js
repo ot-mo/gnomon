@@ -32,7 +32,7 @@ import { MUTATIONS } from "../content/mutations.js";
 import { IMPLANTS } from "../content/items/implants.js";
 import { TREES } from "../content/powers.js";
 import { FACTIONS } from "../factions.js";
-import { mutationOffers, canGain, isDefect, creasesSpent } from "../progression/mutations.js";
+import { mutationOffers, canGain, isDefect, creasesSpent, offerSeed } from "../progression/mutations.js";
 import { RUN_MODES, NAME_MAX, beginRun, validateChoices, suggestSpread, suggestName, baseAttrs, pointsLeft,
          canRaise, canLower, freeImplants } from "../progression/chargen.js";
 
@@ -96,11 +96,12 @@ function preview(game) {
   return p;
 }
 
-// The offers are seeded by the run's seed and how many mutations you've taken (defects don't count): the same
-// choices, the same offers; taking one draws three more.
+// The offers are seeded by the run's seed and how many mutations you've taken (defects don't count), as the sheet's
+// are (progression/mutations.js offerSeed): the same choices, the same offers; taking one draws three more, and
+// creases kept for later find the same three on the sheet.
 function offersFor(game) {
   if (wiz.genotype !== "bent") return [];
-  const rng = makeRng(seedFor(wiz.seed, "creation", "mutations", wiz.mutations.filter((id) => !isDefect(id)).length));
+  const rng = makeRng(offerSeed(wiz.seed, wiz.mutations.filter((id) => !isDefect(id)).length));
   return (mutationOffers(game, preview(game), rng) || []).filter((id) => MUTATIONS[id] && !wiz.mutations.includes(id));
 }
 const defectsFor = () => Object.keys(MUTATIONS).filter((id) => isDefect(id) && !wiz.mutations.includes(id));
