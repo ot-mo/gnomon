@@ -309,7 +309,8 @@ function siteRules(name, seed, run) {
     if (r.x < SITE_MARGIN || r.y < SITE_MARGIN || r.x + r.w > SURFACE.w - SITE_MARGIN || r.y + r.d > SURFACE.d - SITE_MARGIN)
       out.push(`${at}: ${s.id}'s footprint ${JSON.stringify(r)} is within ${SITE_MARGIN} tiles of an edge`);
     if (t.landmark || t.travel !== "yes" || t.edges !== "open" || t.roadWidth || t.riverWidth) out.push(`${at}: ${s.id} on a span it can't use`);
-    if (!(W.regions[t.region]?.sites?.[s.kind] > 0)) out.push(`${at}: ${s.id} in a region without ${s.kind}s`);
+    if (s.kind === "historic") out.push(...historicRule(at, run, s, t));   // WS10: placed by tier, not a region's chance
+    else if (!(W.regions[t.region]?.sites?.[s.kind] > 0)) out.push(`${at}: ${s.id} in a region without ${s.kind}s`);
     if (s.dungeon && dungeonLevelOf(s.dungeon, 1) !== levelOfTier(t.tier) + 1) out.push(`${at}: ${s.id}'s floor 1 is not the surface level + 1`);
     for (const o of run.sites.values())
       if (o !== s && Math.max(Math.abs(o.at.wx - s.at.wx), Math.abs(o.at.wy - s.at.wy)) <= 1) out.push(`${at}: ${s.id} has no free span between it and ${o.id}`);
@@ -320,6 +321,24 @@ function siteRules(name, seed, run) {
   }
   if (run.villages.size !== [...run.sites.values()].filter((s) => s.kind === "village").length) out.push(`${at}: a village site without village data`);
   if (run.history?.rulers?.length !== 2 || run.history.siteRequests.length !== 2 || run.history.relics.length !== 1) out.push(`${at}: the history is not the fixture`);
+  // WS10: every site request of the history is placed, once, as a historic site (bible §8.7).
+  for (const req of run.history?.siteRequests || []) {
+    const n = [...run.sites.values()].filter((o) => o.kind === "historic" && o.id === req.id).length;
+    if (n !== 1) out.push(`${at}: site request ${req.id} placed ${n} times`);
+  }
+  return out;
+}
+
+// WS10: a historic site comes from exactly one of the history's site requests and sits on a span of the requested
+// tier, or of the nearest tier a usable span has (bible §4.10, §8.7: Hour sites go by tier band, not by a region's
+// chance, so they skip the region rule; every other rule applies to them as to any site).
+function historicRule(at, run, s, t) {
+  const out = [], reqs = (run.history?.siteRequests || []).filter((r) => r.id === s.id);
+  if (reqs.length !== 1) return [`${at}: historic site ${s.id} matches ${reqs.length} site requests`];
+  const want = reqs[0].tier;
+  const usable = run.world.tiles.filter((u) => !u.landmark && u.travel === "yes" && u.edges === "open" && !u.roadWidth && !u.riverWidth);
+  const best = Math.min(...usable.map((u) => Math.abs(u.tier - want)));
+  if (Math.abs(t.tier - want) !== best) out.push(`${at}: historic site ${s.id} on a tier-${t.tier} span, asked for tier ${want}`);
   return out;
 }
 
