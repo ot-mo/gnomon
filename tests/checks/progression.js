@@ -210,6 +210,10 @@ export async function checkProgression(m) {
       runs++;
       if (game.player.background !== bg || game.state.mode !== "pilgrim" || game.mode !== "map") fail(`${bg}: the run began as ${game.player.background}, mode ${game.state.mode}, in ${game.mode}`);
       for (const [f, n] of Object.entries(B.rep || {})) if (game.state.rep?.[f] !== n) fail(`${bg}: ${f} at ${game.state.rep?.[f]}, want ${n}`);
+      // The purse once the run has begun: the world's start purse where it has one (the test world's 1,000, for the
+      // parent's prices: game.js startRun), else the background's; the glim is the background's either way.
+      const purse = game.world.startPurse || B.purse || 200;
+      if (game.player.purse !== purse || game.player.funds !== B.glim) fail(`${bg}: began with ${game.player.funds} glim in a ${game.player.purse} purse, want ${B.glim} in ${purse}`);
       const t0 = game.time, x0 = p.x, y0 = p.y;
       for (const code of ["KeyS", "KeyD", "KeyW", "KeyA", "KeyS", "KeyD"]) { press(code); if (p.x !== x0 || p.y !== y0) break; }
       if (p.x === x0 && p.y === y0) fail(`${bg}: no step on the map moved`);
