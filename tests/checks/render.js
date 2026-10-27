@@ -25,7 +25,8 @@
 //      the terrain one and says glim; a pit not looked into, ghost planks and an unseen bridge draw as the ground
 //      around them; underground the map is the parent's (golden (b), part 9). Water holding
 //      another liquid takes its colour on the map and in 3D, under the sky and underground; beyond an edge the
-//      neighbour's water is the neighbour's liquid.
+//      neighbour's water is the neighbour's liquid. G on the map (screens/play.js, WS3's request 4) shows the
+//      legend where it doesn't fit and hides it where it does; the legend's foot names G.
 //   7. Music: the temple keeps the temple mood, a flats span plays open by day and night at night, the Shade
 //      plays shade all night; every mood content/moods.js names is one music.js plays. Voices: speakLetter's voice
 //      is a voice object, a parent's person's id, or else the neutral voice (not Maren's).
@@ -47,7 +48,7 @@ import { checkGolden } from "./golden.js";
 
 export async function checkRender(m) {
   const { game, startRun, S, capture, frameHash, clock, light, raycast, render3d, renderMap, zones, turns, world, rules, music,
-    moods, liquids, worldmap, creatures } = m;
+    moods, liquids, worldmap, creatures, keys } = m;
   const { Zone, B, FLOOR_Z } = world;
   const problems = [], stats = {};
   const expect = (ok, msg) => { if (!ok) problems.push(msg); return ok; };
@@ -499,6 +500,17 @@ export async function checkRender(m) {
       const pressed = renderMap.toggleMapLegend({ ...game, zone: hidden });
       renderMap.setMapLegendMode("auto"); m.resize(180, 56);
       expect(pressed === false, `toggleMapLegend in a zone where the legend fits (after a map where it didn't): turned it ${pressed ? "on" : "off"}`);
+      // The key (screens/play.js): on the temple span at 160 columns the legend doesn't fit, G shows it, G again hides it.
+      if (keys) {
+        m.resize(160, 56); renderMap.setMapLegendMode("auto");
+        game.view = "map"; game.mode = "map";
+        const before = renderMap.mapLegendShown(game);
+        keys.dispatchKey(game, "KeyG"); const once = renderMap.mapLegendShown(game);
+        renderMap.renderMap(game); S.present(); const foot = /G: legend/.test(legendText());
+        keys.dispatchKey(game, "KeyG"); const twice = renderMap.mapLegendShown(game);
+        renderMap.setMapLegendMode("auto"); m.resize(180, 56);
+        expect(!before && once && !twice && foot, `G on the map at 160 columns: the legend ${before} → ${once} → ${twice}, its foot names G ${foot}`);
+      }
     }
     stats.map = { road: rc, grass: gc, legend: "glim", disguised, chasm: { holes, unlike }, pitRow: { unseen: pitRowUnseen, seen: pitRowSeen }, pitDark };
   }
@@ -742,14 +754,14 @@ export async function checkRender(m) {
 export async function run(env) {
   const scr = await env.screen({ cols: 180, rows: 56 });
   const load = (p) => env.src(p);
-  const [g, clock, light, raycast, render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, sfx, creatures] = await Promise.all(
+  const [g, clock, light, raycast, render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, sfx, creatures, keys] = await Promise.all(
     ["game.js", "clock.js", "light.js", "raycast.js", "render3d.js", "renderMap.js", "zones.js", "turns.js", "world.js", "rules.js", "music.js",
-     "content/moods.js", "content/liquids.js", "content/world/worldmap.js", "sfx.js", "creatures.js"].map(load));
+     "content/moods.js", "content/liquids.js", "content/world/worldmap.js", "sfx.js", "creatures.js", "keys.js"].map(load));
   const fixtures = { frames: await env.json("tests/fixtures/golden/frames.json") };
   const { currentApi } = await import("../golden/current-api.js");
   const S = await load("screen.js");
   const result = await checkRender({ game: g.game, startRun: g.startRun, S, capture: scr.capture, frameHash: scr.frameHash, clock, light, raycast,
-    render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, creatures, golden: null, seedRandom: env.seedRandom, resize: scr.resize, sfx });
+    render3d, renderMap, zones, turns, world, rules, music, moods, liquids, worldmap, creatures, keys, golden: null, seedRandom: env.seedRandom, resize: scr.resize, sfx });
   // Golden (b) last: its api reseeds Math.random and replaces the run.
   const api = await currentApi({ load, capture: scr.capture, frameHash: scr.frameHash }, env.seedRandom);
   const gold = checkGolden(api, fixtures, { only: ["frames"] });

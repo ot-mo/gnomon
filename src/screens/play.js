@@ -17,7 +17,7 @@
 //   HOTBAR_KEYS                            1-9: player.hotbar's abilities (abilities.js useHotbar), both views
 import { keys, isLocked, lockPointer } from "../input.js";
 import { registerScreen, setMode, pushMode } from "../screens.js";
-import { bind, globalKey, dispatchKey } from "../keys.js";
+import { bind, globalKey, dispatchKey, keyLabel } from "../keys.js";
 import { at, hitLabel } from "../ui.js";
 import { changeZone, enterZone, zoneBelow, zoneAbove, dungeonOffset, tryWalkOff, ZONE_RULES } from "../zones.js";
 import { clampPitch, updatePlayer, takeImpact, hasFeatherFall, bonus, bodyCollides, RADIUS } from "../player.js";
@@ -27,7 +27,7 @@ import { updateCreatures } from "../ai.js";
 import { creatureAt, hostilesTo, canTalk } from "../creatures.js";
 import { pickUpItems } from "../items.js";
 import { render3d } from "../render3d.js";
-import { renderMap, tileAtCell, mapView, hoverInspect } from "../renderMap.js";
+import { renderMap, tileAtCell, mapView, hoverInspect, toggleMapLegend, setLegendKeyHint } from "../renderMap.js";
 import { emit } from "../events.js";
 import { drawHud, layoutHud, registerHudSegment } from "../hud.js";
 import { ABILITIES, useHotbar } from "../abilities.js";
@@ -400,6 +400,10 @@ bind("map", "KeyT", (game) => { if (throwAtNearest(game)) mapUseTime(game, THROW
 bind("map", "KeyF", (game) => { toggleTorch(game); refreshView(game); }, { help: "torch" });
 bind("map", "KeyR", (game) => { const t = swapWeapons(game); if (t) mapUseTime(game, t); }, { help: "swap weapons" });
 bind("map", HOTBAR_KEYS, (game, code) => { useHotbar(game, HOTBAR_KEYS.indexOf(code)); }, { help: "abilities (hotbar)" });
+// The legend beside the map (renderMap.js): shown by itself where it fits; G hides it, or shows it where it doesn't
+// (an 80-wide surface zone at 160 columns: the view then narrows and follows you). Its foot names the key.
+bind("map", "KeyG", (game) => { toggleMapLegend(game); }, { help: "map legend" });
+setLegendKeyHint(keyLabel("KeyG"));
 
 bind("explore", "Enter", (game) => { playerMelee(game); }, { when: canAct, help: "attack" });   // for when a mouse button isn't handy
 bind("explore", "KeyE", (game) => { interact(game); }, { when: canAct, help: "use / talk" });
