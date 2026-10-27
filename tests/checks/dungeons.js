@@ -245,6 +245,11 @@ export function siteLevelProblems(f, p) {
     }
     if (!f.beat) out.push("oneBeat: no zone.beat");
   }
+  // The vault's puzzle is the gimmicks' to leave alone (its both-view rule): its spikes keep their own pattern,
+  // and only the Unseen Path has ghost planks.
+  for (const [i, sp] of f.spikes) { const x = i % f.w, y = (i - x) / f.w; if (inVault(x, y) && sp.pattern === "beat") { out.push(`a gimmick changed the vault's spikes at (${x}, ${y})`); break; } }
+  if (v && v.name !== "The Unseen Path")
+    outer2: for (let y = v.y0; y <= v.y1; y++) for (let x = v.x0; x <= v.x1; x++) if (f.get(x, y, FLOOR_Z - 1) === B.GHOST) { out.push(`ghost planks in ${v.name} at (${x}, ${y})`); break outer2; }
   const flats = f.creatures.filter((c) => c.vis?.flat && !canTalk(c) && !c.guardian && !c.flags?.legend);
   if (g.includes("allDeep") && !(g.includes("flatland") && after("flatland", "allDeep")) && flats.length) out.push(`allDeep: ${flats.length} flat creature(s)`);
   const buried = f.items.filter((it) => f.get(Math.floor(it.x), Math.floor(it.y), Math.floor(it.z)) !== B.AIR);
