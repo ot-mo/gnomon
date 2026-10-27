@@ -1,9 +1,10 @@
 // config.js and what moved onto it (0D2; TECH_DESIGN §1.4, §7.3, §9; DECISIONS §2 "Identity").
 //
-//   checkConfig({ config, audio, srcFiles, indexHtml }) → { name, ok, problems, stats }
+//   checkConfig({ config, audio, srcFiles, indexHtml, genVersion }) → { name, ok, problems, stats }   (genVersion: world/run.js GEN_VERSION)
 //     srcFiles: [{ file, text }] for every src/*.js (paths relative to src/, with "/")
 //
-//   1. GAME_ID "gnomon", the page title "GNOMON" (index.html too), VERSION = { save: 1, gen: 1, world: 1 }, frozen.
+//   1. GAME_ID "gnomon", the page title "GNOMON" (index.html too), VERSION = { save: 1, gen: GEN_VERSION, world: 1 }, frozen
+//      (gen follows world/run.js GEN_VERSION since the WS9 merge: integrator, WS10 #2; save and world stay 1).
 //   2. FLAGS from the URL: ?seed=N (a whole number > 0, else null), ?silent / ?debug / ?quick (on unless
 //      "0", "false" or "off"); in Node every flag is off and seed is null.
 //   3. storageKey(name) = "gnomon:<name>"; audio.js's switches read and write it, and read the parent game's
@@ -14,7 +15,7 @@
 //      speakers) only in audio.js, whose audioOut() everything else connects to.
 const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/.*$/gm, "$1");
 
-export function checkConfig({ config, audio, srcFiles, indexHtml }) {
+export function checkConfig({ config, audio, srcFiles, indexHtml, genVersion }) {
   const problems = [], stats = {};
   const fail = (m) => problems.push(m);
 
@@ -23,7 +24,7 @@ export function checkConfig({ config, audio, srcFiles, indexHtml }) {
   if (config.TITLE !== "GNOMON") fail(`TITLE is ${config.TITLE}`);
   if (!/<title>GNOMON<\/title>/.test(indexHtml)) fail("index.html's title isn't GNOMON");
   const V = config.VERSION;
-  if (JSON.stringify(V) !== JSON.stringify({ save: 1, gen: 1, world: 1 })) fail(`VERSION is ${JSON.stringify(V)}`);
+  if (JSON.stringify(V) !== JSON.stringify({ save: 1, gen: genVersion, world: 1 })) fail(`VERSION is ${JSON.stringify(V)}, want gen = world/run.js GEN_VERSION ${genVersion}`);   // integrator (WS10 #2)
   if (!Object.isFrozen(V)) fail("VERSION isn't frozen");
 
   // --- 2. Flags ----------------------------------------------------------------------------------------
@@ -85,5 +86,6 @@ export function checkConfig({ config, audio, srcFiles, indexHtml }) {
 export async function run(env) {
   await env.screen();
   return checkConfig({ config: await env.src("config.js"), audio: await env.src("audio.js"), srcFiles: await env.srcFiles(),
+    genVersion: (await env.src("world/run.js")).GEN_VERSION,   // integrator (WS10 #2)
     indexHtml: await env.text("index.html") });
 }
