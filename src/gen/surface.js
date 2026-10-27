@@ -180,6 +180,15 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
   else if (rect) hub = { x: rect.x + (rect.w >> 1), y: rect.y + rect.d + 1 };
   else hub = { x: ZW >> 1, y: ZD >> 1 };
   hub.x = clampInt(hub.x, R.edgeKeep, ZW - 1 - R.edgeKeep); hub.y = clampInt(hub.y, R.edgeKeep, ZD - 1 - R.edgeKeep);
+  // Never on a cliff or in the world's water (a road carved up to a cliff top would be a map wall the road
+  // ends in, and a way onto the cliff in 3D): the nearest plain ground instead. A plan's door stays put.
+  if (!(planAt && planDef.hub)) {
+    const plain = (x, y) => keep(x, y) && !base.cliff[x + y * ZW] && !base.water[x + y * ZW];
+    if (!plain(hub.x, hub.y)) {
+      const to = NEAR.find(([dx, dy]) => plain(hub.x + dx, hub.y + dy));
+      if (to) hub = { x: hub.x + to[0], y: hub.y + to[1] };
+    }
+  }
 
   // 3. Rivers: the bends between the approaches (or a lake), then banks that slope down to the water.
   const rivers = base.ports.filter((p) => p.kind === "river");
@@ -636,6 +645,10 @@ export function validateSurface(zone) {
         const b = top >= 0 ? zone.get(x, y, top) : 0;
         if (b === B.WATER_SHALLOW || b === B.WATER_DEEP || (stand[x + y * w] < 0 && !zone.get(x, y, FLOOR_Z))) problems.push("the entrance is in or next to water or a drop");
       }
+  // A road the map draws as wall (carved up onto a cliff).
+  let roadWalls = 0;
+  for (let i = 0; i < w * d; i++) if (kind[i] === KIND.WALL && stand[i] > 0 && zone.blocks[i + (stand[i] - 1) * w * d] === B.ROAD) roadWalls++;
+  if (roadWalls) problems.push(`${roadWalls} road columns the map draws as wall`);
   // Unplanned 2-block steps (a cliff's foot and a plan's walls are planned).
   let steps = 0;
   for (let y = 0; y < d; y++)

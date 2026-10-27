@@ -19,9 +19,13 @@
 //    so building them again takes no time and gives the same band; cold and warm times reported.
 // 6. Ports: edgePorts is portsOf in §1.4's shape. forgetWorld drops what is kept (world functions, ports, bands).
 // 7. validateSurface catches what it must (each a mutant of a valid zone): a hole outside the dungeon's rect,
-//    water with air under it, the anchor walled in, an open edge cut off; and ground 13 up can't be stood on.
+//    water with air under it, the anchor walled in, an open edge cut off, a road on a map wall; and ground 13 up
+//    can't be stood on.
+// 8. Roads never climb a cliff: the test world's spans where the zone centre (a road's hub) is on a cliff
+//    (verification of 2a: seeds 3, 20 and 42) have their hub on plain ground and no road on a map wall.
 import { buildRun } from "../../src/world/run.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
+import { TEST_WORLD } from "../../src/content/world/test-world.js";
 import { generateSurface, surfaceSteps, validateSurface, worldFns, buildApronBand, forgetWorld, SURFACE_RULES } from "../../src/gen/surface.js";
 import { edgePorts, portsOf, portTable } from "../../src/gen/ports.js";
 import { apronBandSteps } from "../../src/gen/apron.js";
@@ -239,7 +243,18 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
     expectCaught("the anchor walled in", (z) => {
       for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === 2) for (let k = 0; k < FLOOR_Z + 6; k++) z.set(ax + dx, ay + dy, k, B.ROCK);
     }, "navigability");
+    expectCaught("a road on a map wall", (z) => {
+      for (let k = 0; k < FLOOR_Z + 5; k++) z.set(ax + 6, ay, k, B.ROCK);
+      z.set(ax + 6, ay, FLOOR_Z + 5, B.ROAD);
+    }, "road columns");
     expectCaught("the north edge cut off", (z) => { for (let x = 0; x < z.w; x++) for (let k = 0; k < FLOOR_Z + 6; k++) z.set(x, 2, k, B.ROCK); }, "the n edge");
+  }
+
+  // 8. Roads and cliffs.
+  for (const [seed, wx, wy] of [[3, 33, 4], [20, 31, 8], [42, 27, 8]]) {
+    const run = buildRun(seed, TEST_WORLD), z = generateSurface(run, wx, wy), W = worldFns(run.world, run.seed);
+    const hub = z.gen.hub, c = W.columnAt(wx * ZW + hub.x, wy * ZD + hub.y);
+    if (c.cliff || c.water || z.problems.length) fail(`test world seed ${seed} (${wx}, ${wy}): hub (${hub.x}, ${hub.y}) cliff ${c.cliff}, water ${c.water}; ${z.problems.join("; ")}`);
   }
 
   // Numbers.
