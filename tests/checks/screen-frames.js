@@ -68,16 +68,29 @@ export function screenFrames({ game, startRun, inputHandlers, addStatus, frameHa
   return out;
 }
 
+// Frames still drawn but not compared with the fixture, each with its reason (WS5, applied on ws/ws5 with the
+// coordinator's leave, for the integrator to union with WS3's list at the merge; tests/checks/items.js checks the
+// inventory itself in the same 8 states).   // WS5
+const WS5_INVENTORY = "the inventory screen WS5 rebuilt (Pack and Equipment tabs, TECH_DESIGN §4.2); the other frames stay held";   // WS5
+export const NOT_COMPARED = new Map([
+  ["seed 99 depth 3 3d inventory", WS5_INVENTORY], ["seed 99 depth 3 map inventory", WS5_INVENTORY],     // WS5
+  ["seed 99 depth 11 3d inventory", WS5_INVENTORY], ["seed 99 depth 11 map inventory", WS5_INVENTORY],   // WS5
+  ["seed 31 depth 3 3d inventory", WS5_INVENTORY], ["seed 31 depth 3 map inventory", WS5_INVENTORY],     // WS5
+  ["seed 31 depth 11 3d inventory", WS5_INVENTORY], ["seed 31 depth 11 map inventory", WS5_INVENTORY],   // WS5
+]);
+
 export function checkScreenFrames(frames, fixture) {
   const problems = [], want = new Map(fixture.frames.map((f) => [f.name, f.hash]));
-  let mismatched = 0;
+  let mismatched = 0, skipped = 0;
   for (const f of frames) {
     if (!want.has(f.name)) { problems.push(`no recorded frame "${f.name}"`); continue; }
+    if (NOT_COMPARED.has(f.name)) { skipped++; continue; }
     if (want.get(f.name) !== f.hash) { mismatched++; problems.push(`"${f.name}" differs from ${fixture.against}`); }
   }
   for (const name of want.keys()) if (!frames.some((f) => f.name === name)) problems.push(`recorded frame "${name}" not drawn`);
   return { name: `screen frames (the HUD and screens against ${fixture.against})`, ok: problems.length === 0, problems,
-           stats: { frames: `${frames.length} at 180×56, ${mismatched} mismatched` } };
+           stats: { frames: `${frames.length} at 180×56, ${frames.length - skipped} compared, ${mismatched} mismatched`,
+                    notCompared: [...NOT_COMPARED].map(([name, why]) => `${name}: ${why}`) } };
 }
 
 // tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
