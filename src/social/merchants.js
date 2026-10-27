@@ -37,6 +37,7 @@ import { makeRng, hashInt } from "../rng.js";
 import { standingOf } from "./builders.js";
 import { sacramentOf } from "./liquids.js";
 import { peddlerStock } from "../content/legacy/encounters.js";
+import { CONTAINERS } from "../content/items/containers.js";
 
 export const TRADE_RULES = extendRules("trade", {
   repStep: { liked: 0.1, loved: 0.2, disliked: -0.1 },   // bible §3.1 / §15.6 "reputation step"
@@ -58,9 +59,13 @@ export const snuffed = (game) => (game.state?.snuffer?.until ?? -Infinity) > (ga
 const markup = (game) => (snuffed(game) ? TRADE_RULES.snufferMarkup : 1);
 const traderArg = (game, c) => (c ? { repStep: repStepOf(game, c) } : null);
 
+// What a trader pays for: the item's worth, but only the glass of a filled vial (what any pool gives for nothing
+// would otherwise be a fill-and-sell loop: an umbra vial sells for 6 at Bright and EGO 24, an empty one costs 3).
+const sellWorth = (it) => (it.kind === "vial" ? CONTAINERS.vial.price : itemPrice(it));
+
 export function priceOf(game, it, trader, side) {
   const t = trader && typeof trader === "object" && "repStep" in trader && !trader.talk ? trader : traderArg(game, trader);
-  if (side === "sell") return sellPrice(game, game.player, itemPrice(it), t);
+  if (side === "sell") return sellPrice(game, game.player, sellWorth(it), t);
   const worth = trader?.level ? Math.round(itemPrice(it) * priceLevel(trader.level)) : itemPrice(it);
   return Math.round(buyPrice(game, game.player, worth, t) * markup(game));
 }

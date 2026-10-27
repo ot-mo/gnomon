@@ -710,6 +710,26 @@ export async function run(env) {
       if (p().funds !== f0 || t.talk.state.credit !== credit - buy.price) fail(`buying ${buy.price} with ${credit} credit: funds ${f0} → ${p().funds}, credit ${t.talk.state.credit}`);
     } else fail(`nothing in the stock costs ${credit} or less`);
     stats.backing += `; counter: a ${row.price}-glim sale with room for 3 → ${credit} credit, spent first`;
+    // No fill-and-sell loop: a trader pays for a filled vial's glass only, so no liquid from a pool sells for more
+    // than an empty vial costs, at Bright and EGO 24 (the best prices there are), here and at Pell's.
+    {
+      const undo = overrideRules("stats", "attributes");
+      try {
+        setEgo(24); game.state.rep = { drovers: 600 };
+        const t2 = named("mira", "merchant", "drovers", { level: 0, name: "Vi" });
+        const empty = merchants.priceOf(game, { kind: "vial", effect: "" }, t2, "buy");
+        for (const id of Object.keys((await m("content/liquids.js")).LIQUIDS)) {
+          const sell = merchants.priceOf(game, { kind: "vial", effect: id }, t2, "sell");
+          if (sell >= empty) fail(`a vial of ${id} sells for ${sell} at Bright, EGO 24; an empty one costs ${empty}`);
+        }
+      } finally { undo(); setEgo(16); }
+      p().inv = [{ kind: "vial", effect: "turnwater", count: 1 }];
+      const pell = person("pell", "pell", null);
+      game.shop = { npc: pell, tab: "sell", sel: 0 };
+      const pellPays = merchants.priceOf(game, p().inv[0], null, "sell");
+      if (pellPays > currency.sellPrice(game, p(), 3)) fail(`Pell pays ${pellPays} for a vial of turnwater`);
+      game.shop = null;
+    }
   }
 
   // --- 10. Pell's services, all through registerService on the trade screen --------------------------------------------

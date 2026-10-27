@@ -15,12 +15,12 @@ import { pushMode, popMode } from "./screens.js";
 import { talkTo, servicesFor, serviceDef } from "./talk.js";
 import { mapPercent } from "./story/quests.js";
 import { typeOf, talkersIn } from "./creatures.js";
-import { itemName, itemGlyph, itemInfo, itemPrice, addToInventory, ITEM_KINDS } from "./items.js";
-import { funds, pay, receive, purseRoom, formatPrice, buyPrice, sellPrice, CURRENCY } from "./currency.js";
+import { itemName, itemGlyph, itemInfo, addToInventory, ITEM_KINDS } from "./items.js";
+import { funds, pay, receive, purseRoom, formatPrice, buyPrice, CURRENCY } from "./currency.js";
 import { sfx, speakLetter } from "./sfx.js";
 import { wrap, box as uiBox, UI, hit, hitLabel } from "./ui.js";
 import { voiceFor } from "./social/voices.js";
-import { openTrade } from "./social/merchants.js";
+import { openTrade, priceOf } from "./social/merchants.js";
 import { openRitual } from "./social/ritual.js";
 
 // --- Text helpers ----------------------------------------------------------------------
@@ -186,7 +186,7 @@ function shopRows(game) {
     return { it: s.item, price: haggle(game, price), count: s.count, stock: s };
   });
   if (sh.tab === "services") return services(game);
-  return p.inv.map((it) => ({ it, price: sellPrice(game, p, itemPrice(it)), count: it.count || 1 }));
+  return p.inv.map((it) => ({ it, price: priceOf(game, it, null, "sell"), count: it.count || 1 }));   // (a vial: the glass only)
 }
 
 export function shopKey(game, code) {
