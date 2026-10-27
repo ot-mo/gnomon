@@ -36,7 +36,7 @@
 //   opinionsOf(game, c) → [[factionId, opinion, why]]     ritualRows(game, c) → [row]   ritualRow(game, c, row) → { ok, line }
 //   game.state.kindling = { kin: { [key]: { faction, name, rite, at, net, follower? } }, followers: [key] }
 //   game.state.snuffer = { until, at }
-import { FACTIONS, repOf, addRep, attitude, membershipsOf } from "../factions.js";
+import { FACTIONS, repOf, addRep, attitude, membershipsOf, relation } from "../factions.js";
 import { node, bye, talkTo, registerTalkOptions } from "../talk.js";
 import { typeOf } from "../creatures.js";
 import { pay, funds, formatPrice } from "../currency.js";
@@ -155,7 +155,7 @@ export function opinionsOf(game, c) {
   out.push([own, "likes", "one of ours"]);
   for (const f of Object.values(FACTIONS)) {
     if (f.hidden || f.group || f.id === own) continue;
-    const r = (f.relations || {})[own];
+    const r = relation(f.id, own);   // (through a parent group too: the Assize hate Hollowmere as Bent)
     if (r === 1) out.push([f.id, "likes", `${f.name} like ${FACTIONS[own].name}`]);
     else if (r === -1) out.push([f.id, "dislikes", `${f.name} hate ${FACTIONS[own].name}`]);
   }
