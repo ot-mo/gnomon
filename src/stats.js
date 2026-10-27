@@ -31,7 +31,8 @@
 //   jump (blocks) · featherFall · killHeal · undeadHeal · burnBonus · poisonHit · sunder · cutsFlat · foldGuard
 // New: the six attributes (str agi tou int wil ego) · av · dv · ma · toHit · examine · navigation · travel ·
 //   carry · price · cooldown · resistFire · resistFrost · resistShock · resistPoison · swim · missileAcc (to hit with
-//   a missile weapon: missiles.js missileSpec; WS4's Steady hand).
+//   a missile weapon: missiles.js missileSpec; WS4's Steady hand) · torchCost (the torch's glim: −0.5 half, −1 free;
+//   torch.js burnTorch; Cassin's Level, Thrifty wick, Lampskin, a glim heart).
 // (`pv` from the tech design is gone: DECISIONS, no penetration dice.)
 import { RULES } from "./rules.js";
 import { itemBonuses, ITEM_KINDS } from "./items.js";
@@ -44,7 +45,7 @@ export const BONUS_KEYS = ["crit", "swing", "reach", "maxDmg", "leech", "crush",
   "str", "maxHp", "armour", "speed", "torch", "sense", "darkSight", "stealth", "firstBlock", "jump", "featherFall",
   "killHeal", "undeadHeal", "burnBonus", "poisonHit", "sunder", "cutsFlat", "foldGuard",
   "agi", "tou", "int", "wil", "ego", "av", "dv", "ma", "toHit", "examine", "navigation", "travel", "carry", "price",
-  "cooldown", "resistFire", "resistFrost", "resistShock", "resistPoison", "swim", "missileAcc"];
+  "cooldown", "resistFire", "resistFrost", "resistShock", "resistPoison", "swim", "missileAcc", "torchCost"];
 export const BASE_FIELDS = ["attrs", "maxHpGain", "level"];
 
 // --- Sources ----------------------------------------------------------------------------------

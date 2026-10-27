@@ -16,9 +16,10 @@
 //      seen); the HUD says so; a skip that runs the purse dry mid-way ends as fine stepping does. The next
 //      glim relights it at once (told once), back to the full torch, underground and by day alike (it pays
 //      the glim it owes).
+//      A bonus torchCost (stats.js) makes it cheaper: −0.5 pays half, −1 nothing.
 //   5. The old game is untouched: a new player's torch is the parent's (range 6, power 2.2) and nothing is
 //      owed; only torch.js burns glim, through currency.pay.
-export function checkTorch({ game, startRun, torch, clock, time, turns, player, light, hud, currency, compileWorld, REAL_WORLD, torchSrc }) {
+export function checkTorch({ game, startRun, torch, clock, time, turns, player, light, hud, currency, compileWorld, REAL_WORLD, torchSrc, statBus }) {
   const problems = [], stats = {};
   const fail = (m) => problems.push(m);
   const near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
@@ -92,6 +93,20 @@ export function checkTorch({ game, startRun, torch, clock, time, turns, player, 
     p = fresh(); p.torch = false;
     time.skipTime(game, 3 * PER, { interruptible: false });
     if (p.funds !== 10 || (p.torchBurn || 0) !== 0) fail(`the torch out: paid ${10 - p.funds}, burn ${p.torchBurn}`);
+    // A cheaper torch (stats.js torchCost, through any bonus source: Cassin's Level, Thrifty wick, Lampskin, a glim
+    // heart): the same 2.2 × 240 s underground pays 1 glim at −0.5 and none at −1.
+    {
+      const cheaper = {};
+      for (const cost of [-0.5, -1]) {
+        p = fresh(); p.bonuses = { torchCost: cost }; statBus.invalidateStats(p);
+        time.skipTime(game, span, { interruptible: false });
+        cheaper[cost] = { paid: 10 - p.funds, burn: +(p.torchBurn || 0).toFixed(6), cost: torch.torchCost(p) };
+        delete p.bonuses; statBus.invalidateStats(p);
+      }
+      if (cheaper[-0.5].paid !== 1 || !near(cheaper[-0.5].burn, span / 2 - PER) || cheaper[-1].paid !== 0 || cheaper[-1].burn !== 0)
+        fail(`torchCost: ${JSON.stringify(cheaper)} (want 1 glim and ${span / 2 - PER} s at −0.5, nothing at −1)`);
+      stats.torchCost = cheaper;
+    }
   }
 
   // --- 3. A day and a night on the surface --------------------------------------------------------------------
@@ -179,5 +194,5 @@ export async function run(env) {
   return checkTorch({ game, startRun, torch: await m("torch.js"), clock: await m("clock.js"), time: await m("time.js"), turns: await m("turns.js"),
     player: await m("player.js"), light: await m("light.js"), hud: await m("hud.js"), currency: await m("currency.js"),
     compileWorld: (await m("world/worldmodel.js")).compileWorld, REAL_WORLD: (await m("content/world/worldmap.js")).REAL_WORLD,
-    torchSrc: await env.text("src/torch.js") });
+    torchSrc: await env.text("src/torch.js"), statBus: await m("stats.js") });
 }

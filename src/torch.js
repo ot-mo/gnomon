@@ -8,12 +8,14 @@
 //
 //   darkSeconds(game, zone, t0, t1) → s     how much of [t0, t1] is darkness for a torch in that zone
 //   burnTorch(game, e, t0, t1, zone)         the drain, the only one: e.torchBurn counts the seconds lit in
-//                                            darkness since the last glim; each glimSeconds() of them pays 1
+//                                            darkness since the last glim (× torchCost(e)); each glimSeconds() of them pays 1
 //                                            glim through currency.pay. When the purse can't, the count
 //                                            stays at glimSeconds() (owed; the flicker itself is free), and
 //                                            every later tick, dark or not, tries to pay it
 //   torchGutters(e) → bool                   lit, and the last glim couldn't be paid
 //   glimSeconds() → 240
+//   torchCost(e) → 0..1                      what a lit dark second costs e: 1 + bonus(e, "torchCost") (stats.js),
+//                                            at least 0 (−0.5 half price, −1 free); 1 for anyone without the key
 //
 // It runs from the clock (clock.js catchUp emits "clock:tick" { t0, t1 }): every frame in both views
 // (3D frames and map actions alike pass game time), when you leave a zone (so the time counts in the
@@ -24,8 +26,10 @@ import { pay } from "./currency.js";
 import { nightSeconds } from "./clock.js";
 import { zoneIsLightless } from "./light.js";
 import { on } from "./events.js";
+import { bonus } from "./stats.js";
 
 export const glimSeconds = () => RULES.torch.hoursPerGlim * 60 * RULES.clock.secondsPerMinute;
+export const torchCost = (e) => Math.max(0, 1 + bonus(e, "torchCost"));
 
 // Is this zone on a span whose terrain is always dark (the Shade)?
 function darkTerrain(game, zone) {
@@ -48,7 +52,7 @@ export function burnTorch(game, e, t0, t1, zone = game.zone) {
   const dark = darkSeconds(game, zone, t0, t1), was = torchGutters(e);
   if (!(dark > 0) && !was) return;   // by day nothing burns; a guttering torch still pays what it owes
   const per = glimSeconds();
-  e.torchBurn = (e.torchBurn || 0) + (dark > 0 ? dark : 0);
+  e.torchBurn = (e.torchBurn || 0) + (dark > 0 ? dark * torchCost(e) : 0);
   while (e.torchBurn >= per - 1e-9) {
     if (!pay(game, e, 1)) { e.torchBurn = per; break; }
     e.torchBurn = Math.max(0, e.torchBurn - per);
