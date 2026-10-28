@@ -20,7 +20,10 @@
 // It runs from the clock (clock.js catchUp emits "clock:tick" { t0, t1 }): every frame in both views
 // (3D frames and map actions alike pass game time), when you leave a zone (so the time counts in the
 // zone you spent it in), and from skipTime. darkSeconds is exact for any interval (nightSeconds adds up
-// over any split), so a skip burns what playing the same time out burns.
+// over any split), so a skip burns what playing the same time out burns. On the world map (a journey,
+// overworld/travel.js game.trip) it burns by the span the road is on, not by the zone you left: the Shade's
+// span is dark all day, any other at night (Phase 2, WS1 #6). A step's hours pass on the span you set out
+// from (worldStep moves the journey after its skipTime).
 import { RULES } from "./rules.js";
 import { pay } from "./currency.js";
 import { nightSeconds } from "./clock.js";
@@ -62,4 +65,5 @@ export function burnTorch(game, e, t0, t1, zone = game.zone) {
     game.log(now ? "Your purse is dry: the torch gutters down to a flicker." : "The torch drinks a drop of glim and flares up again.", [255, 200, 120]);
 }
 
-on("clock:tick", (game, { t0, t1 }) => { if (game.player) burnTorch(game, game.player, t0, t1); });
+const roadZone = (game) => (game.trip && !game.trip.viewOnly ? { hasSky: true, wx: game.trip.wx, wy: game.trip.wy } : game.zone);
+on("clock:tick", (game, { t0, t1 }) => { if (game.player) burnTorch(game, game.player, t0, t1, roadZone(game)); });

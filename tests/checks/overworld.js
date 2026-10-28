@@ -517,6 +517,24 @@ function resting(G, problems) {
   try { r = rest(game, { until: 2 * H }); } finally { undo(); }
   out.r10 = { poisonGone: !hasStatus(q, "poisoned"), hpLost: hp0 - q.hp, cooldown: cooldownLeft(q, "foldingStrike"), secondWind: cooldownLeft(q, "secondWind") };
   if (hasStatus(q, "poisoned") || !(hp0 - q.hp > 0) || !near(cooldownLeft(q, "foldingStrike"), 300 - 2 * H) || cooldownLeft(q, "secondWind") || !(2 * H >= RULES.cooldown.restClears)) problems.push(`rest: statuses and cooldowns didn't catch up (${JSON.stringify(out.r10)})`);
+  // The torch on the road (Phase 2, WS1 #6): on the world map it burns by the span the journey is on, not the zone
+  // you left (here a plain one): by day 4 hours on the Shade's span pay a glim, 4 on another span nothing.
+  {
+    const g = fresh(G, 58, REAL_WORLD), W = g.run.world, tp = g.player;
+    const shade = W.tiles.find((t) => W.terrains[t.terrain]?.dark), plain = W.tileAt(W.start.wx, W.start.wy);
+    skipTime(g, secondsUntil(g, "dawn") + 2 * H, { interruptible: false });
+    enterWorldMap(g);
+    const burn = (at) => {
+      g.trip.wx = at.wx; g.trip.wy = at.wy; tp.funds = 10; tp.torch = true; tp.torchBurn = 0;
+      const day = !isNight(g);
+      skipTime(g, 4 * H, { interruptible: false, reason: "travel" });
+      return day && !isNight(g) ? 10 - tp.funds : "night";
+    };
+    const torch = { shade: shade && burn(shade), plain: burn(plain), left: W.terrains[W.tileAt(g.zone.wx, g.zone.wy).terrain]?.dark ? "dark" : "plain" };
+    out.roadTorch = torch;
+    if (!shade || torch.shade !== 1 || torch.plain !== 0 || torch.left !== "plain") problems.push(`rest: the torch on the road by day (glim for 4 hours) ${JSON.stringify(torch)}, want the Shade 1, another span 0`);
+    g.trip = null;
+  }
   // Dying on the road ends the journey: the next run's Z is an ordinary rest in a zone (a hunter 2 tiles off stops it).
   game = fresh(G, 57, G.game.world);
   goTo(game, 3, 3); enterWorldMap(game);
