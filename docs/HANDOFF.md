@@ -2,16 +2,15 @@
 
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
-**Updated:** 2026-10-28, the integrator (local session), on `integration`. **Phase 1 is done and fully merged: every
-workstream's `p1-*` tag is in, each tagged `p2-*` at its merge (`p2-ws3` … `p2-ws9`, the last `p2-ws1`), the flip
-too (`p2-flip`); `main` = `p2-ws1`. Phase 2's rest (TECH_DESIGN §8.5: the last wiring merge and 2B hardening) starts
-from `p2-ws1`: "Next step" below. Nothing is running: the user is taking a break, so no session works on GNOMON until
-the user starts one.** From here on only the integrator edits this file and
+**Updated:** 2026-10-28, the integrator (local session), on `integration`. **Phase 1 is done and fully merged
+(`p2-ws3` … `p2-ws1`, the flip `p2-flip`). Phase 2's 2B hardening is done and tagged `p2-2b` (e0b7c9b), with the
+Phase 2 items that need no C1; `main` = `p2-2b`. What's left of Phase 2 is the last wiring merge, which waits on C1:
+"Next step" below. Nothing is running.** From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p2-ws1` on `integration` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+- **Last tag:** `p2-2b` on `integration` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
   `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b`, `p1-ws10`, the flip, `p1-ws2a`, `p1-ws7a`,
   `p1-ws7b`, `p1-ws2b`, `p1-ws9` and `p1-ws1`, with their integration requests; `p2-ws3` … `p2-ws9` before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
@@ -27,7 +26,7 @@ moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
   `NODE_PATH="$(npm root -g)"`): `browser-0d2.mjs`, `browser-0d1.mjs`, `browser-gate.mjs`, `browser-silent.mjs`, and
   with `node tools/serve.mjs <port>` running, `browser-shell.mjs` and `browser-0c.mjs` (`--port <port>`); each
   workstream's own (`browser-ws8.mjs` from WS8, `browser-ws4.mjs` from WS4, `browser-ws5.mjs` from WS5,
-  `browser-ws6.mjs` from WS6; `browser-ws7.mjs`, the integrator's, for WS7b's pray quests); WS9's browser half, `check-save.mjs --browser` (not in
+  `browser-ws6.mjs` from WS6; `browser-ws7.mjs`, the integrator's, for WS7b's pray quests; `browser-2b.mjs`, 2B's, which serves the repository itself); WS9's browser half, `check-save.mjs --browser` (not in
   `run-all`). `tools/README.md` has every command and what each check proves.
 
 ## Next step
@@ -35,16 +34,20 @@ moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 **Phase 1 is closed.** What `main` (= `p2-ws1`) holds, the balance phase's list and Phase 2's work are under "Phase 1's
 closing state" below.
 
-**Phase 2 starts from `p2-ws1`.** Its exact first step, for the session the user starts next (local; CLAUDE.md's
-"Start of every session"): `git fetch origin --tags`, then in the worktree `C:\Users\Otto Mörner\Code\gnomon-wt\integration`
-on branch `integration` (at `p2-ws1`) run `node tools/run-all.mjs` (38 of 38 at `p2-ws1`) and
-`NODE_PATH="$(npm root -g)" node tools/check-save.mjs --browser` (PASS), so the start is known green; then begin 2B
-hardening (TECH_DESIGN §8.5) with its bot playthrough: a scripted session in `tools/bot.mjs` (a new scenario beside
-`runSession`) that goes create → 3 zones in both views → world travel 10 steps → village trade and ritual → a quest →
-a dungeon 3 levels down → save → reload → continue, on the test world (the real world has no village until C1), each
-step asserted. After it: the performance pass against §6.7 and the browser QA checklist with silent audio. §8.5's
-"last wiring merge" (title → create → the start landmark → the first village, the legacy fixture site off the default
-world) waits on C1's regions and villages: `game.js` still builds runs on the test world.
+**Phase 2's 2B hardening is done: `p2-2b`** (2026-10-28; `docs/sessions/2B.md`). The bot playthrough is in
+`check-bot`; travel saves, discovery XP on a load, `restClears`, the torch on the road and the journal's Locations tab
+are in; the performance pass and the browser QA checklist (14 tools, `tools/browser-2b.mjs` new) passed. `main` =
+`p2-2b`.
+
+**Next step:** §8.5's last wiring merge (title → create → the start landmark → the first village; the legacy fixture
+site leaves the default world, staying in the test world) waits on C1's regions and villages: `game.js` still builds
+runs on the test world. Its first step, once C1 is in: `git fetch origin --tags`, then in the worktree
+`C:\Users\Otto Mörner\Code\gnomon-wt\integration` on branch `integration` (at `p2-2b` or later) run
+`node tools/run-all.mjs` (38 of 38 at `p2-2b`) and `NODE_PATH="$(npm root -g)" node tools/browser-2b.mjs` (PASS), merge
+C1's tag, and point `game.js`'s new runs at the real world; then run the playthrough on the real world too (it runs on
+the test world today, seed 18, because the real world has no village before C1). Until C1, what comes next is the
+user's call (Phase 3's content, C1-C5, §8.6), and the coordinator's two questions wait for them ("Phase 1's closing
+state" below).
 
 **On `main` since `p2-ws6a`** (both at the user's request, without a tag of their own): the root README for GNOMON as
 it stands at `p2-ws5` (`6645658`, from `wip/readme`; an interim update before Phase 4's rewrite; the secret rooms'
@@ -84,7 +87,8 @@ village XP (`xpReward` 0.6, 0.75, 0.2 of a level); discovery, which on the real 
 (FISTS: 0.3 s, reach 1.3, no design number); the wildlife's d20 numbers (no species has `dv` or attributes).
 
 **Phase 2's work** (TECH_DESIGN §8.5): 2B hardening (the bot playthrough, the performance pass, the browser QA
-checklist) and the last wiring merge (after C1). Found at the last merges and left for it:
+checklist) and the last wiring merge (after C1). Found at the last merges and left for it (**the five items done in
+`p2-2b`**; the coordinator's two questions still open):
 - **Travel saves:** WS9 saves every 10 s on the world map, but WS1's world map isn't saveable, rightly: `game.trip`
   isn't saved, so a save there would load you back where the journey began. Saving the trip (and then making
   `"world"` saveable, WS9 #8) is the fix; until then a travel save waits for the next view.
@@ -276,6 +280,24 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p2-2b`** (2026-10-28): 2B hardening on `p2-ws1` (TECH_DESIGN §8.5), with Phase 2's items that need no C1; notes in
+`docs/sessions/2B.md`. Each change has an assertion that fails without it.
+- The bot playthrough (`8dcf10f`, `bot.mjs` `runPlaythrough`, in `check-bot`): the wizard by keys → 3 zones in both
+  views → 30 world steps to Saltcote Steading → a buy and the Kindling → its prayer quest → the Sour Burrow 3 levels
+  down (the last in 3D) → Save and quit → Continue (the same state) → the stairs up; seed 18, test world, 423 keys,
+  4 s. It found `bd88868`: after a village quest's reward every save failed (the reward and the offers one array, R5).
+- Travel saves (`f6f6cf8`): the journey in the slot as `state.trip`, `"world"` saveable, restored on a new
+  `"save:loaded"` event. Discovery XP never paid on a load (`7867f28`). `restClears` 60 (`c3003ae`; WS1's R10 test
+  now on the folding strike). The torch on the road by the journey's span (`224f320`). The journal's Locations tab:
+  O, Enter or a click show the marked place on the world map (`48094d9`). `tools/browser-2b.mjs` (`f62629d`).
+- Checks: `run-all` at `f62629d` **38 of 38** (188.3 s). `check-perf --against p2-ws1 --rounds 3 --no-render` alone on
+  the idle machine: **PASS**, every §6.7 item inside its budget, ×0.97-1.14 (outdoor frame p50 15.36 against 15.51;
+  dungeon generation p95 31.86 against 27.87, budget 40; passTime p50 5.82 against 5.17, budget 12). Browser (0
+  console errors, audio silenced), all PASS: `browser-2b`, `browser-0d1 --against p2-ws1` (27 of 27 modes, golden (b)
+  27 of 27, per tick +0.4% to +1.6%), `browser-0d2 --all` (34 passed), `browser-gate` (1234, 7), `browser-silent`,
+  `check-save --browser`, and on `tools/serve.mjs 8660` `browser-ws1`, `browser-0c`, `browser-shell`,
+  `browser-ws4` … `browser-ws8`. `main` fast-forwarded to `p2-2b`.
 
 **`p2-ws1`** (2026-10-28): `p1-ws1` (b042cc0) merged into `integration` (`e6f16e2`), the last Phase 1 tag. One
 conflict, the imports of `tests/checks/world.js` (WS1 #12): WS7a's history import and WS1's `canStep`, both kept;
