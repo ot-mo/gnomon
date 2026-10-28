@@ -45,8 +45,8 @@ const CORE = {
   ma: { base: 4 },                                     // MA = 4 + WIL mod + bonus(ma)
   cooldown: { perPoint: 0.05, min: 0.2, max: 2,        // × (1 − 0.05 × (WIL − 16)), clamped
               // Once-per-floor effects are game-time cooldowns (TECH_DESIGN §2.4, review #26), in seconds;
-              // a rest of an hour clears the first two.
-              secondWind: 300, firstBlock: 120, foldingStrike: 10, restClears: 3600 },
+              // a rest of an hour clears the first two: one world hour, 60 s (the clock below; Phase 2, WS1 #7).
+              secondWind: 300, firstBlock: 120, foldingStrike: 10, restClears: 60 },
   price: { buy: 1.5, buyPerMod: 0.1, sell: 0.3, sellPerMod: 0.05, minBuy: 0.2,   // value × (1.5 − 0.1·EGO mod − step) …
            levelStep: 15, haggle: 0.8 },                                     // … × (1 + level / 15) (currency.js priceLevel); the Haggler × 0.8
   carry: { perStr: 15 },

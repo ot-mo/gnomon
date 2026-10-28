@@ -503,18 +503,20 @@ function resting(G, problems) {
     out.worldRest = rr.why;
     if (rr.why === "hostile" || !near(rr.elapsed, 2 * H)) problems.push(`rest on the world map: stopped by a hunter in the zone you left (${rr.why}, ${rr.elapsed} s)`);
   }
-  // R10: poison does its full, finite damage; a cooldown counts down exactly.
+  // R10: poison does its full, finite damage; a cooldown a rest doesn't clear counts down exactly (the folding
+  // strike's), and the second wind's is cleared: the rest is longer than RULES.cooldown.restClears, one world hour.
   game = fresh(G, 54, G.game.world);
   goTo(game, 3, 3);
   const q = game.player;
   q.hp = maxHp(q);
   addStatus(game, q, "poisoned", { t: 6 });
+  startCooldown(q, "foldingStrike", 300);
   startCooldown(q, "secondWind", 300);
   const hp0 = q.hp;
   undo = overrideRules("overworld", { restEncounter: 0 });
   try { r = rest(game, { until: 2 * H }); } finally { undo(); }
-  out.r10 = { poisonGone: !hasStatus(q, "poisoned"), hpLost: hp0 - q.hp, cooldown: cooldownLeft(q, "secondWind") };
-  if (hasStatus(q, "poisoned") || !(hp0 - q.hp > 0) || !near(cooldownLeft(q, "secondWind"), 300 - 2 * H)) problems.push(`rest: statuses and cooldowns didn't catch up (${JSON.stringify(out.r10)})`);
+  out.r10 = { poisonGone: !hasStatus(q, "poisoned"), hpLost: hp0 - q.hp, cooldown: cooldownLeft(q, "foldingStrike"), secondWind: cooldownLeft(q, "secondWind") };
+  if (hasStatus(q, "poisoned") || !(hp0 - q.hp > 0) || !near(cooldownLeft(q, "foldingStrike"), 300 - 2 * H) || cooldownLeft(q, "secondWind") || !(2 * H >= RULES.cooldown.restClears)) problems.push(`rest: statuses and cooldowns didn't catch up (${JSON.stringify(out.r10)})`);
   // Dying on the road ends the journey: the next run's Z is an ordinary rest in a zone (a hunter 2 tiles off stops it).
   game = fresh(G, 57, G.game.world);
   goTo(game, 3, 3); enterWorldMap(game);
