@@ -762,6 +762,9 @@ async function quests7b(env, { fail, stats, test, json, startRun, game }) {
       if (other && F.repOf(game, other.factionId) - o0 !== 25) throw new Error("the sweetened answer didn't please the other village");
       if (xpOf(p) - x0 !== R.xp || !(R.xp > 0)) throw new Error(`XP +${xpOf(p) - x0} (reward ${R.xp})`);
       if (prm.itemUid && p.inv.some((i) => i.uid === prm.itemUid)) throw new Error("the thing wasn't handed over");
+      // A save takes the state as it is now: plain JSON, no object in two places (R5; found by the 2B playthrough).
+      const jp = (await env.src("save/codec.js")).jsonProblems(game.state, "state");
+      if (jp.length) throw new Error(`the state after the reward can't be saved: ${jp.slice(0, 2).join("; ")}`);
       n1.options[1].go();
       if (q.vars.took !== 1 || p.inv.length < inv0 - (prm.itemUid ? 1 : 0) + 1 - 0 || opt(who(prm.giver), /reward/)) throw new Error(`the item choice: took ${q.vars.took}`);
       done.push(`${T} (${v.name}, ${prm.where}: +${R.funds} glim, +${R.xp} XP)`);

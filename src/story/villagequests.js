@@ -180,7 +180,8 @@ function offersFor(game, q, level) {
 }
 function giveReward(game, q) {
   const r = rewardOf(game, q), p = game.player;
-  q.reward = { funds: r.funds, rep: r.rep, xp: r.xp, items: r.items };
+  // (The reward keeps its own copy of the offers: a save refuses one object in two places, R5.)
+  q.reward = { funds: r.funds, rep: r.rep, xp: r.xp, items: JSON.parse(JSON.stringify(r.items)) };
   q.vars.offers = r.items;
   q.vars.offerOpen = true;
   if (q.vars.itemUid && p?.inv) p.inv = p.inv.filter((it) => it.uid !== q.vars.itemUid);   // handed over
