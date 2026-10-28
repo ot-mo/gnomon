@@ -1808,6 +1808,32 @@ async function ws9Sections(ctx) {
     const drownT = game.player.status.drowning?.t, backT = decodePlayer(encodePlayer(game.player)).status?.drowning?.t;
     if (!(drownT > 0) || backT !== drownT) fail(`a drowning player's status: t ${drownT}, after a save ${backT}`);
     out.push("a drowning player's status comes back whole");
+    // A save made on the world map (Phase 2: "world" is saveable, the journey rides as state.trip): the load puts you back
+    // on it, at that span, the journey's own fields as they were, over the view you set out from; a step goes on from
+    // there, and the live state never holds the trip.
+    {
+      const T = await import("../../src/overworld/travel.js");
+      const store = memoryAdapter();
+      useStore(store);
+      startRun(1234); game.pages = null; game.story.cube = true;
+      playing(game, "map");
+      T.enterWorldMap(game);
+      const moves = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+      let stepped = null;
+      for (const [dx, dy] of moves) { const r = T.worldStep(game, dx, dy, { confirm: true, drop: false }); if (r.ok && game.trip) { stepped = r.to; break; } }
+      const tripWas = game.trip && { wx: game.trip.wx, wy: game.trip.wy, came: game.trip.came, moved: game.trip.moved, fromKey: game.trip.fromKey, view: game.trip.view };
+      const slot = stepped && game.mode === "world" && canSave(game) ? await saveGame(game, {}) : null;   // (not saveable, it would wait)
+      await whenWritten(game);
+      const live = "trip" in game.state;
+      startRun(4321); game.pages = null;
+      if (slot) await loadGame(slot.id, { store });
+      const t = game.trip, tripNow = t && { wx: t.wx, wy: t.wy, came: t.came, moved: t.moved, fromKey: t.fromKey, view: t.view };
+      const on = game.mode === "world" && JSON.stringify(tripNow) === JSON.stringify(tripWas) && !("trip" in game.state) && !live;
+      const step2 = on ? moves.map(([dx, dy]) => T.worldStep(game, dx, dy, { confirm: true, drop: false })).find((r) => r.ok) : null;
+      if (!stepped || !slot || !on || !step2) fail(`a save on the world map: stepped ${JSON.stringify(stepped)}, saved ${!!slot}, loaded into ${game.mode} with ${JSON.stringify(tripNow)} (was ${JSON.stringify(tripWas)}), state.trip live ${live} / after ${"trip" in game.state}, a step after ${!!step2}`);
+      else out.push(`a save on the world map at (${tripWas.wx}, ${tripWas.wy}) loads back onto it, and a step goes on to (${step2.to.wx}, ${step2.to.wy})`);
+      game.trip = null;
+    }
     useStore(null);
     stats.phase1RoundTrip = out.join("; ");
   }

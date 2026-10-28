@@ -274,14 +274,19 @@ export function decodePlayer(data) {
 }
 
 // --- The slot ---------------------------------------------------------------------------------------------
+// A journey on the world map (overworld/travel.js game.trip) rides in the saved state as state.trip, so a load puts you
+// back on it (travel.js restores it on "save:loaded"); the live state never holds it. The prompt and the warned spans
+// go with it, the screen's own menu and a read under way don't.
+const TRIP_FIELDS = ["wx", "wy", "came", "moved", "fromKey", "view", "warned", "prompt"];
+const tripOf = (t) => (t && !t.viewOnly ? Object.fromEntries(TRIP_FIELDS.filter((k) => t[k] !== undefined).map((k) => [k, t[k]])) : null);
 export function snapshotSlot(game, { id, created, updated, zones = [], live = null, unclean = 0, checkpoint }) {
-  const p = game.player;
+  const p = game.player, trip = tripOf(game.trip);
   const slot = {
     id, game: GAME_ID, version: VERSION.save, genVersion: VERSION.gen, worldVersion: VERSION.world, created, updated,
     mode: game.state.mode ?? "oneWick", seed: game.seed,
     character: { name: p.name ?? null, genotype: p.genotype ?? null, background: p.background ?? null, level: p.level },
-    where: { zoneKey: game.zone?.key ?? null, world: null, view: game.view },
-    time: game.time, state: game.state, player: encodePlayer(p), ids: getIds(), run: serializeRun(game.run),
+    where: { zoneKey: game.zone?.key ?? null, world: trip ? { wx: trip.wx, wy: trip.wy } : null, view: game.view },
+    time: game.time, state: trip ? { ...game.state, trip } : game.state, player: encodePlayer(p), ids: getIds(), run: serializeRun(game.run),
     zones, live, unclean, ...(checkpoint ? { checkpoint } : {}),
   };
   const problems = [...jsonProblems(slot.state, "state"), ...jsonProblems(slot.player, "player"), ...jsonProblems(slot.run, "run", { shared: true })];

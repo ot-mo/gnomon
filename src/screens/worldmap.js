@@ -96,6 +96,7 @@ function clickSpan(game, button, s) {
 
 registerScreen(MODE, {
   over: "none", pointer: "unlock",
+  saveable: true,   // (the journey is saved with it: save/codec.js state.trip, restored on a load; Phase 2)
   draw(game) {
     S.clear();
     if (game.trip && game.run) renderWorld(game);

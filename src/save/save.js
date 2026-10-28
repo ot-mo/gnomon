@@ -86,7 +86,7 @@ import { RULES } from "../rules.js";
 import { game as theGame, resumeRun } from "../game.js";
 import { screenFor, setMode, pushMode, syncStack } from "../screens.js";
 import { playMode } from "../screens/play.js";
-import { on, registerUpdate } from "../events.js";
+import { on, emit, registerUpdate } from "../events.js";
 import { changeZone, ZONE_LOADER, evictDormant, zoneState, parseKey } from "../zones.js";
 import { restoreRun } from "../world/run.js";
 import { setIds } from "../ids.js";
@@ -665,6 +665,7 @@ async function loadHeld(slotId, { game = theGame, store, version = VERSION.save,
   setMode(game, playMode(game), null, { pointer: false });
   if (game.view !== "map") pushMode(game, "pause", null, { pointer: false });
   SAVE_STATS.loads++;
+  emit(game, "save:loaded", { slotId });   // (the journey a save made on the world map holds: overworld/travel.js)
   return game;
 }
 

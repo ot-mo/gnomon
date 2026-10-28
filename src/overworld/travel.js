@@ -74,6 +74,16 @@ export function enterWorldMap(game, { viewOnly = false, center = null } = {}) {
 // A journey ends when you go down (leaveWorldMap clears it first), so any other zone entry finds a stale one: a new
 // run or a load (both enter a zone) after you died on the road. Clear it, so nothing reads the old run's span.
 on("zone:enter", (game) => { game.trip = null; game.bearingsLook = null; }, { priority: 50 });
+// A save made on the world map ("world" is saveable since Phase 2, so WS9's travel saves are made) holds the journey as
+// state.trip (save/codec.js snapshotSlot): a load puts you back on it, at that span, over the view you set out from.
+on("save:loaded", (game) => {
+  const t = game.state?.trip;
+  if (!t) return;
+  delete game.state.trip;
+  game.trip = { ...t, came: t.came ?? null, moved: !!t.moved, warned: t.warned || {}, prompt: t.prompt ?? null, viewOnly: false, cursor: null, menu: null, busy: false };
+  setMode(game, t.view === "map" ? "map" : "explore", null, { pointer: false });
+  pushMode(game, "world");
+});
 
 // --- One step ------------------------------------------------------------------------------------------------------
 export function stepHours(game, from, to, edge = edgeBetween(game.run.world, from, to)) {
