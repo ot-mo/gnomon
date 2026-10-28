@@ -1834,6 +1834,30 @@ async function ws9Sections(ctx) {
       else out.push(`a save on the world map at (${tripWas.wx}, ${tripWas.wy}) loads back onto it, and a step goes on to (${step2.to.wx}, ${step2.to.wy})`);
       game.trip = null;
     }
+    // A load is never a first visit (WS9's rule): a save made before WS1 (no atlas) in a span whose site pays discovery
+    // XP loads with the player's XP and level as saved, the site marked paid, so a later visit pays nothing either.
+    {
+      const { discoveryXp } = await import("../../src/overworld/discovery.js");
+      const store = memoryAdapter();
+      useStore(store);
+      startRun(1234); game.pages = null; game.story.cube = true;
+      const st = game.run.world.start;
+      const site = [...game.run.sites.values()].find((s) => s.kind !== "village" && s.kind !== "landmark" && s.at && !(s.at.wx === st.wx && s.at.wy === st.wy) && discoveryXp(game, s) > 0);
+      let res = "no site";
+      if (site) {
+        await changeZone(game, `${site.at.wx},${site.at.wy},0`, { how: "travel" }); playing(game, "map");
+        delete game.state.atlas;   // (as a save made before WS1 holds it)
+        const was = { xp: game.player.xp, level: game.player.level };
+        const slot = await saveGame(game, {});
+        await whenWritten(game);
+        startRun(4321); game.pages = null;
+        await loadGame(slot.id, { store });
+        const now = { xp: game.player.xp, level: game.player.level }, paid = !!game.state.atlas?.paid?.[site.id];
+        res = JSON.stringify(now) === JSON.stringify(was) && paid ? "" : `XP and level ${JSON.stringify(now)}, saved ${JSON.stringify(was)}; the site marked paid ${paid}`;
+        if (!res) out.push(`a save made before WS1 in ${site.kind} ${site.id}'s span (${discoveryXp(game, site)} XP on a first visit) loads with its XP as saved, the site marked paid`);
+      }
+      if (res) fail(`a load paid discovery XP: ${res}`);
+    }
     useStore(null);
     stats.phase1RoundTrip = out.join("; ");
   }

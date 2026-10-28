@@ -12,15 +12,18 @@
 //   knownSites(game, wx, wy) → [Site]       the span's sites you know of (a landmark's once its span is known)
 //   findSite(game, site, how)               you know of this one site now (a hidden site seen from the road, a
 //                                           rumour); emits "discover" { kind, id, at } the first time
-//   visit(game, wx, wy)                     you are in the span's zone (or under it): it is visited and known, its
-//                                           sites found, and the discovery XP of each site there paid once
+//   visit(game, wx, wy, { pay })            you are in the span's zone (or under it): it is visited and known, its
+//                                           sites found, and the discovery XP of each site there paid once (pay
+//                                           false: marked paid, nothing given; a load)
 //   sight(game, wx, wy)                     landmarks whose visibleFrom reaches (wx, wy) become known
 //   discoveryXp(game, site) → n             what a site's first visit pays (0 for a village: its own pays, WS7b)
 //
 // Discovery XP: the first visit to a landmark gives 0.3 of one level's XP at its surface level, any other site
 // but a village RULES.overworld.xp.site (bible §4.9, §15.6). It goes through leveling.gainXp with source
 // "discovery" (Pilgrim's ×2.2 where WS4's gainXp reads the source). The world's start span pays nothing: you
-// begin there. A visit is entering the span's zone, in either view, or a dungeon level under it.
+// begin there. A visit is entering the span's zone, in either view, or a dungeon level under it. A load is never a
+// first visit (WS9's rule; WS7b's village XP keeps it too): a save made before WS1 has no atlas, so the span it loads
+// into has its sites marked paid, without paying them.
 import { on, emit } from "../events.js";
 import { RULES } from "../rules.js";
 import { xpToNext, gainXp } from "../leveling.js";
@@ -89,7 +92,7 @@ export function discoveryXp(game, site) {
   return Math.round(share * xpToNext(levelOfTier(site.tier || 1)));
 }
 
-export function visit(game, wx, wy) {
+export function visit(game, wx, wy, { pay = true } = {}) {
   const world = game.run?.world, A = atlas(game);
   if (!world?.inBounds(wx, wy)) return;
   const k = spanKey(wx, wy), first = A.visited[k] === undefined;
@@ -99,7 +102,7 @@ export function visit(game, wx, wy) {
   for (const s of sitesAt(game, wx, wy)) {
     if (A.paid[s.id]) continue;
     A.paid[s.id] = 1;
-    const xp = start ? 0 : discoveryXp(game, s);
+    const xp = start || !pay ? 0 : discoveryXp(game, s);
     if (!xp) continue;
     game.log?.(`You've found ${s.name}. (+${xp} XP)`, [150, 220, 255]);
     gainXp(game, xp, { source: "discovery" });
@@ -120,5 +123,5 @@ export function sight(game, wx, wy) {
 // Entering a zone is a visit to its span, from either view and from below (a dungeon level under it).
 on("zone:enter", (game, ev) => {
   const z = ev.zone;
-  if (game.run && Number.isInteger(z?.wx) && Number.isInteger(z?.wy)) visit(game, z.wx, z.wy);
+  if (game.run && Number.isInteger(z?.wx) && Number.isInteger(z?.wy)) visit(game, z.wx, z.wy, { pay: ev.how !== "load" });
 });
