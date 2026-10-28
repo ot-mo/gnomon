@@ -1,11 +1,12 @@
 // The bot in both views (tools/bot.mjs): down three legacy levels and back up, landing beside the
 // right stairs each time; then a smoke run with monsters alive on levels 3, 5, 10, 15 and 20; every
-// legacy encounter played to the end (0C); and the edge walk: off the temple span's east edge in 3D, back
-// west on the map.
+// legacy encounter played to the end (0C); the edge walk: off the temple span's east edge in 3D, back
+// west on the map; and the 2B playthrough (Phase 2, bot.mjs runPlaythrough): one run from the title through the systems,
+// each step asserted.
 //   node tools/check-bot.mjs [--seeds 1234,7]
 import { parseArgs } from "./node-env.mjs";
 import { report } from "./report.mjs";
-import { runStairs, runSmoke, runEdges, runEncounters } from "./bot.mjs";
+import { runStairs, runSmoke, runEdges, runEncounters, runPlaythrough } from "./bot.mjs";
 
 const args = parseArgs();
 const seeds = String(args.seeds || "1234,7").split(",").map(Number);
@@ -28,4 +29,7 @@ for (const seed of seeds) {
   stats[`edges seed ${seed}`] = `${edges.steps.join(" · ")}; crossing frame ${edges.stats.crossFrameMs} ms, black ${edges.stats.black}`;
   problems.push(...edges.problems.map((p) => `seed ${seed} edges: ${p}`));
 }
+const play = await runPlaythrough();
+stats.playthrough = play.steps.join(" · ");
+problems.push(...play.problems.map((p) => `playthrough: ${p}`));
 process.exit(report({ name: "bot", ok: problems.length === 0, problems, stats }));

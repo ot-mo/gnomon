@@ -114,6 +114,7 @@ function walkMap(goal) {
   for (let presses = 0; presses < 2000 && game.zone === zone; ) {
     const path = route(goal);
     if (!path) return `no route to (${goal.x}, ${goal.y})`;
+    if (!path.length) return `on (${goal.x}, ${goal.y}) and still in ${zone.key}`;   // (else it looped for ever: nothing to press)
     for (const [x, y] of path) {
       const [px, py] = tileOf(game.player);
       const code = ARROWS[`${x - px},${y - py}`];
@@ -844,8 +845,386 @@ export async function runSession({ seed = 1234, zones: want = 10 } = {}) {
   return { ok: problems.length === 0, steps, problems, stats: { visited, ...counts } };
 }
 
+// The 2B playthrough (TECH_DESIGN §8.5, Phase 2's hardening): one run from the title on the test world, through the real
+// input handlers wherever a player presses keys, each step asserted. Create (the title's New game with a typed seed, the
+// wizard by its keys) → 3 zones in both views (an edge crossed on the map and one in 3D, each zone seen in both) → 10
+// steps on the world map (O, the arrow keys; dropped by an encounter or lost, back onto it) → a village: a trade (a buy
+// on the trade screen) and the Kindling (the rite its people take, where it is done) → its quest (a prayer at the mosaic
+// shrine by the map's look cursor, turned in, a reward taken) → back to the temple and a dungeon 3 levels down (the
+// legacy stack's stairs, the last in 3D) → save (the options' "Save and quit") → reload (the title's Continue) → continue
+// (the same state, then the stairs back up). The seed (18) gives a lived-in village 7 spans from the start whose quest
+// is a prayer at a mosaic shrine. Monsters are cleared on arrival and the bot can't die: this exercises the systems in
+// one run, not fights. → { ok, steps, problems, stats }
+export async function runPlaythrough({ seed = 18 } = {}) {
+  const { openTitle } = await import("../src/screens/title.js");
+  const { wizard } = await import("../src/screens/create.js");
+  const { neighbourAddr } = await import("../src/zones.js");
+  const { travelPath } = await import("../src/overworld/travel.js");
+  const { WORLD_MOVES } = await import("../src/screens/worldmap.js");
+  const { tradeRows } = await import("../src/social/merchants.js");
+  const { kin } = await import("../src/social/ritual.js");
+  const { villageQuestId } = await import("../src/story/villagequests.js");
+  const { cursorTarget } = await import("../src/screens/target.js");
+  const { whenWritten } = await import("../src/save/save.js");
+  const { digestGame } = await import("../tests/checks/save.js");
+  const { optionItems } = await import("../src/screens/options.js");
+  const { creatureAt } = await import("../src/creatures.js");
+  const problems = [], steps = [], counts = { keys: 0, frames: 0, worldSteps: 0, drops: 0 };
+  const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
+  const press = (code, key = code) => { inputHandlers.onKeyDown(code, false, key); counts.keys++; };
+  const frames = (n = 1) => { for (let k = 0; k < n; k++) { game.debug.step(1 / 60); counts.frames++; } };
+  const expect = (ok, what) => { if (!ok) problems.push(what); return ok; };
+  const tough = () => { const p = game.player; if (!p) return; p.maxHpGain = Math.max(p.maxHpGain || 0, 999); if (p.hp < 900) p.hp = 999; };
+  const clear = () => { game.zone.creatures = game.zone.creatures.filter((c) => canTalk(c)); tough(); };   // no fights
+  // What stands between a key and play: a level gained (its first offer), the target screen, the "DEPTH n" beat, story
+  // pages (Space), the examine screen (Esc), the pause card (the lock taken back).
+  const settled = () => {
+    for (let k = 0; k < 600; k++) {
+      if (game.mode === "levelup") press("Digit1");
+      else if (game.mode === "target") { aimed(); counts.keys++; }
+      else if (game.mode === "transition" || game.mode === "rotate") frames();
+      else if (game.mode === "story") press("Space");
+      else if (game.mode === "examine") press("Escape");
+      else if (game.mode === "pause") game.debug.lockChange(true);
+      else break;
+    }
+    tough();
+  };
+  const toView = (view) => {
+    settled();
+    if ((view === "map") !== (game.view === "map")) press("Tab");
+    settled();
+    game.paused = false;
+    return (view === "map") === (game.view === "map");
+  };
+  // The map: to a tile by the arrow keys along route() (not through people or over stairs), re-planned after each press.
+  const walkTo = (goal) => {
+    const zone = game.zone;
+    for (let n = 0; n < 600 && game.zone === zone; n++) {
+      const [px, py] = tileOf(game.player);
+      if (px === goal.x && py === goal.y) return true;
+      const path = route(goal);
+      if (!path?.length) return false;
+      const [x, y] = path[0], code = ARROWS[`${x - px},${y - py}`];
+      if (!code) return false;
+      press(code); settled();
+    }
+    return false;
+  };
+  // Talk: beside them on the map and a bump (the map's talk); the options by their digits once the words are shown.
+  const talkTo = (c) => {
+    toView("map");
+    const zone = game.zone, side = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dy]) => {
+      const x = c.tx + dx, y = c.ty + dy;
+      return zone.stand[x + y * zone.w] >= 0 && !creatureAt(zone, x, y) && route({ x, y });
+    });
+    if (!side || !walkTo({ x: c.tx + side[0], y: c.ty + side[1] })) return false;
+    press(ARROWS[`${-side[0]},${-side[1]}`]);
+    return game.mode === "talk";
+  };
+  // A zone the save holds is read back (zones.js readZone, a promise): the "DEPTH n" beat covers it in play; here the
+  // read is awaited before anything else is asked of the new zone.
+  const loaded = async () => { for (let k = 0; k < 400 && game.zoneLoading; k++) await tick(5); settled(); };
+  // Stairs (or an entrance) on the map: walked onto; standing on them already (a load puts you beside, a fall on), off
+  // and back on. → null, or why not.
+  const takeStairs = async (goal) => {
+    const zone = game.zone;
+    const [px, py] = tileOf(game.player);
+    if (px === goal.x && py === goal.y) {
+      const off = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dy]) => zone.stand[px + dx + (py + dy) * zone.w] >= 0);
+      if (off) { press(ARROWS[`${off[0]},${off[1]}`]); settled(); }
+    }
+    if (game.zone === zone && !game.zoneLoading) walkTo(goal);
+    await loaded();
+    return game.zone === zone ? `never went down (or up) at (${goal.x}, ${goal.y}) in ${zone.key}` : null;
+  };
+  // In 3D: beside them, facing them, W held frame by frame, a level gained on the way taken (its card stops the walk).
+  const stairs3d = async (goal) => {
+    const zone = game.zone, p = game.player, sz = zone.stand[goal.x + goal.y * zone.w];
+    const from = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([ox, oy]) => [goal.x + ox, goal.y + oy])
+      .find(([x, y]) => zone.stand[x + y * zone.w] === sz && zone.get(x, y, FLOOR_Z - 1) !== B.STAIRS && zone.get(x, y, FLOOR_Z - 1) !== B.STAIRS_UP);
+    if (!from) return "no free tile beside the stairs";
+    Object.assign(p, { x: from[0] + 0.5, y: from[1] + 0.5, z: sz, vz: 0, onGround: true, pitch: 0, yaw: Math.atan2(goal.y - from[1], goal.x - from[0]) });
+    for (let k = 0; k < 240 && game.zone === zone && !game.zoneLoading; k++) {
+      if (game.mode !== "explore") { keys.delete("KeyW"); settled(); toView("3d"); p.yaw = Math.atan2(goal.y + 0.5 - p.y, goal.x + 0.5 - p.x); }
+      keys.add("KeyW"); frames();
+    }
+    keys.delete("KeyW");
+    await loaded();
+    return game.zone === zone ? "walked but never took the stairs" : null;
+  };
+  const words = () => { for (let k = 0; k < 4 && game.talk && game.talk.shown < game.talk.length; k++) press("KeyE"); };
+  const optionLabels = () => (game.talk?.node?.options || []).map((o) => o.label);
+  const say = (re) => {
+    words();
+    const k = optionLabels().findIndex((l) => re.test(l));
+    if (k < 0 || k > 8) return false;
+    press(`Digit${k + 1}`, String(k + 1));
+    return true;
+  };
+  const leaveTalk = () => { for (let k = 0; k < 4 && (game.mode === "talk" || game.mode === "trade" || game.mode === "ritual"); k++) press("Escape"); settled(); };
+  const seen = [], viewsIn = {};
+  const mark = () => {
+    const k = game.zone.key;
+    if (!seen.includes(k)) seen.push(k);
+    (viewsIn[k] ||= new Set()).add(game.view === "map" ? "map" : "3d");
+  };
+  let step = "start";
+  try {
+    // --- Create ------------------------------------------------------------------------------------------------------
+    step = "create";
+    await openTitle(game);
+    expect(game.mode === "title", `the title: in ${game.mode}`);
+    press("ArrowDown"); press("ArrowDown"); press("Enter");   // the seed line: typed
+    for (const ch of String(seed)) press(`Digit${ch}`, ch);
+    press("Enter"); press("Home"); press("Enter");   // New game: the wizard, with the seed and mode
+    expect(game.mode === "create", `New game on the title: ${game.mode}, not the wizard`);
+    for (let k = 0; k < 20 && game.mode === "create"; k++) {
+      const w = wizard().step;
+      if (w === "track") press("End"); else if (w === "name") press("Tab");
+      press("Enter");
+    }
+    const p0 = game.player;
+    expect(game.mode === "story" && game.seed === seed && p0?.genotype && p0?.name && game.state?.mode,
+      `the wizard began ${game.mode}, seed ${game.seed}, ${p0?.genotype} "${p0?.name}"`);
+    settled();
+    expect(game.mode === "map" && game.zone?.key === "0,0,0", `after the intro: ${game.mode} in ${game.zone?.key}`);
+    steps.push(`created ${p0.name}, a ${p0.genotype} ${p0.background} (${game.state.mode}), seed ${game.seed}`);
+    clear();
+    // The Rotation Cube on the temple's altar: until it is touched the world is only seen from above. It lies behind the
+    // parent's temple puzzle (the spike floor, the levers, the stepping stones: golden (a)'s and the legacy story's, not
+    // this run's), so the bot touches it as taking it does (game.onCube) and the world turns: its pages, the pause card.
+    step = "the cube";
+    const cube = game.zone.items.find((it) => it.kind === "cube");
+    expect(cube && !game.story.cube, `the temple's cube: ${cube ? "there" : "missing"}, the story's cube ${game.story.cube}`);
+    game.onCube();
+    settled();
+    expect(game.story.cube && game.view === "3d" && game.mode === "explore", `walked onto the cube: story.cube ${game.story.cube}, ${game.mode} in ${game.view}`);
+    steps.push("the cube touched: the world turned");
+
+    // --- Three zones in both views ------------------------------------------------------------------------------------
+    step = "three zones";
+    mark(); toView("3d"); frames(10); mark(); toView("map"); mark();
+    // Off the east edge on the map: a reachable tile of the east column, then one step east.
+    let z = game.zone, w = z.w;
+    expect(!!neighbourAddr(game, z, "e"), `${z.key} has no open east edge`);
+    const edge = [...Array(z.d).keys()].map((y) => ({ x: w - 1, y })).find((t) => z.stand[t.x + t.y * w] >= 0 && route(t));
+    if (expect(edge && walkTo(edge), `no way to the east edge of ${z.key}`)) { press("ArrowRight"); settled(); }
+    expect(game.zone !== z, `the map's step off the east edge left ${game.zone.key} as it was`);
+    clear(); mark(); toView("3d"); frames(10); mark();
+    // Off the next east edge in 3D: near it on open ground, facing east, W held until the zone changes.
+    z = game.zone; w = z.w;
+    const row = [...Array(z.d).keys()].find((y) => z.stand[w - 2 + y * w] >= 0 && z.stand[w - 1 + y * w] === z.stand[w - 2 + y * w]);
+    if (expect(row !== undefined && neighbourAddr(game, z, "e"), `${z.key}: no open ground at its east edge`)) {
+      Object.assign(game.player, { x: w - 1.5, y: row + 0.5, z: z.stand[w - 2 + row * w], vz: 0, yaw: 0, pitch: 0, onGround: true });
+      keys.add("KeyW");
+      for (let k = 0; k < 180 && game.zone === z; k++) frames();
+      keys.delete("KeyW");
+    }
+    expect(game.zone !== z, `3D: W held toward ${z.key}'s east edge never crossed it`);
+    clear(); mark(); toView("map"); mark();
+    const both = seen.filter((k) => viewsIn[k].size === 2);
+    expect(seen.length >= 3 && both.length >= 3, `zones in both views: ${seen.map((k) => `${k} ${[...viewsIn[k]]}`).join("; ")}`);
+    steps.push(`3 zones in both views (${both.join(" → ")})`);
+
+    // --- Ten steps on the world map ------------------------------------------------------------------------------------
+    step = "world map";
+    const village = [...game.run.villages.values()].filter((v) => !v.abandoned && v.quest?.template === "pray" && v.culture.shrine === "mosaic")
+      .map((v) => ({ v, site: game.run.sites.get(v.siteId) })).sort((a, b) => Math.max(Math.abs(a.site.at.wx), Math.abs(a.site.at.wy)) - Math.max(Math.abs(b.site.at.wx), Math.abs(b.site.at.wy)))[0];
+    if (!expect(village, `seed ${seed}: no village with a prayer at a mosaic shrine`)) throw new Error("no village");
+    const moveKey = (dx, dy) => Object.keys(WORLD_MOVES).find((c) => WORLD_MOVES[c][0] === dx && WORLD_MOVES[c][1] === dy);
+    const onWorld = () => {
+      if (game.mode === "world") return true;
+      settled(); clear(); toView("map");
+      press("KeyO"); settled();
+      return game.mode === "world";
+    };
+    // One step by its key: a prompt answered (a far tier: go on; a hidden site: not now); a drop walked back up.
+    const worldStep = (dx, dy) => {
+      if (!onWorld()) return false;
+      const from = `${game.trip.wx},${game.trip.wy}`;
+      press(moveKey(dx, dy));
+      if (game.trip?.prompt) press(game.trip.prompt.kind === "tier" ? "KeyY" : "KeyN");
+      if (game.mode !== "world") { counts.drops++; settled(); }
+      const at = game.trip ? `${game.trip.wx},${game.trip.wy}` : `${game.zone.wx},${game.zone.wy}`;
+      if (at !== from) counts.worldSteps++;
+      return at !== from;
+    };
+    // Toward a span: along travelPath where the way is known (it plans over known spans only), else the step that
+    // closes the distance most, the next best when the world refuses it (a mountain, the sea).
+    const travelTo = (to) => {
+      for (let n = 0; n < 60; n++) {
+        if (!onWorld()) return false;
+        const here = { wx: game.trip.wx, wy: game.trip.wy };
+        if (here.wx === to.wx && here.wy === to.wy) return true;
+        const path = travelPath(game, here, to);
+        const tries = path?.length ? [[Math.sign(path[0].wx - here.wx), Math.sign(path[0].wy - here.wy)]]
+          : Object.values(WORLD_MOVES).filter((d, k, a) => a.findIndex((e) => e[0] === d[0] && e[1] === d[1]) === k)
+            .sort((a, b) => Math.max(Math.abs(to.wx - here.wx - a[0]), Math.abs(to.wy - here.wy - a[1])) - Math.max(Math.abs(to.wx - here.wx - b[0]), Math.abs(to.wy - here.wy - b[1])));
+        let moved = false;
+        for (const [dx, dy] of tries.slice(0, 4)) if ((moved = worldStep(dx, dy))) break;
+        if (!moved) return false;
+      }
+      return false;
+    };
+    if (!expect(onWorld(), `O on the map: ${game.mode}, not the world map`)) throw new Error("no world map");
+    const start = { wx: game.trip.wx, wy: game.trip.wy }, target = village.site.at;
+    const length = (travelPath(game, start, target) || []).length;
+    // Out and back first where the way is shorter than ten steps (to the first span a step can reach).
+    const out = Object.values(WORLD_MOVES).find(([dx, dy]) => !travelPath(game, start, { wx: start.wx + dx, wy: start.wy + dy }) ? false : true);
+    for (let k = 0; counts.worldSteps + length < 10 && k < 6; k++) { worldStep(out[0], out[1]); travelTo(start); }
+    expect(travelTo(target), `the world map never reached ${village.v.name} (${target.wx}, ${target.wy})`);
+    expect(counts.worldSteps >= 10, `${counts.worldSteps} steps on the world map, not 10`);
+    // Down at the village's entrance: Enter, then its line on the menu.
+    press("Enter");
+    const items = game.trip?.menu?.items || [];
+    const k = items.findIndex((it) => it.siteId === village.site.id);
+    if (k >= 0) press(`Digit${k + 1}`, String(k + 1));
+    settled(); clear();
+    expect(game.mode === "map" && game.zone.village?.siteId === village.site.id, `down at ${village.v.name}: ${game.mode} in ${game.zone.key}`);
+    steps.push(`${counts.worldSteps} world-map steps (${counts.drops} drops walked back up) to ${village.v.name}`);
+
+    // --- A trade and the Kindling ----------------------------------------------------------------------------------------
+    step = "trade";
+    const cast = (role) => game.zone.creatures.find((c) => c.village === village.site.id && c.villageRole === role);
+    const merchant = cast("merchant"), p = game.player;
+    expect(merchant && talkTo(merchant), `no talk with ${village.v.name}'s merchant (${game.mode})`);
+    expect(say(/Show me what you have/), `the merchant offers no trade: ${optionLabels().join(" | ")}`);
+    expect(game.mode === "trade", `the merchant's trade: ${game.mode}`);
+    const carried = () => p.inv.reduce((n, it) => n + (it.count || 1), 0);   // (a buy may join a stack)
+    const f0 = p.funds, inv0 = carried();
+    const buy = tradeRows(game, game.trade.npc, "theirs").findIndex((r) => r.price > 0 && r.price <= p.funds);
+    if (expect(buy >= 0, `nothing in ${merchant.name}'s stock is within ${p.funds} glim`)) {
+      for (let k = 0; k < buy; k++) press("ArrowDown");
+      press("Enter");
+    }
+    expect(p.funds < f0 && carried() > inv0, `a buy on the trade screen: ${f0} → ${p.funds} glim, ${inv0} → ${carried()} things carried`);
+    leaveTalk();
+    steps.push(`bought from ${merchant.name} (${f0} → ${p.funds} glim)`);
+    step = "the Kindling";
+    const leader = cast("leader");
+    let rite = null;
+    for (const where of ["map", "lit", "dark"]) {   // the Tracing on the map; the Lighting, torch lit, or the Snuffing, out, in 3D
+      if (where === "map") { if (!talkTo(leader)) continue; }
+      else {
+        leaveTalk(); toView("map");
+        const side = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dy]) => game.zone.stand[leader.tx + dx + (leader.ty + dy) * game.zone.w] >= 0 && route({ x: leader.tx + dx, y: leader.ty + dy }));
+        if (!side || !walkTo({ x: leader.tx + side[0], y: leader.ty + side[1] })) continue;
+        toView("3d");
+        p.yaw = Math.atan2(leader.y - p.y, leader.x - p.x); p.pitch = -0.1;
+        if ((where === "lit") !== !!p.torch) press("KeyF");
+        press("KeyE"); settled();
+        if (game.mode !== "talk") continue;
+      }
+      if (!say(/kindle with me/)) continue;
+      words();
+      const rites = optionLabels().filter((l) => !/^Back|^Goodbye|^Bye|Farewell/.test(l));
+      if (!rites.length) continue;
+      rite = rites[0];
+      say(new RegExp(`^${rite.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`));
+      if (say(/Sit with me/)) { expect(game.mode === "ritual", `"Sit with me a while.": ${game.mode}`); press("Escape"); }
+      break;
+    }
+    leaveTalk();
+    expect(rite && kin(game, leader), `the Kindling with ${leader?.name}: rite ${rite}, flame-kin ${!!(leader && kin(game, leader))}`);
+    if (!p.torch) press("KeyF");
+    steps.push(`kindled with ${leader?.name} (${rite})`);
+
+    // --- Its quest: a prayer at the mosaic shrine ------------------------------------------------------------------------
+    step = "quest";
+    const giver = game.zone.creatures.find((c) => c.uid === village.v.quest.params.giver);
+    expect(giver && talkTo(giver) && say(/anything I can do/) && say(/I'll do it/), `the quest from ${giver?.name}: ${optionLabels().join(" | ")}`);
+    leaveTalk();
+    const q = game.quests.find((x) => x.id === villageQuestId(village.site.id));
+    expect(q && q.stage === "pray", `the quest: ${q?.stage}`);
+    toView("map");
+    const shrine = game.zone.village.shrine;
+    press("KeyL");
+    for (let k = 0; k < 120 && game.mode === "target"; k++) {   // the look cursor onto the shrine by the arrow keys
+      const at = cursorTarget(game)?.tile;
+      if (!at || (at.x === shrine.x && at.y === shrine.y)) break;
+      press(at.x < shrine.x ? "ArrowRight" : at.x > shrine.x ? "ArrowLeft" : at.y < shrine.y ? "ArrowDown" : "ArrowUp");
+    }
+    press("Enter"); settled();
+    expect(q?.stage === "return", `the prayer at the mosaic (${shrine.x}, ${shrine.y}) by the look cursor: stage ${q?.stage}`);
+    const x0 = p.xp + (p.level - 1) * 1e6, g0 = p.funds;
+    expect(talkTo(giver) && say(/It's done/), `turning the quest in: ${optionLabels().join(" | ")}`);
+    words();
+    if (optionLabels().some((l) => /^Take /.test(l))) say(/^Take /);
+    leaveTalk();
+    expect(q?.done && p.funds > g0 && p.xp + (p.level - 1) * 1e6 > x0, `the quest's reward: done ${q?.done}, ${g0} → ${p.funds} glim`);
+    steps.push(`"${q?.title}" done (${g0} → ${p.funds} glim)`);
+
+    // --- A dungeon three levels down ------------------------------------------------------------------------------------
+    // The nearest site with three levels or more besides the temple's stack (behind its puzzle): on the world map to its
+    // span, down at its entrance (its line on the menu), into it, then its stairs twice, the last in 3D.
+    step = "dungeon";
+    const lair = [...game.run.sites.values()].filter((s) => s.dungeon && !s.dungeon.legacy && (s.dungeon.levels || 0) >= 3)
+      .sort((a, b) => Math.max(Math.abs(a.at.wx - target.wx), Math.abs(a.at.wy - target.wy)) - Math.max(Math.abs(b.at.wx - target.wx), Math.abs(b.at.wy - target.wy)))[0];
+    if (!expect(lair, `seed ${seed}: no site with three levels`)) throw new Error("no dungeon");
+    expect(travelTo(lair.at), `the world map never reached ${lair.name} (${lair.at.wx}, ${lair.at.wy})`);
+    press("Enter");
+    const k2 = (game.trip?.menu?.items || []).findIndex((it) => it.siteId === lair.id);
+    if (k2 >= 0) press(`Digit${k2 + 1}`, String(k2 + 1));
+    settled(); clear();
+    expect(game.zone.key === `${lair.at.wx},${lair.at.wy},0` && game.zone.entrance, `down at ${lair.name}: in ${game.zone.key}, entrance ${!!game.zone.entrance}`);
+    const down = [];
+    for (let level = 1; level <= 3; level++) {
+      const zz = game.zone, goal = level === 1 ? zz.entrance : zz.stairs;
+      if (!expect(goal, `${zz.key} has no way down`)) break;
+      const err = level === 3 ? (toView("3d"), await stairs3d(goal)) : (toView("map"), await takeStairs(goal));
+      settled(); clear();
+      down.push(game.zone.key);
+      expect(!err && game.zone.key === `${zz.wx},${zz.wy},${zz.z + 1}`, `level ${level}: ${err || ""} in ${game.zone.key}`);
+    }
+    steps.push(`${counts.worldSteps} world steps in all; down ${lair.name} ${down.join(" → ")} (the last in 3D)`);
+
+    // --- Save, reload, continue ------------------------------------------------------------------------------------------
+    step = "save";
+    toView("3d");
+    const at = { key: game.zone.key, x: game.player.x, y: game.player.y };
+    game.debug.lockChange(false);   // the lock let go: the pause card
+    press("Escape");   // the options
+    expect(game.mode === "options", `Esc on the pause card: ${game.mode}`);
+    const before = await digestGame(game, [game.zone.key]);
+    const quit = optionItems(game).findIndex((it) => it.id === "quit");   // "Save and quit (to the title)", by the arrows
+    if (expect(quit >= 0, `the options offer no save and quit: ${optionItems(game).map((it) => it.label).join(" | ")}`)) {
+      press("Home"); for (let j = 0; j < quit; j++) press("ArrowDown");
+      press("Enter");
+    }
+    for (let k = 0; k < 200 && game.mode !== "title"; k++) await tick(5);
+    expect(game.mode === "title", `"Save and quit": ${game.mode}, not the title`);
+    step = "reload";
+    press("ArrowDown"); press("Enter");   // Continue
+    for (let k = 0; k < 200 && (game.mode === "title" || !game.zone); k++) await tick(5);
+    settled();
+    const after = await digestGame(game, [at.key]);
+    expect(game.zone?.key === at.key && game.player.x === at.x && game.player.y === at.y, `Continue: in ${game.zone?.key} at ${game.player?.x},${game.player?.y}, saved in ${at.key} at ${at.x},${at.y}`);
+    expect(before.state === after.state && before.player === after.player, `Continue: the state ${before.state === after.state ? "the same" : "differs"}, the player ${before.player === after.player ? "the same" : "differs"}`);
+    step = "continue";
+    clear(); toView("map");
+    const up = game.zone.upStairs, from = game.zone.key;
+    const err = up ? await takeStairs(up) : "no stairs up";
+    settled();
+    expect(!err && game.zone.key === `${game.zone.wx},${game.zone.wy},2`, `continue: the stairs back up from ${from}: ${err || ""} in ${game.zone.key}`);
+    steps.push(`saved and quit in ${at.key}, Continued there (the same state), then up to ${game.zone.key}`);
+    await whenWritten(game);
+  } catch (e) {
+    problems.push(`${step}: ${String(e.stack || e).split(/\r?\n/).slice(0, 4).join(" | ")}`);
+  }
+  keys.clear();
+  steps.unshift(`seed ${seed}: ${counts.keys} keys, ${counts.frames} frames, ${counts.worldSteps} world steps; ${game.time?.toFixed(0)} s of game time`);
+  return { ok: problems.length === 0, steps, problems, stats: counts };
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = parseArgs();
+  if (args.playthrough) {   // (only the 2B playthrough)
+    const r = await runPlaythrough({ seed: Number(args.seed) || 18 });
+    console.log(`${r.ok ? "OK  " : "FAIL"} playthrough: ${r.steps.join(" · ")}`);
+    for (const p of r.problems) console.log(`  ✗ ${p}`);
+    process.exit(r.ok ? 0 : 1);
+  }
   const views = !args.view || args.view === "both" ? ["map", "3d"] : [args.view];
   let ok = true;
   for (const view of views) {
