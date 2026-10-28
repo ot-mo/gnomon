@@ -22,7 +22,8 @@
 // 5. Gossip: a talker that gossips offers "Heard anything lately?" and its rumour lands in the journal; a legacy talker
 //    (Maren) offers nothing new.
 // 6. The journal screen: J opens it, its five tabs by keys and clicks, the Histories tab shows what you read, J, Esc and
-//    a click outside the tabs close it; its state survives JSON (a save).
+//    a click outside the tabs close it; its state survives JSON (a save). On the Locations tab O, Enter and a click on a
+//    place's title show the marked place on the world map, to look only, and Esc comes back to the journal.
 import * as names from "./names.js";
 
 const NAME = "story (history, grammar, secrets, murals, gossip, journal; villages, quests, campaign)";
@@ -388,6 +389,29 @@ export async function run(env) {
     t = screenText().join("\n");
     const want = game.run.history.rulers[0].events[1].text.gospel.slice(0, 30);
     if (!/Ishvalet the Glazier/.test(t) || !t.replace(/\s+/g, " ").includes(want) || !/of \d+ events known/.test(t)) fail(`the Histories tab: ${t.slice(0, 300)}`);
+    // The Locations tab (integrator, WS1 #2): the first place in view is marked; O and Enter show it on the world map
+    // (the cursor on its span, to look only), a click on its title too; Esc comes back to the journal each time.
+    {
+      const loc = [...SEC.secretsOf(game.run).values()].find((d) => d.kind === "location" && d.at && (d.at.wx !== game.zone.wx || d.at.wy !== game.zone.wy));   // (not where you are: the map opens there anyway)
+      if (!loc) fail("the Locations tab: the run has no location secret away from here to learn");
+      else {
+        SEC.learnSecret(game, loc.id, "talk", { quiet: true });
+        const title = SEC.secretTitle(game.run, loc), got = [];
+        press("Digit2");
+        const marked = screenText().some((r) => r.includes(`>${title}`));
+        for (const how of ["KeyO", "Enter", "click"]) {
+          if (how === "click") clickAt(title); else press(how);
+          const t = game.trip;
+          got.push(`${how}: ${game.mode} ${t?.viewOnly ? "look" : "-"} ${t?.cursor ? `${t.cursor.wx},${t.cursor.wy}` : "-"}`);
+          press("Escape");
+          got[got.length - 1] += ` → ${game.mode}${game.trip ? " (trip left)" : ""}`;
+        }
+        const want = ["KeyO", "Enter", "click"].map((h) => `${h}: world look ${loc.at.wx},${loc.at.wy} → journal`);
+        if (!marked || json(got) !== json(want)) fail(`the Locations tab: marked ${marked}; ${got.join("; ")} (want ${want.join("; ")})`);
+        else stats.journalLocations = `${title} at (${loc.at.wx}, ${loc.at.wy}): marked; O, Enter and a click show it on the world map, Esc back`;
+      }
+      press("Digit3");
+    }
     press("ArrowRight");
     if (game.journalView.tab !== 3) fail(`→ from Histories gave tab ${game.journalView.tab}`);
     clickAt("Notes");

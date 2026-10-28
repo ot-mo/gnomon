@@ -1,15 +1,18 @@
 // The journal (J; TECH_DESIGN §4.2 `journal`, owner WS7): tabs Quests · Locations · Histories (n of m known, by date) ·
 // Gossip · Notes. J or Esc closes it; Tab, ← → or 1-5 change the tab; ↑ ↓ (W S), PgUp PgDn, Home End and the wheel
 // scroll; a click on a tab opens it, a click anywhere else (or any other button) closes the journal. Drawing never changes the game's state.
+// On the Locations tab the first place in view is marked (>): O or Enter shows it on the world map (WS1's
+// openWorldMap, to look only; Esc comes back here), and so does a click on a place's title (integrator, WS1 #2).
 //
 //   openJournal(game)                  J (or a click on "J: journal"): open it over the view you are in
 //   JOURNAL_TABS                       the tab names, in order
-//   journalLines(game, tab, width) → [[text, rgb]]   a tab's text (for the screen and the checks)
-// "Show on the world map" waits for WS1's world map (integration request).
+//   journalLines(game, tab, width) → [[text, rgb, { at }?]]   a tab's text (for the screen and the checks); a place's
+//                                      title line carries its span, { at: { wx, wy } }
 import * as S from "../screen.js";
 import { registerScreen, popMode } from "../screens.js";
+import { openWorldMap } from "./worldmap.js";
 import { openJournal } from "../dialogue.js";
-import { UI, box, wrap, tabs, tabsKey, at } from "../ui.js";
+import { UI, box, wrap, tabs, tabsKey, at, hit } from "../ui.js";
 import { mapPercent, questDone } from "../story/quests.js";
 import { talkersIn } from "../creatures.js";
 import { GRAMMAR } from "../content/grammar.js";
@@ -25,7 +28,7 @@ const VIEW_WORD = { flat: "map", deep: "3D", dark: "dark" };
 const view = (game) => (game.journalView ||= { tab: 0, top: 0 });
 
 export function journalLines(game, tab, width) {
-  const L = [], put = (t, c = C.text) => L.push([t, c]), para = (t, c, indent = "") => { for (const l of wrap(t, width - indent.length)) put(indent + l, c); };
+  const L = [], put = (t, c = C.text, x = null) => L.push(x ? [t, c, x] : [t, c]), para = (t, c, indent = "") => { for (const l of wrap(t, width - indent.length)) put(indent + l, c); };
   const J = journalOf(game), run = game.run;
   const learned = (kind) => Object.keys(J.secrets).map((id) => secretDef(run, id)).filter((d) => d?.kind === kind);
   if (tab === 0) {   // Quests: the parent's journal, as it was
@@ -46,7 +49,7 @@ export function journalLines(game, tab, width) {
     const locs = learned("location");
     if (!locs.length) put("No places learned yet. Talk to people, read the floors, listen to rumours.", C.dim);
     for (const d of locs) {
-      put(`${secretTitle(run, d)}${questDone(game, `visit:${d.id}`) ? "  (visited)" : ""}`, C.head);
+      put(`${secretTitle(run, d)}${questDone(game, `visit:${d.id}`) ? "  (visited)" : ""}`, C.head, d.at ? { at: { wx: d.at.wx, wy: d.at.wy } } : null);
       para(d.text, C.text, "  ");
     }
     const tales = learned("village");   // a village's own story (story/villages.js), under the places
@@ -105,16 +108,35 @@ function drawJournal(game) {
   const lines = journalLines(game, v.tab, inner), rows = h - 6;
   v.top = Math.max(0, Math.min(v.top, lines.length - rows));
   v.rows = rows; v.n = lines.length;
-  lines.slice(v.top, v.top + rows).forEach(([t, c], k) => c && S.text(x0 + 3, y0 + 3 + k, t.slice(0, inner), ...c));
+  lines.slice(v.top, v.top + rows).forEach(([t, c, x], k) => {
+    if (c) S.text(x0 + 3, y0 + 3 + k, t.slice(0, inner), ...c);
+    if (x?.at) hit({ x: x0 + 3, y: y0 + 3 + k, w: Math.min(inner, t.length), h: 1 }, { at: x.at });   // (a click: on the world map)
+  });
+  const k = shown(game, lines);
+  if (k >= 0) S.put(x0 + 2, y0 + 3 + k - v.top, ">", ...C.mark);
   if (v.top > 0) S.put(x0 + w - 2, y0 + 3, "^", ...UI.help);
   if (v.top + rows < lines.length) S.put(x0 + w - 2, y0 + 2 + rows, "v", ...UI.help);
-  S.text(x0 + 3, y0 + h - 2, "J or Esc to close · ← → or 1-5: tabs · ↑ ↓: scroll", 110, 110, 120);
+  S.text(x0 + 3, y0 + h - 2, `J or Esc to close · ← → or 1-5: tabs · ↑ ↓: scroll${k >= 0 ? " · O: on the world map" : ""}`, 110, 110, 120);
+}
+
+// The place the Locations tab marks: the first title in view (→ its line's index, or -1).
+function shown(game, lines = journalLines(game, view(game).tab, Math.min(S.cols - 4, 96) - 6)) {
+  const v = view(game);
+  if (v.tab !== 1) return -1;
+  const end = v.rows ? v.top + v.rows : lines.length;
+  for (let k = v.top; k < Math.min(end, lines.length); k++) if (lines[k][2]?.at) return k;
+  return -1;
 }
 
 const SCROLL = { ArrowUp: -1, KeyW: -1, ArrowDown: 1, KeyS: 1 };
 function journalKey(game, code) {
   const v = view(game);
   if (code === "KeyJ" || code === "Escape") { popMode(game); return true; }
+  if (v.tab === 1 && (code === "KeyO" || code === "Enter" || code === "NumpadEnter")) {
+    const lines = journalLines(game, v.tab, Math.min(S.cols - 4, 96) - 6), k = shown(game, lines);
+    if (k >= 0) openWorldMap(game, { center: lines[k][2].at });
+    return true;
+  }
   const t = tabsKey(code, v.tab, JOURNAL_TABS.length) ?? (/^Digit[1-5]$/.test(code) ? +code.slice(5) - 1 : null);
   if (t !== null) { v.tab = t; v.top = 0; return true; }
   const page = Math.max(1, (v.rows || 10) - 1);
@@ -138,6 +160,7 @@ registerScreen("journal", {
   mouse(game, button, cell) {
     const p = button === 0 ? at(cell) : null;   // any other button closes it, as before
     if (p && p.tab !== undefined) { view(game).tab = p.tab; view(game).top = 0; }
+    else if (p?.at) openWorldMap(game, { center: p.at });
     else popMode(game);
   },
   wheel(game, sign) { journalKey(game, sign < 0 ? "ArrowUp" : "ArrowDown"); },
