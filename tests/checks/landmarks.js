@@ -215,10 +215,11 @@ function checkHollowmere(seeds, expect) {
     expect(z.props.length === want, `${at}: ${z.props.length} props, the plan has ${want}`);
     props += z.props.length;
     expect(z.creatures.every((c) => c.type === "maren"), `${at}: wildlife or someone else in the start village (${z.creatures.map((c) => c.type)})`);
-    // (the road is laid over the plan's open ground, which the plan keeps: it reaches the porch, the plan's hub)
-    const [hx, hy] = P.hub;
+    // (the road is laid over the plan's open ground, which the plan keeps: it reaches the temple's porch, the H cells,
+    // whatever the plan calls its hub)
+    const [hx, hy] = tcell("H");
     let roadAtPorch = false;
-    for (let y = hy - 2; y <= hy + 2; y++) for (let x = hx - 1; x <= hx + 3; x++) if (z.get(x, y, FLOOR_Z - 1) === B.ROAD) roadAtPorch = true;
+    for (let y = hy - 2; y <= hy + 2; y++) for (let x = hx + 2; x <= hx + 4; x++) if (z.get(x, y, FLOOR_Z - 1) === B.ROAD) roadAtPorch = true;
     expect(roadAtPorch && z.gen.ports.some((p) => p.kind === "road" && p.side === "e"), `${at}: the Old Rule doesn't come in from the east to the porch`);
     // Seams with the four neighbours (check-edges' rules (a) and (c)): the ground on both sides of every edge tile is
     // the world function's, and no step across is over a block unless it's a cliff.
@@ -231,7 +232,7 @@ function checkHollowmere(seeds, expect) {
       for (let k = 0; k < len; k++) {
         const [ax2, ay2] = side === "n" ? [k, 0] : side === "s" ? [k, z.d - 1] : side === "w" ? [0, k] : [z.w - 1, k];
         const [bx, by] = side === "n" ? [k, nb.d - 1] : side === "s" ? [k, 0] : side === "w" ? [nb.w - 1, k] : [0, k];
-        const ga = groundOf(z, ax2, ay2), gb = groundOf(nb, bx, by);
+        const ga = groundOf(z, ax2, ay2, rows), gb = groundOf(nb, bx, by);
         const fa = FLOOR_Z + Wf.heightAt(5 * z.w + ax2, 16 * z.d + ay2), fb = FLOOR_Z + Wf.heightAt((5 + dx) * nb.w + bx, (16 + dy) * nb.d + by);
         seamTiles++;
         if (ga !== null && ga !== fa) expect(false, `${at}: its ${side} edge at ${k} stands ${ga}, the world function ${fa}`);
@@ -245,10 +246,11 @@ function checkHollowmere(seeds, expect) {
     `${seams} seams (${seamTiles} tiles) on the world function`;
 }
 const GROUND_SKIP = new Set([B.LEAVES, B.TRUNK]);
-// The ground a seam rule compares: the top of the terrain column (water at the datum counts), or null where a plan's
-// wall, a tree or a prop's post stands (check-edges leaves those out too).
-function groundOf(zone, x, y) {
-  if (zone.gen?.plan?.[x + y * zone.w] && zone.get(x, y, FLOOR_Z)) return null;
+// The ground a seam rule compares: the top of the terrain column (water at the datum counts), or null where a plan
+// builds (a cell of `rows` that isn't its open ground "."; without rows, any plan cell with a block on it, as
+// check-edges has it) or a tree stands.
+function groundOf(zone, x, y, rows = null) {
+  if (rows ? rows[y]?.[x] !== undefined && rows[y][x] !== "." : zone.gen?.plan?.[x + y * zone.w] && zone.get(x, y, FLOOR_Z)) return null;
   let z = 0;
   while (z < zone.h && zone.get(x, y, z) && !GROUND_SKIP.has(zone.get(x, y, z))) z++;
   return GROUND_SKIP.has(zone.get(x, y, z)) ? null : z;
