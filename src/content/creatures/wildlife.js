@@ -324,7 +324,7 @@ export const WILDLIFE = {
     ...reskin("shade", { k: [[25, 20, 40], 0.1], E: [[150, 120, 230], 1.5] }),
   },
   gloamWarden: {   // (bible: "the original Gloom Warden, as a legendary": the Lampless Saint's rule, guardians.js)
-    name: "Gloam Warden", glyph: "W", color: [118, 204, 240], xp: 90, factions: ["unlit"], temperament: "aggressive",
+    name: "Gloam Warden", glyph: "W", color: [118, 204, 240], xp: 90, levels: [17, 20], factions: ["unlit"], temperament: "aggressive",
     hp: 120, speed: 1.9, damage: [6, 10], cooldown: 1.6, reach: 1.6, sight: 18, w: 1.6, h: 2.8, hover: 0.4,
     ghostly: true, undead: true, darkSight: true, resist: ["frost", "fire", "shock"], ai: "legend:lamplessSaint", ...d20(22, 14, 26, 12, 24, 16),
     needs: "its place at the bottom of the Unlit Choir (C1b's landmark dungeon) and its wake line (story)",
@@ -446,13 +446,13 @@ export const WILDLIFE = {
   // Called by your wakes at your tier (bible §10.3, §15.6 "Cast"): the "smoothers" event's listener spawns the pack
   // (integration request; C2 #11). They belong to no faction (the Plane is no one's), so every one is out for you.
   smoother: {
-    name: "smoother", glyph: "o", color: [150, 150, 162], xp: 6, factions: [], flat: true, darkSight: true,
+    name: "smoother", glyph: "o", color: [150, 150, 162], xp: 6, levels: [1, 30], factions: [], flat: true, darkSight: true,
     hp: 12, speed: 3.0, damage: [2, 5], cooldown: 1.1, reach: 1.2, sight: 14, w: 0.8, h: 0.1, ...d20(14, 18, 14, 2, 22, 1),
     needs: "the \"smoothers\" listener that spawns the pack along the floor at your tier (WS4b #17, C2 #11)",
     frames: ART.flat, palette: { o: [[110, 110, 125], 0], O: [[170, 170, 185], 0.3] },
   },
   burnisher: {
-    name: "burnisher", glyph: "o", color: [240, 240, 246], xp: 9, factions: [], flat: true, darkSight: true,
+    name: "burnisher", glyph: "o", color: [240, 240, 246], xp: 9, levels: [1, 30], factions: [], flat: true, darkSight: true,
     hp: 16, speed: 3.2, damage: [3, 6], cooldown: 1.1, reach: 1.2, sight: 14, w: 0.8, h: 0.1, ...d20(16, 18, 16, 2, 24, 1),
     rule: { flattens: 3 }, needs: "the smoothers' listener (one tier above yours), and its hit pressing you Flat for 3 s (combat.js onHit; status.js flat)",
     frames: ART.flat, palette: { o: [[200, 200, 210], 0.2], O: [[255, 255, 255], 0.6] },

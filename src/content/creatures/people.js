@@ -8,13 +8,13 @@
 //                  regions.js): drawn into dungeons like any kind of the rows, so their conversation is registered here
 //                  under their own ids (talk.js dispatches on the type's id by default)
 //     tamsin, hallen, ottilie, corner    Hollowmere's people of bible §5 A (content/world/landmarks.js letters `who`),
-//                  for C1b's and C5's placing and C5's words (registered with no conversation of their own: C5's)
+//                  for C1b's and C5's placing and C5's words (each talks with its role's conversation until then)
 //     detailC      Benchmark's Truing Cradle keeper (bible §5 D), the surgeon of WS5 #11
 //   STOCKS[id]     the surgeon's and the tinker's packs (WS5 #11, with C4's implants, artifacts and cells): what
 //                  social/merchants.js registerStock(id, …) makes of them is integration request 10 in docs/c3.md; a
 //                  merchant naming a stock that isn't registered sells the general one meanwhile
 import { registerCreatures } from "../../creatures.js";
-import { registerDialogue, dialogueIds } from "../../talk.js";
+import { registerDialogue, dialogueIds, node, bye } from "../../talk.js";
 import { buildDialogue } from "../../social/builders.js";
 import { BESTIARY } from "./bestiary.js";
 import { CLOAK, APRON, SMOCK, look } from "./villagers.js";
@@ -102,6 +102,8 @@ for (const [id, t] of Object.entries(PEOPLE)) {
   if (b) { t.info = b.deep; t.lines = { flat: b.flat, deep: b.deep, dark: b.dark }; }
 }
 registerCreatures(PEOPLE);
-// The two the regions' rows draw into dungeons talk with their role's conversation (until C5 writes theirs).
-for (const id of ["flatfolkWanderer", "pressedPilgrim"])
-  if (!dialogueIds().includes(id)) registerDialogue(id, buildDialogue(PEOPLE[id].talk.dialogue));
+// Each talks with its role's conversation under its own id (talk.js dispatches on the type's id by default; the
+// regions' rows draw the first two into dungeons), until C5 registers its words; Corner is a cat.
+const CORNER = (game, c) => node("Corner considers you, then the space beside you, and settles for the space.", [bye()]);
+for (const [id, t] of Object.entries(PEOPLE))
+  if (!dialogueIds().includes(id)) registerDialogue(id, id === "corner" ? CORNER : buildDialogue(t.talk.dialogue));

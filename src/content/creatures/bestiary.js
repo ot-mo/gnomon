@@ -119,7 +119,7 @@ export const BESTIARY = {
   chandlerGuard: B("12.8", "Chandler guard", "J", [4, 5], "CHANDLER GUARD. Glimgun: range 8.",
     "A broad watchman smelling of lamp oil.", "a click\nthe floor lights up"),
   lampHound: B("12.8", "lamp-hound", "d", [3, 5], "LAMP-HOUND. Tracks light. Torch out: lost.",
-    "A gold hound following lamplight, not scent.", "it waits for the match"),
+    "A tawny hound following lamplight, not scent.", "it waits for the match"),
 
   // --- §12.9 The Stacks and the Metronome --------------------------------------------------------------------
   draughtsman: B("12.9", "draughtsman", "R", [4, 6], "DRAUGHTSMAN. Path: the blueprint. Repairs walls.",
