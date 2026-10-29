@@ -29,6 +29,7 @@ registerStatus("tonic", { color: [150, 220, 200], kind: "good", t: 15, stack: "r
 // Balm: health over its time, exactly for any steps (status.js advance hands tick the seconds it still runs; the carry
 // in s.acc, so a skip heals what playing it out heals).
 T("balm", "BALM", { t: 3, tick(game, e, s, dt) {
+  if (hasStatus(e, "tonic:sick")) return;   // (an overdone balm: no balm heals for 30 s)
   s.acc += s.mag * 4 * dt;
   const n = Math.floor(s.acc + 1e-9);
   if (n > 0) { s.acc -= n; e.hp = Math.min(maxHp(e), e.hp + n); }
@@ -38,7 +39,7 @@ T("gloam", "GLOAM", { t: 60, bonus: (s) => ({ darkSight: 3 * s.mag, stealth: 0.3
 T("ironbark", "IRONBARK", { t: 60, bonus: (s) => ({ av: Math.round(2 * s.mag), str: Math.round(2 * s.mag) }) });
 T("clearwit", "CLEARWIT", { t: 60, bonus: (s) => ({ examine: Math.round(5 * s.mag), int: Math.round(2 * s.mag) }) });
 // Overdoses.
-T("sick", "NO HEALING", { color: [170, 200, 110], kind: "bad", t: 30, flags: { noRegen: true }, ended: "Your stomach settles." });
+T("sick", "SICK", { color: [170, 200, 110], kind: "bad", t: 30, flags: { noRegen: true }, ended: "Your stomach settles." });
 T("heavy", "SLOWED", { color: [160, 150, 120], kind: "bad", t: 20, speed: 0.5, ended: "Your legs are your own again." });
 T("crash", "HASP", { kind: "bad", t: 15, onEnd(game, e, s, why) {
   if (why === "expired") { addStatus(game, e, "paralyzed", { t: 3 }); if (game && e === game.player) game.log("The hasp runs out all at once. You can't move.", [200, 120, 255]); }
@@ -51,7 +52,7 @@ export const TONICS = {
   balm: {
     name: "balm", value: 25, t: 3, info: "Heals 12 over 3 s. Overdone: no healing for 30 s.",
     use: (game, p, k) => { addStatus(game, p, "tonic:balm", { t: 3, mag: k }); say(game, p, `Warmth spreads up your arm. (+${12 * k} HP over 3 s)`, [230, 90, 110]); },
-    overdose: (game, p) => { addStatus(game, p, "tonic:sick", { t: 30 }); say(game, p, "The balm curdles. Nothing will heal you for a while.", [170, 200, 110]); },
+    overdose: (game, p) => { addStatus(game, p, "tonic:sick", { t: 30 }); say(game, p, "The balm curdles. Neither rest nor balm will mend you for a while.", [170, 200, 110]); },
   },
   hasp: {
     name: "hasp", value: 40, t: 15, info: "Haste for 15 s. Overdone: then 3 s unable to move.",
