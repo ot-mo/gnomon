@@ -18,6 +18,7 @@ ids (pushed first, `6e6de6d`, for C2 and C3), the integration requests and the h
 | `1e07429` | The crypt on the ground |
 | `161d92d` | `docs/c1.md`: the region rules by glyph |
 | `323d45b` | The Deep Pleat's and the Shade's wildlife back to WS2's 2-4 |
+| `a4938cc` | Merge of `p3i-sinkholes` (the integrator's fix of request 9) |
 
 ## 1. The start
 
@@ -69,7 +70,7 @@ frames), with C2's and C4's sessions running on the same machine: the load the b
 | The Inkrun is ink | **Pass**: `riverLiquid` ink on its 5 path spans and its ports; the Slake plain water; no span where the two meet (check-surface) |
 | Hollowmere stands on its plan, the same twice, seams with its neighbours | **Pass** (check-landmarks section 4, 5 seeds): the temple with Maren, the cube, the spikes and cube wall, you in your room, the Keeper's Stair (20 legacy levels) at the temple's stairs in the parent's frame, no sinkhole outside the shaft; 45 houses (9 a seed) on their floors with doors and roofs, 45 people's places reachable, the commons lamp, 680 brine-bed tiles, 240 props, the Old Rule to the porch; 20 seams (1,280 tiles) on the world function; the 90 landmark zones twice the same, none retried |
 | check-surface, check-edges, check-landmarks on the real world | **Pass**: 1,500 real-world zones (500 a seed × 3) valid, none retried, 60 made twice the same; 790 edges (50,336 seam tiles) over 1,247 zones; 90 real landmark zones |
-| Surface generation inside §6.7's budget there (check-perf alone, against `p3i-props`) | **Fails, not from the data** (section 6): p95 68.8 ms against `p3i-props`' 45.5 (×1.51, budget 60). The difference is one span of perf's sample, (22, 3), a lair since the real world has sites: a span with a dungeon builds its level 1 to place its sinkholes (gen/surface.js landingFloor), about a surface's cost again; on `p3i-props` the test world's ruins cost the same (55-68 ms against 22-29 for plain spans) but its sample never hits one. The region rows don't slow that level (33 against 30 ms with the legacy table). Integration request 9 |
+| Surface generation inside §6.7's budget there (check-perf alone, against `p3i-props`) | **Pass**, with `p3i-sinkholes` merged (the integrator's fix of request 9): surface generation p50 24.64, p95 36.76, max 55.93 ms against `p3i-props`' p95 37.09, max 120.66 (×0.99, ×0.46; budget p95 60, max 150). Before the fix it failed (p95 68.8 against 45.5): a span with a dungeon under it built its level 1 to place sinkholes, and perf's sample now held a real-world lair (section 6) |
 | check-content, check-names | **Pass**: coverage 173 (region, level) pairs on both worlds, at least 3 kinds everywhere (fewest 3, the Salt Waste at level 8); names: 184 modules, 0 hits of §15.11 |
 | Golden (b), check-screen-frames, check-legacyfights untouched | **Pass**: golden mechanics 86 of 86, frames 27 of 27; screen frames 47, 34 compared, 0 mismatched; legacyfights PASS. The test world's data and `DEFAULT_BIOME` are unchanged |
 | Something of it in both views in the browser | **Pass** (headless Chromium, `?silent=1&quick=1&world=real&seed=1234`, audio routed to an analyser and a zero gain, 1 connection; no console errors; server and browser closed): the map of Hollowmere (the temple, the houses, the beds), 3D in the village (a thatch house, the brine beds with glimseed), the world map with the Mere; `browser-2b` PASS |
@@ -123,12 +124,26 @@ frames), with C2's and C4's sessions running on the same machine: the load the b
 
 ## 6. The gate
 
-`run-all` at `323d45b`: **37 of 38**. The one failure is check-perf, run in the gate against `p0-done` with the other
-sessions on the machine (its dungeon item, which only measures the parent's legacy levels, read ×1.25 there, so the
-load counted too). Alone against `p3i-props` (`--rounds 3 --no-render`, 4 runs of each tree alternating, the machine
-at 15-50%): every item within budget or within 15% of `p3i-props` but surface generation, p95 68.79 ms against 45.5
-(×1.51) and max 239.6 against 159.4 (×1.50); the cause is section 3's (a site span in the sample), not this data's
-cost per zone. No tag yet: integration request 9 asks the integrator's call.
+**At `323d45b`** (before the fix): `run-all` 37 of 38. check-perf alone against `p3i-props` failed surface generation,
+p95 68.79 ms against 45.5 (×1.51) and max 239.6 against 159.4. Taken apart span by span on both trees, the cause was
+code, not C1a's data: a span with a dungeon under it built that dungeon's level 1 to place its sinkholes
+(`gen/surface.js` landingFloor), about a surface's cost again. On `p3i-props` the test world's ruins already cost
+55-68 ms against 22-29 for plain spans; perf's seed-4242 sample first hit such a span when the real world got sites,
+a lair at (22, 3). The region rows don't slow that level (33 against 30 ms with the legacy table). That was integration
+request 9. The integrator declined a tag with a red gate and fixed it on `integration`: `p3i-sinkholes` (76bb63a;
+`docs/sessions/2B.md` §9). The surface no longer makes level 1: `world/sites.js sinkholeSpots` gives each span 6
+spots, and level 1 makes each one reachable floor. Merged into `ws/c1` (`a4938cc`, a merge).
+
+**At the tag** (`ws/c1` with `p3i-sinkholes`, the machine idle, 15-17%):
+- check-perf alone, `--against p3i-props --rounds 3 --no-render`, 4 runs of each tree alternating: **PASS**.
+  - Surface generation: p50 24.64, p95 36.76, max 55.93 ms (`p3i-props` 37.09 / 120.66).
+  - Dungeon generation p95: 23.43 (30.84). Frames at noon, dusk and night: p50 15.63 / 14.5 / 14.39 (16.15 / 14.93 / 14.54).
+  - `passTime` p50 6.6 (6.11). The map step: 1.63 (1.63).
+  - `restoreRun` p50 3.96 ms against 1.98 (×2.00, budget 50): a real-world run now restores its sites, about 45
+    a seed where it had only the landmarks.
+- `node tools/run-all.mjs`: **38 of 38** (180.5 s). check-sites: 702 sinkholes over 367 spans.
+- Every number in section 3 holds on this tree: Hollowmere (5 seeds, the same promises), the villages (312 on 20 seeds),
+  the regions.
 
 ## 7. Names and key texts, for the user to read through
 
