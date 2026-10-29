@@ -1458,7 +1458,10 @@ export async function run(env) {
       }
       if (!Array.isArray(d.effects?.drink) || !Array.isArray(d.effects?.touch)) fail(`liquid ${id}: no effects`);
     }
-    for (const f of Object.values(F.FACTIONS)) if (!f.hidden && L[f.liquid] && !L[f.liquid].sacramentOf?.includes(f.id)) fail(`${f.id}'s sacrament ${f.liquid} doesn't list it`);
+    // (content/factions.js's own factions: a generated village or cult registered earlier in this process pours a
+    // village's liquid, which no table lists)
+    const CF = (await m("content/factions.js")).FACTIONS;
+    for (const [id, f] of Object.entries(CF)) if (L[f.liquid] && !L[f.liquid].sacramentOf?.includes(id)) fail(`${id}'s sacrament ${f.liquid} doesn't list it`);
     const eff = (id, part, key) => (L[id].effects[part] || []).find((e) => e[key] !== undefined || e.status === key);
     const bible = [   // bible §13.7: [liquid, part, finder, field, want]
       ["glim", "drink", "glowing", "t", 10], ["glim", "touch", "burns", "burns", 6], ["brine", "drink", "nausea", "t", 3], ["brine", "touch", "ward", "ward", 3],
