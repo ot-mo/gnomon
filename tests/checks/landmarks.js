@@ -53,6 +53,7 @@ import { TOP as TABLE_TOP } from "../../src/content/world/plans/tallTable.js";
 import { RINGS } from "../../src/content/world/plans/foldmother.js";
 import { NEEDLE } from "../../src/content/world/plans/gnomon.js";
 import { PRESSYARD_HOUSES } from "../../src/content/world/plans/pressyard.js";
+import { TOLL_GATE } from "../../src/content/world/plans/molar.js";
 
 const pct = (sorted, q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))];
 const holesOf = (z) => {
@@ -361,7 +362,8 @@ const PROMISES = {
     [cell("R").every(([x, y]) => z.stand[x + y * z.w] === FLOOR_Z + 12 && z.kind[x + y * z.w] === KIND.WALL), "the crag isn't 12 high"],
     [cell("H").every(([x, y]) => z.get(x, y, FLOOR_Z + 4) === B.ROCK), "a hall has no rock over it"], [cell("H").every(([x, y]) => reach[x + y * z.w] >= 0), "a hall can't be walked to"],
     [anyIn(z, pa.x, pa.y + 17, pa.x + 1, pa.y + 21, (x, y) => road(z, x, y)) && anyIn(z, pa.x + 62, pa.y + 17, pa.x + 63, pa.y + 21, (x, y) => road(z, x, y)),
-      "the Old Rule doesn't run through the gullet's two mouths"]],
+      "the Old Rule doesn't run through the gullet's two mouths"],
+    [[17, 18, 19, 20, 21].every((y) => z.get(pa.x + TOLL_GATE, pa.y + y, FLOOR_Z + 4) === B.STONE && z.stand[pa.x + TOLL_GATE + (pa.y + y) * z.w] === FLOOR_Z), "the toll gate's arch over the gullet, the way under it open"]],
   folio: ({ z, pa, plan, cell }) => {
     let walls = 0, mosaic = 0;
     plan.rows.forEach((r, y) => [...r].forEach((ch, x) => { const k = z.kind[pa.x + x + (pa.y + y) * z.w]; if (k === KIND.WALL && ch !== "A") walls++; if (k === KIND.MOSAIC) mosaic++; }));

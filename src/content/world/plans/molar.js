@@ -11,6 +11,7 @@
 //   .  the ground as the world made it (the gullet included)   R  the crag (rock, 12 high)   P  a cusp of it (14)
 //   H  a hall carved into the crag (4 of room, the crag over it)   L  a Chandler lamp-post   S  the dial-stele
 //   >  the stair down into the Root Canals
+// The toll gate ("Gate 1") is an arch across the gullet by the west mouth, its lintel over head height (TOLL_GATE).
 //   people, each on a hall's floor: s Mother Saffre  i the innkeeper  m the map-seller  c Assizer Castor Dell-Cassin
 //     z Zaqar Tesfu  r Rook  n Pell (days 5-6 of his round, in the market)
 import { B, FLOOR_Z } from "../../../world.js";
@@ -19,6 +20,7 @@ import { stampVault } from "../../../gen/vaults.js";
 import { Grid, cells, peopleKeys, mural } from "./kit.js";
 
 const CRAG = 12, CUSP = 14;
+export const TOLL_GATE = 4;   // the arch's column in the plan, by the west mouth
 const G = new Grid(64, 42);
 for (let y = 0; y < 42; y++) for (let x = 0; x < 64; x++) if (((x - 31.5) / 31) ** 4 + ((y - 19) / 16.5) ** 4 <= 1) G.put(x, y, "R");
 for (const [x, y] of [[15, 4], [16, 4], [31, 3], [32, 3], [47, 4], [48, 4], [24, 34], [40, 34]]) G.put(x, y, "P");
@@ -54,6 +56,8 @@ export function stampMolar(zone, ox, oy) {
     const [x0, y0, x1, y1] = h.room, north = h.door[1] < y0;
     zone.set(ox + ((x0 + x1) >> 1), oy + (north ? y1 + 1 : y0 - 1), FLOOR_Z + 2, B.LAMP);
   }
+  // The toll gate: a lintel of dressed stone two blocks thick across the gullet, the road passing under it.
+  for (let y = 17; y <= 21; y++) for (let z = FLOOR_Z + 4; z < FLOOR_Z + 6; z++) zone.set(ox + TOLL_GATE, oy + y, z, B.STONE);
   // The dial-stele: a stone with the Horary's carving, in its niche.
   const [[tx, ty]] = cells(MOLAR_ROWS, "S");
   zone.set(ox + tx, oy + ty, FLOOR_Z, B.STONE); zone.set(ox + tx, oy + ty, FLOOR_Z + 1, B.MURAL);
