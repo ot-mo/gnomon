@@ -2,15 +2,16 @@
 
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
-**Updated:** 2026-10-28, the integrator (local session), on `integration`. **Phase 1 is done and fully merged
+**Updated:** 2026-10-29, the integrator (local session), on `integration`. **Phase 1 is done and fully merged
 (`p2-ws3` … `p2-ws1`, the flip `p2-flip`). Phase 2's 2B hardening is done and tagged `p2-2b` (e0b7c9b), with the
-Phase 2 items that need no C1; `main` = `p2-2b`. What's left of Phase 2 is the last wiring merge, which waits on C1:
+Phase 2 items that need no C1; since then `?world=real` (a new game on the real world, a preview; `p2-realworld`,
+2602aff), and `main` = `p2-realworld`. What's left of Phase 2 is the last wiring merge, which waits on C1:
 "Next step" below. Nothing is running.** From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p2-2b` on `integration` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+- **Last tag:** `p2-realworld` (`?world=real`, on `p2-2b`) on `integration`; before it `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
   `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b`, `p1-ws10`, the flip, `p1-ws2a`, `p1-ws7a`,
   `p1-ws7b`, `p1-ws2b`, `p1-ws9` and `p1-ws1`, with their integration requests; `p2-ws3` … `p2-ws9` before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
@@ -38,6 +39,11 @@ closing state" below.
 `check-bot`; travel saves, discovery XP on a load, `restClears`, the torch on the road and the journal's Locations tab
 are in; the performance pass and the browser QA checklist (14 tools, `tools/browser-2b.mjs` new) passed. `main` =
 `p2-2b`.
+
+**`?world=real`** (`p2-realworld`, the user's request, 2026-10-29): a new game starts on the real world at
+Hollowmere, holding the cube (it has none to find yet); without the flag nothing changed. The last wiring merge makes
+the real world the default: then `main.js`'s `?world=real` branch and its cube hook go (`config.js` `WORLD` can stay
+or go with it; browser-2b part 3 and check-overworld's 7 URLs follow).
 
 **Next step:** §8.5's last wiring merge (title → create → the start landmark → the first village; the legacy fixture
 site leaves the default world, staying in the test world) waits on C1's regions and villages: `game.js` still builds
@@ -280,6 +286,12 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p2-realworld`** (2026-10-29): `?world=real` on `p2-2b` (`3343302`; `docs/sessions/2B.md` §7). `config.js` exports
+`WORLD` (its own export: P0's check-config holds `FLAGS` to four flags, untouched); `main.js` builds new runs on
+`REAL_WORLD` and gives them the cube. check-overworld (7 URLs) and browser-2b part 3 (New game and `?quick=1` at
+5,16,0 with the cube, Tab both ways, 882 of 882 spans drawn, a step); three mutants fail. `run-all` 38 of 38 (192.4
+s); check-config, check-imports, check-names, browser-0d2, browser-silent pass. `main` fast-forwarded.
 
 **`p2-2b`** (2026-10-28): 2B hardening on `p2-ws1` (TECH_DESIGN §8.5), with Phase 2's items that need no C1; notes in
 `docs/sessions/2B.md`. Each change has an assertion that fails without it.
