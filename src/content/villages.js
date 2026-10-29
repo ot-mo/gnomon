@@ -180,25 +180,25 @@ const plans = {
   workshop: ["######", "#....#", "l....#", "#.r..#", "##M###"],
 };
 
-// Given names by bible §2.3's phonology (the landmarks' people, Maren, Pell, Mira, Hallen, Ess and Tee among them, are
-// left out: they are somebody already). Marshfolk two syllables, soft and doubled; Drovers CV-CVC, clipped; the Plumb
+// Given names by bible §2.3's phonology. Nobody named in bible §5 (the landmarks' people: Maren, Saara, Zaqar, Abbess
+// Wisse, Section Nine, Kay of the Long Line…) or among the parent's people: they are somebody already (check-story 10). Marshfolk two syllables, soft and doubled; Drovers CV-CVC, clipped; the Plumb
 // a Latinate given name; the Flatfolk a letter, an elder's with a line; the Lampless whispered; the Plan's units drawing
 // titles; the Moot's tenders slow descriptions; former Rustbacks a nickname and a scrap; Kites and the Clatter sounds;
 // Errata an original's name, mirrored.
 const names = {
-  bent: ["Ilka", "Tovi", "Saara", "Osse", "Lumo", "Bramwyn", "Kevi", "Anke", "Mitte", "Tilo", "Rosse", "Haaro", "Vemo", "Peri", "Sarin", "Lumel"],
+  bent: ["Ilka", "Ossa", "Ilke", "Osse", "Hamo", "Vessa", "Kevi", "Anke", "Mitte", "Tilo", "Rosse", "Haaro", "Vemo", "Peri", "Sarin", "Lumel"],
   clatter: ["Tkrr", "Chitt-Ashell", "Krrik", "Chatt", "Tikkr", "Krett", "Chik-Shellen", "Tkk-Rasp", "Krr-Kesh", "Ttcha", "Chkk", "Tirr-Shell", "Krrach", "Tchett"],
-  drover: ["Zaqar", "Tesfu", "Debbek", "Qamu", "Azzu", "Ennat", "Gudri", "Hasay", "Murat", "Sedek", "Rozar", "Bekku", "Tuffe", "Yezri", "Dasay", "Hubbat"],
-  flat: ["Kay", "Vee", "Zed", "Emm", "Aitch", "Wye", "Arr", "Eff", "Jay", "Cue", "Dee", "Bee", "Kay of the Long Line", "Double-Ell", "Ess Underlined", "Pee Struck Through"],
-  kite: ["Kreeva", "Aawik", "Riiva", "Weeka", "Kiira", "Aariw", "Wiiko", "Keeri", "Riiwa", "Aaki", "Weeri", "Kiiwa", "Aarik", "Riikee"],
-  plumb: ["Aurel", "Ysolde", "Castor", "Teodor", "Severine", "Dexant", "Corel", "Talis", "Ostrade", "Verine", "Marex", "Delmor", "Quinel", "Ysade"],
-  lampless: ["Wisse", "Hulven", "Ishe", "Thol", "Sesh", "Ovhe", "Nelle", "Velen", "Thossa", "Ulshe", "Sathe", "Nevhe", "Olen", "Hussa"],
-  machine: ["Section Nine", "Elevation East", "Revision Seven", "Grid Four", "Sheet Twelve", "Hatch Two", "Scale One", "Datum Three",
+  drover: ["Sebbu", "Dakkat", "Debbek", "Qamu", "Azzu", "Ennat", "Rozek", "Guffar", "Murat", "Sedek", "Rozar", "Bekku", "Tuffe", "Yezri", "Dasay", "Hubbat"],
+  flat: ["Ex", "Vee", "Zed", "Emm", "Aitch", "Wye", "Arr", "Eff", "Jay", "Cue", "Dee", "Bee", "Vee of the Short Line", "Double-Emm", "Ess Underlined", "Pee Struck Through"],
+  kite: ["Wiiree", "Aawik", "Riiva", "Keewi", "Aarii", "Aariw", "Wiiko", "Keeri", "Riiwa", "Aaki", "Weeri", "Wikee", "Aarik", "Riikee"],
+  plumb: ["Ysolde", "Sevine", "Dexant", "Corel", "Talis", "Ostade", "Verine", "Marex", "Delor", "Quinel", "Ysade", "Quinex", "Talant", "Corris"],
+  lampless: ["Ishel", "Hulven", "Ishe", "Thol", "Sesh", "Ovhe", "Nelle", "Velen", "Thossa", "Ulshe", "Sathe", "Nevhe", "Olen", "Hussa"],
+  machine: ["Section Six", "Elevation East", "Revision Seven", "Grid Four", "Sheet Twelve", "Hatch Two", "Scale One", "Datum Three",
     "Section Eleven", "Elevation North", "Detail F", "Revision Two", "Sheet Nine", "Grid Fourteen"],
   tender: ["Keeps-the-Damp", "Turns-the-Mulch", "Hears-Slowly", "Sleeps-in-Moss", "Counts-Spores", "Smells-Rain", "Waits-Twice",
-    "Leans-at-Dusk", "Holds-the-Rain", "Opens-Twice", "Grows-Late", "Rests-Long", "Knows-Mould", "Drinks-Fog"],
+    "Feeds-the-Roots", "Minds-the-Rot", "Walks-Wet", "Grows-Late", "Rests-Long", "Knows-Mould", "Drinks-Fog"],
   rustback: ["Grak", "Mogdut", "Harrib", "Two-Nail", "Kettle-Ear", "Dubak", "Skib", "Gradut", "Harrak", "Mogib", "Bolt-Tooth", "Pan-Lid", "Skak", "Hinge-Hand"],
-  errata: ["Akli", "Ivot", "Araas", "Esso", "Omul", "Ufset", "Kebbed", "Irdug", "Yasah", "Tanne", "Umaq", "Uzza", "Raqaz", "Nerram"],
+  errata: ["Akli", "Ivot", "Araas", "Esso", "Omul", "Ufset", "Kebbed", "Irdug", "Yasah", "Tanne", "Umaq", "Uzza", "Asso", "Omah"],
 };
 const callings = ["reed-cutter", "eel-warden", "salt-raker", "lens-grinder", "wick-trimmer", "weir-mender", "kite-flier",
   "ink-boiler", "rune-cutter", "wax-renderer", "bell-founder", "longback-breeder"];

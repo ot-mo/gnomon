@@ -879,7 +879,7 @@ const C1A_REGIONS = ["flats", "hollowMere", "waste", "steps", "downs", "pleatwoo
 const OLD_FACTIONS = ["flatfolk", "plan", "kites", "clatter", "unlit", "moths", "saltbeasts", "pleatwood", "sporeMoot", "askew", "errata"];
 const GUILDS = ["the glaziers", "the salt-rakers", "the scribes", "the gravewardens", "the stair-builders", "the smelters", "the chandlers",
   "the clockmen", "the folders", "the herders"];
-const TAKEN = ["Maren", "Pell", "Mira", "Hallen", "Ess", "Tee", "Brann", "Corwin", "Rook", "Lio"];   // people who are somebody already
+const TAKEN = ["Maren", "Pell", "Mira", "Hallen", "Ess", "Tee", "Brann", "Corwin", "Rook", "Lio"];   // the parent's people (bible §5's are read from the bible)
 
 async function peoplesC2(env, { fail, stats }) {
   const { VILLAGES: V } = await env.src("content/villages.js"), { GRAMMAR: G } = await env.src("content/grammar.js");
@@ -916,7 +916,11 @@ async function peoplesC2(env, { fail, stats }) {
     if (!list || list.length < cast || new Set(list).size !== list.length) fail(`villages: ${id}'s names (${P.names}): ${list?.length}, a cast needs ${cast}`);
     if (!F.FACTIONS[P.faction] || !["bent", "peoples"].includes(P.parent)) fail(`villages: ${id}'s faction ${P.faction} / parent ${P.parent}`);
   }
-  const taken = Object.values(V.names).flat().filter((n) => TAKEN.includes(n));
+  // Nobody is named after somebody already: the parent's people, or anyone bible §5 (the landmarks) names.
+  const bible = await env.text("docs/design/WORLD_BIBLE.md"), s5 = bible.slice(bible.indexOf("## 5. Fixed landmarks"), bible.indexOf("## 6. Factions"));
+  const inS5 = (n) => new RegExp(`(^|[^A-Za-z])${n.replace(/[-]/g, "[- ]")}([^A-Za-z]|$)`).test(s5);
+  if (s5.length < 1000) fail("villages: bible §5 not found to hold the names against");
+  const taken = Object.values(V.names).flat().filter((n) => TAKEN.includes(n) || inS5(n));
   if (taken.length) fail(`villages: names somebody already has: ${taken.join(", ")}`);
   // The grammar.
   const D = Object.entries(G.domains);
