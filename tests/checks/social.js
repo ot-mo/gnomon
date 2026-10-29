@@ -54,6 +54,48 @@ export const BIBLE_START = {   // bible §15.4 "Start (Bent / Plumb)"
   askew: [-500, -500], plan: [-100, 100], moths: [300, 300], kites: [-100, -100], clatter: [50, 50], saltbeasts: [-400, -400],
   sporeMoot: [-200, -200], pleatwood: [0, 0], errata: [-250, -250],
 };
+// C2: bible §15.4's relations matrix (the AI's), likes and hates by faction id; "bent" is the hidden group of the Bent.
+export const BIBLE_RELATIONS = {
+  hollowmere: [["noonVigil", "clatter", "survey"], ["rustbacks", "assize"]],
+  noonVigil: [["hollowmere", "flatfolk"], ["lampless", "horary", "assize"]],
+  survey: [["flatfolk", "plan", "kites"], ["rustbacks", "askew"]],
+  assize: [["plan", "chandlers", "horary"], ["bent", "flatfolk", "askew", "rustbacks", "errata"]],
+  horary: [["kites", "plan"], ["lampless", "noonVigil"]],
+  pressed: [["flatfolk", "unlit"], ["kites", "plan", "assize"]],
+  lampless: [["unlit", "pressed"], ["moths", "chandlers", "horary"]],
+  drovers: [["clatter", "chandlers", "kites"], ["rustbacks", "assize"]],
+  chandlers: [["assize", "moths", "drovers"], ["lampless", "rustbacks"]],
+  rustbacks: [["saltbeasts"], ["drovers", "plan", "survey"]],
+  flatfolk: [["survey", "pressed", "noonVigil"], ["assize", "askew", "errata"]],
+  unlit: [["lampless", "noonVigil"], ["moths", "chandlers"]],
+  askew: [["pleatwood", "sporeMoot"], ["assize", "survey", "plan"]],
+  plan: [["survey", "assize", "horary"], ["rustbacks", "askew", "sporeMoot"]],
+  moths: [["chandlers"], ["lampless", "unlit"]],
+  kites: [["survey", "drovers"], ["pressed", "assize"]],
+  clatter: [["drovers", "hollowmere"], ["saltbeasts", "rustbacks"]],
+  saltbeasts: [["rustbacks"], ["drovers", "clatter"]],
+  sporeMoot: [["pleatwood", "unlit"], ["chandlers", "plan"]],
+  pleatwood: [["sporeMoot", "kites", "askew"], ["assize", "chandlers"]],
+  errata: [["askew", "unlit"], ["assize", "flatfolk"]],
+};
+// C2: bible §3.3's faction variants of the Kindling (the rite each is done as) and its faction specials (their rep).
+const BIBLE_VARIANTS = { unlit: ["the Pouring", "snuffing"], plan: ["the Oiling", "lighting"], kites: ["the Ascent", "lighting"],
+  errata: ["the Mirroring", "lighting"], moths: ["Moon-Wick", "lighting"], saltbeasts: ["Herdmother", "lighting"] };
+const BIBLE_SPECIALS = { sporeMoot: ["limb", -30], pressed: ["pressing", -100], lampless: ["snuff", -200] };
+const BIBLE_NEEDS = { kites: { height: 8 }, plan: { glim: 5 }, pleatwood: { hours: [18, 19] }, horary: { steleHour: 1 }, rustbacks: { gift: "iron" },
+  unlit: { pour: "any" }, errata: { then: "tracing" }, moths: { legend: "moonWick" }, saltbeasts: { legend: "herdmother" }, sporeMoot: {} };
+// C2: what each faction takes in the Kindling's menu (bible §6.2's Buys, as close as { readings, topics } can say it;
+// docs/sessions/c2.md lists where it can't).
+const BUYS = {
+  hollowmere: { topics: ["gossip", "location"] }, noonVigil: { topics: ["history"], subjects: ["noon"] },
+  survey: { readings: ["flat", "deep"], topics: ["location", "history"] }, assize: { topics: ["location", "history"], subjects: ["bentVillage", "relic"] },
+  horary: { topics: ["history"] }, pressed: { readings: ["flat"] }, lampless: { readings: ["dark"] }, drovers: { topics: ["gossip", "location", "village"] },
+  chandlers: { topics: ["location", "gossip"] }, rustbacks: { topics: ["location"] }, flatfolk: { readings: ["deep"] },
+  unlit: { readings: ["dark", "deep"], double: ["deep"] }, askew: { readings: ["deep"] }, plan: { readings: ["flat"], topics: ["location"] },
+  moths: { readings: [], topics: [] }, kites: { topics: ["location"] }, clatter: { topics: ["location"] }, saltbeasts: { readings: [], topics: [] },
+  sporeMoot: { topics: ["location"] }, pleatwood: { topics: ["location"] }, errata: { topics: ["history", "village"] }, bentVillages: { topics: ["gossip", "location"] },
+};
+const SHRINE_VIEWS = { mosaic: "map", relief: "3d", rune: "dark", pillar: "3d" };   // bible §7's table
 // §2.11's table: band × temperament → attitude toward you.
 const TABLE = {
   hated: ["hostile", "hostile", "hostile"], disliked: ["wary", "hostile", "hostile"], indifferent: ["neutral", "neutral", "hostile"],
@@ -117,6 +159,91 @@ export async function run(env) {
     }
     if (scrF.knownFactions(game).some((id) => F.FACTIONS[id].hidden)) fail("a hidden group is listed as known");
     stats.factions = `${shown.length} shown, ${Object.keys(F.FACTIONS).length - shown.length} hidden groups, ${Object.values(F.FACTIONS).reduce((s, f) => s + Object.keys(f.relations).length, 0)} relations`;
+  }
+
+  // --- 1b. C2's faction content (bible §3.3, §6.2, §7, §15.4) -------------------------------------------------------
+  // The relations are exactly §15.4's matrix (both ways: nothing missing, nothing extra); every faction that speaks
+  // greets at Grey and Warm within two lines, its trespass warning too; the six rite variants and the three specials
+  // are there with the bible's rite and cost; `buys` names only reading kinds and secret topics; the six faiths stand
+  // on registered factions with a shrine of the view their prayers need; the Hour cult's template registers and keeps
+  // a Pilgrim run below zero.
+  {
+    const C = await m("content/factions.js"), V = (await m("content/villages.js")).VILLAGES;
+    let pairs = 0, lines = 0;
+    for (const [id, [likes, hates]] of Object.entries(BIBLE_RELATIONS)) {
+      const f = F.FACTIONS[id], want = { ...Object.fromEntries(likes.map((o) => [o, 1])), ...Object.fromEntries(hates.map((o) => [o, -1])) };
+      const have = Object.fromEntries(Object.entries(f?.relations || {}).filter(([, n]) => n));
+      for (const o of new Set([...Object.keys(want), ...Object.keys(have)])) {
+        pairs++;
+        if (want[o] !== have[o]) fail(`${id} → ${o}: ${have[o] ?? 0}, bible §15.4 says ${want[o] ?? 0}`);
+      }
+      for (const [o, why] of [...f.likes, ...f.hates]) if (typeof why !== "string" || !why.trim()) fail(`${id} → ${o}: no reason`);
+    }
+    const talky = (s) => typeof s === "string" && !!s.trim() && s.length <= 128;   // two lines of the talk box (§2.1: greetings at most 2 lines)
+    for (const f of Object.values(C.FACTIONS)) {
+      const id = Object.keys(C.FACTIONS).find((k) => C.FACTIONS[k] === f), g = f.lines?.greet || {};
+      if (id !== "saltbeasts") for (const b of ["indifferent", "liked"]) { if (!talky(g[b])) fail(`${id}: no ${b} greeting within two lines: "${g[b]}"`); else lines++; }
+      if (g.loved !== undefined) { if (!talky(g.loved)) fail(`${id}: its Bright greeting "${g.loved}"`); else lines++; }
+      for (const k of ["warn", "turn"]) if (f.lines?.trespass && !talky(f.lines.trespass[k])) fail(`${id}: trespass ${k} "${f.lines.trespass[k]}"`);
+      const b = f.buys;
+      if (!b || (b.readings && b.readings.some((r) => !["flat", "deep", "dark"].includes(r))) ||
+          (b.topics && b.topics.some((t) => !["location", "history", "village", "gossip", "recipe"].includes(t)))) fail(`${id}: buys ${JSON.stringify(b)}`);
+      for (const r of f.homeRegions || []) if (typeof r !== "string" || !/^[a-z][a-zA-Z]*$/.test(r)) fail(`${id}: home region ${r}`);
+    }
+    for (const [id, [name, rite]] of Object.entries(BIBLE_VARIANTS)) {
+      const v = C.FACTIONS[id].riteVariant;
+      if (!v?.name?.includes(name) || v.rite !== rite || !v.how) fail(`${id}'s rite variant: ${JSON.stringify(v)?.slice(0, 100)}`);
+      if (v?.words && (v.words.length !== 2 || !v.words.every(talky))) fail(`${id}'s rite words: ${v.words}`);
+    }
+    for (const [id, needs] of Object.entries(BIBLE_NEEDS)) {
+      const v = C.FACTIONS[id].riteVariant;
+      if (JSON.stringify(v?.needs) !== JSON.stringify(needs)) fail(`${id}'s rite needs ${JSON.stringify(v?.needs)}, bible §3.3/§6.2: ${JSON.stringify(needs)}`);
+    }
+    if (C.FACTIONS.plan.riteVariant.alt?.rite !== "tracing" || C.FACTIONS.plan.riteVariant.alt.needs?.floorPlan !== 0.9) fail("the Oiling on the map: a full floor plan (90%)");
+    for (const [id, b] of Object.entries(BUYS)) if (JSON.stringify(C.FACTIONS[id].buys) !== JSON.stringify(b)) fail(`${id} buys ${JSON.stringify(C.FACTIONS[id].buys)}, want ${JSON.stringify(b)}`);
+    for (const [id, [sp, rep]] of Object.entries(BIBLE_SPECIALS)) if (C.FACTIONS[id].specials?.find((s) => s.id === sp)?.rep !== rep) fail(`${id}'s special ${sp}: want ${rep}`);
+    if (Object.keys(C.FAITHS).length !== 6) fail(`${Object.keys(C.FAITHS).length} faiths, bible §7 has six`);
+    for (const [id, fa] of Object.entries(C.FAITHS)) {
+      if (!F.FACTIONS[fa.faction] || F.FACTIONS[fa.faction].hidden) fail(`faith ${id}: faction ${fa.faction}`);
+      if (fa.shrine !== null && !V.shrines[fa.shrine]) fail(`faith ${id}: shrine ${fa.shrine} isn't one of the four`);
+      if (fa.pray && fa.shrine && SHRINE_VIEWS[fa.shrine] !== fa.pray.view) fail(`faith ${id}: prays in ${fa.pray.view} at a ${fa.shrine} shrine`);
+      for (const [o] of Object.entries(fa.desecrate?.rep || {})) if (!F.FACTIONS[o]) fail(`faith ${id}: desecration moves ${o}`);
+      for (const k of ["pray", "wrong", "desecrate"]) if (!talky(fa.lines?.[k])) fail(`faith ${id}: no ${k} line`);
+    }
+    // §7's numbers, and the donations the game takes today (social/shrines.js DONATIONS) agree with them.
+    const FA = C.FAITHS, eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    const faithNumbers = [
+      ["the Vigil's donation", FA.noonVigil.donate, { glim: 50, rep: 10, cap: 200 }], ["the Vigil's desecration", FA.noonVigil.desecrate.rep, { noonVigil: -100, lampless: 50 }],
+      ["the Vigil's prayer", [FA.noonVigil.pray.height, FA.noonVigil.pray.hours], [8, [11, 13]]],
+      ["the Horary's desecration", FA.horary.desecrate.rep, { horary: -150, noonVigil: 50 }], ["the Horary's donation", FA.horary.donate.rep, 25],
+      ["the Horary's prayer", FA.horary.pray.steleHour, 1],
+      ["the Lampless' donation", FA.lampless.donate, { per: 2, rep: 1, cap: 150, dark: true }], ["the Lampless' desecration", FA.lampless.desecrate.rep, { lampless: -150, moths: 50 }],
+      ["a snuffed brazier", FA.lampless.snuffBrazier, { rep: 5, cap: 100 }],
+      ["truing", FA.rule.truing.rep, { assize: 300 }], ["the vow", [FA.rule.vow.rep, FA.rule.vow.trueMarks], [{ assize: 200, bentVillages: -100 }, 1]],
+      ["a banner", FA.rule.banner.rep, { assize: -50 }], ["a plumb-stone", FA.rule.desecrate.rep, { assize: -100, bentVillages: 25 }],
+      ["a broken mosaic", FA.pressed.desecrate.rep, { pressed: -150, plan: 10 }], ["the Pressed's prayer", FA.pressed.pray.seconds, 10],
+      ["unpressing", FA.pressed.unpressing.rep, { pressed: -150 }],
+      ["a floor plan", [FA.plan.donate.rep, FA.plan.donate.trueMarks], [25, [3, 6]]], ["the Stacks' blocks", FA.plan.desecrate.rep, { plan: -50 }],
+    ];
+    for (const [what, got, want] of faithNumbers) if (!eq(got, want)) fail(`${what}: ${JSON.stringify(got)}, bible §7: ${JSON.stringify(want)}`);
+    const DON = (await m("social/shrines.js")).DONATIONS;
+    if (DON.noonVigil.per !== FA.noonVigil.donate.glim || DON.noonVigil.rep !== FA.noonVigil.donate.rep || DON.noonVigil.cap !== FA.noonVigil.donate.cap ||
+        DON.lampless.per !== FA.lampless.donate.per || DON.lampless.cap !== FA.lampless.donate.cap) fail("FAITHS' donations and social/shrines.js DONATIONS disagree");
+    const HC = C.HOUR_CULT;
+    if (HC.passRep !== 600 || HC.maskRep !== 200 || HC.startRep.bent !== -500 || HC.startRep.plumb !== -500 || HC.pray?.view !== "3d" ||
+        !eq(HC.desecrate?.rep, { cult: -100, hated: 50 })) fail(`the Hour cult: pass ${HC.passRep}, mask ${HC.maskRep}, start ${JSON.stringify(HC.startRep)}, pray ${JSON.stringify(HC.pray)}, desecrate ${JSON.stringify(HC.desecrate)} (bible §6.3, §7.7)`);
+    // The Hour cult template, filled as the run's factions step will (integration request): −500 even for a Pilgrim.
+    const H = C.HOUR_CULT, cult = "test:cult";
+    try {
+      F.registerFaction(cult, { ...H, name: "the Choir of the Glazier", about: H.about.replace("{name}", "Ishvalet").replace("{cog}", "the Glazier").replace("{ordinal}", "Fourth"),
+        likes: [["kites", "the view"], ["horary", H.likesHorary]], hates: [["unlit", "an old hate"]], color: [150, 210, 170] });
+      const was = game.state.mode; game.state.mode = "pilgrim";
+      const pil = F.baseRep(game, cult), other = F.baseRep(game, "rustbacks");
+      game.state.mode = was;
+      if (pil !== -500 || other !== 0 || F.FACTIONS[cult].relations.horary !== 1 || F.FACTIONS[cult].parent !== "faiths") fail(`an Hour cult in a Pilgrim run starts at ${pil} (the Rustbacks at ${other})`);
+    } finally { delete F.FACTIONS[cult]; }
+    stats.content = `${pairs} relations as §15.4 (likes and hates, both ways); ${lines} greetings; ${Object.keys(BIBLE_VARIANTS).length} rite variants, ` +
+      `${Object.keys(BIBLE_SPECIALS).length} specials; ${Object.keys(C.FAITHS).length} faiths; the Hour cult's template at −500 for a Pilgrim`;
   }
 
   // --- 2. Attitude ------------------------------------------------------------------------------------------------
@@ -1066,6 +1193,10 @@ export async function run(env) {
 
     // The flame-kin menu: rep as currency, the +120 cap, the floor, recruiting, the best item, a power.
     setup();
+    // C2: the Drovers buy what bible §6.2 says (rumours, village Locations); this part holds the default rule (a
+    // faction wants its own reading kinds), so it runs with their `buys` set aside, and puts it back after.
+    const droverBuys = F.FACTIONS.drovers.buys;
+    delete F.FACTIONS.drovers.buys;
     const k = named("mira", "merchant", "drovers", { near: [1, 0], name: "Dov", level: 5 });
     k.teaches = ["swimmer", "tough", "repair"];   // (repair waits on its needs: never offered)
     ritual.performRite(game, k, "tracing");
@@ -1095,6 +1226,24 @@ export async function run(env) {
     if (kk.net !== 120) fail(`the cap: net ${kk.net} after 95 + 35, want 120`);
     SEC.learnSecret(game, Dd.id, "talk", { quiet: true });
     if (doRow(`give:${Dd.id}`).ok) fail("a gain past the +120 cap went through");
+    // C2: with their own `buys` back (bible §6.2: rumours, village Locations, prices), the Drovers want a location
+    // and no Hour account of any reading; a faction that buys readings by kind (the Lampless: dark) wants only that.
+    F.FACTIONS.drovers.buys = droverBuys;
+    {
+      const L = defs.find((x) => x.kind === "location" && !game.state.journal.secrets?.[x.id]), E = pick("deep");
+      for (const d of [L, E]) SEC.learnSecret(game, d.id, "talk", { quiet: true });
+      const offered = rows().map((r) => r.id);
+      if (!offered.includes(`give:${L.id}`) || offered.includes(`give:${E.id}`) || offered.includes(`give:${Bd.id}`))
+        fail(`the Drovers' buys (${JSON.stringify(droverBuys)}): offered ${offered.filter((id) => id.startsWith("give:")).join(", ")}`);
+      const lampKin = named("brann", "villager", "lampless", { near: [0, 1], name: "Hulven" });
+      game.view = "3d"; p().torch = false;
+      const r = ritual.performRite(game, lampKin, "snuffing");
+      const lampWants = ritual.ritualRows(game, lampKin).map((x) => x.id).filter((id) => id.startsWith("give:"));
+      if (!r.ok || !lampWants.includes(`give:${Bd.id}`) || lampWants.some((id) => id !== `give:${Bd.id}`))
+        fail(`the Lampless (buys dark readings): ${r.text}; offered ${lampWants.join(", ")}`);
+      game.view = "map";
+      stats.buys = `the Drovers take a location, not an Hour account (deep or dark); the Lampless only the dark one`;
+    }
     const repB = F.repOf(game, "drovers");
     doRow("power:tough");
     if (F.repOf(game, "drovers") !== repB - 50 || leveling.perkRank(p(), "tough") !== 1) fail(`a rank-1 power: rep ${repB} → ${F.repOf(game, "drovers")}, rank ${leveling.perkRank(p(), "tough")}`);
@@ -1285,6 +1434,80 @@ export async function run(env) {
     if (merchants.priceOf(game, p().inv[0], null, "sell") !== merchants.priceOf(game, { kind: "vial", effect: "" }, null, "sell")) fail("a vial of glim sells for more than its glass");
     const L = (await m("content/liquids.js")).LIQUIDS;
     stats.liquids = `${Object.keys(L).length} liquids (every faction's sacrament among them); a vial filled with brine; fresh water +2 HP; ink, Flat`;
+  }
+
+  // --- 14b. C2's liquids and money (bible §3.1, §13.7) -------------------------------------------------------------------
+  // Every liquid is whole (a name, a colour, a vial's worth of 1-30 glim, its drink and touch words, its effects) and
+  // its sacrament list and the factions' `liquid` agree both ways; the effects hold bible §13.7's numbers, name only
+  // statuses the game has or the three it waits for, and where drinkLiquid already acts (heals, Flat, poison, night
+  // eyes) it does what the data says. The money's words and reference numbers are §3.1's.
+  {
+    const L = (await m("content/liquids.js")).LIQUIDS, { CURRENCY: CUR } = await m("content/currency.js"), ST = await m("status.js");
+    const WANTED = ["glowing", "nausea", "confused"];   // statuses §13.7 needs that status.js hasn't (integration request)
+    const KNOWN = ["heal", "hurt", "status", "save", "burns", "douse", "clean", "ward", "stain", "draws", "shortcut", "dark", "seek", "reroll",
+      "shutdown", "transform", "seePlane", "rep", "again"];
+    let effects = 0;
+    for (const [id, d] of Object.entries(L)) {
+      if (d.sameAs) { if (!L[d.sameAs] || L[d.sameAs].sameAs) fail(`liquid ${id}: sameAs ${d.sameAs}`); continue; }
+      if (!d.name || d.color?.length !== 3 || !Number.isInteger(d.value) || d.value < 1 || d.value > 30 || !d.drink || !d.touch) fail(`liquid ${id} isn't whole: ${JSON.stringify(d).slice(0, 90)}`);
+      for (const f of d.sacramentOf || []) if (F.FACTIONS[f]?.liquid !== id) fail(`liquid ${id}: ${f}'s sacrament is ${F.FACTIONS[f]?.liquid}`);
+      for (const e of [...(d.effects?.drink || []), ...(d.effects?.touch || [])]) {
+        effects++;
+        if (!Object.keys(e).some((k) => KNOWN.includes(k))) fail(`liquid ${id}: an effect ${JSON.stringify(e)}`);
+        for (const s of [e.status, e.fail?.status].filter(Boolean)) if (!ST.STATUS_DEFS[s] && !WANTED.includes(s)) fail(`liquid ${id}: status ${s} isn't one`);
+      }
+      if (!Array.isArray(d.effects?.drink) || !Array.isArray(d.effects?.touch)) fail(`liquid ${id}: no effects`);
+    }
+    // (content/factions.js's own factions: a generated village or cult registered earlier in this process pours a
+    // village's liquid, which no table lists)
+    const CF = (await m("content/factions.js")).FACTIONS;
+    for (const [id, f] of Object.entries(CF)) if (L[f.liquid] && !L[f.liquid].sacramentOf?.includes(id)) fail(`${id}'s sacrament ${f.liquid} doesn't list it`);
+    const eff = (id, part, key) => (L[id].effects[part] || []).find((e) => e[key] !== undefined || e.status === key);
+    const bible = [   // bible §13.7: [liquid, part, finder, field, want]
+      ["glim", "drink", "glowing", "t", 10], ["glim", "touch", "burns", "burns", 6], ["brine", "drink", "nausea", "t", 3], ["brine", "touch", "ward", "ward", 3],
+      ["ink", "drink", "confused", "t", 5], ["ink", "drink", "flat", "t", 60], ["ink", "drink", "flat", "perTou", -3], ["ink", "touch", "stain", "stain", { sight: 2, t: 30 }],
+      ["umbra", "drink", "nightEyes", "t", 60], ["umbra", "drink", "blinded", "t", 20], ["quicksilver", "drink", "poisoned", "t", 6], ["sunwine", "drink", "heal", "heal", 6],
+      ["sunwine", "touch", "pinned", "t", 1], ["freshWater", "drink", "heal", "heal", 2], ["clearGlim", "drink", "seePlane", "seePlane", 1800],
+      ["clearGlim", "touch", "burns", "burns", 12], ["turnwater", "drink", "shutdown", "days", 1], ["turnwater", "touch", "transform", "transform", "sameTier"],
+      ["blood", "touch", "stain", "stain", { sight: 2, t: 30 }], ["blood", "touch", "draws", "draws", "saltbeasts"],
+    ];
+    // A vial's words say what drinking does today: a liquid whose drink waits on a status or effect the game hasn't
+    // got keeps the bible's words in `full`, and its shown words don't name what isn't there.
+    for (const [id, d] of Object.entries(L)) {
+      if (d.sameAs) continue;
+      const waits = (d.effects.drink || []).some((e) => WANTED.includes(e.status) || e.reroll || e.seePlane || e.after);
+      if (waits && (!d.full?.drink || /glow for|nausea|confus|re-roll|see the Plane|blind/.test(d.drink))) fail(`liquid ${id}: "${d.drink}" promises what drinking doesn't do yet`);
+    }
+    for (const [id, part, key, field, want] of bible) {
+      const got = eff(id, part, key)?.[field];
+      if (JSON.stringify(got) !== JSON.stringify(want)) fail(`liquid ${id} ${part} ${key}.${field}: ${JSON.stringify(got)}, bible §13.7 ${JSON.stringify(want)}`);
+    }
+    if (eff("clearGlim", "drink", "rep")?.rep?.lampless !== -100 || L.clearGlim.value !== 5) fail("clear glim: Lampless −100 if seen, worth 5 a unit (bible §3.1, §13.7)");
+    // Where drinkLiquid acts today, it acts as the data says.
+    for (const id of ["freshWater", "sunwine", "longbackMilk", "mulchWine", "sap"]) {
+      fresh(1234, { genotype: "bent" });
+      p().hp = 1;
+      liquids.drinkLiquid(game, p(), id);
+      const want = 1 + eff(id, "drink", "heal").heal;
+      if (p().hp !== want) fail(`${id}: drinking it heals ${p().hp - 1}, the data says ${want - 1}`);
+    }
+    fresh(1234, { genotype: "bent" });
+    for (const [id, s] of [["quicksilver", "poisoned"], ["umbra", "nightEyes"]]) {
+      liquids.drinkLiquid(game, p(), id);
+      if (!p().status?.[s] || Math.abs(p().status[s].t - eff(id, "drink", s).t) > 0.01) fail(`${id}: ${s} ${p().status?.[s]?.t}, the data ${eff(id, "drink", s).t}`);
+    }
+    // The money: purses as flasks, the banks, the words, §3.1's anchors.
+    const A = CUR.anchors;
+    if (CUR.flasks.map((f) => f.size).join() !== CUR.purses.join() || CUR.flasks.map((f) => f.price).join() !== "0,150,450" || CUR.startPurse !== CUR.purses[0])
+      fail(`the flasks ${JSON.stringify(CUR.flasks.map((f) => [f.size, f.price]))}, bible §3.1: 200 at the start, 500 for 150, 1,000 for 450`);
+    if (CUR.banks.join() !== "F,H,D" || CUR.bankFee !== 0.05) fail(`the banks ${CUR.banks} at ${CUR.bankFee}, bible §3.1: Molar, Halfnight, Benchmark at 5%`);
+    for (const [k, s] of Object.entries(CUR.lines)) if (!s || s.length > 128) fail(`the money's line ${k}: "${s}"`);
+    const P = A.prices, S = A.sources;
+    if (P.throwingKnife !== 8 || P.bomb !== 20 || P.balmTonic !== 25 || P.copperShortSword !== 40 || P.ironLongsword !== 120 || P.innNight !== 10 ||
+        P.homingPip !== 300 || P.implant.join() !== "400,2000" || P.clearGlim !== 5 || S.questPerTier !== 25 || S.floorPiles.base !== 10 ||
+        S.floorPiles.perTier !== 4 || S.commonsLampPerDay !== 5 || A.torch.glim !== 1 || A.torch.hours !== 4) fail(`the money's anchors aren't bible §3.1's: ${JSON.stringify(A).slice(0, 120)}`);
+    stats.liquidsC2 = `${Object.keys(L).length - 1} liquids whole, ${effects} effects (statuses the game has, or ${WANTED.join(", ")}), ${bible.length} of §13.7's numbers; ` +
+      `drinkLiquid as the data for 5 heals, poison and night eyes; the money: 3 flasks, 3 banks at 5%, ${Object.keys(CUR.lines).length} lines, §3.1's anchors`;
   }
 
   // --- 15. Shrines -------------------------------------------------------------------------------------------------------

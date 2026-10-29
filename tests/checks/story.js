@@ -24,6 +24,8 @@
 // 6. The journal screen: J opens it, its five tabs by keys and clicks, the Histories tab shows what you read, J, Esc and
 //    a click outside the tabs close it; its state survives JSON (a save). On the Locations tab O, Enter and a click on a
 //    place's title show the marked place on the world map, to look only, and Esc comes back to the journal.
+// 10. The peoples' content (C2): the village pools, founders, styles and names, and the grammar's lists and accounts,
+//    held to bible §2.3, §8 and §9; the budgeted areas' words counted (its own comment, at the end).
 import * as names from "./names.js";
 
 const NAME = "story (history, grammar, secrets, murals, gossip, journal; villages, quests, campaign)";
@@ -454,6 +456,7 @@ export async function run(env) {
   await villages7b(env, { fail, stats, test, real, json, startRun, game });
   await quests7b(env, { fail, stats, test, json, startRun, game });
   await campaign7b(env, { fail, stats, real, test, json, game, startRun });
+  await peoplesC2(env, { fail, stats });   // C2
   return { name: NAME, ok: problems.length === 0, problems, stats };
 }
 
@@ -862,4 +865,125 @@ async function campaign7b(env, { fail, stats, real, test, json, game, startRun }
   game.run = keep.run; game.quests = keep.quests; game.state.campaign = keep.campaign;
   stats.campaign = `11 beats as data at their landmarks' floors; the start on the real world gives beat 1 (none on the test world, whose intro stays the parent's); ` +
     `beats done by their events in order, 8 before 7, 9 after both; the Lengthening after beats ${json(lengthen)}; beat 10 begun early ×1.5`;
+}
+
+// --- 10. The peoples' content (C2) ----------------------------------------------------------------------------------
+// The village pools are bible §9.3's (14 events, 8 governments, 12 sacred and 12 profane things, 12 activities, 11
+// proverbs, 12 dishes, 16 skills, 10 liquids that exist, 4 shrines with a wrong-view line and a reward); the founding
+// peoples and the architecture by region are §9.3's and §9.4's tables, each style's blocks exist and its heights stay
+// within DECISIONS "Heights"; every people names its cast from its own list (bible §2.3), long enough for a full cast,
+// with nobody's name that a landmark's person already has; every dish has its book entry. The grammar holds bible
+// §8.2's ten domains (six practices, weapon words, omens and ruin words, four relic powers), the 16 event types with
+// all three accounts of every variant, the eleven old factions (registered), the ten guilds and Noon's 18 lines.
+// The words of each budgeted area (bible §15.9) are counted into the stats.
+const BIBLE_FOUNDERS = {   // bible §9.3 "Founding peoples by region", §9.4's style; keys: C1a's region ids (docs/c1.md)
+  flats: [["marshfolk", "clatter"], "reed"], waste: [["drovers", "pressed"], "salt"], steps: [["drovers", "kites", "rustbacks"], "ledge"],
+  downs: [["farmers", "exiles"], "turf"], pleatwood: [["families", "sporeMoot"], "bark"], deepPleat: [["families", "errata"], "bark"],
+  tessellate: [["flatfolk", "pressed"], "page"], shade: [["lampless"], "cell"], stacks: [["plan"], "storey"],
+  glassShore: [["clatter", "errata"], "glass"], teeth: [["kites", "hermits"], "cave"],
+};
+// C1a's 20 region ids (docs/c1.md on ws/c1, fixed 2026-10-29); at C1a's merge content/world/regions.js holds them.
+const C1A_REGIONS = ["flats", "hollowMere", "waste", "steps", "downs", "pleatwood", "deepPleat", "tessellate", "shade", "stacks", "oldCuts",
+  "lattice", "teeth", "glassSea", "glassShore", "oldRule", "straightCut", "glassCauseway", "slake", "inkrun"];
+const OLD_FACTIONS = ["flatfolk", "plan", "kites", "clatter", "unlit", "moths", "saltbeasts", "pleatwood", "sporeMoot", "askew", "errata"];
+const GUILDS = ["the glaziers", "the salt-rakers", "the scribes", "the gravewardens", "the stair-builders", "the smelters", "the chandlers",
+  "the clockmen", "the folders", "the herders"];
+const TAKEN = ["Maren", "Pell", "Mira", "Hallen", "Ess", "Tee", "Brann", "Corwin", "Rook", "Lio"];   // the parent's people (bible §5's are read from the bible)
+
+async function peoplesC2(env, { fail, stats }) {
+  const { VILLAGES: V } = await env.src("content/villages.js"), { GRAMMAR: G } = await env.src("content/grammar.js");
+  const { LIQUIDS } = await env.src("content/liquids.js"), { B } = await env.src("blocks.js"), F = await env.src("factions.js");
+  const C = await env.src("content/factions.js"), { VILLAGE_ROLES } = await env.src("story/villages.js");
+  const words = (s) => (String(s ?? "").match(/[A-Za-z0-9'’-]+/g) || []).length;
+  const sum = (xs) => xs.reduce((n, s) => n + words(s), 0);
+  // The pools.
+  const sizes = { events: 14, governments: 8, sacred: 12, profane: 12, activities: 12, proverbs: 11, dishes: 12, skills: 16, liquids: 10 };
+  for (const [k, n] of Object.entries(sizes)) if (V[k]?.length !== n || new Set(V[k].map((x) => x.id ?? x)).size !== n) fail(`villages: ${V[k]?.length} ${k}, bible §9.3 has ${n}`);
+  for (const l of V.liquids) if (!LIQUIDS[l]) fail(`villages: the sacred liquid ${l} isn't a liquid`);
+  for (const [id, s] of Object.entries(V.shrines)) if (!s.wrong || !s.reward?.text || !["map", "3d", "dark"].includes(s.view)) fail(`villages: the ${id} shrine ${JSON.stringify(s).slice(0, 80)}`);
+  if (Object.keys(V.shrines).join() !== "mosaic,relief,rune,pillar") fail(`villages: shrines ${Object.keys(V.shrines)}`);
+  if (V.governments.find((g) => g.id === "council")?.speakers?.join() !== "Flat-speaker,Deep-speaker,Dark-speaker") fail("villages: the Council of Three's speakers");
+  if (JSON.stringify(V.commons.take) !== JSON.stringify({ free: 5, per: 5, rep: -25 })) fail(`villages: the commons lamp ${JSON.stringify(V.commons.take)}, bible §3.1: 5 free a day, −25 a 5 more`);
+  const { BONUS_KEYS, ATTRS } = await env.src("stats.js"), KEYS = new Set([...BONUS_KEYS, ...ATTRS]);
+  for (const d of V.dishes) {
+    const b = V.dishBook[d];
+    if (!b?.note || !b.text || !b.bonus || !Object.keys(b.bonus).length) fail(`villages: no dish book entry for ${d}`);
+    else for (const k of Object.keys(b.bonus)) if (!KEYS.has(k)) fail(`villages: ${d}'s buff ${k} isn't a bonus key (stats.js BONUS_KEYS)`);
+  }
+  // Regions: founders and styles.
+  for (const [r, [peoples, style]] of Object.entries(BIBLE_FOUNDERS)) {
+    const t = V.byTerrain[r];
+    if (!t || t.peoples.join() !== peoples.join() || t.style !== style) fail(`villages: ${r} → ${JSON.stringify(t)}, bible §9.3/§9.4: ${peoples} in ${style}`);
+  }
+  const { TEST_WORLD } = await env.src("content/world/test-world.js"), testTerrains = Object.keys(TEST_WORLD.terrains);
+  for (const r of Object.keys(V.byTerrain)) if (!C1A_REGIONS.includes(r) && !testTerrains.includes(r)) fail(`villages: ${r} is neither a region of C1a's nor a test-world terrain`);
+  for (const [id, f] of Object.entries(C.FACTIONS)) for (const r of f.homeRegions || []) if (!C1A_REGIONS.includes(r)) fail(`factions: ${id}'s home region ${r} isn't one of C1a's`);
+  for (const [id, S] of Object.entries(V.styles)) {
+    for (const k of ["wall", "floor", "roof", "ground"]) if (B[S[k]] === undefined) fail(`villages: style ${id}'s ${k} ${S[k]} isn't a block`);
+    // The highest floor in blocks (ledges 3 apart, storeys 4): at most 10 up, so 3-block walls and a roof stay under the
+    // scenery cap of 14 (DECISIONS "Heights"); a sunk floor at most 1 down.
+    const H = S.heights || {}, top = Math.max(0, H.stilts || 0, H.ledges ? (H.ledges[1] - 1) * 3 : 0, H.storeys ? (H.storeys[1] - 1) * 4 : 0,
+      H.canopy?.[1] || 0, H.cliff?.[1] || 0);
+    if (!S.views || top > 10 || (H.sunk || 0) > 1 || Object.keys(H).some((k) => !["stilts", "ledges", "storeys", "canopy", "cliff", "sunk"].includes(k)))
+      fail(`villages: style ${id}: heights ${JSON.stringify(S.heights)} (top floor ${top} up), views ${S.views}`);
+  }
+  // Names: each people's own list, a full cast's worth, nobody taken.
+  const cast = VILLAGE_ROLES.length + 6;
+  for (const [id, P] of Object.entries(V.peoples)) {
+    const list = V.names[P.names];
+    if (!list || list.length < cast || new Set(list).size !== list.length) fail(`villages: ${id}'s names (${P.names}): ${list?.length}, a cast needs ${cast}`);
+    if (!F.FACTIONS[P.faction] || !["bent", "peoples"].includes(P.parent)) fail(`villages: ${id}'s faction ${P.faction} / parent ${P.parent}`);
+  }
+  // Nobody is named after somebody already: the parent's people, or anyone bible §5 (the landmarks) names.
+  const bible = await env.text("docs/design/WORLD_BIBLE.md"), s5 = bible.slice(bible.indexOf("## 5. Fixed landmarks"), bible.indexOf("## 6. Factions"));
+  const inS5 = (n) => new RegExp(`(^|[^A-Za-z])${n.replace(/[-]/g, "[- ]")}([^A-Za-z]|$)`).test(s5);
+  if (s5.length < 1000) fail("villages: bible §5 not found to hold the names against");
+  const taken = Object.values(V.names).flat().filter((n) => TAKEN.includes(n) || inS5(n));
+  if (taken.length) fail(`villages: names somebody already has: ${taken.join(", ")}`);
+  // The grammar.
+  const D = Object.entries(G.domains);
+  if (D.length !== 10) fail(`grammar: ${D.length} domains`);
+  for (const [id, d] of D) {
+    for (const k of ["practices", "weapons", "omens", "ruins"]) if (d[k]?.length !== 6) fail(`grammar: ${id} has ${d[k]?.length} ${k}, bible §8.2 six`);
+    if (d.powers?.length !== 4 || d.powers.some((p) => !p.text || p.power === undefined)) fail(`grammar: ${id} has ${d.powers?.length} relic powers, bible §8.2 four`);
+    for (const pw of d.powers || []) {   // a bonus of BONUS_KEYS (Appendix A), else an ability id
+      if (typeof pw.power === "string") { if (!/^[a-z][a-zA-Z]+$/.test(pw.power)) fail(`grammar: ${id}'s power id "${pw.power}"`); }
+      else for (const k of Object.keys(pw.power || {})) if (!KEYS.has(k)) fail(`grammar: ${id}'s relic power key ${k} isn't a bonus key`);
+    }
+    if (!(d.cognomens?.length >= 4) || !(d.relicNouns?.length >= 4) || !Array.isArray(d.rgb) || d.rgb.length !== 3) fail(`grammar: ${id}'s cognomens, relic nouns or rgb`);
+  }
+  // A cult is drawn as "@" in its domain's colour (HOUR_CULT): no faction's colour, and no other domain's (DECISIONS "Glyphs").
+  const rgbs = D.map(([, d]) => d.rgb.join()), factionRgb = Object.values(C.FACTIONS).map((f) => (f.color || []).join());
+  if (new Set(rgbs).size !== rgbs.length || rgbs.some((x) => factionRgb.includes(x))) fail(`grammar: a domain's rgb repeats another's or a faction's: ${rgbs.join(" | ")}`);
+  if (D.map(([, d]) => d.guild).sort().join() !== GUILDS.slice().sort().join()) fail(`grammar: the guilds ${D.map(([, d]) => d.guild)}`);
+  if (Object.keys(G.factions).sort().join() !== OLD_FACTIONS.slice().sort().join()) fail(`grammar: the old factions ${Object.keys(G.factions)}`);
+  for (const id of OLD_FACTIONS) if (!F.FACTIONS[id] || G.factions[id]?.name !== F.FACTIONS[id].name) fail(`grammar: the old faction ${id} isn't the registered ${F.FACTIONS[id]?.name}`);
+  if (Object.keys(G.events).length !== 16) fail(`grammar: ${Object.keys(G.events).length} event types, bible §8.3 sixteen`);
+  let accounts = 0;
+  for (const [type, e] of Object.entries(G.events)) for (const variant of Object.keys(e.variants)) for (const reg of ["flat", "deep", "dark"]) {
+    const list = G.rules[`${type}/${variant}/${reg}`];
+    if (!list?.length || list.some((t) => !t.trim())) fail(`grammar: no ${reg} account for ${type}/${variant}`); else accounts++;
+  }
+  if (G.noon.length !== 6 || G.noon.some((n) => !n.flat || !n.deep || !n.dark)) fail("grammar: Noon's 18 lines");
+  // Words, by bible §15.9's areas.
+  const lists = D.reduce((n, [, d]) => n + sum([...d.practices, ...d.weapons, ...d.omens, ...d.ruins, ...d.powers.map((p) => p.text)]), 0);
+  const acc = Object.entries(G.rules).filter(([k]) => /^\w+\/\w+\/(flat|deep|dark)$/.test(k)).reduce((n, [, v]) => n + sum(v), 0);
+  const noon = sum(G.noon.flatMap((n) => [n.flat, n.deep, n.dark]));
+  const fl = Object.values(C.FACTIONS).reduce((n, f) => n + sum(Object.values(f.lines?.greet || {})) + sum(Object.values(f.lines?.trespass || {})) +
+    sum(f.riteVariant?.words || []) + sum(f.riteVariant?.altWords || []), 0) + sum(Object.values(C.HOUR_CULT.lines.greet)) + sum(Object.values(C.HOUR_CULT.lines.trespass));
+  const faith = Object.values(C.FAITHS).reduce((n, f) => n + sum(Object.values(f.lines)), 0);
+  const pools = sum([...V.events.map((e) => e.text), ...V.sacred, ...V.profane, ...V.activities, ...V.proverbs, ...V.dishes,
+    ...Object.values(V.dishBook).flatMap((b) => [b.note, b.text]), ...Object.values(V.shrines).flatMap((s) => [s.pray, s.wrong, s.reward.text]),
+    ...Object.values(V.commons.lines), ...Object.values(V.styles).map((s) => s.views)]);
+  // The budgets (bible §15.9) held: the lines and the pools within theirs; the history grammar is over its 2,400 (WS7's
+  // second account of each variant, kept so a run's accounts stay apart: docs/sessions/c2.md deviation), so it may not grow.
+  const allFaith = Object.values(C.FAITHS).reduce((n, f) => n + sum(JSON.stringify(f).match(/"[^"]*\s[^"]*"/g) || []), 0);
+  if (fl + faith > 1200) fail(`words: faction and faith lines ${fl + faith}, over §15.9's 1,200`);
+  if (pools > 1000) fail(`words: village pools ${pools}, over §15.9's 1,000`);
+  if (lists + acc + noon > 2864) fail(`words: the history grammar grew to ${lists + acc + noon} (2,864 at C2, §15.9's 2,400)`);
+  stats.peoplesFaiths = `all of FAITHS' text (creeds, holy places, practices, hooks, lines): ${allFaith} words, most of it bible §7's own`;
+  stats.peoples = `villages: §9.3's pools, ${Object.keys(BIBLE_FOUNDERS).length} regions' founders and styles, ${Object.keys(V.names).length} name lists; ` +
+    `grammar: 10 domains × 6/6/6/6 and 4 relic powers, ${accounts} accounts (16 types, every variant × 3), Noon 18; ` +
+    `words: history grammar ${lists + acc + noon} (lists ${lists}, accounts ${acc}, Noon ${noon}; §15.9 2,400), faction and faith lines ${fl + faith} ` +
+    `(factions ${fl}, faiths ${faith}; §15.9 1,200), village pools ${pools} (§15.9 1,000 with the quest templates)`;
 }
