@@ -211,7 +211,10 @@ export async function checkProgression(m) {
         // The Levels (bible §10.10), written out here rather than read from the table under test: Vey +3 to examine,
         // Orrum +1 natural armour, Cassin neither.
         const LEVEL_WANT = { vey: { examine: 3, av: 0 }, orrum: { examine: 0, av: 1 }, cassin: { examine: 0, av: 0 } };
-        const want = LEVEL_WANT[B.level] || { examine: 0, av: 0 };
+        // (C4) and the kits' worn pieces, written out too: the Archivist's examining kit, +2 (bible §10.10).
+        const KIT_WANT = { archivistOfVey: { examine: 2 } };
+        const want = { ...(LEVEL_WANT[B.level] || { examine: 0, av: 0 }) };
+        want.examine += KIT_WANT[bg]?.examine || 0;
         // (The free implant, fitted since the WS9 merge, adds its own: WS5's table, not the one under test.)
         const own = (g === "plumb" && m.implants.IMPLANTS[B.implant]?.bonus) || {};
         const armour = { clothes: 0, leather: 1, chain: 2 }[B.kit.equip.body?.id] ?? 0, wantAv = armour + want.av + (own.av || 0);
@@ -1105,8 +1108,10 @@ export async function checkProgression(m) {
       // Through a long map action (5 s at once) Dark-fear holds: no frame runs inside it.
       T.mapUseTime(game, 5);
       if (!STS.hasStatus(p, "shaken") || st.bonus(p, "toHit") !== -2) fail(`Dark-fear after a 5 s map action: ${JSON.stringify(Object.keys(p.status))}, toHit ${st.bonus(p, "toHit")}`);
+      // (Moth-kissed's -0.3 on top of what the kit already gives: the Reedcutter's reed cloak, +0.1, since C4.)
+      const kitStealth = st.bonus(p, "stealth");
       p.torch = true; step(1 / 60);
-      if (STS.hasStatus(p, "shaken") || !STS.hasStatus(p, "mobbed") || st.bonus(p, "stealth") !== -0.3) fail(`the torch lit: ${JSON.stringify(Object.keys(p.status))}, stealth ${st.bonus(p, "stealth")}`);
+      if (STS.hasStatus(p, "shaken") || !STS.hasStatus(p, "mobbed") || Math.abs(st.bonus(p, "stealth") - (kitStealth - 0.3)) > 1e-9) fail(`the torch lit: ${JSON.stringify(Object.keys(p.status))}, stealth ${st.bonus(p, "stealth")}, want ${kitStealth} - 0.3`);
       if (!m.pmut.lasting(p.status.mobbed) || JSON.stringify(codec.encodePlayer(p).status.mobbed) !== JSON.stringify(p.status.mobbed)) fail(`Moth-kissed's status doesn't last or doesn't save: ${JSON.stringify(p.status.mobbed)}`);
       // Lightsick: on the surface by day, 1 HP every 20 s; underground nothing.
       p.mutations = { lightsick: 1 }; st.invalidateStats(p);
