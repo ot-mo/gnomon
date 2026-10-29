@@ -1138,7 +1138,7 @@ export function checkGear(m) {
           if (spec.material !== dmg) fail(`${set}: ${mat} ${id}: the spec's material is ${spec.material}, want ${dmg}`);
           const w = I.WEAPONS[id], line = I.itemInfo(game, it);
           if (!line.startsWith(`${w.dmg[0] + dmg}-${w.dmg[1] + dmg} damage`) || !line.includes(F.MATERIALS[mat].info)) fail(`${set}: ${mat} ${id}'s line: "${line}"`);
-          if ((St.bonus(e, "cutsFlat") > 0) !== (mat === "noonsilver")) fail(`${set}: ${mat} ${id}: cutsFlat ${St.bonus(e, "cutsFlat")}`);
+          if ((St.bonus(e, "cutsFlat") > 0) !== (mat === "noonsilver") || line.includes("cuts flat") !== (mat === "noonsilver")) fail(`${set}: ${mat} ${id}: cutsFlat ${St.bonus(e, "cutsFlat")}, line "${line}"`);
           if (!Bd.unequip(game, e, "hand_r").ok || snap(e) !== before) fail(`${set}: ${mat} ${id} on and off changed the derived numbers`);
           pieces++;
         }
@@ -1154,6 +1154,7 @@ export function checkGear(m) {
           const part = Bd.slotsFor(e, it)[0];
           const plain = { kind: "armour", id, ench: 0, known: true }, pe = entity();
           if (!Bd.equip(game, pe, plain, part).ok || !Bd.equip(game, e, it, part).ok) { fail(`${set}: ${mat} ${id} won't go on ${part}`); continue; }
+          if (I.itemInfo(game, it).includes("cuts flat")) fail(`${set}: ${mat} ${id}'s line says it cuts flat beings: only a weapon does`);
           if (St.av(e) - St.av(pe) !== (forged ? av : 0)) fail(`${set}: ${mat} ${id}: armour ${St.av(e)} against ${St.av(pe)} plain, want +${forged ? av : 0}`);
           if (!Bd.unequip(game, e, part).ok || snap(e) !== before) fail(`${set}: ${mat} ${id} on and off changed the derived numbers`);
           pieces++;

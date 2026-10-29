@@ -16,7 +16,8 @@
 //     dmg      what it adds to a weapon's damage; av: what it adds to a forged armour piece (FORGED.armour)
 //     value    the price multiplier over the class's copper value (VALUE): bible §3.1's anchors are a copper short
 //              sword at 40 and an iron longsword at 120
-//     info     what the item's line says of it (only what the game does: a rule still to be built is in `needs`)
+//     info     what the item's line says of it (only what the game does: a rule still to be built is in `needs`);
+//              weaponInfo: what a weapon of it adds to that (noonsilver's cut: the bonus below is the weapon kind's)
 //     bonus    to the stat bus while a weapon of it is wielded (noonsilver cuts flat beings: creatures.js reads cutsFlat)
 //     strReq   pleatmetal's −3 STR requirement (items.js strNeeded doesn't read it yet: docs/c4.md)
 //     needs    the rest of the bible's line, for the code that will do it (docs/c4.md, integration requests)
@@ -33,8 +34,9 @@ export const MATERIALS = {
                 needs: "ignores 1 point of armour (combat.js soak)" },
   pleatmetal: { name: "pleatmetal", tier: 7, dmg: 5,  av: 2, value: 5.5, color: [176, 146, 206], info: "folded a thousand times", strReq: -3,
                 needs: "-3 STR requirement (items.js strNeeded reads strReq); draws as a hairline on the map (renderMap.js)" },
-  noonsilver: { name: "noonsilver", tier: 8, dmg: 6,  av: 3, value: 7.5, color: [255, 244, 206], info: "it casts no shadow, and cuts flat beings in 3D",
-                bonus: { cutsFlat: 1 }, needs: "glows at noon (hud.js, render3d.js)" },
+  noonsilver: { name: "noonsilver", tier: 8, dmg: 6,  av: 3, value: 7.5, color: [255, 244, 206], info: "it casts no shadow",
+                weaponInfo: "it cuts flat beings in 3D", bonus: { cutsFlat: 1 },
+                needs: "glows at noon (hud.js, render3d.js); a noonsilver bolt cutting flat beings too (combat.js passes `blade` for melee only)" },
 };
 export const MATERIAL_ORDER = Object.keys(MATERIALS);
 
@@ -223,6 +225,9 @@ export const TEXT = {
   assizeWrit: "Sealed in quicksilver. It vouches for you, loudly.",
 };
 
-// The line an item's info shows for its material: "copper: soft and green".
-export const materialLine = (made) => (MATERIALS[made] ? `${MATERIALS[made].name}: ${MATERIALS[made].info}` : "");
+// The line an item's info shows for its material: "copper: soft and green" (a weapon's with its weaponInfo).
+export const materialLine = (made, kind = null) => {
+  const d = MATERIALS[made];
+  return d ? `${d.name}: ${d.info}${kind === "weapon" && d.weaponInfo ? `; ${d.weaponInfo}` : ""}` : "";
+};
 export const isForged = (kind, id) => kind === "weapon" || !!FORGED[kind]?.includes(id);

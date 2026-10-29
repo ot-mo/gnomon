@@ -298,7 +298,7 @@ const isNew = (it) => !!(it.made || (it.kind === "weapon" ? GEAR_WEAPONS : GEAR_
 function newInfo(it) {
   if (!isNew(it)) return "";
   const def = (it.kind === "weapon" ? WEAPONS : ARMOURS)[it.id], cls = it.kind === "weapon" && CLASSES[CLASS_OF[it.id]];
-  const parts = [cls?.info, def.info, it.made && materialLine(it.made)].filter(Boolean);
+  const parts = [cls?.info, def.info, it.made && materialLine(it.made, it.kind)].filter(Boolean);
   return parts.length ? " · " + parts.join(" · ") : "";
 }
 const materialDmg = (it) => (it.made ? MATERIALS[it.made]?.dmg || 0 : 0);
