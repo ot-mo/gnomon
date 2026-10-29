@@ -130,7 +130,7 @@ export const GRAMMAR = {
       cognomens: ["the Chandler", "Who Sealed the Doors", "the Honeyed", "Wick of the Morning"],
       relicNouns: [["Wick", { kind: "amulet", id: "sight" }], ["Seal", { kind: "ring", id: "regeneration" }],
                    ["Spear", { kind: "weapon", id: "spear" }], ["Hive", { kind: "amulet", id: "life" }]],
-      powers: [{ power: { torch: 2 }, text: "torch radius +2" }, { power: "stickyStrike", text: "what you strike sticks for 1 s" },
+      powers: [{ power: { torch: 0.34, torchCost: -1 }, text: "torch radius +2, at no glim" }, { power: "stickyStrike", text: "what you strike sticks for 1 s" },
                { power: "sealDoor", text: "seal a door shut once a floor" },
                { power: "balmDouble", text: "balms heal double" }],
     },
