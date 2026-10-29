@@ -30,8 +30,8 @@ const row = (type, weight, lo, hi) => [type, weight, lo, hi];
 export const ENCOUNTERS = {
   kinds: { band: 6, travellers: 3, legend: 1 },
   regions: {
-    // The Flats and the Mere: the safest country; more people on the way than teeth.
-    flats: { kinds: { band: 5, travellers: 4, legend: 1 },
+    // The Flats: the safest country, its beasts small.
+    flats: {
       rows: [row("saltrat", 4, 1, 8), row("brinehog", 3, 1, 8), row("brineGrub", 2, 1, 8), row("flatling", 1, 1, 10)] },
     waste: { rows: [row("brinehog", 3, 1, 11), row("rustbackScav", 3, 1, 11), row("chaffDevil", 3, 3, 11), row("saltrat", 1, 1, 7)] },
     steps: { rows: [row("rustbackScav", 5, 1, 10), row("rustbackSlinger", 2, 3, 10), row("ledgehorn", 3, 3, 10), row("ledgeSpider", 2, 3, 10),
@@ -41,24 +41,24 @@ export const ENCOUNTERS = {
                     row("barrowTroll", 1, 9, 16), row("assizeOutrider", 1, 6, 13)] },
     // The Pleatwood keeps its own peace (its beetles, vines and monkeys are the trees' and leave a stranger be until
     // the trees don't): what comes for you on its roads is the wood's other animals.
-    pleatwood: { kinds: { band: 4, travellers: 4, legend: 1 },
+    pleatwood: {
       rows: [row("pleatSpider", 4, 3, 15), row("duskBat", 2, 3, 14), row("hangvine", 1, 6, 16), row("paperWasps", 2, 9, 23), row("brinehog", 1, 3, 8)] },
     deepPleat: { rows: [row("paperWasps", 4, 9, 23), row("pleatSpider", 2, 9, 15), row("mootWalker", 2, 12, 23), row("hangvine", 1, 9, 23),
                         row("plumbknight", 1, 12, 23), row("assizer", 1, 12, 23), row("assizeOutrider", 1, 9, 17), row("duskBat", 1, 9, 14)] },
-    // The Tessellate: Flatfolk couriers on every road, and the Assize's hounds after them.
-    tessellate: { kinds: { band: 5, travellers: 4, legend: 1 },
+    // The Tessellate: the Assize's hounds after the Flatfolk, and the floors that bite.
+    tessellate: {
       rows: [row("pressHound", 4, 9, 18), row("tileMimic", 3, 9, 18), row("erratum", 1, 9, 18), row("lampHound", 1, 6, 16), row("mosaicGolem", 1, 12, 18)] },
-    shade: { kinds: { band: 7, travellers: 1, legend: 2 },
+    shade: {
       rows: [row("shade", 4, 12, 28), row("longshadow", 3, 12, 28), row("wraith", 2, 12, 28)] },
     inkrun: { rows: [row("longshadow", 2, 12, 17), row("pressHound", 2, 9, 16), row("shade", 2, 12, 17), row("wraith", 1, 12, 17)] },
     stacks: { rows: [row("rustbackBrute", 3, 12, 25), row("beatSpider", 3, 12, 25), row("rustOoze", 2, 12, 25), row("girderGolem", 1, 15, 25)] },
-    lattice: { kinds: { band: 7, travellers: 1, legend: 2 },
+    lattice: {
       rows: [row("askewAngle", 3, 18, 30), row("fold", 2, 18, 30), row("latticeTroll", 2, 18, 30), row("planarQueen", 1, 18, 30)] },
     teeth: { rows: [row("ledgehorn", 3, 3, 14), row("duskBat", 2, 3, 14), row("cairnHound", 1, 3, 11), row("lampHound", 1, 6, 16), row("barrowTroll", 1, 9, 16)] },
     glassShore: { rows: [row("glassCrab", 3, 12, 24), row("slagSalamander", 2, 12, 24), row("erratum", 2, 9, 24), row("tileMimic", 2, 9, 16), row("pressHound", 1, 9, 18)] },
     glassCauseway: { rows: [row("glassCrab", 3, 12, 22), row("erratum", 2, 9, 22), row("slagSalamander", 1, 12, 22)] },
-    // The roads: traders and drovers going the other way, and whoever patrols the road.
-    oldRule: { kinds: { band: 5, travellers: 5, legend: 1 },
+    // The roads: whoever patrols them, and whatever follows the carts.
+    oldRule: {
       rows: [row("rustbackScav", 3, 1, 10), row("brinehog", 2, 1, 8), row("saltrat", 1, 1, 7), row("cairnHound", 1, 3, 11), row("assizeOutrider", 2, 6, 17),
              row("pressHound", 1, 9, 17), row("rustbackBrute", 1, 12, 17), row("plumbknight", 1, 14, 17)] },
     straightCut: { rows: [row("assizeOutrider", 3, 6, 17), row("pressHound", 2, 9, 17), row("plumbknight", 1, 12, 19), row("assizer", 1, 12, 19),

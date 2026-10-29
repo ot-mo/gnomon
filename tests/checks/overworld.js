@@ -56,6 +56,10 @@ import { encounterChance, rollEncounter, placeEncounter, legendsFor, hiddenSiteR
 import { atlas, canStep, edgeBetween, spanKey, OW } from "../../src/overworld/state.js";
 import { isLost, lostChance } from "../../src/overworld/lost.js";
 import { worldView, spanLines } from "../../src/overworld/renderWorld.js";
+import { CREATURE_TYPES } from "../../src/creatures.js";
+import { attitude } from "../../src/factions.js";
+import { compileWorld } from "../../src/world/worldmodel.js";
+import { pickRow, rowsAt } from "../../src/content/creatures/levels.js";
 
 const DIRS = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]];
 const WORLDS = (game) => [["test", game.world], ["real", REAL_WORLD]];
@@ -433,6 +437,63 @@ function bands(G, name, world, problems) {
   return { unvisited: range(dists.unvisited), visited: range(dists.visited), short, real };
 }
 const range = (xs) => (xs.length ? { n: xs.length, min: +Math.min(...xs).toFixed(2), max: +Math.max(...xs).toFixed(2) } : { n: 0 });
+
+// --- 4b. The real world's encounter tables (C3; content/encounters.js ENCOUNTERS.regions) --------------------------
+// Every real-world region with an encounter rate has rows; each row a registered kind out for a Bent stranger at the
+// start, weight > 0, levels within 1-30; every level its spans make held by two kinds or more; a region's kinds only
+// band, travellers and legend; no entry for a test-world region (its draws stay as they were); pickRow draws each kind
+// of a level by its weight (20,000 draws, within 1.5 points) and nothing outside the level. Three mutants, each caught.
+function tableProblems(game) {
+  const out = [], W = compileWorld(REAL_WORLD), E = ENCOUNTERS.regions, levels = {};
+  for (const t of W.tiles) if (t.encounterRate > 0) (levels[t.region] ||= new Set()).add(t.level);
+  for (const r of Object.keys(E)) if (!REAL_WORLD.regions[r]) out.push(`encounters: ${r} isn't a real-world region`);
+  for (const [r, set] of Object.entries(levels)) {
+    const rows = E[r]?.rows;
+    if (!rows?.length) { out.push(`encounters: ${r} has an encounter rate and no rows`); continue; }
+    for (const row of rows) {
+      const [type, w, lo, hi] = row, T = CREATURE_TYPES[type];
+      if (!T || T.talks || !(w > 0) || !Number.isInteger(lo) || !Number.isInteger(hi) || lo < 1 || hi > 30 || lo > hi) { out.push(`encounters: ${r} row ${JSON.stringify(row)}`); continue; }
+      const c = spawnCreature(type, 1, 1, FLOOR_Z, { rng: () => 0.5, level: lo });
+      if (attitude(game, c, game.player) !== "hostile") out.push(`encounters: ${r}'s ${type} isn't out for a stranger (${attitude(game, c, game.player)})`);
+    }
+    for (const L of set) if (rowsAt(rows, L).length < 2) out.push(`encounters: ${r} level ${L}: ${rowsAt(rows, L).length} kind(s), want 2 or more`);
+    const k = E[r].kinds;
+    if (k && (!Object.keys(k).every((x) => ["band", "travellers", "legend"].includes(x) && k[x] >= 0) || !(Object.values(k).reduce((a, n) => a + n, 0) > 0))) out.push(`encounters: ${r} kinds ${JSON.stringify(k)}`);
+  }
+  for (const t of compileWorld(game.world).tiles) if (E[t.region]) { out.push(`encounters: the test world's ${t.region} has an entry`); break; }
+  return { out, regions: Object.keys(levels).length };
+}
+function encounterTables(G, problems) {
+  const game = fresh(G, 23, G.game.world), p = game.player, saved = { genotype: p.genotype, rep: game.state.rep };
+  const stats = {};
+  try {
+    p.genotype = "bent"; game.state.rep = {};
+    const { out, regions } = tableProblems(game);
+    problems.push(...out);
+    // pickRow draws by weight within the level.
+    const rows = ENCOUNTERS.regions.downs.rows, L = 8, live = rowsAt(rows, L), want = live.reduce((a, r) => a + r[1], 0), got = {}, rng = makeRng(77);
+    for (let n = 0; n < 20000; n++) { const t = pickRow(rng, rows, L); got[t] = (got[t] || 0) + 1; }
+    for (const [type, w] of live) if (Math.abs(got[type] / 20000 - w / want) > 0.015) problems.push(`pickRow: the downs' ${type} drawn ${(got[type] / 200).toFixed(1)}%, its weight ${(100 * w / want).toFixed(1)}%`);
+    for (const t of Object.keys(got)) if (!live.some(([x]) => x === t)) problems.push(`pickRow: drew ${t}, not of level ${L}`);
+    if (pickRow(rng, rows, 31) !== null) problems.push("pickRow: drew at a level no row holds");
+    // Its teeth.
+    const mutants = [
+      ["an unregistered kind", () => { const r = ENCOUNTERS.regions.flats.rows; r.push(["noSuchThing", 1, 1, 8]); return () => r.pop(); }, /flats row \["noSuchThing"/],
+      ["one kind at a level", () => { const r = ENCOUNTERS.regions.lattice.rows, old = r.slice(); r.splice(1); return () => { r.length = 0; r.push(...old); }; }, /lattice level \d+: 1 kind/],
+      ["a docile kind in a band", () => { const r = ENCOUNTERS.regions.waste.rows; r.push(["longback", 1, 1, 11]); return () => r.pop(); }, /waste's longback isn't out for a stranger/],
+    ];
+    let caught = 0;
+    for (const [what, apply, re] of mutants) {
+      const undo = apply();
+      let o;
+      try { o = tableProblems(game).out; } finally { undo(); }
+      if (o.some((x) => re.test(x))) caught++; else problems.push(`encounter tables: the mutant "${what}" isn't caught`);
+    }
+    if (tableProblems(game).out.length !== out.length) problems.push("encounter tables: the rows aren't as they were after the mutants");
+    Object.assign(stats, { regions, rows: Object.values(ENCOUNTERS.regions).reduce((a, r) => a + (r.rows?.length || 0), 0), downsAt8: got, mutants: `${caught} of ${mutants.length}` });
+  } finally { p.genotype = saved.genotype; game.state.rep = saved.rep; }
+  return stats;
+}
 
 // --- 5. Rest -------------------------------------------------------------------------------------------------
 function resting(G, problems) {
@@ -1014,6 +1075,7 @@ export async function run(env) {
   section("fast travel", (pr) => Object.fromEntries(WORLDS(G.game).map(([n, w]) => [n, fast(G, n, w, pr)])));
   section("arrival edges", (pr) => ({ test: arrival(G, "test", G.game.world, { wx: 5, wy: 5 }, pr), real: arrival(G, "real", REAL_WORLD, { wx: 8, wy: 17 }, pr) }));
   section("encounter bands", (pr) => Object.fromEntries(WORLDS(G.game).map(([n, w]) => [n, bands(G, n, w, pr)])));
+  section("encounter tables (C3)", (pr) => encounterTables(G, pr));
   section("rest", (pr) => resting(G, pr));
   section("lost", (pr) => lost(G, pr));
   { const problems = []; let stats = {}; try { stats = await stored(G, problems); } catch (e) { problems.push(`threw: ${e?.stack || e}`); }
