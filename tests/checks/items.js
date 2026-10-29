@@ -1222,6 +1222,11 @@ export function checkGear(m) {
     const tierOf = (level) => Math.min(8, Math.ceil((level + 1) / 3));
     let launchers = 0;
     const HEAVY = { greatsword: 4, maul: 4, glaive: 4, waraxe: 3, longsword: 3 };
+    // The armour that does something now (written out, not read from gear.js useful): armour, or a bonus the stat bus reads.
+    const LOOT_ARMOUR = ["leather", "chain", "scale", "plate", "copperCap", "ironHelm", "goggles", "cloak", "bracers", "gauntlets", "boots",
+      "helm", "plumbHelm", "lampCrownHat", "monocle", "glassScale", "pleatedCoat", "reedCloak", "featherCloak", "mapCase", "kiteGlider", "examiningKit",
+      "stiltSandals", "stiltBoots"];
+    const drawnArmour = new Set();
     const tally = {};
     for (let level = 1; level <= 30; level++) {
       const tier = tierOf(level), rng = m.rng.makeRng(4100 + level), mats = {};
@@ -1229,13 +1234,14 @@ export function checkGear(m) {
         const it = GR.randomGear(rng, level);
         if (!I.ITEM_KINDS[it.kind] || !({ weapon: I.WEAPONS, armour: I.ARMOURS, missile: m.missileTable }[it.kind] || {})[it.id]) { fail(`level ${level}: drew ${JSON.stringify(it)}`); continue; }
         if (it.id === "clothes") fail(`level ${level}: drew plain clothes`);
-        if (!GR.useful(it.kind, it.id)) fail(`level ${level}: drew ${it.id}, which does nothing yet`);
+        if (it.kind === "armour" && !LOOT_ARMOUR.includes(it.id)) fail(`level ${level}: drew ${it.id}, which isn't loot (it does nothing yet, or is clothes)`);
         if (it.made) {
           mats[it.made] = (mats[it.made] || 0) + 1;
           if (F.MATERIALS[it.made].tier > tier) fail(`level ${level} (tier ${tier}): ${it.made} (tier ${F.MATERIALS[it.made].tier})`);
           if (it.kind !== "armour" && it.material !== F.MATERIALS[it.made].dmg) fail(`level ${level}: ${it.made} ${it.id} with material ${it.material}`);
         } else if (it.kind === "weapon" || it.id === "boltBow") fail(`level ${level}: a ${it.id} with no material`);
         if (it.kind === "missile") launchers++;
+        if (it.kind === "armour") drawnArmour.add(it.id);
         if (HEAVY[it.id] > tier) fail(`level ${level} (tier ${tier}): a ${it.id} before tier ${HEAVY[it.id]}`);
         if (I.ARMOURS[it.id]?.tier > tier && !F.FORGED.armour.includes(it.id)) fail(`level ${level}: ${it.id} of tier ${I.ARMOURS[it.id].tier}`);
       }
@@ -1244,6 +1250,8 @@ export function checkGear(m) {
       if (top !== own) fail(`level ${level} (tier ${tier}): the commonest material is ${top} (${JSON.stringify(mats)}), want ${own}`);
       tally[level] = top;
     }
+    const never = LOOT_ARMOUR.filter((id) => !drawnArmour.has(id));
+    if (never.length) fail(`randomGear never drew ${never.join(", ")} in 12,000 draws`);
     const a = [], b = [];
     for (let k = 0, r1 = m.rng.makeRng(9), r2 = m.rng.makeRng(9); k < 50; k++) { a.push(GR.randomGear(r1, 12)); b.push(GR.randomGear(r2, 12)); }
     if (JSON.stringify(a) !== JSON.stringify(b)) fail("randomGear: two draws from the same seed differ");
@@ -1398,6 +1406,50 @@ export function checkGear(m) {
       const bad = TN.injectTonic(game, p, "hasp", seq(0.01));
       if (bad.k !== 0.5 || !bad.overdose || !has(p, "tonic:crash") || ironbark !== 1) fail(`the Bent: ironbark +${ironbark} armour, a bad reaction ${JSON.stringify(bad)}`);
       out.bent = `ironbark +${ironbark} armour, bad reaction on 0.01`;
+    }
+    // The rules' numbers, written out (bible §13.8): the save's edge and its TOU modifier; the chain's 60 s; the Bent's 5%
+    // and halved times; the overdoses' times and effects; the values.
+    {
+      const tou20 = (p) => { p.attrs = { ...p.attrs, tou: 20 }; St.invalidateStats(p); return p; };   // TOU modifier +2
+      let p = tou20(fresh()); TN.injectTonic(game, p, "ironbark", seq(0.9));
+      const edge = TN.injectTonic(game, p, "gloam", seq(0.6));   // nat 13 + 2 = 15 against 15: a pass
+      p = tou20(fresh()); TN.injectTonic(game, p, "ironbark", seq(0.9));
+      const under = TN.injectTonic(game, p, "gloam", seq(0.55));   // nat 12 + 2 = 14: an overdose
+      if (edge.overdose || edge.save?.total !== 15 || !under.overdose || under.save?.total !== 14) fail(`the save's edge with TOU 20: ${JSON.stringify(edge.save)} ${edge.overdose}, ${JSON.stringify(under.save)} ${under.overdose}`);
+      p = fresh(); TN.injectTonic(game, p, "gloam", seq(0.9)); m.status.catchUpStatuses(game, p, 59);
+      const at59 = TN.injectTonic(game, p, "ironbark", seq(0.99));
+      p = fresh(); TN.injectTonic(game, p, "gloam", seq(0.9)); m.status.catchUpStatuses(game, p, 61);
+      const at61 = TN.injectTonic(game, p, "ironbark", seq(0.99));
+      if (!at59.save || at61.save) fail(`gloam's chain: a second at 59 s asked ${JSON.stringify(at59.save)}, at 61 s ${JSON.stringify(at61.save)}`);
+      let bents = 0, plumbs = 0;
+      const rng = m.rng.makeRng(77);
+      for (let k = 0; k < 4000; k++) {
+        const q = game.player;
+        q.genotype = k % 2 ? "bent" : "plumb"; q.status = {}; St.invalidateStats(q);
+        if (TN.injectTonic(game, q, "balm", rng).overdose) (k % 2 ? bents++ : plumbs++);
+      }
+      fresh();
+      if (Math.abs(bents / 2000 - 0.05) > 0.015 || plumbs) fail(`bad reactions: the Bent ${bents} of 2000 (want about 5%), the Plumb ${plumbs}`);
+      out.badReactions = `the Bent ${bents} of 2000, the Plumb ${plumbs}`;
+      const od = (id, check) => { const q = fresh(); game.zone.seen.fill(1); game.zone.holeSeen.fill(1); TN.injectTonic(game, q, "ironbark", seq(0.9)); TN.injectTonic(game, q, id, seq(0)); return check(q); };
+      const ods = {
+        balm: od("balm", (q) => m.status.statusLeft(q, "tonic:sick") === 30 && m.status.statusFlag(q, "noRegen")),
+        gloam: od("gloam", (q) => m.status.statusLeft(q, "darkened") === 20),
+        ironbark: od("ironbark", (q) => m.status.statusLeft(q, "tonic:heavy") === 20 && m.status.statusSpeed(q) === 0.5),
+        hasp: od("hasp", (q) => m.status.statusLeft(q, "hasted") === 15 && m.status.statusLeft(q, "tonic:crash") === 15),
+        foldSap: od("foldSap", (q) => m.status.statusLeft(q, "flat") === 60),
+        clearwit: od("clearwit", () => !game.zone.seen.some(Boolean) && !game.zone.holeSeen.some(Boolean)),
+      };
+      for (const [id, ok] of Object.entries(ods)) if (!ok) fail(`${id}'s overdose isn't the bible's`);
+      const half = {};
+      for (const [id, st, want] of [["hasp", "hasted", 7.5], ["foldSap", "flat", 5], ["gloam", "tonic:gloam", 60]]) {
+        const q = fresh({ genotype: "bent" }); TN.injectTonic(game, q, id, seq(0.9));
+        half[id] = m.status.statusLeft(q, st);
+        if (half[id] !== want) fail(`a Bent's ${id}: ${st} ${half[id]} s, want ${want}`);
+      }
+      const VALUES = { balm: 25, hasp: 40, gloam: 35, ironbark: 45, foldSap: 50, clearwit: 35 };
+      for (const [id, v] of Object.entries(VALUES)) if (I.itemPrice({ kind: "tonic", effect: id }) !== v) fail(`the ${id} tonic is worth ${I.itemPrice({ kind: "tonic", effect: id })}, want ${v}`);
+      out.rules = `the save's edge 15 passes and 14 fails at TOU 20; the chain asks at 59 s, not 61; a Bent's hasp ${half.hasp} s, fold-sap ${half.foldSap} s`;
     }
     // The balm played out and skipped heal the same.
     {
