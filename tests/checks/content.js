@@ -34,6 +34,16 @@
 //      region's, else the legacy one: gear of that level, potions and scrolls). Exempt, and reported: the test
 //      world's legacy stack keeps the parent's floor 1 (rat and goblin only; check-legacyfights holds its fights).
 //
+//   1b. C4's data (Phase 3; content/items/forge.js, gear.js, tonics.js, artifacts.js, mutations.js, backgrounds.js):
+//      the materials (a name, a tier each from 1 to 8, damage, armour, a rising value, a colour, a line; bonus keys);
+//      every weapon a class, a value and a description, the new ones tier 0 (the parent's loot never draws them); every
+//      armour a description, the new pieces a slot of the humanoid body, a tier, valid bonuses, something they do or
+//      what they wait for (`needs`), a worn reputation by the bible's factions; the forged pieces and values real ids;
+//      every description at most 3 sentences (bible §2.1); the tonics, their statuses and the tools; every artifact
+//      and waiting artifact (a name, a class, a complexity, a charge, a value, a line; a waiting one its `needs`, a
+//      relic its three registers); every waiting mutation (kind, cost, max, exclusions, info by level, needs, its
+//      reputation by the bible's factions); every kit piece a registered kind, a real id, its material the ladder's.
+//      The words of the area go in the stats (bible §15.9: about 12 an entry; not a gate).
 //   5. Its teeth (checkMutations): 13 mutations of the live registries (a ragged art row, a palette letter missing, an
 //      unknown bonus key, a status kind, two creature types fewer from level 20, a missing legend handler, a screen
 //      without draw(), an ability's target, a monster without hp, a weapon's pivot, an elite without info, an item
@@ -131,6 +141,89 @@ export function checkContent(m) {
       `property ${id}: needs slot weapon | armour, an adj or suffix, info and a bonus table`);
   stats.items = `${kinds.length} kinds; ${Object.keys(I.WEAPONS).length} weapons, ${Object.keys(I.ARMOURS).length} armours, ` +
     `${Object.keys(I.RINGS).length + Object.keys(I.AMULETS).length} jewels, ${Object.keys(I.PROPERTIES).length} properties, ${Object.keys(I.RELICS).length} relics`;
+
+  // --- 1b. C4's data ----------------------------------------------------------------------------------------------
+  if (m.c4) {
+    const { forge: Fg, gear: Gr, tonics: Tn, artifacts: Ar, mutations: Mu, backgrounds: Bg } = m.c4;
+    const KEYS = new Set(m.stats.BONUS_KEYS), FACTIONS = new Set([...Mu.BIBLE_FACTIONS, "bentVillages"]);
+    const PARTS = new Set(m.body.BODY_PLANS.humanoid.map((q) => q.type));
+    const sentences = (t) => (String(t).match(/[.!?](?=\s|$)/g) || []).length;
+    const words = (t) => (typeof t === "string" ? t.split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w)).length : 0);
+    const bonusOk = (at, b) => { for (const k of Object.keys(b || {})) need(KEYS.has(k), `${at}: unknown bonus key "${k}"`); };
+    const repOk = (at, rep) => { for (const [f, n] of Object.entries(rep || {})) need(FACTIONS.has(f) && Number.isInteger(n), `${at}: reputation ${f} ${n} (a bible §15.4 faction, a whole number)`); };
+    const tiers = Object.values(Fg.MATERIALS).map((d) => d.tier);
+    need(JSON.stringify(tiers) === JSON.stringify([1, 2, 3, 4, 5, 6, 7, 8]), `materials: tiers ${tiers.join(", ")}, want 1-8 in order`);
+    let lastValue = 0;
+    for (const [id, d] of Object.entries(Fg.MATERIALS)) {
+      need(str(d.name) && Number.isInteger(d.dmg) && Number.isInteger(d.av) && num(d.value) && d.value > lastValue && RGB(d.color) && str(d.info),
+        `material ${id}: needs a name, whole damage and armour, a value above the rung below, a colour and a line`);
+      lastValue = d.value;
+      bonusOk(`material ${id}`, d.bonus);
+    }
+    for (const [id, w] of Object.entries(I.WEAPONS)) {
+      need(Fg.CLASSES[Fg.CLASS_OF[id]]?.name, `weapon ${id}: no class (forge.js CLASS_OF, CLASSES)`);
+      need(num(Fg.VALUE[id]) && Fg.VALUE[id] > 0, `weapon ${id}: no value (forge.js VALUE)`);
+      need(str(Fg.TEXT[id]) && sentences(Fg.TEXT[id]) <= 3, `weapon ${id}: a description of at most 3 sentences (forge.js TEXT)`);
+      if (Fg.GEAR_WEAPONS[id]) need(w.tier === 0, `weapon ${id}: tier ${w.tier}, want 0 (the parent's loot draws tiers 1-4)`);
+    }
+    for (const [id, a] of Object.entries(I.ARMOURS)) {
+      need(str(Fg.TEXT[id]) && sentences(Fg.TEXT[id]) <= 3, `armour ${id}: a description of at most 3 sentences (forge.js TEXT)`);
+      if (!Fg.GEAR_ARMOURS[id]) continue;
+      const at = `armour ${id}`;
+      need(PARTS.has(a.slot), `${at}: slot ${a.slot}, not a part of the humanoid body`);
+      need(Number.isInteger(a.tier) && a.tier >= 1 && a.tier <= 8, `${at}: tier ${a.tier}`);
+      bonusOk(at, a.bonus);
+      need(a.armour > 0 || Object.keys(a.bonus || {}).length > 0 || str(a.needs), `${at}: does nothing and says nothing of what it needs`);
+      need(a.info === undefined || (str(a.info) && sentences(a.info) <= 1), `${at}: info`);
+      if (a.wornRep === "hour") need(Number.isInteger(a.hourRep) && a.hourRep > 0, `${at}: an Hour mask's hourRep`);
+      else if (a.wornRep !== undefined) repOk(at, a.wornRep);
+      if (a.wornRep !== undefined) need(str(a.needs), `${at}: a worn reputation with no needs (the hook is a request)`);
+    }
+    for (const id of Fg.FORGED.armour) need(I.ARMOURS[id], `forged armour ${id}: no such armour`);
+    for (const id of Object.keys(Fg.VALUE)) need(I.WEAPONS[id] || I.ARMOURS[id], `value ${id}: no such weapon or armour`);
+    for (const [id, c] of Object.entries(Fg.CLASSES)) need(str(c.name) && (c.info === undefined || str(c.info)) && str(c.needs), `class ${id}: name, info and needs`);
+    for (const [id, t] of Object.entries(Tn.TONICS)) {
+      need(str(t.name) && num(t.value) && t.value > 0 && num(t.t) && t.t > 0 && str(t.info) && sentences(t.info) <= 3 && fn(t.use) && fn(t.overdose), `tonic ${id}: name, value, time, info, use and overdose`);
+    }
+    for (const id of ["tonic", "tonic:balm", "tonic:gloam", "tonic:ironbark", "tonic:clearwit", "tonic:sick", "tonic:heavy", "tonic:crash"]) need(m.status.STATUS_DEFS[id], `status ${id} (tonics.js) isn't registered`);
+    for (const [id, t] of Object.entries(Gr.TOOLS)) need(str(t.name) && oneGlyph(t.glyph) && RGB(t.color) && str(t.info) && num(t.price), `tool ${id}: name, glyph, colour, info and price`);
+    for (const [table, rows] of [["artifact", Ar.ARTIFACTS], ["waiting artifact", Ar.ARTIFACTS_WAITING]])
+      for (const [id, d] of Object.entries(rows)) {
+        const at = `${table} ${id}`;
+        need(str(d.name) && str(d.class) && Number.isInteger(d.complexity) && num(d.charge) && num(d.value) && str(d.info) && sentences(d.info) <= 3 && (d.relic || str(d.vague)),
+          `${at}: name, vague, class, complexity, charge, value and info`);
+        bonusOk(at, d.bonus);
+        if (table === "waiting artifact") need(str(d.needs) && !Ar.ARTIFACTS[id], `${at}: says nothing of what it needs, or is live too`);
+        if (d.relic) need(str(d.flat) && str(d.deep) && /^[a-z \n]+$/.test(d.dark || ""), `${at}: a relic's three registers (bible §2.1)`);
+      }
+    for (const [id, d] of Object.entries(Mu.MUTATIONS_WAITING)) {
+      const at = `waiting mutation ${id}`;
+      need(str(d.name) && ["physical", "mental", "defect"].includes(d.kind) && Number.isInteger(d.cost) && Number.isInteger(d.max) && d.max >= 1 && Array.isArray(d.excludes) && fn(d.info) && str(d.info(1)) && str(d.needs),
+        `${at}: name, kind, cost, max, excludes, info(level) and needs`);
+      need(!Mu.MUTATIONS[id], `${at}: is live too`);
+      for (const x of d.excludes) need(Mu.MUTATIONS[x] || Mu.MUTATIONS_WAITING[x], `${at}: excludes ${x}, which is no mutation`);
+      repOk(at, d.rep);
+    }
+    for (const [bg, B] of Object.entries(Bg.BACKGROUNDS)) {
+      const pieces = [...Object.values(B.kit.equip || {}), B.kit.belt, ...(B.kit.pack || [])].filter(Boolean);
+      for (const it of pieces) {
+        const at = `${bg}'s kit: ${it.kind} ${it.id || it.effect || ""}`.trim();
+        need(I.ITEM_KINDS[it.kind], `${at}: the kind isn't registered`);
+        if (it.kind === "weapon") need(I.WEAPONS[it.id], `${at}: no such weapon`);
+        if (it.kind === "armour") need(I.ARMOURS[it.id], `${at}: no such armour`);
+        if (it.made) need(Fg.MATERIALS[it.made] && (it.kind !== "weapon" || it.material === Fg.MATERIALS[it.made].dmg), `${at}: made of ${it.made}, material ${it.material}`);
+      }
+      need(Array.isArray(B.kit.wants) && B.kit.wants.every(str), `${bg}'s kit: wants must be a list of lines`);
+    }
+    const area = [...Object.values(Fg.TEXT), ...Object.values(Fg.MATERIALS).map((d) => d.info), ...Object.values(Fg.CLASSES).map((d) => d.info),
+      ...Object.values(Fg.GEAR_ARMOURS).map((d) => d.info), ...Object.values(Gr.TOOLS).map((d) => d.info), ...Object.values(Tn.TONICS).map((d) => d.info),
+      ...[...Object.values(Ar.ARTIFACTS), ...Object.values(Ar.ARTIFACTS_WAITING)].flatMap((d) => [d.info, d.vague, d.class, d.flat, d.deep, d.dark]),
+      ...Object.values(Ar.CELLS).map((d) => d.info), ...Object.values(m.c4.implants.IMPLANTS).map((d) => d.info),
+      ...[...Object.values(Mu.MUTATIONS), ...Object.values(Mu.MUTATIONS_WAITING)].map((d) => d.info(1))];
+    stats.c4 = `${Object.keys(Fg.MATERIALS).length} materials, ${Object.keys(Fg.GEAR_WEAPONS).length} new classes, ${Object.keys(Fg.GEAR_ARMOURS).length} new pieces, ` +
+      `${Object.keys(Tn.TONICS).length} tonics, ${Object.keys(Ar.ARTIFACTS).length} + ${Object.keys(Ar.ARTIFACTS_WAITING).length} artifacts, ` +
+      `${Object.keys(Mu.MUTATIONS).length} + ${Object.keys(Mu.MUTATIONS_WAITING).length} mutations; the area's text ${area.reduce((n, t) => n + words(t), 0)} words`;
+  }
 
   // Statuses.
   const statuses = Object.entries(m.status.STATUS_DEFS);
@@ -317,6 +410,9 @@ export const MUTATIONS = [
   ["a monster without hp", (m) => { const t = m.creatures.CREATURE_TYPES.goblin, old = t.hp; delete t.hp; return () => { t.hp = old; }; }, /creature goblin: hp undefined/],
   ["a held weapon's pivot outside (0, 1)", (m) => { const h = m.items.WEAPONS.dagger.held, old = h.pivot; h.pivot = 1.2; return () => { h.pivot = old; }; }, /held dagger: pivot 1.2/],
   ["an elite without info", (m) => { const e = m.creatures.ELITES.swift, old = e.info; delete e.info; return () => { e.info = old; }; }, /elite swift/],
+  ["a material off its rung (C4)", (m) => { const d = m.c4.forge.MATERIALS.iron, old = d.tier; d.tier = 5; return () => { d.tier = old; }; }, /materials: tiers 1, 2, 5/],
+  ["a worn piece for no faction (C4)", (m) => { const a = m.items.ARMOURS.featheredHood, old = a.wornRep; a.wornRep = { kytes: 250 }; return () => { a.wornRep = old; }; }, /armour featheredHood: reputation kytes/],
+  ["a relic's dark line punctuated (C4)", (m) => { const d = m.c4.artifacts.ARTIFACTS_WAITING.noonglass, old = d.dark; d.dark = "It is noon."; return () => { d.dark = old; }; }, /waiting artifact noonglass: a relic's three registers/],
   ["an item kind with no sample", (m) => { m.items.registerItemKind("mutant", { name: () => "mutant", glyph: () => ["w", [1, 2, 3]], stack: false });
     return () => { delete m.items.ITEM_KINDS.mutant; }; }, /item kind mutant: no sample/],
   ["a HUD segment on row 2", (m) => { const d = m.hud.segmentDef("fps"); m.hud.registerHudSegment("fps", { ...d, row: 2 }); return () => m.hud.registerHudSegment("fps", d); }, /HUD segment fps/],
@@ -343,6 +439,9 @@ export async function contentModules(src) {
     await Promise.all(["creatures.js", "items.js", "status.js", "abilities.js", "screens.js", "hud.js", "gen/vaults.js", "stats.js", "leveling.js",
       "world/run.js", "world/sites.js", "world/worldmodel.js", "content/world/test-world.js", "content/world/worldmap.js", "content/world/temple.js",
       "game.js", "interact.js", "world.js"].map((p) => src(p)));
+  // C4's tables (section 1b).
+  const [forge, gear, tonics, artifacts, mutations, backgrounds, implants, body] = await Promise.all(["content/items/forge.js", "content/items/gear.js",
+    "content/items/tonics.js", "content/items/artifacts.js", "content/mutations.js", "content/backgrounds.js", "content/items/implants.js", "body.js"].map((p) => src(p)));
   game.startRun(4242);
   game.game.pages = null;
   return {
@@ -350,6 +449,7 @@ export async function contentModules(src) {
     buildRun: run.buildRun, dungeonLevelOf: sites.dungeonLevelOf, compileWorld: worldmodel.compileWorld, contentLevel: stats.contentLevel,
     worlds: [{ id: "test", def: testWorld.TEST_WORLD }, { id: "real", def: worldmap.REAL_WORLD }],
     templeLegends: temple.TEMPLE_LEGENDS, interact, blocks: world.BLOCKS,
+    body, c4: { forge, gear, tonics, artifacts, mutations, backgrounds, implants },
   };
 }
 
