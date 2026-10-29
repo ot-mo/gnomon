@@ -393,6 +393,16 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
 
 ## Integration log
 
+**`p3i-c4`** (2026-10-29): `p3-c4` (c2d59eb) merged into `integration` (`1732c81`), cleanly: bible §13's gear in
+materials and classes for tiers 1-8 (`content/items/gear.js`, `forge.js`), tonics, the 20 missing mutations (waiting
+ones listed with their hooks), implants, artifacts and relics, the backgrounds' kits, the powers' data; the parent's
+352 pieces frozen (`PARENT_GEAR`). Requests applied (`8470cdc`, each with an assertion and a mutant): #3 Lightsick's veil;
+#11 the wizard's kit lines by itemName; #16 the README rows; `browser-c4` on `?world=test`. Next: #1 (the real world's
+loot and stock through `randomGear`/`randomTonic`) and #2 (worn reputation) after C2's merge; #4-#10, #12-#14 to the
+backlog (new systems: materials' specials, weapon classes, armour specials, artifacts' and mutations' and powers' hooks,
+tonics' rest, implants); #17 stays. Checks: `run-all` 37 of 38 under load, the one check-overworld's world-map draw
+(3.19 ms with 11 checks running), PASS alone (1.62 ms); browser-ws4, browser-ws5, browser-c4 PASS.
+
 **`p3i-wiring`** (2026-10-29): TECH_DESIGN §8.5's **last wiring merge**, on `p3i-c1a` (`5981d0a`, `0fcc58a`). New games
 in the browser (the title's and `?quick=1`'s) start on GNOMON's real world at Hollowmere, whose temple holds the
 Rotation Cube; `?world=test` opens the test world, which every browser tool that knows its layout now asks for; Node's
