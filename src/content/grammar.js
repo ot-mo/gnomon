@@ -135,7 +135,7 @@ export const GRAMMAR = {
                { power: "balmDouble", text: "balms heal double" }],
     },
     gears: {
-      noun: "the beat", leaning: "beat", guild: "the clockmen", profession: "clockman", colour: "brass", rgb: [200, 170, 90],
+      noun: "the beat", leaning: "beat", guild: "the clockmen", profession: "clockman", colour: "brass", rgb: [190, 150, 70],
       practices: ["setting every law to a beat", "marching in step", "winding the great clocks", "keeping time with the heart",
                   "tuning bells", "dancing the escapement"],
       weapons: ["geared", "toothed", "wound", "ratcheted", "ticking", "a clock-hammer"],
