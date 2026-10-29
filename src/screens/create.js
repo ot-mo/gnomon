@@ -20,11 +20,11 @@ import * as S from "../screen.js";
 import { registerScreen, setMode, popMode } from "../screens.js";
 import { UI, list, listKey, listAt, listWheel, keyHelp, wrap, hit, at, textInput, drawTextInput } from "../ui.js";
 import { FLAGS } from "../config.js";
-import { randomSeed } from "../game.js";
+import { randomSeed, game } from "../game.js";
 import { makeRng, seedFor } from "../rng.js";
 import { ATTRS, maxHp, dv, av, ma, cooldownMul, carryCap, mod, attr } from "../stats.js";
 import { makeBody } from "../body.js";
-import { WEAPONS, ARMOURS, ITEM_KINDS } from "../items.js";
+import { ITEM_KINDS, itemName } from "../items.js";
 import { formatPrice } from "../currency.js";
 import { GENOTYPES } from "../content/genotypes.js";
 import { BACKGROUNDS, LEVELS, backgroundsOf } from "../content/backgrounds.js";
@@ -225,14 +225,15 @@ const button = (x, y, label, payload, color = UI.title) => { S.text(x, y, label,
 const signed = (n) => (n > 0 ? `+${n}` : `${n}`);
 const say = (x, y, w, text, color = UI.text) => { const lines = wrap(text, w); lines.forEach((l, k) => S.text(x, y + k, l, ...color)); return lines.length; };
 
+// A kit piece as the game names it (items.js itemName: "copper hand-axe", "marker chalk", "balm tonic"); a potion by
+// what it is (its kind would name it by its colour until you know it) and the throwing knives by their count
+// (integrator, C4 #11).
 function kitLine(it) {
-  if (it.kind === "weapon") return WEAPONS[it.id]?.name;
-  if (it.kind === "armour") return ARMOURS[it.id]?.name;
   if (it.kind === "potion") return `${it.count} potion${it.count > 1 ? "s" : ""} of ${it.effect}`;
   if (it.kind === "knife") return `${it.count} throwing knives`;
-  return it.id || it.effect || it.kind;
+  return itemName(game, it) || it.id || it.effect || it.kind;
 }
-function kitOf(bg) {
+export function kitOf(bg) {   // (exported for checks)
   const k = bg.kit, items = [...Object.values(k.equip || {}), k.belt, ...(k.pack || [])].filter((it) => it && ITEM_KINDS[it.kind]);
   return items.map(kitLine).filter(Boolean);
 }

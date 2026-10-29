@@ -1149,9 +1149,29 @@ export async function checkProgression(m) {
         lost.carried = h - p.hp - lost.shade;
         if (roofed && lost.shade !== 0) fail(`Lightsick in the shade for 90 s: lost ${lost.shade} HP`);
         if (roofed && lost.carried !== 1) fail(`Lightsick's count over a stretch of shade: 10 s + 10 s in the sun lost ${lost.carried} HP, want 1`);
+        // Under a veil (C4's salt veil, `veil: true`; integrator, C4 #3) the sun doesn't reach you; taken off, it does.
+        if (sunny) {
+          const veil = { kind: "armour", id: "saltVeil", count: 1 }, eq = m.body.equip(game, p, veil);
+          h = p.hp; m.time.skipTime(game, 60, { interruptible: false }); lost.veiled = h - p.hp;
+          m.body.unequip(game, p, Object.keys(p.body.equip).find((k) => p.body.equip[k] === veil)); h = p.hp; m.time.skipTime(game, 60, { interruptible: false }); lost.unveiled = h - p.hp;
+          if (!eq.ok || lost.veiled !== 0 || lost.unveiled !== 3) fail(`Lightsick under a salt veil: worn ${eq.ok} (${eq.reason || ""}), lost ${lost.veiled} HP in 60 s; taken off, ${lost.unveiled} (want 0, then 3)`);
+        }
       } finally { noRegen(); }
       if (sunny && (lost.waits !== 3 || lost.skip !== 6 || lost.actions !== 3)) fail(`Lightsick on the surface: ${JSON.stringify(lost)}, want 3 by waits (60 s), 6 by a 120 s skip, 3 by 60 actions of 1 s`);
       out.defects = `shaken / mobbed by the torch, held through a 5 s action; Lightsick on the surface: ${JSON.stringify(lost)}${sunny ? "" : " (no sky here!)"}`;
+      // The wizard's kit line names each piece as the game does (integrator, C4 #11): no registry id ("markerChalk"),
+      // a made piece by its material ("copper hand-axe").
+      {
+        const badKit = [];
+        for (const bg of Object.values(m.content.BACKGROUNDS)) {
+          const k = bg.kit, pieces = [...Object.values(k.equip || {}), k.belt, ...(k.pack || [])].filter((it) => it && m.items.ITEM_KINDS[it.kind]);
+          m.create.kitOf(bg).forEach((line, i) => {
+            const it = pieces[i];
+            if (/[a-z][A-Z]/.test(line) || (it?.made && !line.toLowerCase().replace(/ /g, "").startsWith(String(it.made).toLowerCase()))) badKit.push(`${bg.name}: "${line}"`);
+          });
+        }
+        if (badKit.length) fail(`the wizard's kit lines: ${badKit.slice(0, 4).join("; ")}`);
+      }
       // Crooked Manner: −50 with every faction.
       C.beginRun(game, choicesFor("reedcutter", C.suggestSpread("bent", "reedcutter"), { mutations: ["crookedManner"] }), { seed: 4 });
       const reps = m.mutations.BIBLE_FACTIONS.map((f) => m.factions.repOf(game, f) - m.factions.baseRep(game, f) - (BACKGROUNDS.reedcutter.rep[f] || 0));
@@ -1372,7 +1392,7 @@ export async function run(env) {
     game, step, draw, capture,
     rules: await src("rules.js"), stats: await src("stats.js"), chargen: await src("progression/chargen.js"), leveling: await src("leveling.js"),
     levelup: await src("screens/levelup.js"), create: await src("screens/create.js"), keys: await src("keys.js"), screens: await src("screens.js"),
-    codec: await src("save/codec.js"), rng: await src("rng.js"), items: await src("items.js"), playerMod: await src("player.js"),
+    codec: await src("save/codec.js"), rng: await src("rng.js"), items: await src("items.js"), playerMod: await src("player.js"), body: await src("body.js"),
     implants: await src("content/items/implants.js"), mutations: await src("content/mutations.js"),
     pmut: await src("progression/mutations.js"), abilities: await src("abilities.js"), turns: await src("turns.js"),
     creatures: await src("creatures.js"), world: await src("world.js"), status: await src("status.js"), events: await src("events.js"),

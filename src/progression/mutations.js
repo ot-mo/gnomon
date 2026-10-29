@@ -46,6 +46,8 @@ import { emit, registerUpdate } from "../events.js";
 import { registerStatus, addStatus, removeStatus, hasStatus, statusFlag } from "../status.js";
 import { addRep, FACTIONS } from "../factions.js";
 import { naturalLight } from "../light.js";
+import { worn } from "../body.js";
+import { ARMOURS } from "../items.js";
 import { RULES, extendRules } from "../rules.js";
 import { makeRng, seedFor } from "../rng.js";
 
@@ -218,7 +220,10 @@ const LASTING = 1e9;
 export const lasting = (s) => s.t >= LASTING / 2;
 registerStatus("shaken", { color: [150, 130, 170], t: LASTING, bonus: () => ({ toHit: -2, dv: -1 }), hud: () => "SHAKEN" });
 registerStatus("mobbed", { color: [250, 240, 170], t: LASTING, bonus: () => ({ stealth: -0.3 }), hud: () => "MOTHS" });
-const sunlit = (game, p) => !!game.zone?.hasSky && naturalLight(game, game.zone, p.x, p.y, p.z + 1.45) >= RULES.mutations.sunsick.light;
+// Under a hood or veil (an armour piece with `veil`: the feathered hood, the salt veil, the spore veil) the sun doesn't
+// reach you (bible §13.5; integrator, C4 #3).
+const veiled = (p) => worn(p).some((it) => it.kind === "armour" && ARMOURS[it.id]?.veil);
+const sunlit = (game, p) => !!game.zone?.hasSky && !veiled(p) && naturalLight(game, game.zone, p.x, p.y, p.z + 1.45) >= RULES.mutations.sunsick.light;
 registerStatus("sunsick", { color: [255, 210, 120], t: LASTING, cause: "sunlight",
   hud: (s, game) => (game?.player && sunlit(game, game.player) ? "SUNSICK" : null),
   tick(game, e, s, dt) {
