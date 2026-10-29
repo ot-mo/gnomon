@@ -27,7 +27,7 @@
 //   spawns      [[creature, weight]] (content/creatures/wildlife.js, or the parent's), picked by the zone's level
 //               (a type's `levels`); bible §15.2's spawn keys
 //   wildlife    how many creatures (or packs) a zone holds (C1a: by the bible's danger, §4.4: the Flats the safest
-//               country and the Downs the gentlest walking, one to three; the Deep Pleat and the Shade two to five)
+//               country and the Downs the gentlest walking, one to three; the rest two to four, as WS2 had them)
 //   caches      the chance of a cache on a cliff top a ramp reaches (the Rustbacks' heaps on the Steps' ledges)
 //   clearings   how many discs (radius 6-8) are cleared of the zone's inner trees before they grow: in dense woods
 //               the only ground the dressing finds free (gen/surface.js step 6)
@@ -124,7 +124,7 @@ export const BIOMES = {
     ponds: { count: [0, 1], radius: [2, 3] },
     props: { count: [12, 20], kinds: [["fern", 3], ["mushroom", 4], ["nest", 1], ["web", 1]] },
     plateaus: 0.3, clearings: [1, 2],
-    spawns: [["paperWasps", 3], ["mootWalker", 2], ["creasebeetle", 3], ["hangvine", 2]], wildlife: [2, 5],
+    spawns: [["paperWasps", 3], ["mootWalker", 2], ["creasebeetle", 3], ["hangvine", 2]], wildlife: [2, 4],
   },
   tessellate: {   // a dead-flat plain paved with the mosaics of pressed towns, readable only on the map
     liquid: "ink", sub: "STONE",
@@ -149,7 +149,7 @@ export const BIOMES = {
     ponds: { count: [1, 2], radius: [2, 3] },
     props: { count: [4, 10], kinds: [["ashDrift", 4], ["bones", 2]] },
     plateaus: 0.3, ramps: [0, 1], caches: 0.3,
-    spawns: [["shade", 4], ["wraith", 2], ["longshadow", 2]], wildlife: [2, 5],
+    spawns: [["shade", 4], ["wraith", 2], ["longshadow", 2]], wildlife: [2, 4],
   },
   lattice: {   // a crystal grid where the Pressing's creases still show
     liquid: "turnwater", sub: "CRYSTAL",
