@@ -51,9 +51,8 @@ runs on the test world. Its first step, once C1 is in: `git fetch origin --tags`
 `C:\Users\Otto Mörner\Code\gnomon-wt\integration` on branch `integration` (at `p2-2b` or later) run
 `node tools/run-all.mjs` (38 of 38 at `p2-2b`) and `NODE_PATH="$(npm root -g)" node tools/browser-2b.mjs` (PASS), merge
 C1's tag, and point `game.js`'s new runs at the real world; then run the playthrough on the real world too (it runs on
-the test world today, seed 18, because the real world has no village before C1). Until C1, what comes next is the
-user's call (Phase 3's content, C1-C5, §8.6), and the coordinator's two questions wait for them ("Phase 1's closing
-state" below).
+the test world today, seed 18, because the real world has no village before C1). Before C1: the user's approval of
+"Phase 3 plan (draft)" below, which starts C1a with two other sessions; nothing is started until then.
 
 **On `main` since `p2-ws6a`** (both at the user's request, without a tag of their own): the root README for GNOMON as
 it stands at `p2-ws5` (`6645658`, from `wip/readme`; an interim update before Phase 4's rewrite; the secret rooms'
@@ -109,6 +108,106 @@ checklist) and the last wiring merge (after C1). Found at the last merges and le
 - **For the coordinator:** Esc on the map (TECH §4.2's options against P0's check-shell, WS9 #5); naming props in the
   legend and inspect (check-hud's frozen describer list, WS2b #7).
 - The integrator's backlog and every carried request: "Carried integration requests" and "Open items" below.
+
+## Phase 3 plan (draft for the user's approval, 2026-10-29)
+
+TECH_DESIGN §8.6: content, in parallel by data file. **Nothing is started until the user approves this plan** (and
+answers the four questions at its end). The bible is the source (§4-§13, §15's data appendix); TECH_DESIGN §2.18 ("Content schemas")
+gives the schemas (`regions.js`, `landmarks.js` and `plans/*.js` included). Phase 3 starts from
+`p2-realworld`; what it leaves for Phase 4 is the balance (WS8's TTK tables with C4's gear, creature scaling, kill XP,
+money) and the README.
+
+**Six sessions, three at a time** (as in Phase 1: this laptop, shared with the training job). C1 is split in two: its
+regions are what the last wiring merge and three other sessions wait on, and its 16 landmark plans are the biggest
+single piece of authoring.
+
+| # | Session | Its data files (§8.4's "C" row, split) | Waits on | Worktree, branch |
+|---|---|---|---|---|
+| 1 | **C1a The world: regions and terrain** | `content/world/worldmap.js` (the regions rows and `regionKey`; the Inkrun's `liquid: "ink"`), `content/world/terrains.js` (the world function's final numbers), new `content/world/regions.js`, `content/biomes.js` (final counts and spawn weights), `content/moods.js` (a region's music and fog), and Hollowmere's plan (`content/world/plans/hollowmere.js`: the start) | nothing | `c1`, `ws/c1` (both halves) |
+| 2 | **C4 Gear and characters** | `content/items/*` (the parent's `items/legacy.js` entries stay as they are: golden), `content/mutations.js genotypes.js backgrounds.js powers.js` | nothing | `c4`, `ws/c4` |
+| 3 | **C2 Peoples** | `content/factions.js villages.js grammar.js currency.js liquids.js` | nothing (it names regions by the bible's ids; checked against C1a's at the merge) | `c2`, `ws/c2` |
+| 4 | **C1b The landmarks** | new `content/world/landmarks.js` and `content/world/plans/*.js` (the other 15 plans, the Gnomon's foot among them), the landmark dungeons' data in `worldmap.js`'s landmark index | C1a merged | `c1`, `ws/c1` |
+| 5 | **C3 Creatures** | `content/creatures/*` (the parent's `creatures/legacy.js` tables stay: golden), `content/encounters.js`, `content/dungeons.js` | C1a merged (creatures and encounters by region) | `c3`, `ws/c3` |
+| 6 | **C5 Story** | `content/quests.js` (the quest texts, the campaign's 11 beats, the starter chain), the landmark people's dialogue (C1b places them; C5 writes their words), the intro on a real-world run | C1b, C2 and C3 merged (it reads their ids) | `c5`, `ws/c5` |
+
+**Order:** C1a, C4 and C2 start together. When C1a tags, the integrator merges it, then does §8.5's **last wiring
+merge** (new games on the real world: title → create → Hollowmere → the first village; `main.js`'s `?world=real` and
+its cube step go; the test world keeps the legacy stack and every check that uses it; the bot playthrough runs on the
+real world too), and C1b takes C1a's slot. C3 takes the next free slot, C5 the last. The integrator merges in the order
+the tags come, C1a always first; each merge gets its tag and `main` fast-forwards to it.
+
+**How a content session works** (as a Phase 1 workstream, CLAUDE.md and the steps under "Phase 1 plan" below):
+- Its worktree is made from the integrator's latest tag when it starts (`p2-realworld`, or `p3i-c1a` and later), so it
+  sees what is merged; its branch is `ws/<c>`.
+- It edits only its data files above, and may add assertions for its own data to `tests/checks/content.js` (§8.4
+  passes `check-content` to C) and to the owner check its files feed (listed below). A change to code, or to anyone
+  else's file, goes in `docs/<c>.md` "Integration requests", for the integrator: a system the data needs (a bleeding
+  status, the Smoothers' listener, the Hour cults as generated factions), a frozen file (`rules.js`'s `contentMax`).
+- Names are original (`check-names`, bible §15.11: no Caves of Qud names); the text is in the bible's voice (§2) and
+  within §15.9's word budget for its area. A departure from the bible is a deviation in `docs/sessions/<c>.md` with
+  its reason. The names and the key texts it wrote go in a list there, for the user to read through (not a gate).
+- It ends as a workstream ends: implement → independent, sceptical verification (rerun the gate; the old game in both
+  views; try to break the claims) → fix (one commit per finding) → recheck → tag `p3-<c>` with `run-all` green and
+  every acceptance item's numbers in `docs/sessions/<c>.md`. It never touches `main` or this file; its handoff goes in
+  `docs/<c>.md`. The integrator merges it, applies its requests, reruns `run-all`, the bot and the browser tools, tags
+  `p3i-<c>` and fast-forwards `main`.
+
+**Acceptance** (every session: `check-content`, `check-names`, its owner checks, `run-all` green; golden (b),
+`check-screen-frames` and `check-legacyfights` untouched; something of it seen in both views in the browser, audio
+silenced):
+- **C1a:** every span of the real world in a region (bible §4; the regions §9.3 and §9.4 name; the village counts of §4.10); a region's
+  tier, music, sky, fog, liquid, encounter rate, creatures, factions and site chances; check-world holds the regions to
+  the bible as it holds the map; villages on the real world (check-story's village part on 20 real-world seeds, as on the
+  test world); the Hollow Mere compiles as itself, not the Glass Sea; the Inkrun is ink; Hollowmere stands on its plan,
+  generates the same twice and seams with its neighbours; check-surface, check-edges and check-landmarks pass on the real
+  world; surface generation inside §6.7's budget there (check-perf, alone).
+- **C4:** bible §13's gear (names, numbers, text), the 20 mutations still missing (WS4 deviation 17), implants,
+  artifacts, genotypes, the backgrounds' kits (WS4 #9's wants), the powers' data; check-items' equip matrix and
+  check-stats' every-gear-piece pass in both formula sets with the new pieces in; check-progression passes.
+- **C2:** the 21 factions' relations, the village cultures and architecture by region (§9.3, §9.4), the grammar's
+  lists and accounts (§8, §15.9's 2,400 words), the currency's text, the liquids' full effects; check-social and
+  check-story pass.
+- **C1b:** the 15 other landmarks on their plans (bible §5, §15.3): each generates on 5 seeds, the same twice, seams
+  with its neighbours, and holds what its landmark promises (its people placed, its dungeon's levels, gimmicks and
+  bottom); the Gnomon's 14-block foot at (40, 24); a screenshot of each in both views in `docs/sessions/c1b.md`.
+- **C3:** bible §12's 63 creatures for every level the world makes (tiers 1-8: levels up to 23; `contentMax` rises,
+  by request), each with its art passing the art check and a unique (glyph, colour) (check-creatures); wildlife's
+  behaviours and d20 numbers; encounter tables and legends by region; WS8's TTK tables rerun per level band (check-combat),
+  the balance reference; check-sites and check-overworld's encounter bands pass.
+- **C5:** the 11 beats of *The Lengthening* (bible §11) as data at their landmarks, the starter chain and Hollowmere,
+  quest texts and pools (§9.6, §10.5), the landmark people's dialogue; check-story passes; the bot playthrough on the
+  real world takes the first beat.
+
+**Carried to the content sessions** (the details are under "Carried integration requests" and "Open items" below):
+- **C1a:** the Inkrun's `liquid: "ink"` (WS2); a region's `music` and `fog` (WS3 #11, #12); the Hollow Mere as the
+  Glass Sea (C1 open item); villages on the real world (WS7).
+- **C1b:** the Square's free fittings (`openTruing(... waive: true)`) and the landmark dungeons' `floorGimmicks`,
+  `named`, `cradle` and `bottom` mapped onto `GIMMICKS` (WS10 #8, WS5 #20); the Keeper's Stair's levels 2-21 against
+  `legacyZone`'s 1-20 (WS10 #9); a plan's legend letters and the Gnomon's foot (WS2b #9, #10).
+- **C2:** Grey members hostile in their holy places; the village heights (§9.4), dish, commons lamp, shrine rewards;
+  the Hour cults (with an integration request for `world/run.js`'s factions step); the rites' faction variants and
+  specials (WS6b #7); a faction's `buys`; the Lantern Moths, the Smoothers' membership, the cults' `pilgrimFloor`
+  (WS6a #9); clear glim and turnwater (WS6b).
+- **C3:** wildlife's behaviours and the species left out (WS2b); the six legendary templates waiting on systems and the
+  legends' `opinions` (WS10 #6, #8); the villagers' fight (WS7b); a surgeon's or tinker's stock (WS5 #11, with C4).
+- **C4:** the worn rep items (feather cloak, Hour mask, Assize writ, ink stains: WS6a #5, with C2); the glimgun (WS4
+  #10); Lightsick's hood or veil (WS4 #19); the powers whose `needs` wait on content (Oil fire, Brew, Chime, Bleed,
+  Return, Staunch).
+- **C5:** the line after the intro on a real-world run (still the parent's "Maren is waiting in the main hall"); the
+  campaign's pages and beats, which show only on the real world.
+- **The integrator, between merges:** its own backlog (gyro wrists, the juggler's arm, the survey lens, grip soles, the
+  lantern-mote's light, `"view:turn"`, Shellback, the Snuffer's mark, the lore powers' effects); the code the sessions'
+  requests ask for.
+
+**For the user to decide with this plan:**
+1. **The split and the order:** six sessions (C1 in two), three at a time, C1a, C4 and C2 first. (Recommended.)
+2. **Golden (b) and C3's retune:** golden (b) is 27 frames of the parent's dungeon on the test world. Recommended: the
+   test world's legacy stack keeps the parent's numbers (golden (b) held, as through Phase 1) and C3 gives the real
+   world's levels their own tables. The other way is to retire golden (b) at C3, as golden (a) retired at the flip.
+3. **Naming props in the map legend and the inspect text** (WS2b #7, waiting since Phase 1): needed before C1a, which
+   finalises the biomes' props. Recommended: yes, a `props` describer, which changes P0's `tests/checks/hud.js:199`.
+4. **Esc on the map** (WS9 #5): the parent's "turn to 3D", or TECH §4.2's options. Not needed before Phase 3; the
+   integrator can make the change at the wiring merge if the user picks the options.
 
 ## Phase 1 plan (agreed with the user, 2026-10-26)
 
@@ -181,7 +280,8 @@ job does. For a timed gate number, run that check alone on an idle machine and a
 
 ## Waiting on the user
 
-Nothing.
+- **The Phase 3 plan** ("Phase 3 plan (draft)" above, 2026-10-29): approve it, or change it, and answer its four
+  questions. No content session starts until then.
 
 - **The flip** (decided by the user on 2026-10-27, given in chat in the coordinating session: "Flip as built now:
   switch to the attribute set and d20 combat, and settle the tuning (creature scaling, kill XP) in the balance phase
