@@ -27,7 +27,8 @@
 //      the Dark line lower case without punctuation) within §15.9's 1,300 words, and a type's info is its Deep line;
 //      the real world's level table holds three kinds or more at every level 1-30; who is out for a Bent stranger
 //      at the start (the moths friendly while your torch burns, the longback and the chime-priest not, the outrider
-//      for the Bent only); and its teeth: six mutants each fail it.
+//      for the Bent only); the test world's villagers as before C3 (a DV term of 0, the tinker's general stock); and its
+//      teeth: seven mutants each fail it.
 //
 // game/startRun: the real game (game.js). srcFiles: [{ file, text }] of every src/ module.
 import { Zone, B, FLOOR_Z } from "../../src/world.js";
@@ -308,6 +309,11 @@ export function rosterProblems(game) {
       if (t.rule && !(typeof t.needs === "string" && t.needs.length > 20)) fail(`${at}: a rule with nothing saying what it needs`);
     }
   stats.species = `${species} C3 species with attributes and dv`;
+  // The types the test world's villages use keep what they had before C3: a DV term of 0, the tinker's general stock.
+  for (const [id, t] of Object.entries(VILLAGERS)) if (t.dv !== 0) fail(`villagers ${id}: dv ${t.dv} (the test world's villages fight as before C3: 0)`);
+  const tinker = VILLAGERS.villageTinker.merchant;
+  if (tinker?.stock !== "general" || JSON.stringify(tinker.services) !== JSON.stringify(["identify", "uncurse"]))
+    fail(`villagers villageTinker: stock ${tinker?.stock}, services ${JSON.stringify(tinker?.services)} (as before C3: general; identify, uncurse)`);
 
   // The real world's level table: three kinds or more at every level it makes.
   const thin = [];
@@ -340,6 +346,7 @@ const MUTANTS = [
   ["a waiting creature in another's colour", () => { const t = CREATURES_WAITING.mirrorEel, old = t.color; t.color = CREATURES_WAITING.umbralEel.color; return () => { t.color = old; }; }, /share the glyph and colour/],
   ["the level table short at the top", () => { const out = LEVEL_POOL.filter(([id]) => id === "askewAngle" || id === "fold"); for (const r of out) LEVEL_POOL.splice(LEVEL_POOL.indexOf(r), 1);
     return () => LEVEL_POOL.push(...out); }, /thin at .*level 30/],
+  ["a villager quicker than before C3", () => { const t = VILLAGERS.villager; t.attrs.agi = 18; t.dv = 1; return () => { t.attrs.agi = 16; t.dv = 0; }; }, /villagers villager: dv 1/],
   ["a creature of the 63 gone", () => { const v = CREATURES_WAITING.vesper; delete CREATURES_WAITING.vesper; return () => { CREATURES_WAITING.vesper = v; }; }, /vesper .*neither registered nor waiting/],
 ];
 
