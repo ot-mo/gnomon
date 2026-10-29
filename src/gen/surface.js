@@ -39,8 +39,7 @@ import { KIND } from "../blocks.js";
 import { makeRng, seedFor, distance } from "../rng.js";
 import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../pathing.js";
 import { SIDES, FLATTEN_SKIRT } from "../world/worldmodel.js";
-import { SITE_BUILDERS, dungeonParams } from "../world/sites.js";
-import { generateDungeonLevel } from "./dungeon.js";
+import { SITE_BUILDERS, sinkholeSpots } from "../world/sites.js";
 import { zoneSeed } from "../world/run.js";
 import { stampVault } from "./vaults.js";
 import { worldFns, heightAt, treeAt, SURFACE_RULES, forgetWorldFns } from "./terrain.js";
@@ -398,17 +397,20 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
       : dungeonRectFor(zone.entrance || hub);
     if (planDef?.sinkholes !== false) {
       // A fall lands on level 1 at (x − ox, y − oy), on the nearest floor reachable from its anchor
-      // (zones.js landing). So a sinkhole opens only over such floor, and you land right under it:
-      // level 1 is generated here to know where (its own seed, so the same level you'll walk into).
-      const r = zone.dungeonRect, want = rng.int(1, 3), below = landingFloor(run, site, wx, wy);
-      for (let k = 0, made = 0; k < 200 && made < want; k++) {
-        const x = rng.int(Math.max(r.ox, R.edgeKeep + 1), Math.min(r.ox + r.w, ZW - R.edgeKeep - 1) - 1);
-        const y = rng.int(Math.max(r.oy, R.edgeKeep + 1), Math.min(r.oy + r.d, ZD - R.edgeKeep - 1) - 1);
+      // (zones.js landing). So a sinkhole opens only over one of the span's sinkhole spots (world/sites.js
+      // sinkholeSpots), each of which level 1 makes floor you can reach (gen/dungeon.js landings): you land right
+      // under it, and the surface needn't make level 1 to know where (integrator, C1a #9). The legacy stack has no
+      // spots: a sinkhole over it may open anywhere in the rect, as before.
+      const r = zone.dungeonRect, want = rng.int(1, 3), spots = site.dungeon.legacy ? null : sinkholeSpots(run, site);
+      const xr = [Math.max(r.ox, R.edgeKeep + 1), Math.min(r.ox + r.w, ZW - R.edgeKeep - 1) - 1];
+      const yr = [Math.max(r.oy, R.edgeKeep + 1), Math.min(r.oy + r.d, ZD - R.edgeKeep - 1) - 1];
+      for (let k = 0, made = 0; k < (spots ? spots.length : 200) && made < want; k++) {
+        const x = spots ? r.ox + spots[k][0] : rng.int(xr[0], xr[1]), y = spots ? r.oy + spots[k][1] : rng.int(yr[0], yr[1]);
+        if (x < xr[0] || x > xr[1] || y < yr[0] || y > yr[1]) continue;
         const i = x + y * ZW;
         if (plan[i] || reserved[i] || road[i] || water[i] || scenery[i] || base.cliff[i] || busy[i] || zone.get(x, y, FLOOR_Z - 1 + H[i] + 1)) continue;   // (busy: the dressing's, its props)
         const e = zone.entrance || hub;
         if (distance(x - e.x, y - e.y) < 5 || NEXT4.some(([dx, dy]) => water[x + dx + (y + dy) * ZW])) continue;
-        if (below && !below(x - r.ox, y - r.oy)) continue;
         for (let z = 0; z < zone.h; z++) zone.set(x, y, z, B.AIR);
         local[i] = 1;
         made++;
@@ -428,23 +430,6 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
                keyPoints, scenery, cliff: base.cliff, worldWater: base.water, plan, planAt, hub, entranceGated, local,
                planned: ctx.planned, jump: ctx.jump, footprint: reserved, ...ctx.made, dress: ctx };
   return zone;
-}
-
-// Where a fall into level 1 of the site's dungeon lands on the spot itself: (lx, ly) → bool, true on
-// floor (not stairs) reachable from the level's anchor under the map's step rules. Null for the legacy
-// stack (its plan has no sinkholes) or a level that can't be generated.
-function landingFloor(run, site, wx, wy) {
-  if (site.dungeon.legacy) return null;
-  const lvl = generateDungeonLevel(zoneSeed(run, wx, wy, 1), dungeonParams(run, site, 1));
-  if (!lvl?.blocks) return null;
-  if (!lvl.hasDerived) lvl.refresh();
-  const { w, d, stand } = lvl, a = lvl.spawn;
-  const dist = reachable(standWith(lvl, "open"), w, d, Math.floor(a.x), Math.floor(a.y), PLAYER_STEP_UP, PLAYER_DROP);
-  return (lx, ly) => {
-    if (lx < 0 || ly < 0 || lx >= w || ly >= d) return false;
-    const i = lx + ly * w, g = lvl.get(lx, ly, FLOOR_Z - 1);
-    return stand[i] >= 0 && dist[i] >= 0 && g !== B.STAIRS && g !== B.STAIRS_UP;
-  };
 }
 
 const capital = (s) => String(s).replace(/^the /, "").replace(/^./, (c) => c.toUpperCase());

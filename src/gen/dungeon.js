@@ -89,6 +89,12 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   f.hasBelow = !final;
   f.hasUp = p.hasUp !== false;
   f.bottom = p.bottom || null;         // { kind, id }: the hall on the last level (validation reads it)
+  // Where a fall from the surface lands (level 1 of a site: world/sites.js sinkholeSpots): each must end up floor you
+  // can reach, not stairs. The vault keeps off them, a corridor reaches each one outside a room, no door is hung
+  // there, and the rooms' features keep clear as they do of doorways; validation holds the rest.
+  const landings = (p.landings || []).map(([x, y]) => ({ x, y }));
+  if (landings.length) f.landings = landings.map(({ x, y }) => [x, y]);
+  const isLanding = (x, y) => landings.some((l) => l.x === x && l.y === y);
   f.blocks.fill(B.ROCK);
   const roomAt = new Int16Array(W * D).fill(-1);   // room interiors
   const ringAt = new Int16Array(W * D).fill(-1);   // room walls
@@ -101,7 +107,9 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   let vaultRect = null, entrance = null;
   for (let tries = 0; tries < 60 && !vaultRect; tries++) {
     const vx = rng.int(2, W - vault.w - 2), vy = rng.int(2, D - vault.d - 4);
-    vaultRect = { x0: vx, y0: vy, x1: vx + vault.w - 1, y1: vy + vault.d - 1 };
+    const rect = { x0: vx, y0: vy, x1: vx + vault.w - 1, y1: vy + vault.d - 1 };
+    if (tries < 59 && landings.some((l) => l.x >= rect.x0 - 2 && l.x <= rect.x1 + 2 && l.y >= rect.y0 - 2 && l.y <= rect.y1 + 2)) continue;
+    vaultRect = rect;
     entrance = stampVault(f, vault, vx, vy, rng, final && p.bottom ? { cosmetic, bottom: p.bottom } : { cosmetic });
   }
   // A guardian's hall at the bottom of a dungeon (a site's last level, 0A2): its gate opens onto
@@ -187,13 +195,23 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   const nearest = rooms.reduce((best, r) =>
     distance(r.cx - vaultDoor.x, r.cy - vaultDoor.y) < distance(best.cx - vaultDoor.x, best.cy - vaultDoor.y) ? r : best);
   dig(route(vaultDoor.x, vaultDoor.y, nearest.cx, nearest.cy));
+  // A corridor to each landing outside a room, from the nearest room. A room a landing lies in, or that its corridor
+  // opens into, is never the locked treasure room (9.): the landing would be behind its door.
+  const landingRooms = new Set();
+  for (const l of landings) {
+    if (roomAt[l.x + l.y * W] >= 0) { landingRooms.add(roomAt[l.x + l.y * W]); continue; }
+    const r = rooms.reduce((best, o) => (distance(o.cx - l.x, o.cy - l.y) < distance(best.cx - l.x, best.cy - l.y) ? o : best));
+    const before = rooms.map((o) => o.doors.length);
+    dig(route(l.x, l.y, r.cx, r.cy));
+    rooms.forEach((o, k) => { if (o.doors.length !== before[k]) landingRooms.add(o.id); });
+  }
 
   // --- 4. Doors in some doorways (only where there's a proper frame on both sides).
   for (const r of rooms) {
     for (const d of r.doors) {
       const sideWall = d.x === r.x0 - 1 || d.x === r.x1 + 1;
       const [ax, ay, bx, by] = sideWall ? [d.x, d.y - 1, d.x, d.y + 1] : [d.x - 1, d.y, d.x + 1, d.y];
-      if (f.get(ax, ay, FLOOR_Z) && f.get(bx, by, FLOOR_Z) && rng.chance(0.4)) {
+      if (f.get(ax, ay, FLOOR_Z) && f.get(bx, by, FLOOR_Z) && rng.chance(0.4) && !isLanding(d.x, d.y)) {
         f.set(d.x, d.y, FLOOR_Z, B.DOOR);
         f.set(d.x, d.y, FLOOR_Z + 1, B.DOOR);
       }
@@ -214,11 +232,16 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   // --- 6. Height features, so the map's flat picture can mislead.
   // Cells next to doorways stay clear so rooms can't be sealed off by accident.
   // The last level has no holes at all (pits, chasms, deep water): there's nowhere lower to fall.
-  const nearDoor = (r, x, y) => r.doors.some((d) => Math.abs(d.x - x) <= 2 && Math.abs(d.y - y) <= 2);
+  const nearDoor = (r, x, y) => r.doors.some((d) => Math.abs(d.x - x) <= 2 && Math.abs(d.y - y) <= 2)
+    || landings.some((l) => Math.abs(l.x - x) <= 1 && Math.abs(l.y - y) <= 1);
   const holesOk = (r) => !p.holesIn || (r.x0 >= p.holesIn.x0 && r.x1 <= p.holesIn.x1 && r.y0 >= p.holesIn.y0 && r.y1 <= p.holesIn.y1);
   if (!simple) {
     for (const r of rooms) {
       if (r === start) continue;
+      if (landingRooms.has(r.id)) {   // (a landing's room stays one floor you can cross: no water, drop or height to cut it off)
+        if (r.hall) addPillars(f, r, nearDoor); else if (rng() < 0.34) addCrates(f, rng, r, nearDoor);
+        continue;
+      }
       if (r.hall && (final || !holesOk(r))) { addPillars(f, r, nearDoor); continue; }
       if (r.hall) {
         if (depth >= 2 && rng.chance(0.45)) addBigChasm(f, rng, r, nearDoor, depth);
@@ -288,7 +311,7 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   }
 
   // --- 9. Sometimes: a locked treasure room, with its key somewhere else.
-  const lockable = rooms.filter((r) => r !== start && r !== stairsRoom && r.doors.length > 0 && r.doors.length <= 2);
+  const lockable = rooms.filter((r) => r !== start && r !== stairsRoom && r.doors.length > 0 && r.doors.length <= 2 && !landingRooms.has(r.id));
   if (rng.chance(0.45) && lockable.length) {
     const r = rng.pick(lockable);
     for (const d of r.doors) { f.set(d.x, d.y, FLOOR_Z, B.LOCKED); f.set(d.x, d.y, FLOOR_Z + 1, B.LOCKED); }
@@ -1149,6 +1172,11 @@ export function validateDungeonLevel(f, p = {}) {
   }
   for (const m of f.creatures) if (!canTalk(m) && f.stand[m.tx + m.ty * w] < 0) problems.push(`${m.type} stuck in a wall`);
   if (f.leverRecord && !f.leverRecordAt) problems.push("the Rune Lever room's record is missing");
+  // A fall from a sinkhole lands right under it (level 1 of a site: world/sites.js sinkholeSpots).
+  for (const [x, y] of p.landings ?? f.landings ?? []) {
+    const g = f.get(x, y, FLOOR_Z - 1);
+    if (f.stand[x + y * w] < 0 || noLocked[x + y * w] < 0 || g === B.STAIRS || g === B.STAIRS_UP) problems.push(`the landing at (${x}, ${y}) isn't floor you can reach`);
+  }
   return problems;
 }
 
