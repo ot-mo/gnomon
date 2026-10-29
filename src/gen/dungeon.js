@@ -1009,15 +1009,17 @@ function placeItem(f, rng, room, item) {
 // Corridor routing: cheapest path with a penalty for turning, so corridors come out
 // as long straight runs. Walls of rooms are expensive (enter through them, don't follow them).
 const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+// (The search's arrays and heap are reused from call to call: a level routes dozens of corridors, and a surface over a
+// dungeon makes its level 1 too. Integrator, C1a #9.)
+const COST = new Float64Array(W * D * 4), PREV = new Int32Array(W * D * 4);
 function findPath(ax, ay, bx, by, blocked, ringAt, corridor, jitter) {
-  const n = W * D * 4;
-  const cost = new Float64Array(n).fill(Infinity);   // must match the heap keys' precision exactly
-  const prev = new Int32Array(n).fill(-1);
-  const heap = new MinHeap();
+  const cost = COST.fill(Infinity);   // must match the heap keys' precision exactly
+  const prev = PREV.fill(-1);
+  const heap = HEAP.clear();
   for (let d = 0; d < 4; d++) { cost[(ax + ay * W) * 4 + d] = 0; heap.push(0, (ax + ay * W) * 4 + d); }
   let end = -1;
   while (heap.size) {
-    const [c, s] = heap.pop();
+    const c = heap.topKey(), s = heap.pop();
     if (c > cost[s]) continue;
     const cell = s >> 2, dir = s & 3;
     const x = cell % W, y = (cell - x) / W;
@@ -1037,34 +1039,44 @@ function findPath(ax, ay, bx, by, blocked, ringAt, corridor, jitter) {
   return path.reverse();
 }
 
+// A binary min-heap of (key, value) pairs in two typed arrays. It makes exactly the comparisons and swaps of the
+// array-of-pairs heap it replaced (sift up on <=, down on <, the left child first), so pops come out in the same
+// order, ties included: every corridor, and so every level, is as before (golden's levels 2-20 byte for byte).
 class MinHeap {
-  constructor() { this.items = []; }
-  get size() { return this.items.length; }
+  constructor(cap = 4096) { this.keys = new Float64Array(cap); this.vals = new Int32Array(cap); this.size = 0; }
+  clear() { this.size = 0; return this; }
+  topKey() { return this.keys[0]; }
   push(key, value) {
-    const a = this.items;
-    a.push([key, value]);
-    for (let i = a.length - 1; i > 0;) {
+    if (this.size === this.keys.length) {
+      const k = new Float64Array(this.size * 2), v = new Int32Array(this.size * 2);
+      k.set(this.keys); v.set(this.vals); this.keys = k; this.vals = v;
+    }
+    const K = this.keys, V = this.vals;
+    let i = this.size++;
+    K[i] = key; V[i] = value;
+    while (i > 0) {
       const p = (i - 1) >> 1;
-      if (a[p][0] <= a[i][0]) break;
-      [a[p], a[i]] = [a[i], a[p]]; i = p;
+      if (K[p] <= K[i]) break;
+      const tk = K[p], tv = V[p]; K[p] = K[i]; V[p] = V[i]; K[i] = tk; V[i] = tv; i = p;
     }
   }
-  pop() {
-    const a = this.items, top = a[0], last = a.pop();
-    if (a.length) {
-      a[0] = last;
+  pop() {   // → the top's value (its key: topKey() before the pop)
+    const K = this.keys, V = this.vals, top = V[0], n = --this.size;
+    if (n) {
+      K[0] = K[n]; V[0] = V[n];
       for (let i = 0; ;) {
         const l = 2 * i + 1, r = l + 1;
         let m = i;
-        if (l < a.length && a[l][0] < a[m][0]) m = l;
-        if (r < a.length && a[r][0] < a[m][0]) m = r;
+        if (l < n && K[l] < K[m]) m = l;
+        if (r < n && K[r] < K[m]) m = r;
         if (m === i) break;
-        [a[m], a[i]] = [a[i], a[m]]; i = m;
+        const tk = K[m], tv = V[m]; K[m] = K[i]; V[m] = V[i]; K[i] = tk; V[i] = tv; i = m;
       }
     }
     return top;
   }
 }
+const HEAP = new MinHeap();
 
 // ---------------------------------------------------------------------------
 // Can this level be finished? Returns a list of problems (empty = fine).
