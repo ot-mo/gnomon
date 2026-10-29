@@ -11,12 +11,14 @@
 //   P  a platform cell (plank, at each of the rings' heights)    1-9, A, B, C  the root-steps' band, that many blocks high
 //   >  the stair down    S  the dial-stele    people: m Foldmother's speaking knot   w Warden Lumo   e the herbalist
 import { B, FLOOR_Z } from "../../../world.js";
-import { makeRng, seedFor } from "../../../rng.js";
+import { makeRng, seedFor, distance } from "../../../rng.js";
 import { stampVault } from "../../../gen/vaults.js";
 import { Grid, cells, peopleKeys, mural, column } from "./kit.js";
 
 export const RINGS = [3, 6, 9, 12];   // the platforms' heights (blocks: where you stand on them)
-const TRUNK = 14, W = 41, D = 37, CX = 20, CY = 18, TRUNK_R = 4.6, RING_OUT = 9, STEP_OUT = 10.4, START = 0.75 * Math.PI;
+const TRUNK = 14, W = 41, D = 37, CX = 20, CY = 18, TRUNK_R = 4.6, RING_OUT = 9, STEP_OUT = 10.4, START = 1.5;   // (south-west)
+// How far round from east a direction is, 0 to 4, clockwise on the map (a "diamond angle": no trigonometry in generation).
+const turnOf = (dx, dy) => (dy >= 0 ? (dx >= 0 ? dy / (dx + dy) : 1 - dx / (dy - dx)) : dx < 0 ? 2 - dy / (-dx - dy) : 3 + dx / (dx - dy));
 const G = new Grid(W, D);
 G.disc(CX, CY, RING_OUT, "P").disc(CX, CY, TRUNK_R, "T");
 // The root-steps: a band round the platforms that climbs a block every twelfth of the way round, from 1 at the south-
@@ -24,9 +26,9 @@ G.disc(CX, CY, RING_OUT, "P").disc(CX, CY, TRUNK_R, "T");
 const STEPS = "123456789ABC";
 for (let y = 0; y < D; y++)
   for (let x = 0; x < W; x++) {
-    const r = Math.hypot(x - CX, y - CY);
+    const r = distance(x - CX, y - CY);
     if (r <= RING_OUT || r > STEP_OUT) continue;
-    const turn = ((Math.atan2(y - CY, x - CX) - START + 4 * Math.PI) % (2 * Math.PI)) / (2 * Math.PI);
+    const turn = ((turnOf(x - CX, y - CY) - START + 4) % 4) / 4;
     G.put(x, y, STEPS[Math.min(11, Math.floor(turn * 12))]);
   }
 G.put(CX - 6, CY + 12, ">").put(CX, CY - 5, "m").put(CX - 3, CY - 13, "w").put(CX + 12, CY + 2, "e").put(CX - 12, CY - 3, "S");
@@ -54,7 +56,7 @@ export const FOLDMOTHER_PLAN = {
     for (const [x, y] of cells(FOLDMOTHER_ROWS, "P")) for (const h of RINGS) zone.set(ox + x, oy + y, FLOOR_Z + h - 1, B.PLANK);
     // The crown: leaves over the trunk's top.
     for (const [x, y] of cells(FOLDMOTHER_ROWS, "T"))
-      for (let z = FLOOR_Z + TRUNK - 2; z < FLOOR_Z + TRUNK; z++) if (Math.hypot(x - CX, y - CY) > 2.5) zone.set(ox + x, oy + y, z, B.LEAVES);
+      for (let z = FLOOR_Z + TRUNK - 2; z < FLOOR_Z + TRUNK; z++) if (distance(x - CX, y - CY) > 2.5) zone.set(ox + x, oy + y, z, B.LEAVES);
     const [[sx, sy]] = cells(FOLDMOTHER_ROWS, "S");
     zone.set(ox + sx, oy + sy, FLOOR_Z + 1, B.MURAL);
     mural(zone, ox + sx, oy + sy, FLOOR_Z + 1, "3d", FOLDMOTHER_STELE);

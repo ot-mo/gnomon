@@ -10,7 +10,7 @@
 //   m  brine-moss round the shaft         >  the stair down to the first floor
 //   x  a crate (the scavengers')          k  scrap                                b  bones
 import { B } from "../../../world.js";
-import { makeRng, seedFor } from "../../../rng.js";
+import { makeRng, seedFor, distance } from "../../../rng.js";
 import { stampVault } from "../../../gen/vaults.js";
 
 const W = 33, D = 36, CX = 16, CY = 15;
@@ -18,7 +18,7 @@ const W = 33, D = 36, CX = 16, CY = 15;
 const CAMP = { "11,32": "x", "12,33": "x", "10,34": "k", "13,31": "b", "20,32": "k", "21,34": "x", "22,33": "b", "19,35": "k" };
 // The rows, ring by ring; the spout is the cleft through the south wall, 3 wide at x 15..17.
 export const KETTLE_ROWS = Array.from({ length: D }, (_, y) => Array.from({ length: W }, (_, x) => {
-  const r = Math.hypot(x - CX, (y - CY) * 1.05), spout = x >= CX - 1 && x <= CX + 1 && y > CY;
+  const r = distance(x - CX, (y - CY) * 1.05), spout = x >= CX - 1 && x <= CX + 1 && y > CY;
   if (x === CX && y === CY) return ">";
   if (r > 15.5) return CAMP[`${x},${y}`] || ".";
   if (spout && r > 5.5) return ",";

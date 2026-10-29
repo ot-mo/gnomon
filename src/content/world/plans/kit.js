@@ -24,6 +24,7 @@
 //                                            .box (a house: its wall ring, floor, one door), .put, .disc, .rows()
 import { B, FLOOR_Z } from "../../../world.js";
 import { stampVault, registerLegend, floorCol, column as fillColumn } from "../../../gen/vaults.js";
+import { distance } from "../../../rng.js";
 
 registerLegend("lm.ground", (c) => { floorCol(c); const b = c.vault.grounds?.[c.ch]; if (b) c.zone.set(c.x, c.y, c.z0 - 1, b); });
 registerLegend("lm.stack", (c) => {
@@ -78,7 +79,7 @@ export class Grid {
   disc(cx, cy, r, ch, keep = null) {
     for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++)
       for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++)
-        if (Math.hypot(x - cx, y - cy) <= r && (!keep || keep.includes(this.g[y]?.[x]))) this.put(x, y, ch);
+        if (distance(x - cx, y - cy) <= r && (!keep || keep.includes(this.g[y]?.[x]))) this.put(x, y, ch);
     return this;
   }
   rows() { return this.g.map((r) => r.join("")); }

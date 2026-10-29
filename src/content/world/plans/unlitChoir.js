@@ -24,7 +24,8 @@ for (const [x, y] of [[9, 10], [9, 19], [21, 10], [30, 10], [21, 19], [30, 19]])
 for (const [x, y] of [[13, 12], [13, 17], [18, 12], [18, 17], [35, 12], [35, 17], [40, 12], [40, 17]]) G.put(x, y, "f");
 for (let x = 23; x <= 28; x++) if (x !== 25 && x !== 26) for (const y of [6, 8, 21, 23]) G.put(x, y, "x");
 G.put(46, 14, ">").put(25, 14, "t").put(25, 6, "c").put(26, 23, "c").put(38, 15, "c");
-for (let k = 0; k < 8; k++) G.put(Math.round(4 + 3 * Math.cos((k * Math.PI) / 4)), Math.round(14.5 + 3 * Math.sin((k * Math.PI) / 4)), k === 4 ? "Y" : "U");
+for (const [x, y] of [[7, 15], [6, 17], [4, 18], [2, 17], [2, 12], [4, 12], [6, 12]]) G.put(x, y, "U");   // the rune circle
+G.put(1, 15, "Y");
 export const UNLIT_CHOIR_ROWS = G.rows();
 export const UNLIT_CHOIR_PEOPLE = { t: 1, c: 1 };
 export const UNLIT_CHOIR_GLOSS = "the song is a map\nsing it backwards\nand you are home";
