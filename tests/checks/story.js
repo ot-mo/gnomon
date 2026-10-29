@@ -895,7 +895,12 @@ async function peoplesC2(env, { fail, stats }) {
   if (Object.keys(V.shrines).join() !== "mosaic,relief,rune,pillar") fail(`villages: shrines ${Object.keys(V.shrines)}`);
   if (V.governments.find((g) => g.id === "council")?.speakers?.join() !== "Flat-speaker,Deep-speaker,Dark-speaker") fail("villages: the Council of Three's speakers");
   if (JSON.stringify(V.commons.take) !== JSON.stringify({ free: 5, per: 5, rep: -25 })) fail(`villages: the commons lamp ${JSON.stringify(V.commons.take)}, bible §3.1: 5 free a day, −25 a 5 more`);
-  for (const d of V.dishes) { const b = V.dishBook[d]; if (!b?.note || !b.text || !b.bonus || !Object.keys(b.bonus).length) fail(`villages: no dish book entry for ${d}`); }
+  const { BONUS_KEYS, ATTRS } = await env.src("stats.js"), KEYS = new Set([...BONUS_KEYS, ...ATTRS]);
+  for (const d of V.dishes) {
+    const b = V.dishBook[d];
+    if (!b?.note || !b.text || !b.bonus || !Object.keys(b.bonus).length) fail(`villages: no dish book entry for ${d}`);
+    else for (const k of Object.keys(b.bonus)) if (!KEYS.has(k)) fail(`villages: ${d}'s buff ${k} isn't a bonus key (stats.js BONUS_KEYS)`);
+  }
   // Regions: founders and styles.
   for (const [r, [peoples, style]] of Object.entries(BIBLE_FOUNDERS)) {
     const t = V.byTerrain[r];
@@ -906,8 +911,12 @@ async function peoplesC2(env, { fail, stats }) {
   for (const [id, f] of Object.entries(C.FACTIONS)) for (const r of f.homeRegions || []) if (!C1A_REGIONS.includes(r)) fail(`factions: ${id}'s home region ${r} isn't one of C1a's`);
   for (const [id, S] of Object.entries(V.styles)) {
     for (const k of ["wall", "floor", "roof", "ground"]) if (B[S[k]] === undefined) fail(`villages: style ${id}'s ${k} ${S[k]} isn't a block`);
-    const hs = Object.values(S.heights || {}).flat();
-    if (!S.views || hs.some((h) => !(h >= -1 && h <= 12))) fail(`villages: style ${id}: heights ${JSON.stringify(S.heights)}, views ${S.views}`);
+    // The highest floor in blocks (ledges 3 apart, storeys 4): at most 10 up, so 3-block walls and a roof stay under the
+    // scenery cap of 14 (DECISIONS "Heights"); a sunk floor at most 1 down.
+    const H = S.heights || {}, top = Math.max(0, H.stilts || 0, H.ledges ? (H.ledges[1] - 1) * 3 : 0, H.storeys ? (H.storeys[1] - 1) * 4 : 0,
+      H.canopy?.[1] || 0, H.cliff?.[1] || 0);
+    if (!S.views || top > 10 || (H.sunk || 0) > 1 || Object.keys(H).some((k) => !["stilts", "ledges", "storeys", "canopy", "cliff", "sunk"].includes(k)))
+      fail(`villages: style ${id}: heights ${JSON.stringify(S.heights)} (top floor ${top} up), views ${S.views}`);
   }
   // Names: each people's own list, a full cast's worth, nobody taken.
   const cast = VILLAGE_ROLES.length + 6;
@@ -928,6 +937,10 @@ async function peoplesC2(env, { fail, stats }) {
   for (const [id, d] of D) {
     for (const k of ["practices", "weapons", "omens", "ruins"]) if (d[k]?.length !== 6) fail(`grammar: ${id} has ${d[k]?.length} ${k}, bible §8.2 six`);
     if (d.powers?.length !== 4 || d.powers.some((p) => !p.text || p.power === undefined)) fail(`grammar: ${id} has ${d.powers?.length} relic powers, bible §8.2 four`);
+    for (const pw of d.powers || []) {   // a bonus of BONUS_KEYS (Appendix A), else an ability id
+      if (typeof pw.power === "string") { if (!/^[a-z][a-zA-Z]+$/.test(pw.power)) fail(`grammar: ${id}'s power id "${pw.power}"`); }
+      else for (const k of Object.keys(pw.power || {})) if (!KEYS.has(k)) fail(`grammar: ${id}'s relic power key ${k} isn't a bonus key`);
+    }
     if (!(d.cognomens?.length >= 4) || !(d.relicNouns?.length >= 4) || !Array.isArray(d.rgb) || d.rgb.length !== 3) fail(`grammar: ${id}'s cognomens, relic nouns or rgb`);
   }
   // A cult is drawn as "@" in its domain's colour (HOUR_CULT): no faction's colour, and no other domain's (DECISIONS "Glyphs").

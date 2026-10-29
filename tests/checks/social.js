@@ -82,6 +82,19 @@ export const BIBLE_RELATIONS = {
 const BIBLE_VARIANTS = { unlit: ["the Pouring", "snuffing"], plan: ["the Oiling", "lighting"], kites: ["the Ascent", "lighting"],
   errata: ["the Mirroring", "lighting"], moths: ["Moon-Wick", "lighting"], saltbeasts: ["Herdmother", "lighting"] };
 const BIBLE_SPECIALS = { sporeMoot: ["limb", -30], pressed: ["pressing", -100], lampless: ["snuff", -200] };
+const BIBLE_NEEDS = { kites: { height: 8 }, plan: { glim: 5 }, pleatwood: { hours: [18, 19] }, horary: { steleHour: 1 }, rustbacks: { gift: "iron" },
+  unlit: { pour: "any" }, errata: { then: "tracing" }, moths: { legend: "moonWick" }, saltbeasts: { legend: "herdmother" }, sporeMoot: {} };
+// C2: what each faction takes in the Kindling's menu (bible §6.2's Buys, as close as { readings, topics } can say it;
+// docs/sessions/c2.md lists where it can't).
+const BUYS = {
+  hollowmere: { topics: ["gossip", "location"] }, noonVigil: { topics: ["history"], subjects: ["noon"] },
+  survey: { readings: ["flat", "deep"], topics: ["location", "history"] }, assize: { topics: ["location", "history"], subjects: ["bentVillage", "relic"] },
+  horary: { topics: ["history"] }, pressed: { readings: ["flat"] }, lampless: { readings: ["dark"] }, drovers: { topics: ["gossip", "location", "village"] },
+  chandlers: { topics: ["location", "gossip"] }, rustbacks: { topics: ["location"] }, flatfolk: { readings: ["deep"] },
+  unlit: { readings: ["dark", "deep"], double: ["deep"] }, askew: { readings: ["deep"] }, plan: { readings: ["flat"], topics: ["location"] },
+  moths: { readings: [], topics: [] }, kites: { topics: ["location"] }, clatter: { topics: ["location"] }, saltbeasts: { readings: [], topics: [] },
+  sporeMoot: { topics: ["location"] }, pleatwood: { topics: ["location"] }, errata: { topics: ["history", "village"] }, bentVillages: { topics: ["gossip", "location"] },
+};
 const SHRINE_VIEWS = { mosaic: "map", relief: "3d", rune: "dark", pillar: "3d" };   // bible §7's table
 // §2.11's table: band × temperament → attitude toward you.
 const TABLE = {
@@ -182,6 +195,12 @@ export async function run(env) {
       if (!v?.name?.includes(name) || v.rite !== rite || !v.how) fail(`${id}'s rite variant: ${JSON.stringify(v)?.slice(0, 100)}`);
       if (v?.words && (v.words.length !== 2 || !v.words.every(talky))) fail(`${id}'s rite words: ${v.words}`);
     }
+    for (const [id, needs] of Object.entries(BIBLE_NEEDS)) {
+      const v = C.FACTIONS[id].riteVariant;
+      if (JSON.stringify(v?.needs) !== JSON.stringify(needs)) fail(`${id}'s rite needs ${JSON.stringify(v?.needs)}, bible §3.3/§6.2: ${JSON.stringify(needs)}`);
+    }
+    if (C.FACTIONS.plan.riteVariant.alt?.rite !== "tracing" || C.FACTIONS.plan.riteVariant.alt.needs?.floorPlan !== 0.9) fail("the Oiling on the map: a full floor plan (90%)");
+    for (const [id, b] of Object.entries(BUYS)) if (JSON.stringify(C.FACTIONS[id].buys) !== JSON.stringify(b)) fail(`${id} buys ${JSON.stringify(C.FACTIONS[id].buys)}, want ${JSON.stringify(b)}`);
     for (const [id, [sp, rep]] of Object.entries(BIBLE_SPECIALS)) if (C.FACTIONS[id].specials?.find((s) => s.id === sp)?.rep !== rep) fail(`${id}'s special ${sp}: want ${rep}`);
     if (Object.keys(C.FAITHS).length !== 6) fail(`${Object.keys(C.FAITHS).length} faiths, bible §7 has six`);
     for (const [id, fa] of Object.entries(C.FAITHS)) {
@@ -191,6 +210,28 @@ export async function run(env) {
       for (const [o] of Object.entries(fa.desecrate?.rep || {})) if (!F.FACTIONS[o]) fail(`faith ${id}: desecration moves ${o}`);
       for (const k of ["pray", "wrong", "desecrate"]) if (!talky(fa.lines?.[k])) fail(`faith ${id}: no ${k} line`);
     }
+    // §7's numbers, and the donations the game takes today (social/shrines.js DONATIONS) agree with them.
+    const FA = C.FAITHS, eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    const faithNumbers = [
+      ["the Vigil's donation", FA.noonVigil.donate, { glim: 50, rep: 10, cap: 200 }], ["the Vigil's desecration", FA.noonVigil.desecrate.rep, { noonVigil: -100, lampless: 50 }],
+      ["the Vigil's prayer", [FA.noonVigil.pray.height, FA.noonVigil.pray.hours], [8, [11, 13]]],
+      ["the Horary's desecration", FA.horary.desecrate.rep, { horary: -150, noonVigil: 50 }], ["the Horary's donation", FA.horary.donate.rep, 25],
+      ["the Horary's prayer", FA.horary.pray.steleHour, 1],
+      ["the Lampless' donation", FA.lampless.donate, { per: 2, rep: 1, cap: 150, dark: true }], ["the Lampless' desecration", FA.lampless.desecrate.rep, { lampless: -150, moths: 50 }],
+      ["a snuffed brazier", FA.lampless.snuffBrazier, { rep: 5, cap: 100 }],
+      ["truing", FA.rule.truing.rep, { assize: 300 }], ["the vow", [FA.rule.vow.rep, FA.rule.vow.trueMarks], [{ assize: 200, bentVillages: -100 }, 1]],
+      ["a banner", FA.rule.banner.rep, { assize: -50 }], ["a plumb-stone", FA.rule.desecrate.rep, { assize: -100, bentVillages: 25 }],
+      ["a broken mosaic", FA.pressed.desecrate.rep, { pressed: -150, plan: 10 }], ["the Pressed's prayer", FA.pressed.pray.seconds, 10],
+      ["unpressing", FA.pressed.unpressing.rep, { pressed: -150 }],
+      ["a floor plan", [FA.plan.donate.rep, FA.plan.donate.trueMarks], [25, [3, 6]]], ["the Stacks' blocks", FA.plan.desecrate.rep, { plan: -50 }],
+    ];
+    for (const [what, got, want] of faithNumbers) if (!eq(got, want)) fail(`${what}: ${JSON.stringify(got)}, bible §7: ${JSON.stringify(want)}`);
+    const DON = (await m("social/shrines.js")).DONATIONS;
+    if (DON.noonVigil.per !== FA.noonVigil.donate.glim || DON.noonVigil.rep !== FA.noonVigil.donate.rep || DON.noonVigil.cap !== FA.noonVigil.donate.cap ||
+        DON.lampless.per !== FA.lampless.donate.per || DON.lampless.cap !== FA.lampless.donate.cap) fail("FAITHS' donations and social/shrines.js DONATIONS disagree");
+    const HC = C.HOUR_CULT;
+    if (HC.passRep !== 600 || HC.maskRep !== 200 || HC.startRep.bent !== -500 || HC.startRep.plumb !== -500 || HC.pray?.view !== "3d" ||
+        !eq(HC.desecrate?.rep, { cult: -100, hated: 50 })) fail(`the Hour cult: pass ${HC.passRep}, mask ${HC.maskRep}, start ${JSON.stringify(HC.startRep)}, pray ${JSON.stringify(HC.pray)}, desecrate ${JSON.stringify(HC.desecrate)} (bible §6.3, §7.7)`);
     // The Hour cult template, filled as the run's factions step will (integration request): −500 even for a Pilgrim.
     const H = C.HOUR_CULT, cult = "test:cult";
     try {

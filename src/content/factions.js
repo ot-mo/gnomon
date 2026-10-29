@@ -25,7 +25,9 @@
 //   buys         { readings?, topics? }: what it takes in the Kindling's menu (social/ritual.js wants(); a reading
 //                kind of "flat" | "deep" | "dark", a topic of story/secrets.js's kinds: "location", "history",
 //                "village", "gossip", "recipe"); a rumour has no reading, so a faction that buys rumours names
-//                no readings. `double` (the Unlit's Deep Inscriptions) waits on the menu (integration request)
+//                no readings. `double` (the Unlit's Deep Inscriptions) and `subjects` (what the bible narrows a topic to:
+//                the Vigil buys only Noon's, the Assize only Bent villages' Locations and relics) wait on the menu
+//                (integration request); until then a faction with `subjects` buys the whole topic
 //   sells, teaches   bible §6.2, as text
 //   lines        { greet: { indifferent, liked, loved }, trespass?: { warn, turn } }: a talker of the faction greets
 //                you with its band's line (Cold stays the role's curt line; integration request); a holy place's
@@ -63,7 +65,7 @@ export const FACTIONS = {
     about: "A faith that keeps the noon-posts and the Temple of Angles. Fresh water, clear as noon.",
     likes: [["hollowmere", "the keepers' village"], ["flatfolk", "they kept Noon's true account"]],
     hates: [["lampless", "they pray to her shadow"], ["horary", "they call her a thief"], ["assize", "they want the Cube"]],
-    buys: { topics: ["history"] }, sells: "noon-post Locations; fragments of Noon's accounts", teaches: ["Leechcraft", "Lore"],
+    buys: { topics: ["history"], subjects: ["noon"] }, sells: "noon-post Locations; fragments of Noon's accounts", teaches: ["Leechcraft", "Lore"],
     lines: { greet: {
       indifferent: "Noon keep you. Your shadow is a debt, but nobody is collecting today.",
       liked: "Welcome back. Drink; it's fresh water, clear as noon.",
@@ -90,7 +92,7 @@ export const FACTIONS = {
     likes: [["plan", "straight and obedient"], ["chandlers", "they fund us"], ["horary", "the dial must turn"]],
     hates: [["bent", "crooked lines"], ["flatfolk", "unfinished people"], ["askew", "they won't hold still to be measured"],
       ["rustbacks", "they took the Molar plumb-stone for scrap"], ["errata", "errors to be corrected"]],
-    buys: { topics: ["location", "history"] }, sells: "Truing Cradle Locations; Hour-site Locations; Plumb lore",
+    buys: { topics: ["location", "history"], subjects: ["bentVillage", "relic"] }, sells: "Truing Cradle Locations; Hour-site Locations; Plumb lore",
     teaches: ["Long Blade", "Parley (Intimidate)"],
     lines: { greet: {
       indifferent: "Stand straight. Straighter. That will do for now.",
@@ -230,7 +232,7 @@ export const FACTIONS = {
     about: "A machine faith of automata, at the Metronome and in the Stacks.",
     likes: [["survey", "accuracy"], ["assize", "clear orders"], ["horary", "the dials we built together"]],
     hates: [["rustbacks", "they strip ruins"], ["askew", "unbuildable"], ["sporeMoot", "rot"]],
-    buys: { readings: ["flat"] }, sells: "ruin floor plans; Truing Cradle access", teaches: ["Artificing"],
+    buys: { readings: ["flat"], topics: ["location"] }, sells: "ruin floor plans; Truing Cradle access", teaches: ["Artificing"],
     riteVariant: { name: "the Oiling", rite: "lighting", needs: { glim: 5 }, alt: { rite: "tracing", needs: { floorPlan: 0.9 } },
       how: "in the deep view, pour 5 glim into the automaton's reservoir; or on the map, present it a full floor plan",
       words: ["Five measures, to drawing.", "Received. You are on the drawing now."], altWords: ["Here is the floor, as built.", "As drawn. Accepted."] },
@@ -479,6 +481,8 @@ export const HOUR_CULT = {
   parent: "faiths", temperament: "aggressive", startRep: both(-500), pilgrimFloor: false, generated: true,
   liquid: "sunwine", rite: "deep", voice: { hz: 380, wave: "triangle", flags: ["vibrato"] }, glyph: "@", homeRegions: [],
   passRep: 600, maskRep: 200, likesHorary: "they keep the dials, if not the faith",
+  pray: { view: "3d", shrine: "relief", blessings: ["domainDay"], text: "Pray at one of the Hour's steles: a day's blessing from the Hour's domain." },
+  desecrate: { act: "chip the Hour's stele", rep: { cult: -100, hated: 50 } },
   buys: { readings: ["deep"], topics: ["history"] }, sells: "the Hour's Deep Inscriptions", teaches: [],
   about: "The cult of {name} {cog}, the {ordinal} Hour. It keeps the Hour's floors, and counts every stranger a thief.",
   lines: { greet: {
