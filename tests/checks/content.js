@@ -33,6 +33,7 @@
 //      pickCreatureType reads them: nothing falls through to its "goblin" default) and a loot table exists (the
 //      region's, else the legacy one: gear of that level, potions and scrolls). Exempt, and reported: the test
 //      world's legacy stack keeps the parent's floor 1 (rat and goblin only; check-legacyfights holds its fights).
+//      A legacy stack's floors (the Keeper's Stair under Hollowmere too) are the legacy tables' whatever region holds them.
 //
 //   5. Its teeth (checkMutations): 13 mutations of the live registries (a ragged art row, a palette letter missing, an
 //      unknown bonus key, a status kind, two creature types fewer from level 20, a missing legend handler, a screen
@@ -264,7 +265,10 @@ export function checkContent(m) {
       for (const s of run.sites.values()) {
         if (!s.dungeon) continue;
         sitesSeen++;
-        const region = W.tileAt(s.at.wx, s.at.wy).region;
+        // The legacy stack (the test world's temple, the real world's Keeper's Stair) is built from the parent's tables
+        // whatever region it lies under (world/zonegen.js legacyZone, never the region's rows): its floors are the
+        // legacy tables' to cover (C1a, once the real world's regions had creature rows).
+        const region = s.dungeon.legacy ? "the legacy stack" : W.tileAt(s.at.wx, s.at.wy).region;
         for (let z = 1; z <= s.dungeon.levels; z++) at(id, region, m.dungeonLevelOf(s.dungeon, z), `${s.id} floor ${z}`);
       }
     }

@@ -1,4 +1,4 @@
-// Biome data (TECH_DESIGN §5.3, §2.18; WS2, then C1 for the final data): per biome id (a terrain's `biome`, else
+// Biome data (TECH_DESIGN §5.3, §2.18; WS2's, final in C1a): per biome id (a terrain's `biome`, else
 // its id: world/worldmodel.js tile.biome), what the world functions and its builder (gen/biomes/<biome>.js) read.
 // The terrain itself (content/world/terrains.js) keeps ground, relief, cliffs and trees; this table adds:
 //
@@ -26,7 +26,8 @@
 //               4 or more up is a wall on the map, so the top is 3D's alone
 //   spawns      [[creature, weight]] (content/creatures/wildlife.js, or the parent's), picked by the zone's level
 //               (a type's `levels`); bible §15.2's spawn keys
-//   wildlife    how many creatures (or packs) a zone holds
+//   wildlife    how many creatures (or packs) a zone holds (C1a: by the bible's danger, §4.4: the Flats the safest
+//               country and the Downs the gentlest walking, one to three; the rest two to four, as WS2 had them)
 //   caches      the chance of a cache on a cliff top a ramp reaches (the Rustbacks' heaps on the Steps' ledges)
 //   clearings   how many discs (radius 6-8) are cleared of the zone's inner trees before they grow: in dense woods
 //               the only ground the dressing finds free (gen/surface.js step 6)
@@ -83,7 +84,7 @@ export const BIOMES = {
     props: { count: [8, 16], kinds: flatsProps },
     lights: { count: [0, 1], post: "PLANK" },
     plateaus: 0.25,
-    spawns: [["saltrat", 6], ["brineGrub", 3], ["brinehog", 3], ["flatling", 1]], wildlife: [2, 4],
+    spawns: [["saltrat", 6], ["brineGrub", 3], ["brinehog", 3], ["flatling", 1]], wildlife: [1, 3],
   },
   waste: {   // the Salt Waste: white dunes of a pressed sea, salt pans that are mosaics, Drover wells
     liquid: "brine", sub: "SALT",
@@ -107,7 +108,7 @@ export const BIOMES = {
     ponds: { count: [0, 2], radius: [2, 3] },
     props: { count: [8, 16], kinds: [["tuft", 5], ["shrub", 3], ["bones", 1]] },
     plateaus: 0.25,
-    spawns: [["cairnHound", 3], ["barrowSkeleton", 2], ["duskBat", 2], ["brinehog", 2], ["barrowTroll", 1]], wildlife: [2, 4],
+    spawns: [["cairnHound", 3], ["barrowSkeleton", 2], ["duskBat", 2], ["brinehog", 2], ["barrowTroll", 1]], wildlife: [1, 3],
   },
   pleatwood: {   // folding trees, fungal groves, a green dimness
     liquid: "water", sub: "DIRT",
@@ -156,7 +157,7 @@ export const BIOMES = {
     ponds: { count: [0, 1], radius: [2, 2] },
     props: { count: [3, 8], kinds: [["crystalShard", 4]] },
     plateaus: 0.35, ramps: [1, 2], caches: 0.3,
-    spawns: [["askewAngle", 3], ["fold", 2], ["latticeTroll", 2], ["planarQueen", 1]], wildlife: [1, 3],
+    spawns: [["askewAngle", 3], ["fold", 2], ["latticeTroll", 2], ["planarQueen", 1]], wildlife: [2, 4],
   },
   teeth: {   // a wall of tooth-shaped crags
     liquid: "water", sub: "SHALE",
@@ -166,7 +167,7 @@ export const BIOMES = {
     plateaus: 0.3, ramps: [1, 3], caches: 0.4,
     spawns: [["kite", 3], ["ledgehorn", 3], ["barrowTroll", 1]], wildlife: [1, 3],
   },
-  sea: {   // the Glass Sea's shore: walkable crust, wrecks under the glass
+  sea: {   // the Glass Sea's shore: walkable crust, wrecks under the glass (the Hollow Mere's terrain, `mere`, has it too)
     liquid: "brine", sub: "GLASS",
     rocks: { block: "GLASS", count: [1, 3], tall: 0.5 },
     ponds: { count: [1, 3], radius: [2, 3] },

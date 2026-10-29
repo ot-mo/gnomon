@@ -458,8 +458,8 @@ export async function run(env) {
 }
 
 // --- 7. Villages (7b) -------------------------------------------------------------------------------------------------
-// Every village site P0's placeSites returns, 20 seeds on both worlds (the real world has no regions before C1, so no
-// village sites yet): the record valid (story/villages.js validateVillage), the same made alone (R6), its surface valid
+// Every village site P0's placeSites returns, 20 seeds on both worlds (the real world's by its regions' chances since
+// C1a: villages on every one of its seeds, each in a region with a village quota, bible §4.10): the record valid (story/villages.js validateVillage), the same made alone (R6), its surface valid
 // on generation (gen/surface.js validateSurface) with the cast where the record says, each reachable with doors open,
 // mortal, a member of its village (and its people's faction or the Bent villages, 0.25-0.5); the murals on their blocks
 // and naming their own accounts; the same zone twice is the same. Then in play: the mosaics read on the map by the
@@ -475,11 +475,20 @@ async function villages7b(env, { fail, stats, test, real, json, startRun, game }
   const counts = { test: 0, real: 0 }, seen = { styles: new Set(), shrines: new Set(), templates: new Set() };
   let n = 0, empty = 0, attempts = 0, maps = 0, lintels = 0, runes = 0, cast = 0, twice = 0, mortals = 0, teaching = 0;
   const codec = await env.src("save/codec.js"), POW = await env.src("content/powers.js"), facs = {};
-  const times = [];
+  const times = [], perRegion = {}, realPerSeed = [];
   for (const W of [test, real]) for (let seed = 1; seed <= 20; seed++) {
     const run = RUN.buildRun(seed, W);
     const want = [...run.sites.values()].filter((s) => s.kind === "village");
     if (run.villages.size !== want.length) fail(`seed ${seed} ${W.id}: ${run.villages.size} villages for ${want.length} village sites`);
+    if (W === real) {   // C1a: the real world's villages, by region (their quotas: content/world/regions.js)
+      if (!want.length) fail(`seed ${seed} real world: no village`);
+      for (const site of want) {
+        const r = run.world.tileAt(site.at.wx, site.at.wy).region;
+        perRegion[r] = (perRegion[r] || 0) + 1;
+        if (!(run.world.regions[r]?.villages > 0)) fail(`seed ${seed} real world: ${site.id} in ${r}, a region with no village quota`);
+      }
+      realPerSeed.push(want.length);
+    }
     for (const site of want) {
       const v = run.villages.get(site.id), tag = `seed ${seed} ${W.id} ${site.id}`;
       counts[W.id === "test" ? "test" : "real"]++;
@@ -559,7 +568,7 @@ async function villages7b(env, { fail, stats, test, real, json, startRun, game }
     const text = await env.text(`src/${f}`);
     if (/Math\.random/.test(text)) fail(`${f} calls Math.random`);
   }
-  stats.villages = `${n} villages (test world ${counts.test}, real world ${counts.real}: no regions there before C1) on every village site of 20 seeds, ` +
+  stats.villages = `${n} villages (test world ${counts.test}, real world ${counts.real}: ${Math.min(...realPerSeed)}-${Math.max(...realPerSeed)} a seed, by region ${Object.entries(perRegion).map(([k, x]) => `${k} ${x}`).join(", ")}) on every village site of 20 seeds,` +
     `${empty} abandoned; surfaces valid on ${attempts} attempts (p50 ${times[n >> 1]?.toFixed(1)} ms, max ${times[n - 1]?.toFixed(1)}); ${cast} villagers placed and reachable; ` +
     `the run's factions villageFaction's (${Object.entries(facs).map(([k, x]) => `${x} under ${k}`).join(", ")}); ${mortals} villagers mortal through a save; ${teaching} leaders teaching a power that works today; ` +
     `${maps} mosaic, ${lintels} lintel and ${runes} rune murals on their blocks; records alike made alone and in ${pairs} pairs with another village taken away, ${twice} zones alike made twice; ` +

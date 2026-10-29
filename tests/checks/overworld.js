@@ -252,8 +252,12 @@ function fast(G, name, world, problems) {
   let fastSteps = 0, fastHits = 0, fastWant = 0;
   {
     if (!game.trip) { goTo(game, from.wx, from.wy); enterWorldMap(game); }
-    const a = { wx: game.trip.wx, wy: game.trip.wy };
-    const b = targets.find((t) => isKnown(game, t.wx, t.wy) && (travelPath(game, a, t)?.length || 0) >= 6);
+    let a = { wx: game.trip.wx, wy: game.trip.wy };
+    const far = (s) => targets.find((t) => isKnown(game, t.wx, t.wy) && (travelPath(game, s, t)?.length || 0) >= 6);
+    let b = far(a);
+    // The journeys above may end in a pocket (a span reached through a known one, with no visited span beside it to
+    // leave by): then the run starts from the start, on the roads (C1a: the real world's regions moved where they end).
+    if (!b) { leaveWorldMap(game); goTo(game, from.wx, from.wy); enterWorldMap(game); a = { wx: game.trip.wx, wy: game.trip.wy }; b = far(a); }
     const undo = [...W.tiles.map((t) => swap(t, { encounterRate: 0.4 })), swap(ENCOUNTERS.kinds, { band: 0, legend: 0, travellers: 1 })];
     const off2 = on("world:step", (g, ev) => { fastSteps++; fastWant += Math.min(1, 0.4 * (isNight(g) ? OW().nightEncounter : 1) * 0.25); if (ev.encounter) fastHits++; });
     try {

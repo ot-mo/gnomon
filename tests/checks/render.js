@@ -38,7 +38,7 @@
 //      p0-0c's, since the map behind it is WS3's): in the same state, every line of the card centred in its box,
 //      its borders whole, its title in its colour, and every cell outside the box what the map draws without it.
 //  12. With --expose-gc (check-perf runs it so): a dormant zone's light arrays, bake and apron are freed after dropDerived.
-//  11. The Gnomon on the horizon (bible §4.12): from Hollowmere, facing its bearing, a dark needle stands over the
+//  11. The Gnomon on the horizon (bible §4.12): from Hollowmere's lane, facing its bearing, a dark needle stands over the
 //      sky and the horizon plane in the screen's middle columns, its tip glinting at noon but not at 09:00; facing
 //      away, none; behind a wall, none; at 23:00 nothing from the flats, a violet light from the Shade and from a Rust
 //      Steps mesa's top (not its foot), none from the Shade at noon; in its own span drawn from under its tip (cut
@@ -700,8 +700,11 @@ export async function checkRender(m) {
       for (let k = -2; k <= 2; k++) for (let zz = FLOOR_Z; zz < z.h; zz++) z.set(cx - Math.round(Math.sin(yaw) * k), cy + Math.round(Math.cos(yaw) * k), zz, B.STONE);
       z.refresh();
     };
-    const gn = { noon: view("5,16,0", 12), morning: view("5,16,0", 9), away: view("5,16,0", 12, { away: true }), behindWall: view("5,16,0", 12, { build: wall }),
-      night: view("5,16,0", 23), shadeNight: view(shadeKey, 23), shadeNoon: view(shadeKey, 12) };
+    // (Hollowmere's middle is the Temple of Angles' roofed hall since C1a's plan: you stand in the village's lane by the
+    // east edge, where the Old Rule comes in, with nothing between you and the Gnomon.)
+    const lane = [76, 14];
+    const gn = { noon: view("5,16,0", 12, { at: lane }), morning: view("5,16,0", 9, { at: lane }), away: view("5,16,0", 12, { away: true, at: lane }),
+      behindWall: view("5,16,0", 12, { build: wall, at: lane }), night: view("5,16,0", 23, { at: lane }), shadeNight: view(shadeKey, 23), shadeNoon: view(shadeKey, 12) };
     // A mesa: the first Rust Steps span with ground 4 above the datum; at night from on it, and from its foot.
     for (const key of steps) {
       const hi = view(key, 23, { high: true });

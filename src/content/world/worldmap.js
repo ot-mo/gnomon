@@ -1,7 +1,10 @@
 // The real world map: WORLD_BIBLE §15.1 (rows, tiers), §15.3 (where the landmarks are) and §15.5 (roads
-// and rivers), copied exactly. A second fixture for now: the game still runs on the test world, and
-// content phase C1 adds the landmarks' plans, the regions and everything else. check-world validates it.
+// and rivers), copied exactly; its regions (C1a: regions.js and REGION_ROWS below) and its landmarks' plans
+// (landmarks.js: Hollowmere in C1a, the other 15 in C1b). check-world validates it. (content/index.js is frozen, so
+// the world's other files are reached from here.)
 import { TERRAINS } from "./terrains.js";
+import { REGIONS } from "./regions.js";
+import { LANDMARKS as AUTHORED_LANDMARKS, PLANS } from "./landmarks.js";
 
 // Each character is one span (a world tile). The river glyph is ", so the rows are single-quoted.
 export const WORLD_ROWS = [
@@ -50,6 +53,39 @@ export const TIER_ROWS = [
   '211111111122222233333344444456666666666777', // 19
   '221111111222222233333344444455555666666777', // 20
 ];
+
+// The regions (content/world/regions.js; C1a): one letter per span, REGION_KEY below. docs/c1.md "Region ids" has the
+// rules that place them, and check-world holds every span to those rules: a landmark is in its terrain's region, a
+// road or a river in its own, the Old Cuts are theirs, any other land span next to the Glass Sea is the Glass Shore,
+// and the rest are their terrain's (& and ~ by x).
+export const REGION_ROWS = [
+  'wwwwwwpppppppppppppeeqqqqqqqqqqqqlllllllll', // 0
+  'wwwwwwpppppppppppppeeqqqqqqqqqqqqlllllllll', // 1
+  'wwwwwwpppppppppppppeeeqqqqqqqqqqqlllllllll', // 2
+  'wwwwwwpppppppppppppeeeqqqqqxqqqqqqllllllll', // 3
+  'wwwwwppppppppppppppeeeqqqqqxqqqqqqhhhhllll', // 4
+  'wwwwwpppppppppppppaeeeqqqqqxqqqqhhhhllllll', // 5
+  'wwwwwpppppppppppppaeeetttttxtthhhhkkllllll', // 6
+  'wwwwssssppppppppppaeeetttttxhhhhkkkkklllll', // 7
+  'wwwwssssssssdddddaaeeetttttxhhkkkkkkrlllll', // 8
+  'wwssssssssssdddddarrerrtthhxhitkkkkkrkkkkk', // 9
+  'wwssssssssssdddddareeerhhhhxtitkkkkkrkkkkk', // 10
+  'wwsssssssssdddddaareeerrtttrrrrrrrrrrkkkkk', // 11
+  'wwssssssssrdrrrrrrreeettttttbibybbbkrkkkkk', // 12
+  'wwsssssssrrddddaaddeeetttttbbggyggbbrkkkkk', // 13
+  'wwssssssrrsdccdadddeeettttbbgggygggbbkkkkk', // 14
+  'wwfffffrrffdddaaddddeettttbggggyggggbkkkkk', // 15
+  'wwffffrrfffdddadddddeettttbgggggggggbkkkkk', // 16
+  'wwfffffffffddaadddddddttttbggggggggbbkkkkk', // 17
+  'wwwfmmmffffddaddddddddttttbbggggggbbkkkkkk', // 18
+  'wwwffffffffddaddddddddtttttbbggggbbkkkkkkk', // 19
+  'wwwffffffffddaddddddddttttttbbbbbbkkkkkkkk', // 20
+];
+export const REGION_KEY = {
+  f: "flats", m: "hollowMere", w: "waste", s: "steps", d: "downs", p: "pleatwood", q: "deepPleat", t: "tessellate",
+  h: "shade", k: "stacks", c: "oldCuts", l: "lattice", e: "teeth", g: "glassSea", b: "glassShore",
+  r: "oldRule", x: "straightCut", y: "glassCauseway", a: "slake", i: "inkrun",
+};
 
 // The landmarks (§15.3): letter, id, name, tier, kind, and the terrain they stand in (§5's headings);
 // dungeon: the floors' levels, in order, from the top (§15.3's "Dungeon" column; `up` for floors
@@ -118,35 +154,42 @@ export const ROADS = [
 export const RIVERS = [
   { id: "slake", width: 5, path: span([[18, 5], [18, 6], [18, 7], [18, 8], [17, 8], [17, 9], [17, 10], [17, 11], [16, 11],
     [16, 12], [16, 13], [15, 13], [15, 14], [15, 15], [14, 15], [14, 16], [14, 17], [13, 17], [13, 18], [13, 19], [13, 20]]) },
-  { id: "inkrun", width: 3, path: span([[29, 9], [29, 10], [29, 11], [29, 12], [29, 13]]) },
+  // The Inkrun is ink (bible §4.7, §13.7): its ink pools stain whoever wades through them (gen/ports.js carries a
+  // river's liquid to both sides of every edge it crosses).
+  { id: "inkrun", width: 3, liquid: "ink", path: span([[29, 9], [29, 10], [29, 11], [29, 12], [29, 13]]) },
 ];
 
-// The terrain counts of §15.1's legend (checked by check-world).
+// The terrain counts of §15.1's legend (checked by check-world). The legend's 47 `~` are the Glass Sea's 44 and the
+// Hollow Mere's 3 (its own terrain, terrains.js `mere`).
 export const TERRAIN_COUNTS = { flats: 42, waste: 73, steps: 61, downs: 85, pleatwood: 101, deepPleat: 65, tessellate: 78,
-  stacks: 109, shade: 24, lattice: 60, teeth: 44, sea: 47, river: 23, road: 52, landmarks: 18 };
+  stacks: 109, shade: 24, lattice: 60, teeth: 44, sea: 44, mere: 3, river: 23, road: 52, landmarks: 18 };
 
 // The world, in the schema of TECH_DESIGN §2.18 (compiled by world/worldmodel.js). A terrainKey entry is a terrain id, or a list of
-// { from?, to?, id } ranges over x for a glyph that means two terrains (the Pleatwood west of the
-// Teeth and the Deep Pleat east of them). Landmark letters stand on the terrain LANDMARK_INDEX names.
+// { from?, to?, id } ranges over x for a glyph that means two terrains (the Pleatwood west of the Teeth and the Deep
+// Pleat east of them; the Hollow Mere west of the Teeth and the Glass Sea east of them). Landmark letters stand on the
+// terrain LANDMARK_INDEX names.
 const terrainKey = {
   ",": "flats", ".": "waste", "=": "steps", ";": "downs", "&": [{ to: 18, id: "pleatwood" }, { from: 21, id: "deepPleat" }],
-  "+": "tessellate", "#": "stacks", "%": "shade", "*": "lattice", "^": "teeth", "~": "sea", "\"": "river", ":": "road",
+  "+": "tessellate", "#": "stacks", "%": "shade", "*": "lattice", "^": "teeth", "~": [{ to: 6, id: "mere" }, { from: 27, id: "sea" }],
+  "\"": "river", ":": "road",
 };
 for (const l of LANDMARK_INDEX) terrainKey[l.letter] = l.terrain;
 
 export const WORLD = {
   id: "gnomon", version: 1, w: 42, h: 21, name: "the Long Noon",
   terrain: WORLD_ROWS, terrainKey,
-  tiers: TIER_ROWS,                       // the tier of every span; regions come in C1 (until then a span's region is its terrain)
+  tiers: TIER_ROWS,                       // the tier of every span (bible §4.5); a region's tier is its lowest
+  regions: REGION_ROWS, regionKey: REGION_KEY,
   landmarkKey: Object.fromEntries(LANDMARK_INDEX.map((l) => [l.letter, l.id])),
   roads: ROADS, rivers: RIVERS,
   start: "hollowmere",
 };
-// Everything compileWorld needs (no landmark plans yet: C1). A landmark dungeon's floors are listed
-// level by level; the legacy flag marks the Keeper's Stair, which is the parent game's 20-level stack.
-export { TERRAINS };
+// Everything compileWorld needs. A landmark is LANDMARK_INDEX's entry, with what landmarks.js gives it (its plan,
+// footprint and words; C1a: Hollowmere, C1b the other 15, which stand on stub footprints until then). A landmark
+// dungeon's floors are listed level by level; the legacy flag marks the Keeper's Stair, which is the parent game's
+// 20-level stack.
+export { TERRAINS, REGIONS, PLANS };
+const AUTHORED = new Map(AUTHORED_LANDMARKS.map((l) => [l.id, l]));
 export const LANDMARKS = LANDMARK_INDEX.map((l) => ({ id: l.id, name: l.name, at: l.at[0], spans: l.at, tier: l.tier, kind: l.kind,
-  plan: null, checkpoint: l.kind === "startVillage", dungeon: l.dungeon || null }));
-export const REGIONS = {};
-export const PLANS = {};
+  plan: null, checkpoint: l.kind === "startVillage", dungeon: l.dungeon || null, ...(AUTHORED.get(l.id) || {}) }));
 export const REAL_WORLD = { world: WORLD, terrains: TERRAINS, regions: REGIONS, landmarks: LANDMARKS, plans: PLANS };

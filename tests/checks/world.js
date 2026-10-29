@@ -17,13 +17,27 @@
 //    reached from the start by legal 8-way steps (overworld/state.js canStep: roads only along road and river
 //    edges, the bible's diagonal rule); "drop" spans end a journey (the Lattice's rim is reached, its inside
 //    walked); no span with travel "no" is reached.
+// 6. The regions (C1a): every span in a region, and in the one docs/c1.md's rules give it (landmarks by terrain,
+//    roads and rivers their own, the Old Cuts, the Glass Shore round the sea); each region's tier its lowest span's,
+//    its music a mood, its sky, fog, liquid (its water's), encounter rate, factions (existing) and site chances
+//    (village only where it has a quota and a span to put one); creature rows on every level its spans make, holding
+//    every one of §15.2's spawn keys (read from the bible); the village quotas §4.10's (read from the bible), 16 in all.
+//    The Hollow Mere compiles as itself (its terrain, name, colour, edge message and tier 2), the Inkrun as ink.
 // Navigability of the zones is check-edges' and check-surface's (later in 0A2).
 import { compileWorld, validateWorld, levelOfTier, tierOfLevel, SIDES, SIDE_STEP, SITE_MARGIN } from "../../src/world/worldmodel.js";
 import { buildRun, serializeRun, restoreRun, zoneSeed, runRng, RUN_STEPS, RUN_STATS } from "../../src/world/run.js";
 import { dungeonLevelOf, SITE_KINDS } from "../../src/world/sites.js";
 import { TEST_WORLD } from "../../src/content/world/test-world.js";
-import { REAL_WORLD, WORLD_ROWS, TIER_ROWS, LANDMARK_INDEX, ROADS, RIVERS, TERRAIN_COUNTS } from "../../src/content/world/worldmap.js";
+import { REAL_WORLD, WORLD_ROWS, TIER_ROWS, LANDMARK_INDEX, ROADS, RIVERS, TERRAIN_COUNTS, REGION_ROWS } from "../../src/content/world/worldmap.js";
 import { TERRAINS } from "../../src/content/world/terrains.js";
+import { REGIONS } from "../../src/content/world/regions.js";   // C1a
+import { LIQUIDS } from "../../src/content/liquids.js";
+import { FACTIONS } from "../../src/factions.js";
+import "../../src/content/factions.js";   // (registers the fixed factions into FACTIONS)
+import { biomeOf } from "../../src/content/biomes.js";
+import { WILDLIFE } from "../../src/content/creatures/wildlife.js";
+import { worldFns } from "../../src/gen/terrain.js";
+import { moodNames } from "../../src/music.js";
 import { CURRENCY } from "../../src/content/currency.js";
 import { distance } from "../../src/rng.js";
 import { GEN_CALLS } from "../../src/world/genstats.js";
@@ -139,8 +153,10 @@ function checkBible(problems, bibleText) {
   const TABLE = { flats: [6, 0.05, 1, 2, "map", 0, 1], waste: [14, 0.15, 1, 3, "map", 0, 1], steps: [8, 0.08, 1, 2, "map", 0, 2],
     downs: [6, 0.04, 2, 3, "map", 0, 2], pleatwood: [12, 0.12, 2, 4, "map", 0, 2], deepPleat: [14, 0.14, 4, 6, "map", 0, 1],
     tessellate: [4, 0, 4, 5, "map", 0, 2], stacks: [10, 0.1, 5, 7, "map", 0, 2], shade: [12, 0.2, 5, 8, "map", 1, 1],
-    lattice: [null, null, 7, 8, "drop", 1, 0], teeth: [null, null, 4, 5, "walk", 1, 1], sea: [null, null, 2, 7, "never", 1, 1],
+    lattice: [null, null, 7, 8, "drop", 1, 0], teeth: [null, null, 4, 5, "walk", 1, 1], sea: [null, null, 5, 7, "never", 1, 1],
+    mere: [null, null, 2, 2, "never", 1, 0],   // C1a: §15.2's sea row ("Glass Sea 5-7, Mere 2"), the Mere a terrain of its own
     river: [12, 0.06, 2, 5, "map", 0, 0], road: [3, 0, 1, 6, "map", 0, 0] };
+  if (TERRAIN_COUNTS.sea + TERRAIN_COUNTS.mere !== 47) problems.push("bible: the Glass Sea and the Hollow Mere don't make §15.1's 47 `~`");
   for (const [id, [hours, lost, lo, hi, enter, mod, villages]] of Object.entries(TABLE)) {
     const t = TERRAINS[id];
     if (!t) { problems.push(`bible: terrain ${id} missing`); continue; }
@@ -356,8 +372,136 @@ export function checkWorld({ seeds = [1, 7, 42, 1234, 31337], bibleText } = {}) 
   const compiled = checkCompiled(problems);
   const run = checkRun(problems, seeds);
   const travel = checkTravel(problems);   // WS1
+  const regions = checkRegions(problems, bibleText || "", seeds);   // C1a
   return { name: "world", ok: problems.length === 0, problems,
-           stats: { brokenWorldsRefused: refused, ...bible, ...compiled, seeds: seeds.length, ...run, travel } };
+           stats: { brokenWorldsRefused: refused, ...bible, ...compiled, seeds: seeds.length, ...run, travel, regions } };
+}
+
+// C1a: the real world's regions against the bible, as checkBible holds the map (section 6 of the header).
+const REGION_OF_TERRAIN = { flats: "flats", waste: "waste", steps: "steps", downs: "downs", pleatwood: "pleatwood", deepPleat: "deepPleat",
+  tessellate: "tessellate", stacks: "stacks", shade: "shade", lattice: "lattice", teeth: "teeth", sea: "glassSea", mere: "hollowMere" };
+const ROAD_REGION = { oldRule: "oldRule", oldRuleNorth: "oldRule", oldRuleSouth: "oldRule", straightCut: "straightCut", glassCauseway: "glassCauseway" };
+const SKIES = ["clear", "haze", "glare", "canopy", "ashen", "crystal"];
+// §4.10's village row and §9.3's region names, as ids.
+const BIBLE_REGION = { "Flats": "flats", "Waste": "waste", "Steps": "steps", "Downs": "downs", "Pleatwood": "pleatwood", "Deep Pleat": "deepPleat",
+  "Tessellate": "tessellate", "Shade": "shade", "Stacks": "stacks", "Glass shore": "glassShore", "Teeth": "teeth" };
+// §15.2's spawn keys, by the key's name, and the regions that must name every one of them.
+const SPAWN_REGIONS = { flats: ["flats"], waste: ["waste"], steps: ["steps"], downs: ["downs"], pleatwood: ["pleatwood"], deepPleat: ["deepPleat"],
+  tessellate: ["tessellate"], stacks: ["stacks"], shade: ["shade"], lattice: ["lattice"], teeth: ["teeth"], "sea shore": ["glassShore"],
+  river: ["slake", "inkrun"] };
+
+function checkRegions(problems, bibleText, seeds) {
+  const out = {}, M = compileWorld(REAL_WORLD), R = REGIONS, ids = Object.keys(R);
+  const bad = (m) => problems.push(`regions: ${m}`);
+  if (REAL_WORLD.regions !== REGIONS) bad("REAL_WORLD doesn't carry regions.js's REGIONS");
+  if (REGION_ROWS.length !== 21 || !REGION_ROWS.every((r) => r.length === 42)) bad("REGION_ROWS is not 21 rows of 42");
+  // Every span in a region, and in the one the rules (docs/c1.md "Region ids") give it.
+  const roadOf = new Map(), riverOf = new Map();
+  for (const r of ROADS) for (const [x, y] of r.path) if (!roadOf.has(`${x},${y}`)) roadOf.set(`${x},${y}`, ROAD_REGION[r.id]);
+  for (const r of RIVERS) for (const [x, y] of r.path) riverOf.set(`${x},${y}`, r.id);
+  const glass = (x, y) => M.tileAt(x, y)?.terrain === "sea";
+  const spans = Object.fromEntries(ids.map((id) => [id, []]));
+  let wrong = 0;
+  for (const t of M.tiles) {
+    const k = `${t.wx},${t.wy}`, c = WORLD_ROWS[t.wy][t.wx];
+    let want;
+    if (t.landmark) want = REGION_OF_TERRAIN[t.terrain];
+    else if (c === ":") want = roadOf.get(k);
+    else if (c === '"') want = riverOf.get(k);
+    else if (t.wy === 14 && (t.wx === 12 || t.wx === 13)) want = "oldCuts";   // §15.3: the Old Cuts (tier-2 Stacks)
+    else if (t.terrain !== "sea" && t.terrain !== "mere" && [-1, 0, 1].some((dy) => [-1, 0, 1].some((dx) => glass(t.wx + dx, t.wy + dy)))) want = "glassShore";
+    else want = REGION_OF_TERRAIN[t.terrain];
+    if (!R[t.region]) { bad(`(${t.wx}, ${t.wy}) is in no region ("${t.region}")`); continue; }
+    if (t.region !== want && ++wrong <= 5) bad(`(${t.wx}, ${t.wy}) ${t.terrain} is in ${t.region}, the rules say ${want}`);
+    spans[t.region].push(t);
+  }
+  if (wrong > 5) bad(`${wrong} spans in the wrong region in all`);
+  out.spans = Object.fromEntries(ids.map((id) => [id, spans[id].length]));
+  if (Object.values(out.spans).reduce((a, b) => a + b, 0) !== 882) bad("the regions don't hold the 882 spans");
+  // Each region's fields.
+  const moods = moodNames();
+  const tiered = {};
+  for (const id of ids) {
+    const r = R[id], at = `region ${id}`, sp = spans[id];
+    if (!sp.length) { bad(`${at} has no span`); continue; }
+    const tiers = sp.map((t) => t.tier), lo = Math.min(...tiers), hi = Math.max(...tiers);
+    tiered[id] = lo === hi ? `${lo}` : `${lo}-${hi}`;
+    if (typeof r.name !== "string" || !/^the [A-Z]/.test(r.name)) bad(`${at}: name ${JSON.stringify(r.name)}`);
+    if (r.tier !== lo) bad(`${at}: tier ${r.tier}, its lowest span's ${lo}`);
+    if (!moods.includes(r.music)) bad(`${at}: music "${r.music}" is no mood of music.js`);
+    if (!SKIES.includes(r.sky)) bad(`${at}: sky "${r.sky}"`);
+    if (!(typeof r.fog === "number" && r.fog >= 0 && r.fog <= 0.03)) bad(`${at}: fog ${r.fog}`);
+    if (!LIQUIDS[r.liquid]) bad(`${at}: liquid "${r.liquid}" is no liquid`);
+    if (!(r.encounterRate >= 0 && r.encounterRate <= 0.2)) bad(`${at}: encounter rate ${r.encounterRate}`);
+    if (!(Number.isInteger(r.villages) && r.villages >= 0)) bad(`${at}: villages ${r.villages}`);
+    if (typeof r.line !== "string" || r.line.split(/[.;:]\s+[A-Z]/).length > 1 || !/[.]$/.test(r.line)) bad(`${at}: its world-map line isn't one sentence`);
+    for (const f of r.factions || []) if (!FACTIONS[f]) bad(`${at}: faction "${f}" doesn't exist`);
+    if (!r.factions?.length) bad(`${at}: no faction`);
+    const S = r.sites || {};
+    if (JSON.stringify(Object.keys(S).sort()) !== JSON.stringify(["historic", "lair", "ruin", "station", "village"])) bad(`${at}: site kinds ${Object.keys(S)}`);
+    for (const [k, v] of Object.entries(S)) if (!(v >= 0 && v < 0.5)) bad(`${at}: ${k} chance ${v}`);
+    if (S.historic !== 0) bad(`${at}: a historic chance (Hour sites go by tier)`);
+    const eligible = sp.filter((t) => t.travel === "yes" && t.edges === "open" && !t.landmark && !t.roadWidth && !t.riverWidth).length;
+    if ((S.village > 0) !== (r.villages > 0 && eligible > 0)) bad(`${at}: village chance ${S.village} for a quota of ${r.villages} on ${eligible} eligible spans`);
+    if (!eligible && Object.values(S).some((v) => v > 0)) bad(`${at}: site chances with no span to put a site on`);
+    // Creatures: [type, weight, lo, hi], levels 1-30, every level its spans make covered by one row or more.
+    if (!Array.isArray(r.creatures) || !r.creatures.length) { bad(`${at}: no creatures`); continue; }
+    for (const row of r.creatures)
+      if (!(Array.isArray(row) && row.length === 4 && typeof row[0] === "string" && /^[a-z][A-Za-z]+$/.test(row[0]) && row[1] > 0
+            && Number.isInteger(row[2]) && Number.isInteger(row[3]) && row[2] >= 1 && row[2] <= row[3] && row[3] <= 30)) bad(`${at}: creature row ${JSON.stringify(row)}`);
+    for (const t of sp) if (!r.creatures.some(([, , a, b]) => t.level >= a && t.level <= b)) { bad(`${at}: nothing lives at level ${t.level}`); break; }
+    // A registered kind's factions (WS2's wildlife; C3 adds the rest) live there too.
+    for (const [type] of r.creatures) for (const f of WILDLIFE[type]?.factions || []) if (!r.factions?.includes(f)) bad(`${at}: ${type} is ${f}'s, which isn't among its factions`);
+  }
+  out.tiers = tiered;
+  // §4.10's village quotas, read out of the bible's Village row; 16 in all.
+  const vrow = bibleText.match(/\| Village \| 16 \| per region: ([^|]+)\|/);
+  if (!vrow) bad("can't read §4.10's village quotas out of WORLD_BIBLE.md");
+  else {
+    const want = {};
+    for (const part of vrow[1].split(",")) {
+      const m = part.trim().match(/^([A-Za-z ]+?) (\d+)/);
+      if (!m || !BIBLE_REGION[m[1]]) { bad(`§4.10: can't read "${part.trim()}"`); continue; }
+      want[BIBLE_REGION[m[1]]] = Number(m[2]);
+    }
+    for (const id of ids) if ((R[id].villages || 0) !== (want[id] || 0)) bad(`region ${id}: ${R[id].villages} villages, §4.10 says ${want[id] || 0}`);
+    if (ids.reduce((a, id) => a + R[id].villages, 0) !== 16) bad("the village quotas don't total 16");
+    out.quotas = Object.entries(want).map(([k, v]) => `${k} ${v}`).join(", ");
+  }
+  // §15.2's spawn keys: every key's creatures in its regions' rows (C3 adds the species; the ids are the bible's).
+  const keys = bibleText.split("**Spawn keys**")[1]?.split("### 15.3")[0] || "";
+  let named = 0;
+  for (const m of keys.matchAll(/^- \*\*([a-zA-Z ]+):\*\* (.+)$/gm)) {
+    const regions = SPAWN_REGIONS[m[1]];
+    if (!regions) { bad(`§15.2: spawn key "${m[1]}" has no region here`); continue; }
+    for (const raw of m[2].split(",")) {
+      const type = raw.trim().replace(/\.$/, "").replace(/ \(.*\)$/, "");
+      const only = /the Inkrun only/.test(raw) ? ["inkrun"] : regions;
+      for (const id of only) if (!R[id].creatures.some(([t]) => t === type)) bad(`region ${id}: no ${type} (§15.2's ${m[1]} key)`);
+      named++;
+    }
+  }
+  if (named < 60) bad(`read ${named} of §15.2's spawn keys, not the 60 or more it lists`);
+  out.spawnKeys = named;
+  // The Hollow Mere compiles as itself; the Inkrun is ink, the Slake plain water.
+  const mere = M.tileAt(5, 18), sea = M.tileAt(30, 15), T = M.terrains;
+  if (!(mere.terrain === "mere" && mere.region === "hollowMere" && mere.tier === 2 && T.mere.name === "the Hollow Mere"
+        && JSON.stringify(T.mere.color) === "[70,112,124]" && /Hollow Mere/.test(T.mere.edgeMessage) && R.hollowMere.name === "the Hollow Mere"))
+    bad(`the Hollow Mere compiles as ${JSON.stringify({ terrain: mere.terrain, region: mere.region, tier: mere.tier, name: T[mere.terrain]?.name })}`);
+  if (!(sea.terrain === "sea" && sea.region === "glassSea" && T.sea.name === "the Glass Sea")) bad("the Glass Sea isn't itself at (30, 15)");
+  for (const [x, y] of RIVERS.find((r) => r.id === "inkrun").path) if (M.tileAt(x, y).riverLiquid !== "ink") bad(`the Inkrun at (${x}, ${y}) isn't ink`);
+  for (const [x, y] of RIVERS.find((r) => r.id === "slake").path) if (M.tileAt(x, y).riverLiquid) bad(`the Slake at (${x}, ${y}) holds ${M.tileAt(x, y).riverLiquid}`);
+  // A region's liquid is its water's: its river's on a river, its biome's elsewhere (the Glass Shore: the sea's, its
+  // shore biome's, docs/c1.md's integration request; the Mere and the Glass Sea: the sea biome's).
+  const W = worldFns(M, seeds[0]);
+  for (const id of ids) {
+    const t = spans[id].find((u) => !u.landmark), want = id === "slake" ? "water" : id === "inkrun" ? "ink"
+      : ["glassShore", "glassSea", "hollowMere"].includes(id) ? biomeOf("sea").liquid : t ? W.liquidOf(t.wx, t.wy) : null;
+    if (want && R[id].liquid !== (want === "water" ? "water" : want)) bad(`region ${id}: liquid ${R[id].liquid}, its spans hold ${want}`);
+  }
+  // Music and fog reach the game: clock.js and music.js read them off the span's region.
+  out.music = [...new Set(ids.map((id) => R[id].music))].join(", ");
+  return out;
 }
 
 // WS1: the world map's travel graph on both worlds (section 5 of the header).
