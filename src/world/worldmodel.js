@@ -169,7 +169,7 @@ export function compileWorld(def) {
       tiles[wx + wy * w] = {
         wx, wy, terrain, region, tier, level: levelOfTier(tier),
         elev: W.elevation ? Number(W.elevation[wy][wx]) : 0,
-        biome: T.biome || terrain,
+        biome: R.biome || T.biome || terrain,   // (a region may dress as another biome: the Glass Shore as the sea's shore; integrator, C1a #3)
         travel: R.travel || how.travel, edges: R.edges || how.edges,
         travelHours: T.travelHours ?? null, lostChance: T.lostChance ?? null,
         encounterRate: (R.encounterRate ?? 0.1) * (T.encounterMul ?? 1),

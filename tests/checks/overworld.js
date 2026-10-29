@@ -55,7 +55,7 @@ import { reveal, isKnown, pin, pinsAt, knownSites, discoveryXp, sight } from "..
 import { encounterChance, rollEncounter, placeEncounter, legendsFor, hiddenSiteRoll } from "../../src/overworld/encounters.js";
 import { atlas, canStep, edgeBetween, spanKey, OW } from "../../src/overworld/state.js";
 import { isLost, lostChance } from "../../src/overworld/lost.js";
-import { worldView } from "../../src/overworld/renderWorld.js";
+import { worldView, spanLines } from "../../src/overworld/renderWorld.js";
 
 const DIRS = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]];
 const WORLDS = (game) => [["test", game.world], ["real", REAL_WORLD]];
@@ -983,6 +983,13 @@ function screen(G, scr, problems) {
   if (game.mode !== "explore") problems.push(`screen: Esc on the wait menu left you in ${game.mode}`);
   out.keys = true;
   scr.resize(180, 56);
+  // A span's panel ends with its region's one sentence (C1a's `line`; integrator, C1a #4), on the real world.
+  {
+    const g = fresh(G, 61, REAL_WORLD), W = g.run.world, st = W.start, t = W.tileAt(st.wx, st.wy), R = W.regions?.[t.region];
+    const lines = spanLines(g, st.wx, st.wy).map((l) => l.text);
+    if (!R?.line || lines.at(-1) !== R.line) problems.push(`screen: the panel of (${st.wx}, ${st.wy}) ends "${lines.at(-1)}", not its region's line`);
+    out.regionLine = `${t.region}: "${(R?.line || "").slice(0, 40)}…"`;
+  }
   // ?world=real: new games on the real world, a preview before C1 (main.js). Only that value picks it.
   const flags = [["?world=real", "real"], ["?seed=7&world=real&silent=1", "real"], ["", "test"], ["?world=test", "test"], ["?world=REAL", "test"], ["?world", "test"], ["?quick=1", "test"]];
   const bad = flags.filter(([q, w]) => parseWorld(q) !== w);

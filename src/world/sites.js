@@ -287,27 +287,51 @@ export function placeSites(run) {
     && !SIDES.some((s) => t.road[s] || t.river[s]) && t.roadWidth === 0 && t.riverWidth === 0);
 
   const used = new Set();
+  // A village (or another rolled site) on span t, its looks and name drawn from r.
+  const rolledSite = (kind, t, r) => {
+    const shape = SITE_SHAPES[kind];
+    const rect = { x: r.int(SITE_MARGIN, SURFACE.w - SITE_MARGIN - shape.w), y: r.int(SITE_MARGIN, SURFACE.d - SITE_MARGIN - shape.d),
+                   w: shape.w, d: shape.d };
+    const [firsts, seconds] = NAMES[kind];
+    let name = `${r.pick(firsts)} ${r.pick(seconds)}`.trim();
+    if (used.has(name)) name = `${name} (${t.wx}, ${t.wy})`;
+    used.add(name);
+    const site = { id: `${kind}:${t.wx},${t.wy}`, kind, at: { wx: t.wx, wy: t.wy }, name, tier: t.tier,
+                   surface: { builder: kind, rect, params: {} } };
+    if (kind === "village") site.checkpoint = true;
+    const floors = r.int(shape.floors[0], shape.floors[1]);
+    if (floors > 0)
+      site.dungeon = { levels: floors, theme: "legacy", baseLevel: levelOfTier(t.tier), levelStep: 1, gimmicks: [],
+                       bottom: { kind: "none", id: null } };
+    furnish(run, site);
+    addSite(run, site);
+  };
+
+  // Villages by quota (bible §4.10: 16 in all, by region; integrator, C1a #1 and #2): a region with `villages` gets
+  // that many first, on free spans of its own drawn from its own stream (an eligible one, else one of its walk-in spans
+  // with open edges: the Teeth's crag village), so nothing here moves the draws below. A region without a quota (the
+  // test world's three) gets villages only by chance, as before.
+  for (const [id, R] of Object.entries(world.regions || {})) {
+    if (!(R.villages > 0)) continue;
+    const vrng = runRng(run, `villages ${id}`);
+    const walkIn = world.tiles.filter((t) => t.region === id && t.travel === "no" && t.edges === "open" && !t.landmark
+      && !SIDES.some((s) => t.road[s] || t.river[s]) && t.roadWidth === 0 && t.riverWidth === 0);
+    const order = [...vrng.shuffle(eligible.filter((t) => t.region === id)), ...vrng.shuffle(walkIn)];
+    let placed = 0;
+    for (const t of order) {
+      if (placed >= R.villages) break;
+      if (busy(t.wx, t.wy)) continue;
+      rolledSite("village", t, vrng);
+      placed++;
+    }
+  }
+
   for (const kind of ROLLED) {
     const order = rng.shuffle(eligible.slice());
     for (const t of order) {
       const chance = world.regions[t.region]?.sites?.[kind] || 0;
       if (!(rng() < chance) || busy(t.wx, t.wy)) continue;
-      const shape = SITE_SHAPES[kind];
-      const rect = { x: rng.int(SITE_MARGIN, SURFACE.w - SITE_MARGIN - shape.w), y: rng.int(SITE_MARGIN, SURFACE.d - SITE_MARGIN - shape.d),
-                     w: shape.w, d: shape.d };
-      const [firsts, seconds] = NAMES[kind];
-      let name = `${rng.pick(firsts)} ${rng.pick(seconds)}`.trim();
-      if (used.has(name)) name = `${name} (${t.wx}, ${t.wy})`;
-      used.add(name);
-      const site = { id: `${kind}:${t.wx},${t.wy}`, kind, at: { wx: t.wx, wy: t.wy }, name, tier: t.tier,
-                     surface: { builder: kind, rect, params: {} } };
-      if (kind === "village") site.checkpoint = true;
-      const floors = rng.int(shape.floors[0], shape.floors[1]);
-      if (floors > 0)
-        site.dungeon = { levels: floors, theme: "legacy", baseLevel: levelOfTier(t.tier), levelStep: 1, gimmicks: [],
-                         bottom: { kind: "none", id: null } };
-      furnish(run, site);
-      addSite(run, site);
+      rolledSite(kind, t, rng);
     }
   }
 

@@ -95,6 +95,7 @@ export function spanLines(game, wx, wy) {
   }
   for (const s of knownSites(game, wx, wy)) line(`${s.kind === "landmark" ? initial(s.name) : SITE_MARK[s.kind] || "*"} ${s.name}`, s.kind === "landmark" ? GOLD : UI.sel);
   for (const p of pinsAt(game, wx, wy)) if (p.label) line(`! ${p.label}`, PIN);
+  if (R?.line) line(R.line, UI.dim);   // (the region's one sentence for a span, bible §2.1 rule 8; last, so it never pushes a site or pin out of the strip; integrator, C1a #4)
   return out;
 }
 

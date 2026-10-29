@@ -331,9 +331,11 @@ function siteRules(name, seed, run) {
     const r = s.surface.rect;
     if (r.x < SITE_MARGIN || r.y < SITE_MARGIN || r.x + r.w > SURFACE.w - SITE_MARGIN || r.y + r.d > SURFACE.d - SITE_MARGIN)
       out.push(`${at}: ${s.id}'s footprint ${JSON.stringify(r)} is within ${SITE_MARGIN} tiles of an edge`);
-    if (t.landmark || t.travel !== "yes" || t.edges !== "open" || t.roadWidth || t.riverWidth) out.push(`${at}: ${s.id} on a span it can't use`);
+    // A village placed by its region's quota (integrator, C1a #1, #2) may stand on a walk-in span with open edges.
+    const byQuota = s.kind === "village" && W.regions[t.region]?.villages > 0;
+    if (t.landmark || (t.travel !== "yes" && !(byQuota && t.travel === "no")) || t.edges !== "open" || t.roadWidth || t.riverWidth) out.push(`${at}: ${s.id} on a span it can't use`);
     if (s.kind === "historic") out.push(...historicRule(at, run, s, t));   // WS10: placed by tier, not a region's chance
-    else if (!(W.regions[t.region]?.sites?.[s.kind] > 0)) out.push(`${at}: ${s.id} in a region without ${s.kind}s`);
+    else if (!byQuota && !(W.regions[t.region]?.sites?.[s.kind] > 0)) out.push(`${at}: ${s.id} in a region without ${s.kind}s`);
     if (s.dungeon && dungeonLevelOf(s.dungeon, 1) !== levelOfTier(t.tier) + 1) out.push(`${at}: ${s.id}'s floor 1 is not the surface level + 1`);
     for (const o of run.sites.values())
       if (o !== s && Math.max(Math.abs(o.at.wx - s.at.wx), Math.abs(o.at.wy - s.at.wy)) <= 1) out.push(`${at}: ${s.id} has no free span between it and ${o.id}`);
@@ -442,7 +444,7 @@ function checkRegions(problems, bibleText, seeds) {
     for (const [k, v] of Object.entries(S)) if (!(v >= 0 && v < 0.5)) bad(`${at}: ${k} chance ${v}`);
     if (S.historic !== 0) bad(`${at}: a historic chance (Hour sites go by tier)`);
     const eligible = sp.filter((t) => t.travel === "yes" && t.edges === "open" && !t.landmark && !t.roadWidth && !t.riverWidth).length;
-    if ((S.village > 0) !== (r.villages > 0 && eligible > 0)) bad(`${at}: village chance ${S.village} for a quota of ${r.villages} on ${eligible} eligible spans`);
+    if (S.village !== 0) bad(`${at}: village chance ${S.village}: villages come by quota (world/sites.js placeSites; integrator, C1a #1)`);
     if (!eligible && Object.values(S).some((v) => v > 0)) bad(`${at}: site chances with no span to put a site on`);
     // Creatures: [type, weight, lo, hi], levels 1-30, every level its spans make covered by one row or more.
     if (!Array.isArray(r.creatures) || !r.creatures.length) { bad(`${at}: no creatures`); continue; }
@@ -467,6 +469,16 @@ function checkRegions(problems, bibleText, seeds) {
     for (const id of ids) if ((R[id].villages || 0) !== (want[id] || 0)) bad(`region ${id}: ${R[id].villages} villages, §4.10 says ${want[id] || 0}`);
     if (ids.reduce((a, id) => a + R[id].villages, 0) !== 16) bad("the village quotas don't total 16");
     out.quotas = Object.entries(want).map(([k, v]) => `${k} ${v}`).join(", ");
+    // Placed by quota (integrator, C1a #1 and #2): every seed's run has exactly each region's villages, 16 in all, the
+    // Teeth's on one of its walk-in spans.
+    const off = [];
+    for (const seed of seeds) {
+      const run = buildRun(seed, REAL_WORLD), got = {};
+      for (const s of run.sites.values()) if (s.kind === "village") { const t = run.world.tileAt(s.at.wx, s.at.wy); got[t.region] = (got[t.region] || 0) + 1; }
+      for (const id of ids) if ((got[id] || 0) !== (R[id].villages || 0)) off.push(`seed ${seed} ${id}: ${got[id] || 0} of ${R[id].villages}`);
+    }
+    if (off.length) bad(`villages by quota: ${off.slice(0, 4).join("; ")}`);
+    out.villagesPlaced = `${seeds.length} seeds × 16, each region its quota`;
   }
   // §15.2's spawn keys: every key's creatures in its regions' rows (C3 adds the species; the ids are the bible's).
   const keys = bibleText.split("**Spawn keys**")[1]?.split("### 15.3")[0] || "";
@@ -499,6 +511,12 @@ function checkRegions(problems, bibleText, seeds) {
       : ["glassShore", "glassSea", "hollowMere"].includes(id) ? biomeOf("sea").liquid : t ? W.liquidOf(t.wx, t.wy) : null;
     if (want && R[id].liquid !== (want === "water" ? "water" : want)) bad(`region ${id}: liquid ${R[id].liquid}, its spans hold ${want}`);
   }
+  // A region's biome wins over its terrain's (integrator, C1a #3): the Glass Shore's spans dress as the sea's shore,
+  // every other span as its terrain says.
+  const shoreOff = M.tiles.filter((t) => t.region === "glassShore" && t.biome !== "sea").length;
+  const otherOff = M.tiles.filter((t) => t.region !== "glassShore" && !R[t.region]?.biome && t.biome !== (T[t.terrain].biome || t.terrain)).length;
+  if (shoreOff || otherOff) bad(`biomes: ${shoreOff} Glass Shore spans not the sea's, ${otherOff} other spans not their terrain's`);
+  out.shoreBiome = `${M.tiles.filter((t) => t.region === "glassShore").length} Glass Shore spans dress as the sea's shore`;
   // Music and fog reach the game: clock.js and music.js read them off the span's region.
   out.music = [...new Set(ids.map((id) => R[id].music))].join(", ");
   return out;
