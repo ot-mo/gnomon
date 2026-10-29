@@ -1398,11 +1398,11 @@ export async function run(env) {
   // --- 14b. C2's liquids and money (bible §3.1, §13.7) -------------------------------------------------------------------
   // Every liquid is whole (a name, a colour, a vial's worth of 1-30 glim, its drink and touch words, its effects) and
   // its sacrament list and the factions' `liquid` agree both ways; the effects hold bible §13.7's numbers, name only
-  // statuses the game has or the four it waits for, and where drinkLiquid already acts (heals, Flat, poison, night
+  // statuses the game has or the three it waits for, and where drinkLiquid already acts (heals, Flat, poison, night
   // eyes) it does what the data says. The money's words and reference numbers are §3.1's.
   {
     const L = (await m("content/liquids.js")).LIQUIDS, { CURRENCY: CUR } = await m("content/currency.js"), ST = await m("status.js");
-    const WANTED = ["glowing", "nausea", "confused", "stuck"];   // statuses §13.7 needs that status.js hasn't (integration request)
+    const WANTED = ["glowing", "nausea", "confused"];   // statuses §13.7 needs that status.js hasn't (integration request)
     const KNOWN = ["heal", "hurt", "status", "save", "burns", "douse", "clean", "ward", "stain", "draws", "shortcut", "dark", "seek", "reroll",
       "shutdown", "transform", "seePlane", "rep", "again"];
     let effects = 0;
@@ -1423,7 +1423,7 @@ export async function run(env) {
       ["glim", "drink", "glowing", "t", 10], ["glim", "touch", "burns", "burns", 6], ["brine", "drink", "nausea", "t", 3], ["brine", "touch", "ward", "ward", 3],
       ["ink", "drink", "confused", "t", 5], ["ink", "drink", "flat", "t", 60], ["ink", "drink", "flat", "perTou", -3], ["ink", "touch", "stain", "stain", { sight: 2, t: 30 }],
       ["umbra", "drink", "nightEyes", "t", 60], ["umbra", "drink", "blinded", "t", 20], ["quicksilver", "drink", "poisoned", "t", 6], ["sunwine", "drink", "heal", "heal", 6],
-      ["sunwine", "touch", "stuck", "t", 1], ["freshWater", "drink", "heal", "heal", 2], ["clearGlim", "drink", "seePlane", "seePlane", 1800],
+      ["sunwine", "touch", "pinned", "t", 1], ["freshWater", "drink", "heal", "heal", 2], ["clearGlim", "drink", "seePlane", "seePlane", 1800],
       ["clearGlim", "touch", "burns", "burns", 12], ["turnwater", "drink", "shutdown", "days", 1], ["turnwater", "touch", "transform", "transform", "sameTier"],
     ];
     for (const [id, part, key, field, want] of bible) {

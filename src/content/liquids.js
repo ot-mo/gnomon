@@ -22,7 +22,7 @@
 //                      { reroll: "mutation" } { shutdown: "implant", days }   { transform: "sameTier" }
 //                      { seePlane: s }   flat beings show in 3D for s seconds   { rep: { [factionId]: n }, seen: true }
 //                      { again: s, status, t }   a second drink within s seconds adds the status
-//                    A status the game doesn't have yet (nausea, confused, glowing, stained, lightBlind, stuck), and
+//                    A status the game doesn't have yet (glowing, nausea, confused; sticky is missiles.js's "pinned"), and
 //                    every effect drinkLiquid doesn't apply, is an integration request (docs/c2.md); social/liquids.js
 //                    applies today what WS6b's deviation 9 lists.
 //
@@ -52,7 +52,7 @@ export const LIQUIDS = {
     effects: { drink: [{ status: "poisoned", t: 6 }], touch: [{ seek: "low" }] } },
   sunwine: { name: "sunwine", color: [240, 190, 70], value: 6, sacramentOf: ["horary"],
     drink: "heals 6; two in a row confuse you", touch: "sticky: you're stuck for 1 s",
-    effects: { drink: [{ heal: 6 }, { again: 10, status: "confused", t: 2 }], touch: [{ status: "stuck", t: 1 }] } },
+    effects: { drink: [{ heal: 6 }, { again: 10, status: "confused", t: 2 }], touch: [{ status: "pinned", t: 1 }] } },
   turnwater: { name: "turnwater", color: [210, 120, 220], value: 30, sacramentOf: ["askew", "errata"], rare: true,
     drink: "the Bent re-roll one random mutation; for the Plumb, one implant shuts down for a day",
     touch: "poured on a creature, it becomes a random creature of the same tier",
@@ -72,5 +72,5 @@ export const LIQUIDS = {
     effects: { drink: [{ heal: 2 }], touch: [] } },
   sap: { name: "sap", color: [170, 135, 60], value: 3, sacramentOf: ["pleatwood"],
     drink: "heals 1; it sticks in the throat", touch: "sticky",
-    effects: { drink: [{ heal: 1 }], touch: [{ status: "stuck", t: 1 }] } },
+    effects: { drink: [{ heal: 1 }], touch: [{ status: "pinned", t: 1 }] } },
 };
