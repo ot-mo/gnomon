@@ -1351,6 +1351,9 @@ export function checkGear(m) {
       TN.injectTonic(game, p, "balm", seq(0.9));
       m.status.catchUpStatuses(game, p, 5);
       const ironbark = (TN.injectTonic(game, (p = fresh({ genotype: "bent" })), "ironbark", seq(0.9)), St.bonus(p, "av"));
+      p = fresh({ genotype: "bent" }); TN.injectTonic(game, p, "clearwit", seq(0.9));
+      const wit = [St.bonus(p, "examine"), St.bonus(p, "int")];   // half of +5 and +2, rounded down
+      if (wit.join() !== "2,1") fail(`a Bent's clearwit: +${wit[0]} examine, +${wit[1]} INT, want +2 and +1`);
       p = fresh({ genotype: "bent" });
       const bad = TN.injectTonic(game, p, "hasp", seq(0.01));
       if (bad.k !== 0.5 || !bad.overdose || !has(p, "tonic:crash") || ironbark !== 1) fail(`the Bent: ironbark +${ironbark} armour, a bad reaction ${JSON.stringify(bad)}`);

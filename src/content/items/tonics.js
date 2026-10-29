@@ -39,8 +39,8 @@ T("balm", "BALM", { t: 3, tick(game, e, s, dt) {
 } });
 // (darkRange: the bible's 6 tiles with the torch out, for player.js torchRange once it reads a status's: docs/c4.md #10.)
 T("gloam", "GLOAM", { t: 60, bonus: (s) => ({ darkSight: 3 * s.mag, stealth: 0.3 * s.mag }), darkRange: (s) => 6 * s.mag });
-T("ironbark", "IRONBARK", { t: 60, bonus: (s) => ({ av: Math.round(2 * s.mag), str: Math.round(2 * s.mag) }) });
-T("clearwit", "CLEARWIT", { t: 60, bonus: (s) => ({ examine: Math.round(5 * s.mag), int: Math.round(2 * s.mag) }) });
+T("ironbark", "IRONBARK", { t: 60, bonus: (s) => ({ av: Math.floor(2 * s.mag), str: Math.floor(2 * s.mag) }) });
+T("clearwit", "CLEARWIT", { t: 60, bonus: (s) => ({ examine: Math.floor(5 * s.mag), int: Math.floor(2 * s.mag) }) });
 // Overdoses.
 T("sick", "SICK", { color: [170, 200, 110], kind: "bad", t: 30, flags: { noRegen: true }, ended: "Your stomach settles." });
 T("heavy", "SLOWED", { color: [160, 150, 120], kind: "bad", t: 20, speed: 0.5, ended: "Your legs are your own again." });
@@ -82,7 +82,7 @@ export const TONICS = {
     overdose: (game, p) => { addStatus(game, p, "darkened", { t: 20 }); say(game, p, "The light is a knife. Your torch shrinks to a glimmer.", [120, 120, 140]); },
   },
   ironbark: {
-    name: "ironbark", value: 45, t: 60, status: "tonic:ironbark", odT: 20, info: (k) => `+${Math.round(2 * k)} armour and STR for 60 s. Overdone: half speed for 20 s.`,
+    name: "ironbark", value: 45, t: 60, status: "tonic:ironbark", odT: 20, info: (k) => `+${Math.floor(2 * k)} armour and STR for 60 s. Overdone: half speed for 20 s.`,
     use: (game, p, k) => { addStatus(game, p, "tonic:ironbark", { t: 60, mag: k }); say(game, p, "Your skin goes stiff and brown at the edges.", [170, 140, 100]); },
     overdose: (game, p) => { addStatus(game, p, "tonic:heavy", { t: 20 }); say(game, p, "Your skin goes stiff, and so does everything under it.", [160, 150, 120]); },
   },
@@ -92,7 +92,7 @@ export const TONICS = {
     overdose: (game, p) => { addStatus(game, p, "flat", { t: 60 }); say(game, p, "You fold down into the floor, and the floor keeps you.", [220, 220, 230]); },
   },
   clearwit: {
-    name: "clearwit", value: 35, t: 60, status: "tonic:clearwit", odT: 1, info: (k) => `+${Math.round(5 * k)} examine, +${Math.round(2 * k)} INT for 60 s. Overdone: you forget this floor's map.`,
+    name: "clearwit", value: 35, t: 60, status: "tonic:clearwit", odT: 1, info: (k) => `+${Math.floor(5 * k)} examine, +${Math.floor(2 * k)} INT for 60 s. Overdone: you forget this floor's map.`,
     needs: "cures confusion (a confused status: C2's ink, the Muddle mutation)",
     use: (game, p, k) => { addStatus(game, p, "tonic:clearwit", { t: 60, mag: k }); say(game, p, "Everything has edges, and you can count them.", [200, 220, 255]); },
     overdose: (game, p) => {
