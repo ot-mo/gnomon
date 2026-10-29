@@ -14,7 +14,7 @@
 //   people (floor where each stands; landmarks.js says who: C5 writes their words, and they are placed once their
 //   kinds exist):  a Mira  b Brother Tamsin  c Brann's ghost (the crypt)  e Reeve Hallen  i Old Ottilie
 //   j Sir Corwin  n Pell  o Ess and Tee  q Corner, the temple cat. Maren is the temple's own M.
-// A house stands on stilts a block above the datum (bible §9.4: "reed houses on stilts 1 block above the brine, with
+// A house (all but the stone crypt) stands on stilts a block above the datum (bible §9.4: "reed houses on stilts 1 block above the brine, with
 // boardwalks"): its floor and door are one step up from the boardwalk, its roof a slab of thatch. On the map the
 // boardwalks are floor and the beds shallow water; in 3D the houses stand up out of the reeds.
 import { B, FLOOR_Z } from "../../../world.js";
@@ -77,10 +77,10 @@ export const HOLLOWMERE_ROWS = [
   "..............................................................................", // 47
 ];
 const TEMPLE_AT = [2, 2];   // the temple plan's corner in this plan
-// The houses: where each stands in the plan, and its walls.
+// The houses: where each stands in the plan, and its walls; the crypt is stone on the ground (ground: no stilts).
 export const HOLLOWMERE_HOUSES = [
   { id: "mira", x: 48, y: 2, w: 7, d: 6, wall: B.THATCH }, { id: "tamsin", x: 57, y: 2, w: 6, d: 5, wall: B.THATCH },
-  { id: "crypt", x: 66, y: 1, w: 6, d: 6, wall: B.STONE }, { id: "corwin", x: 69, y: 8, w: 6, d: 4, wall: B.THATCH },
+  { id: "crypt", x: 66, y: 1, w: 6, d: 6, wall: B.STONE, ground: true }, { id: "corwin", x: 69, y: 8, w: 6, d: 4, wall: B.THATCH },
   { id: "cotA", x: 69, y: 16, w: 6, d: 5, wall: B.THATCH }, { id: "hallen", x: 48, y: 21, w: 8, d: 6, wall: B.THATCH },
   { id: "ottilie", x: 60, y: 21, w: 7, d: 6, wall: B.THATCH }, { id: "cotB", x: 69, y: 23, w: 6, d: 5, wall: B.THATCH },
   { id: "cotC", x: 48, y: 29, w: 6, d: 5, wall: B.THATCH },
@@ -106,7 +106,7 @@ export function stampHollowmere(zone, ox, oy, rng) {
   for (const h of HOLLOWMERE_HOUSES) {
     const plan = HOLLOWMERE_ROWS.slice(h.y, h.y + h.d).map((r) => r.slice(h.x, h.x + h.w));
     stampVault(zone, { name: `Hollowmere, ${h.id}`, plan, height: 4, wall: h.wall, floorBlock: B.PLANK, links: [], legend: HOUSE },
-               ox + h.x, oy + h.y, still, { roof: "slab", wallHeight: 4, baseZ: FLOOR_Z + 1 });
+               ox + h.x, oy + h.y, still, { roof: "slab", wallHeight: 4, baseZ: h.ground ? FLOOR_Z : FLOOR_Z + 1 });
   }
   const keyPoints = [...out.keyPoints];
   HOLLOWMERE_ROWS.forEach((row, y) => [...row].forEach((ch, x) => { if (HOLLOWMERE_PEOPLE.includes(ch)) keyPoints.push({ x: ox + x, y: oy + y }); }));

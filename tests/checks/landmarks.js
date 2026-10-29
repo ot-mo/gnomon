@@ -19,7 +19,7 @@
 // 4. Hollowmere (C1a, bible §5 A, §9.4), on every seed: the start, on its plan at the zone's corner; the parent's temple
 //    at (2, 2) with Maren, the cube, its spikes and cube wall, you waking in your room, the Keeper's Stair (the 20-level
 //    legacy stack) at its stairs in the parent's frame, no sinkhole outside the shaft; every house a block up on its
-//    stilts (plank floor, slab roof, thatch walls on the map, its door up there); every person's place a key point
+//    stilts but the stone crypt (plank floor, slab roof, its walls on the map, its door up there); every person's place a key point
 //    (reachable); the commons lamp, the brine beds (shallow, the Flats' brine), the boardwalks, every prop; nobody but
 //    Maren in it (a settlement: no wildlife); the Old Rule coming in; and its four seams on the world function, with no
 //    step across them over a block but at a cliff.
@@ -188,14 +188,14 @@ function checkHollowmere(seeds, expect) {
     expect(siteWithDungeon(run, 5, 16)?.dungeon?.legacy && siteWithDungeon(run, 5, 16).dungeon.levels === 20, `${at}: the Keeper's Stair isn't the 20-level legacy stack`);
     // The village: houses on stilts a block up, their doors there, thatch walls on the map, a slab roof.
     for (const h of HOLLOWMERE_HOUSES) {
-      const inner = [], doors = [];
+      const inner = [], doors = [], up = h.ground ? 0 : 1;   // (the crypt stands on the ground)
       for (let y = h.y; y < h.y + h.d; y++) for (let x = h.x; x < h.x + h.w; x++) {
         const c = rows[y][x], i = x + y * z.w;
         if (c === "D") doors.push([x, y]);
         else if (c === "#" || c === "U") expect(z.kind[i] === KIND.WALL && z.get(x, y, FLOOR_Z + 1) === h.wall, `${at}: ${h.id}'s wall at (${x}, ${y})`);
-        else { inner.push([x, y]); expect(z.stand[i] === FLOOR_Z + 1 && z.get(x, y, FLOOR_Z) === B.PLANK && z.get(x, y, FLOOR_Z + 5) === h.wall, `${at}: ${h.id}'s floor or roof at (${x}, ${y})`); }
+        else { inner.push([x, y]); expect(z.stand[i] === FLOOR_Z + up && z.get(x, y, FLOOR_Z - 1 + up) === B.PLANK && z.get(x, y, FLOOR_Z + 4 + up) === h.wall, `${at}: ${h.id}'s floor or roof at (${x}, ${y})`); }
       }
-      expect(doors.length === 1 && z.get(doors[0][0], doors[0][1], FLOOR_Z + 1) === B.DOOR, `${at}: ${h.id}'s door`);
+      expect(doors.length === 1 && z.get(doors[0][0], doors[0][1], FLOOR_Z + up) === B.DOOR, `${at}: ${h.id}'s door`);
       expect(inner.length > 0, `${at}: ${h.id} has no inside`);
       houses++;
     }
