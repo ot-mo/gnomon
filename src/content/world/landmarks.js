@@ -239,7 +239,7 @@ export const LANDMARKS = [
     holy: "assize",   // a Bent below Bright is trespass (C2 #5)
   },
   {
-    id: "gnomon", plan: "gnomon", anchor: [25, 14], flatten: true, visibleFrom: 6,
+    id: "gnomon", plan: "gnomon", anchor: [25, 14], flatten: true, visibleFrom: 42,   // seen from every span (bible §4.12)
     description: "A black needle leaning over the world, so tall that the top of it is weather.",
     lines: {   // bible §5 N
       flat: "GNOMON. Height: off the page. Shadow: 15.5 spans at noon, and lengthening.",
