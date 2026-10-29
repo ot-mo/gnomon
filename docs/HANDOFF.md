@@ -393,6 +393,17 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
 
 ## Integration log
 
+**`p3i-wiring`** (2026-10-29): TECH_DESIGN §8.5's **last wiring merge**, on `p3i-c1a` (`5981d0a`, `0fcc58a`). New games
+in the browser (the title's and `?quick=1`'s) start on GNOMON's real world at Hollowmere, whose temple holds the
+Rotation Cube; `?world=test` opens the test world, which every browser tool that knows its layout now asks for; Node's
+checks still build on the test world (golden, the legacy fights, the frames untouched). The `?world=real` preview and its
+cube step are gone (C1a #7). `browser-2b` part 3 holds the default (Hollowmere, no cube until it is touched, Tab refused
+until then, 882 spans drawn, a step); a mutant fails. The 2B playthrough runs on the real world too (check-bot: seed
+35, from Hollowmere to Reedwick Steading's trade, Kindling and prayer, the Broken Arcade 3 levels down, save, Continue).
+Checks: `run-all` **38 of 38** (178.9 s); 14 browser tools PASS on `?world=test` (browser-0d1 27 of 27 modes,
+browser-0d2 184 modules and `test-world.html` passing, browser-gate, browser-silent, check-save --browser, browser-ws1,
+-0c, -shell, -ws4 … -ws8) and browser-2b on the default.
+
 **`p3i-c1a`** (2026-10-29): `p3-c1a` (3bdcc7e, with `p3i-sinkholes` in) merged into `integration` (`861b82d`), cleanly:
 the real world's 34 regions, the terrains' final numbers, the biomes' counts, the moods, Hollowmere on its plan (the
 parent's temple and the Keeper's Stair under it, the village east of the porch). Requests applied (`46fb55d`, each with
