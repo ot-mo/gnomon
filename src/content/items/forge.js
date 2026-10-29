@@ -70,7 +70,7 @@ const rep = (row, n) => Array(n).fill(row);
 const alt = (a, b, n) => Array.from({ length: n }, (_, i) => (i % 2 ? b : a));
 export const GEAR_WEAPONS = {
   stylus: {
-    name: "stylus", dmg: [1, 3], swing: 0.3, reach: 1.4, str: 6, tier: 0,
+    name: "stylus", dmg: [2, 3], swing: 0.3, reach: 1.4, str: 6, tier: 0,
     held: { length: 0.3, pivot: 9.5 / 13, art: ["  w  ", "  W  ", ...rep(" wWs ", 5), "  s  ", ...alt("  h  ", "  H  ", 4), "  d  "] },
   },
   handAxe: {
@@ -112,7 +112,7 @@ export const GEAR_WEAPONS = {
 // A piece that does nothing yet (only `needs`) stays out of the real world's loot until it does (items/gear.js useful).
 export const GEAR_ARMOURS = {
   // Head
-  helm:          { name: "helm", armour: 2, str: 12, tier: 4, metal: true, slot: "head" },
+  helm:          { name: "close helm", armour: 2, str: 12, tier: 4, metal: true, slot: "head" },   // (forged: "saltsteel close helm", never the parent's "iron helm" twice)
   plumbHelm:     { name: "plumb-helm", armour: 3, str: 13, tier: 6, metal: true, slot: "head" },
   lampCrownHat:  { name: "lamp crown", armour: 0, str: 0, tier: 4, metal: true, slot: "head", bonus: { torch: 1 / 3 }, info: "your torch reaches 2 tiles further" },
   featheredHood: { name: "feathered hood", armour: 0, str: 0, tier: 2, metal: false, slot: "head", veil: true, wornRep: { kites: 250 },
@@ -174,28 +174,28 @@ export const VALUE = {
 // parent's pieces have theirs here too, so the bible's names read the same in both worlds.
 export const TEXT = {
   dagger: "A short blade. It goes where the light doesn't.",
-  stylus: "A writing point, sharpened past writing.",
+  stylus: "A writing point, sharpened past writing. From above it is a full stop.",
   shortsword: "Worn at the grip by many hands. From above it is a short line.",
   longsword: "Balanced a hand above the guard.",
-  mace: "It argues with armour and usually wins.",
+  mace: "It argues with armour and usually wins. From above, a knot.",
   maul: "Subtlety was considered and set aside.",
-  staff: "Pilgrims lean on it until they swing it.",
+  staff: "Pilgrims lean on it until they swing it. From above it is a line you can walk.",
   handAxe: "A reedcutter's axe, for work done twice a day.",
   waraxe: "Made for people rather than reeds.",
   spear: "From above it is a dot that arrives first.",
   glaive: "For keeping a decision at arm's length and a half.",
-  greatsword: "Carried on the shoulder, swung with the whole back.",
+  greatsword: "Carried on the shoulder, swung with the whole back. From above, a long dash.",
   lanternFlail: "For people who want to bring the light to someone personally.",
   clothes: "They have seen worse.",
   leather: "Boiled leather, stiff at the elbows.",
   chain: "Rings on rings. It sounds like rain when you run.",
   scale: "Like a fish that took up a trade.",
-  plate: "Shaped for a body not quite yours.",
+  plate: "Shaped for a body not quite yours. From above you are a lid.",
   helm: "It rings when struck, which is the point.",
   plumbHelm: "Cut to a true level. It never sits crooked, even on you.",
   lampCrownHat: "For reading in the dark with both hands.",
   featheredHood: "The Kites take it as good manners.",
-  reedHat: "It keeps the noon off.",
+  reedHat: "It keeps the noon off. From above you are a hat.",
   copperCap: "Green where it sits.",
   ironHelm: "For a face you mean to keep.",
   goggles: "The dark looks a little less dark.",
@@ -205,15 +205,15 @@ export const TEXT = {
   hourMask: "Worn smooth inside by its last face.",
   glassScale: "Arrows skid. From above it is a puddle.",
   pleatedCoat: "Folded so often it has forgotten its weight.",
-  cloak: "It makes you a shape rather than a person.",
+  cloak: "It makes you a shape rather than a person. From above, a smaller shape.",
   reedCloak: "In the reeds it is mostly reeds.",
   featherCloak: "Moulted over many years and one argument.",
-  mapCase: "It keeps the maps dry and you honest.",
-  kiteGlider: "It makes falling a slower kind of falling.",
+  mapCase: "It keeps the maps dry and you honest. From above it holds another above.",
+  kiteGlider: "It makes falling a slower kind of falling. From above it is a kite with ideas.",
   pack: "Canvas and two straps. Room for more than you should carry.",
   banner: "People nearby stand straighter.",
   bracers: "Scuffed on the inside of the wrist.",
-  buckler: "For the blows you saw coming.",
+  buckler: "For the blows you saw coming. From above, a coin.",
   climbingHooks: "For walls that wanted no visitors.",
   gloves: "You keep a better grip in them.",
   gauntlets: "A fist in them is a small mace.",

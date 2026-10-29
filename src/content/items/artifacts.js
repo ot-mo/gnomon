@@ -95,7 +95,7 @@ export const ARTIFACTS_WAITING = {
     info: "A 15 × 15 look from above, even where you have never been.",
     needs: "Overlook's reveal at 15 × 15, anywhere on the floor (progression/abilities.js overlook)" },
   inkStamp: { name: "ink-stamp", vague: "a stamp that is always wet", class: "a marker", complexity: 1, charge: 50, value: 120,
-    info: "A mark in both views. Flat allies can use it as a door.",
+    info: "A mark in both views. Flat allies can use it as a door. From above it is the door.",
     needs: "the mark (the zone's markers, as marker chalk) and doors for flat followers (followers, WS8)" },
   heightLens: { name: "height lens", vague: "a lens with numbers in it", class: "a mapper", complexity: 4, charge: 300, value: 450,
     info: "For 30 s every tile on your map shows its height as a digit.", needs: "height digits on the map (renderMap.js; the Read heights power's too)" },
@@ -115,7 +115,7 @@ export const ARTIFACTS_WAITING = {
   greatTheodolite: { name: "the Great Theodolite", relic: true, class: "a relic", complexity: 0, charge: 0, value: 0,
     info: "Shows the Hand and the hidden sites within 3 spans on the world map.",
     flat: "THEODOLITE, GREAT. Brass. Reach 3 spans.",
-    deep: "A surveyor's instrument the size of a child, brass gone the colour of tea.",
+    deep: "A brass instrument too heavy to carry far, holding the last of the light after the rest has gone.",
     dark: "it measured the needle\nthe needle measured back",
     needs: "the Hand and the hidden sites on the world map (overworld: WS1's discovery)" },
 };
