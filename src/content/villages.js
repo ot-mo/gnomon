@@ -32,7 +32,7 @@ const events = [
   { id: "feud", text: "{name} won a long feud with {neighbour}, and has never let them forget it.", mood: "pride" },
   { id: "pact", text: "{name} made a pact with {pactName}, who still speak well of it.", mood: "pride" },
   { id: "assize", text: "{name} drove the Assize out with rakes and lamp oil, and they have not come back.", mood: "pride", cruel: true },
-  { id: "legend", text: "{name} was saved by a great beast that still lives in the hills nearby.", mood: "awe" },
+  { id: "legend", text: "{name} was saved by a great beast that still lives a span or two away.", mood: "awe" },
   { id: "spring", text: "A glim spring opened under {name}, ran for three generations, and closed again.", mood: "grief" },
   { id: "stele", text: "A child of {name} read a stele no one else could, and the village keeps what the Hour left behind.", mood: "awe" },
   { id: "council", text: "{name} formed a council, and has argued in it ever since.", mood: "pride", gov: "council" },
@@ -40,7 +40,7 @@ const events = [
   { id: "dish", text: "Someone in {name} first made {dish}, and the village has made it every feast day since.", mood: "pride" },
   { id: "moths", text: "A moth plague came to {name} one summer and ate every wick in the village.", mood: "grief", cruel: true },
   { id: "shade", text: "The Shade touched {name}: one quarter of the village lies in dusk all day.", mood: "awe", cruel: true },
-  { id: "mutation", text: "Everyone in the Flats with {mutation} came to {name}, and all its people share it now.", mood: "pride" },
+  { id: "mutation", text: "Everyone for ten spans around with {mutation} came to {name}, and all its people share it now.", mood: "pride" },
 ];
 // One in 20 of each event leaves the village empty (bible §9.1).
 for (const e of events) e.abandon = 0.05;

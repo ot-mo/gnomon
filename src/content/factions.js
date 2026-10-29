@@ -32,7 +32,8 @@
 //   lines        { greet: { indifferent, liked, loved }, trespass?: { warn, turn } }: a talker of the faction greets
 //                you with its band's line (Cold stays the role's curt line; integration request); a holy place's
 //                warning, and what is said when they turn on you. Plain register, at most two lines (§2.1)
-//   riteVariant  the faction's own Kindling (bible §3.3 "Faction variants"): { name, rite, needs, how, words }
+//   riteVariant  the faction's own Kindling (bible §3.3 "Faction variants"): { name, rite, needs, how, words, narration? }
+//                (a beast says nothing: its `narration` is what you see instead)
 //                where the numbers are the plain rite's and the verbs differ (integration request)
 //   specials     bible §3.3's "Faction specials", bought with rep in the flame-kin menu (integration request)
 //   torchFriend  the Lantern Moths like you while your torch is lit (bible §6.2; integration request)
@@ -251,7 +252,7 @@ export const FACTIONS = {
     buys: { readings: [], topics: [] }, sells: "nothing; the Moon-Wick sells the Locations of every glim spring", teaches: [],
     riteVariant: { name: "the Moon-Wick's Lighting", rite: "lighting", needs: { legend: "moonWick" },
       how: "the Lighting, with the legendary Moon-Wick and no other moth",
-      words: ["My light on your wick. See by it.", "The great moth folds its wings over your flame, and does not burn."] },
+      words: null, narration: "The great moth folds its wings over your flame, and does not burn." },
     lines: { greet: {
       indifferent: "It flutters once round your torch and waits for more light.",
       liked: "A dozen of them settle on your lamp hand, warm as breath." } },
@@ -292,7 +293,7 @@ export const FACTIONS = {
     buys: { readings: [], topics: [] }, sells: "a Herdmother will sell her herd's peace", teaches: [],
     riteVariant: { name: "the Herdmother's Lighting", rite: "lighting", needs: { legend: "herdmother" },
       how: "the Lighting, with a legendary Herdmother: the herd follows her",
-      words: ["My light on your wick. See by it.", "She lowers her head to your lamp and breathes on it. The herd goes quiet."] },
+      words: null, narration: "She lowers her head to your lamp and breathes on it. The herd goes quiet." },
     lines: { greet: {} },
   },
   sporeMoot: {
@@ -307,7 +308,7 @@ export const FACTIONS = {
     specials: [{ id: "limb", name: "a fungal limb", rep: -30, after: { sporeMoot: 200, pleatwood: -100 },
       text: "It grows where you let it. The Moot is delighted. The Pleatwood less so." }],
     lines: { greet: {
-      indifferent: "The Moot is in session. Speak slowly. We will reply next week.",
+      indifferent: "The Moot is in session. Speak slowly. We will reply next season.",
       liked: "The Moot recognises the soft one. A motion to welcome you: carried, eventually.",
       loved: "The Moot counts you among its rot. It is a great honour. Sit in the damp." },
       trespass: { warn: "This grove is in session. Lower the light.", turn: "The Moot votes. Unanimous. Dry the intruder." } },
