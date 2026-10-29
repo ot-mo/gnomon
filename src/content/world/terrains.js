@@ -12,7 +12,9 @@
 //   tierMod      +1 in the Shade, the Lattice, the Teeth and on water (the tier formula, §4.5)
 //   dark         always dark, by day too (the Shade, bible §3.2): a lit torch burns glim there (torch.js)
 //
-// World-function parameters (TECH_DESIGN §5.3; P0 placeholders that WS2 tunes, C1 finalises):
+//   biome        content/biomes.js's id for its dressing and wildlife (default: the terrain's id)
+//
+// World-function parameters (TECH_DESIGN §5.3; WS2's numbers, final in C1a):
 //   ground   the block on top of the ground (a key of blocks.js B)
 //   relief   0..1: how hilly (heightAt's amplitude is 3 blocks × relief)
 //   cliffs   0..1: how often a cliff raises an area by 4 blocks (map walls)
@@ -76,11 +78,20 @@ export const TERRAINS = {
     travelHours: null, lostChance: null, tiers: [4, 5], enter: "walk", tierMod: 1, villages: 1,
     ground: "SHALE", relief: 1, cliffs: 1, trees: 0.02,
   },
-  sea: {
-    name: "the Glass Sea", glyph: "~", color: [96, 152, 160], palette: [[96, 152, 160], [152, 202, 206], [70, 112, 124]],
-    travelHours: null, lostChance: null, tiers: [2, 7], enter: "never", tierMod: 1, villages: 1,
+  sea: {   // (its village is on a shore span: the region glassShore, content/world/regions.js)
+    name: "the Glass Sea", glyph: "~", color: [96, 152, 160], palette: [[96, 152, 160], [152, 202, 206]],
+    travelHours: null, lostChance: null, tiers: [5, 7], enter: "never", tierMod: 1, villages: 1,
     edgeMessage: "Half liquid, half glass: the sea won't bear you, and won't let you swim.",
     ground: "GLASS", relief: 0, cliffs: 0, trees: 0,
+  },
+  // The Hollow Mere (4..6, 18): the sea row of §15.2 gives it its own tier (2) and palette. It is `~` on the map, a
+  // terrain of its own here (worldmap.js splits the glyph by x, as `&`), so it is named, coloured and refused as
+  // itself, not as the Glass Sea. Its biome is the sea's (nobody goes in: no zone of it is ever made).
+  mere: {
+    name: "the Hollow Mere", glyph: "~", color: [70, 112, 124], palette: [[70, 112, 124]],
+    travelHours: null, lostChance: null, tiers: [2, 2], enter: "never", tierMod: 1, villages: 0, biome: "sea",
+    edgeMessage: "The Hollow Mere is brine to the knee and silt below that: nobody wades it twice.",
+    ground: "WATER_SHALLOW", relief: 0, cliffs: 0, trees: 0,
   },
   river: {
     name: "a river", glyph: "\"", color: [82, 132, 150], palette: [[82, 132, 150], [22, 22, 32]],
