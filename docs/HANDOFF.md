@@ -5,14 +5,14 @@ Update this file as the last act of every session (see `CLAUDE.md`, "Handing off
 **Updated:** 2026-10-29, the integrator (local session), on `integration`. **Phase 1 is done and fully merged
 (`p2-ws3` … `p2-ws1`, the flip `p2-flip`). Phase 2's 2B hardening is done and tagged `p2-2b` (e0b7c9b), with the
 Phase 2 items that need no C1; since then `?world=real` (a new game on the real world, a preview; `p2-realworld`,
-2602aff), the Phase 3 plan (approved by the user) and its first step, props named (`p3i-props`, 7959ea0); `main` =
-`p3i-props`. What's left of Phase 2 is the last wiring merge, which waits on C1:
+2602aff), the Phase 3 plan (approved by the user) and its first step, props named (`p3i-props`, 7959ea0), then C1a's request 9
+(`p3i-sinkholes`, 76bb63a: a surface no longer makes its dungeon's level 1); `main` = `p3i-sinkholes`. What's left of Phase 2 is the last wiring merge, which waits on C1:
 "Next step" below. Nothing is running.** From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p3i-props` (props named in the legend and inspect, on `p2-realworld`; C1a's base) on `integration`; before it `p2-realworld`, `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+- **Last tag:** `p3i-sinkholes` (C1a's request 9, on `p3i-props`) on `integration`; before it `p3i-props` (props named; C1a's, C4's and C2's base), `p2-realworld`, `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
   `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b`, `p1-ws10`, the flip, `p1-ws2a`, `p1-ws7a`,
   `p1-ws7b`, `p1-ws2b`, `p1-ws9` and `p1-ws1`, with their integration requests; `p2-ws3` … `p2-ws9` before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
@@ -392,6 +392,15 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p3i-sinkholes`** (2026-10-29): C1a's request 9 (`docs/sessions/2B.md` §9). C1a's real-world sites put a dungeon span in
+check-perf's surface sample (p95 68.8 ms, budget 60: the surface made its dungeon's level 1 to place its sinkholes);
+C1a held its tag, and the user chose the code fix over splitting the budget. `4ebca92`: the corridor heap in typed
+arrays (identical output). `ed69dde`: the surface and level 1 share the span's sinkhole spots (`world/sites.js
+sinkholeSpots`; level 1's `landings`, validated); check-sites holds 478 sinkholes over 240 spans to land right under
+them; three mutants fail; level 1 1.14 attempts (1.07), p95 29.3 ms (22.3; budget 40). On C1a's tree merged with it,
+`check-perf --against p3i-props` alone: PASS (surface p95 34.66, max 41.54). `run-all` 38 of 38 (172.5 s);
+`browser-gate` (falls off by 0) and `browser-2b` PASS. `main` fast-forwarded; C1a told to merge the tag and rerun.
 
 **`p3i-props`** (2026-10-29): props named in the map legend and on the inspect line (`de12966`; integrator, WS2b #7;
 the user's answer 3 with the Phase 3 plan), on `p2-realworld`. A `props` describer in `renderMap.js` and the outdoor
