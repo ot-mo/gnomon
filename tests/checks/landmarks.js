@@ -51,7 +51,6 @@ import { FACTIONS } from "../../src/content/factions.js";
 import { LANDMARK_INDEX, GIMMICK_KEYS } from "../../src/content/world/worldmap.js";   // C1b
 import { TOP as TABLE_TOP } from "../../src/content/world/plans/tallTable.js";
 import { RINGS } from "../../src/content/world/plans/foldmother.js";
-import { NEEDLE } from "../../src/content/world/plans/gnomon.js";
 import { PRESSYARD_HOUSES } from "../../src/content/world/plans/pressyard.js";
 import { TOLL_GATE } from "../../src/content/world/plans/molar.js";
 
@@ -324,6 +323,9 @@ const mapReach = (z) => {
   for (let i = 0; i < z.w * z.d; i++) if (z.kind[i] === KIND.WALL) open[i] = -1;
   return reachable(open, z.w, z.d, Math.floor(z.spawn.x), Math.floor(z.spawn.y), PLAYER_STEP_UP, PLAYER_DROP);
 };
+// The bible's own figures, never the plans': the Gnomon's foot (§4.11, §4.12: 14 blocks) and the floors §5 names.
+const NEEDLE = 14;
+const BIBLE_FLOORS = { press: { 5: /Press-hall/ }, dialWorks: { 8: /Noon Socket/ }, underPage: { 2: /Speaking Door/ }, unlitChoir: { 4: /Warden/, 6: /Noon/ } };
 // What each plan promises beyond the rest (bible §5); c = { z, pa, cell(ch) → zone cells, plan, run, L, dungeon }.
 const solidUp = (z, x, y, from, to) => { for (let k = from; k < to; k++) if (!z.get(x, y, k)) return false; return true; };
 const anyIn = (z, x0, y0, x1, y1, test) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (test(x, y)) return true; return false; };
@@ -482,7 +484,9 @@ function checkC1b(seeds, expect) {
         const p = dungeonParams(t.run, site, lz);
         tally.floors++;
         p.gimmicks.forEach((g) => used.add(g));
-        expect(p.level === want.floors[lz - 1] && p.name === want.named[lz - 1] && p.gimmicks.every((g) => GIMMICKS[g]) && p.cradle === !!want.cradle?.includes(lz),
+        const named = BIBLE_FLOORS[want.id]?.[lz];
+        expect(!named || named.test(p.name), `${at} floor ${lz}: "${p.name}", where the bible names it ${named}`);
+        expect(p.level === want.floors[lz - 1] && p.name === want.named?.[lz - 1] && p.gimmicks.every((g) => GIMMICKS[g]) && p.cradle === !!want.cradle?.includes(lz),
           `${at} floor ${lz}: level ${p.level}, name "${p.name}", gimmicks ${p.gimmicks}, cradle ${p.cradle}`);
         if (lz === site.dungeon.levels && want.bottom) {
           const f = generateDungeonLevel(zoneSeed(t.run, L.wx, L.wy, lz), p);
