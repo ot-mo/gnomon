@@ -53,8 +53,10 @@ runs on the test world. Its first step, once C1 is in: `git fetch origin --tags`
 `node tools/run-all.mjs` (38 of 38 at `p2-2b`) and `NODE_PATH="$(npm root -g)" node tools/browser-2b.mjs` (PASS), merge
 C1's tag, and point `game.js`'s new runs at the real world; then run the playthrough on the real world too (it runs on
 the test world today, seed 18, because the real world has no village before C1). The Phase 3 plan below is approved
-(the user, 2026-10-29), and its first step is done: props are named (`p3i-props`, `docs/sessions/2B.md` §8). **Next:
-C1a, C4 and C2 start from `p3i-props` on the user's word**, none yet (the plan's "How a content session works").
+(the user, 2026-10-29), and its first step is done: props are named (`p3i-props`, `docs/sessions/2B.md` §8). **C1a, C4
+and C2 are started** (the user, 2026-10-29: "start C1a, C4 and C2 from p3i-props, as the Phase 3 plan says"), each in
+its worktree at `p3i-props` (the plan's table). Next for the integrator: merge C1a's tag when it comes, then the last
+wiring merge; C1b takes C1a's slot, C3 the next free one.
 
 **On `main` since `p2-ws6a`** (both at the user's request, without a tag of their own): the root README for GNOMON as
 it stands at `p2-ws5` (`6645658`, from `wip/readme`; an interim update before Phase 4's rewrite; the secret rooms'
@@ -125,9 +127,9 @@ single piece of authoring.
 
 | # | Session | Its data files (§8.4's "C" row, split) | Waits on | Worktree, branch |
 |---|---|---|---|---|
-| 1 | **C1a The world: regions and terrain** | `content/world/worldmap.js` (the regions rows and `regionKey`; the Inkrun's `liquid: "ink"`), `content/world/terrains.js` (the world function's final numbers), new `content/world/regions.js`, `content/biomes.js` (final counts and spawn weights), `content/moods.js` (a region's music and fog), and Hollowmere's plan (`content/world/plans/hollowmere.js`: the start) | nothing | `c1`, `ws/c1` (both halves) |
-| 2 | **C4 Gear and characters** | `content/items/*` (the parent's `items/legacy.js` entries stay as they are: golden), `content/mutations.js genotypes.js backgrounds.js powers.js` | nothing | `c4`, `ws/c4` |
-| 3 | **C2 Peoples** | `content/factions.js villages.js grammar.js currency.js liquids.js` | nothing (it names regions by the bible's ids; checked against C1a's at the merge) | `c2`, `ws/c2` |
+| 1 | **C1a The world: regions and terrain** (started 2026-10-29) | `content/world/worldmap.js` (the regions rows and `regionKey`; the Inkrun's `liquid: "ink"`), `content/world/terrains.js` (the world function's final numbers), new `content/world/regions.js`, `content/biomes.js` (final counts and spawn weights), `content/moods.js` (a region's music and fog), and Hollowmere's plan (`content/world/plans/hollowmere.js`: the start) | nothing | `c1`, `ws/c1` (both halves) |
+| 2 | **C4 Gear and characters** (started 2026-10-29) | `content/items/*` (the parent's `items/legacy.js` entries stay as they are: golden), `content/mutations.js genotypes.js backgrounds.js powers.js` | nothing | `c4`, `ws/c4` |
+| 3 | **C2 Peoples** (started 2026-10-29) | `content/factions.js villages.js grammar.js currency.js liquids.js` | nothing (it names regions by the bible's ids; checked against C1a's at the merge) | `c2`, `ws/c2` |
 | 4 | **C1b The landmarks** | new `content/world/landmarks.js` and `content/world/plans/*.js` (the other 15 plans, the Gnomon's foot among them), the landmark dungeons' data in `worldmap.js`'s landmark index | C1a merged | `c1`, `ws/c1` |
 | 5 | **C3 Creatures** | `content/creatures/*` (the parent's `creatures/legacy.js` tables stay: golden), `content/encounters.js`, `content/dungeons.js` | C1a merged (creatures and encounters by region) | `c3`, `ws/c3` |
 | 6 | **C5 Story** | `content/quests.js` (the quest texts, the campaign's 11 beats, the starter chain), the landmark people's dialogue (C1b places them; C5 writes their words), the intro on a real-world run | C1b, C2 and C3 merged (it reads their ids) | `c5`, `ws/c5` |
@@ -284,8 +286,7 @@ job does. For a timed gate number, run that check alone on an idle machine and a
 
 ## Waiting on the user
 
-- **Starting Phase 3's sessions** (the plan above is approved, 2026-10-29; props are named, `p3i-props`): C1a, C4 and
-  C2 start from `p3i-props` on the user's word.
+- Nothing: C1a, C4 and C2 are running (2026-10-29). C1b, C3 and C5 start as the plan says, as slots free.
 
 - **The flip** (decided by the user on 2026-10-27, given in chat in the coordinating session: "Flip as built now:
   switch to the attribute set and d20 combat, and settle the tuning (creature scaling, kill XP) in the balance phase
