@@ -46,6 +46,13 @@ surveys of the parent code that the tech design cites.
   `C:\Users\Otto Mörner\Code\gnomon-wt\<ws>`, on branch `ws/<ws>` created from tag `p0-done`. Make it with
   `git worktree add` from the main checkout, and edit only the files the ownership matrix (§8.4) gives you. Anything that
   needs a change to someone else's file goes in `docs/<ws>.md` under "Integration requests".
+- **Phase 3 content sessions** (approved by the user, 2026-10-29; `docs/HANDOFF.md` "Phase 3 plan" has the table, the
+  acceptance and the carried items). Six sessions, three at a time: C1a, C4 and C2 first, then C1b, C3, C5. Each runs in
+  its own worktree `C:\Users\Otto Mörner\Code\gnomon-wt\<c>` on branch `ws/<c>` (`c1` for both halves of C1), made from
+  the integrator's latest tag when it starts. It edits only its data files and the assertions for its own data, and
+  puts anything else in `docs/<c>.md` under "Integration requests". **Golden (b) stays held:** the parent's legacy
+  creature and item tables don't change, and the real world's levels get tables of their own. Props are named in the
+  map legend and the inspect text; Esc on the map stays "turn to 3D".
 - **Commits.** Commit early and often: each logical step gets its own commit (a module moved, a check passing, a
   feature working), so that `main` and every `ws/*` branch show the work as it happens. End every message with the line
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Never rewrite history on `main`.

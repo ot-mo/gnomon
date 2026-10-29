@@ -51,8 +51,10 @@ runs on the test world. Its first step, once C1 is in: `git fetch origin --tags`
 `C:\Users\Otto Mörner\Code\gnomon-wt\integration` on branch `integration` (at `p2-2b` or later) run
 `node tools/run-all.mjs` (38 of 38 at `p2-2b`) and `NODE_PATH="$(npm root -g)" node tools/browser-2b.mjs` (PASS), merge
 C1's tag, and point `game.js`'s new runs at the real world; then run the playthrough on the real world too (it runs on
-the test world today, seed 18, because the real world has no village before C1). Before C1: the user's approval of
-"Phase 3 plan (draft)" below, which starts C1a with two other sessions; nothing is started until then.
+the test world today, seed 18, because the real world has no village before C1). The Phase 3 plan below is approved
+(the user, 2026-10-29); its sessions start on the user's word, none yet. Before C1a starts, the integrator adds the
+`props` describer (the user's answer 3; it changes P0's `tests/checks/hud.js:199`, approved with the plan) and tags it,
+so C1a starts from a tag that names the props.
 
 **On `main` since `p2-ws6a`** (both at the user's request, without a tag of their own): the root README for GNOMON as
 it stands at `p2-ws5` (`6645658`, from `wip/readme`; an interim update before Phase 4's rewrite; the secret rooms'
@@ -93,7 +95,7 @@ village XP (`xpReward` 0.6, 0.75, 0.2 of a level); discovery, which on the real 
 
 **Phase 2's work** (TECH_DESIGN §8.5): 2B hardening (the bot playthrough, the performance pass, the browser QA
 checklist) and the last wiring merge (after C1). Found at the last merges and left for it (**the five items done in
-`p2-2b`**; the coordinator's two questions still open):
+`p2-2b`**; the coordinator's two questions answered by the user with the Phase 3 plan, 2026-10-29):
 - **Travel saves:** WS9 saves every 10 s on the world map, but WS1's world map isn't saveable, rightly: `game.trip`
   isn't saved, so a save there would load you back where the journey began. Saving the trip (and then making
   `"world"` saveable, WS9 #8) is the fix; until then a travel save waits for the next view.
@@ -105,14 +107,14 @@ checklist) and the last wiring merge (after C1). Found at the last merges and le
   nothing; `torch.js darkSeconds` could read the span under `game.trip`.
 - **The journal's Locations tab** (WS1 #2): a key and a click to `openWorldMap(game, { center })` need a selected
   location, which the tab (scrolling text) doesn't have yet.
-- **For the coordinator:** Esc on the map (TECH §4.2's options against P0's check-shell, WS9 #5); naming props in the
-  legend and inspect (check-hud's frozen describer list, WS2b #7).
+- **For the coordinator** (answered, 2026-10-29): Esc on the map stays the parent's "turn to 3D" for now (WS9 #5);
+  props are named in the legend and inspect (WS2b #7), by the integrator before C1a.
 - The integrator's backlog and every carried request: "Carried integration requests" and "Open items" below.
 
-## Phase 3 plan (draft for the user's approval, 2026-10-29)
+## Phase 3 plan (approved by the user, 2026-10-29)
 
-TECH_DESIGN §8.6: content, in parallel by data file. **Nothing is started until the user approves this plan** (and
-answers the four questions at its end). The bible is the source (§4-§13, §15's data appendix); TECH_DESIGN §2.18 ("Content schemas")
+TECH_DESIGN §8.6: content, in parallel by data file. **Approved by the user on 2026-10-29, with the recommended answers
+to its four questions (below). No session is started yet: they start on the user's word.** The bible is the source (§4-§13, §15's data appendix); TECH_DESIGN §2.18 ("Content schemas")
 gives the schemas (`regions.js`, `landmarks.js` and `plans/*.js` included). Phase 3 starts from
 `p2-realworld`; what it leaves for Phase 4 is the balance (WS8's TTK tables with C4's gear, creature scaling, kill XP,
 money) and the README.
@@ -199,15 +201,17 @@ silenced):
   lantern-mote's light, `"view:turn"`, Shellback, the Snuffer's mark, the lore powers' effects); the code the sessions'
   requests ask for.
 
-**For the user to decide with this plan:**
-1. **The split and the order:** six sessions (C1 in two), three at a time, C1a, C4 and C2 first. (Recommended.)
-2. **Golden (b) and C3's retune:** golden (b) is 27 frames of the parent's dungeon on the test world. Recommended: the
-   test world's legacy stack keeps the parent's numbers (golden (b) held, as through Phase 1) and C3 gives the real
-   world's levels their own tables. The other way is to retire golden (b) at C3, as golden (a) retired at the flip.
-3. **Naming props in the map legend and the inspect text** (WS2b #7, waiting since Phase 1): needed before C1a, which
-   finalises the biomes' props. Recommended: yes, a `props` describer, which changes P0's `tests/checks/hud.js:199`.
-4. **Esc on the map** (WS9 #5): the parent's "turn to 3D", or TECH §4.2's options. Not needed before Phase 3; the
-   integrator can make the change at the wiring merge if the user picks the options.
+**Decided by the user with the plan** (2026-10-29, in chat: "Approve the Phase 3 plan as drafted, with the recommended
+answers: six sessions, three at a time, C1a, C4 and C2 first; golden (b) held, with the real world's levels on their
+own tables; name props in the map legend and the inspect text; Esc on the map stays 'turn to 3D' for now"):
+1. **The split and the order:** six sessions (C1 in two), three at a time, C1a, C4 and C2 first.
+2. **Golden (b) stays held:** the test world's legacy stack keeps the parent's numbers, and C3 gives the real world's
+   levels (up to 23) tables of their own; `creatures/legacy.js`'s and `items/legacy.js`'s entries don't change.
+3. **Props are named** in the map legend and the inspect text: a `props` describer, with P0's
+   `tests/checks/hud.js:199` changed to allow it. The integrator does it before C1a starts (its own commit, marked
+   `// integrator (WS2b #7)`, with a mutant), and C1a's final props are named through it.
+4. **Esc on the map stays "turn to 3D"** for now (P0's `tests/checks/shell.js:366` unchanged); TECH §4.2's options
+   stay reached by Tab and Esc twice, or the title.
 
 ## Phase 1 plan (agreed with the user, 2026-10-26)
 
@@ -280,8 +284,8 @@ job does. For a timed gate number, run that check alone on an idle machine and a
 
 ## Waiting on the user
 
-- **The Phase 3 plan** ("Phase 3 plan (draft)" above, 2026-10-29): approve it, or change it, and answer its four
-  questions. No content session starts until then.
+- **Starting Phase 3's sessions** (the plan above is approved, 2026-10-29): C1a, C4 and C2 start on the user's word,
+  after the integrator's props describer is tagged.
 
 - **The flip** (decided by the user on 2026-10-27, given in chat in the coordinating session: "Flip as built now:
   switch to the attribute set and d20 combat, and settle the tuning (creature scaling, kill XP) in the balance phase
@@ -370,9 +374,10 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `LANDMARK_BUILDERS`, and the Gnomon's must stand its own 14-block foot at the span's middle, (40, 24), where render3d
   starts the needle; until then the real world's landmarks stand on stub footprints. Wildlife (C3 and the balance
   phase): bible §12's behaviours, the species left out, d20 `dv` and attributes per species; `content/biomes.js`'s
-  wildlife counts and spawn weights are first numbers. GRASS (id 7) stays `.` (§6.5's `"` is the amulet's). **For
-  the coordinator:** naming props in the map legend (`,`) and the inspect describer needs a `props` describer, which
-  `tests/checks/hud.js:199` (P0's) freezes out; the props are drawn since `p2-ws2b`, unnamed.
+  wildlife counts and spawn weights are first numbers. GRASS (id 7) stays `.` (§6.5's `"` is the amulet's). Naming
+  props in the map legend (`,`) and the inspect describer needs a `props` describer, which `tests/checks/hud.js:199`
+  (P0's) freezes out; the props are drawn since `p2-ws2b`, unnamed. **Decided** (the user, 2026-10-29): name them; the
+  integrator, before C1a.
 - **WS1, WS7, WS6b** (at their merges): WS4 #11, discoveries, quests, triangulations and Kindlings give XP through
   `gainXp(game, xpReward(kind, level), { source: kind })` (Pilgrim's ×2.2), and the powers waiting on them (Keen Eye,
   Pathfinder, Terrain lore, Homing sense: WS1; Hour script, Gossip, Triangulator, Vey's script: WS7) lose their `needs`
@@ -984,8 +989,8 @@ its §8.4 files and two P0 checks).
   `Θ` artifact, `≡` cell, `¶` true-mark) wait with the underground legend for golden (b)'s retirement; two old lines
   kept as golden and the frames record them (#23: "You put on the The Mantle of Angles.", "throwing knifes"); a stray
   file outside the repository, `C:OTTOMR~1placeholder-never-written.txt` (1 byte), to delete by hand (the user).
-- **WS9 (merged; what's left):** **for the coordinator:** Esc on the map is still the parent's "to 3D" (TECH §4.2 says
-  it opens the options; P0's `tests/checks/shell.js:366` holds Esc → 3D, so changing it needs that check changed; WS9
+- **WS9 (merged; what's left):** Esc on the map stays the parent's "to 3D" (**decided** by the user, 2026-10-29, "for
+  now"; TECH §4.2 says it opens the options; P0's `tests/checks/shell.js:366` holds Esc → 3D, so changing it needs that check changed; WS9
   #5): the options and save-and-quit are reached from the map by Tab and Esc twice, or the title. A `?quick=1` game's
   saves stay in memory (the browser tools; the title moves it into IndexedDB), `main.js` and `tools/README.md` say
   so (#1). The wizard keeps its own copy of the run modes' names (WS4 #13, harmless). `VERSION.gen` is 4, the baseline
