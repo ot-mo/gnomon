@@ -1219,6 +1219,16 @@ export function checkGear(m) {
     stats.randomGear = `${launchers} launchers among them; randomTonic ${JSON.stringify(tonics)}; 30 levels × 400 draws; the commonest material by tier: ${[1, 4, 7, 10, 13, 16, 19, 22].map((l) => `${tierOf(l)} ${tally[l]}`).join(", ")}; randomEquipment ${parent} draws, none new`;
   });
 
+  // The map case: 3 points off the lost chance (bible §15.6 counts a compass-ring's 5), never lost-proof.
+  section("map case", () => {
+    const p = fresh(), it = GR.makeGear("armour", "mapCase");
+    if (!Bd.equip(game, p, it, "back").ok) { fail("the map case won't go on the back"); return; }
+    const n = St.bonus(p, "navigation");
+    if (Math.abs(n - 0.03) > 1e-9) fail(`the map case: navigation ${n}, want 0.03 (a compass-ring is 0.05)`);
+    Bd.unequip(game, p, "back");
+    stats.mapCase = `navigation ${n}`;
+  });
+
   section("switched on", () => {
     const p = fresh(), out = {};
     for (const [id, key, n] of [["featherfallLantern", "featherFall", 1], ["jumpSprings", "jump", 2], ["mirrorShield", "ward", 3]]) {

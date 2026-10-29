@@ -131,7 +131,8 @@ export const GEAR_ARMOURS = {
   reedCloak:     { name: "reed cloak", armour: 0, str: 0, tier: 1, metal: false, slot: "back", bonus: { stealth: 0.1 } },
   featherCloak:  { name: "feather cloak", armour: 0, str: 0, tier: 3, metal: false, slot: "back", bonus: { stealth: 0.05 }, wornRep: { kites: 250 },
                    needs: "Kites +250 while worn (the worn reputation hook)" },
-  mapCase:       { name: "map case", armour: 0, str: 0, tier: 1, metal: false, slot: "back", bonus: { navigation: 3 }, info: "you get lost less on the world map" },
+  // (navigation is taken off a chance: overworld/lost.js; a compass-ring is 0.05, bible §15.6's "-5 points")
+  mapCase:       { name: "map case", armour: 0, str: 0, tier: 1, metal: false, slot: "back", bonus: { navigation: 0.03 }, info: "you get lost less on the world map" },
   kiteGlider:    { name: "kite-glider", armour: 0, str: 0, tier: 4, metal: false, slot: "back", bonus: { featherFall: 1 }, info: "falls never hurt you",
                    needs: "glide 4 tiles from a height in 3D (player.js)" },
   banner:        { name: "banner", armour: 0, str: 0, tier: 3, metal: false, slot: "back", rally: 1,
