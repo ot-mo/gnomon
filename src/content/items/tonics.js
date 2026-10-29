@@ -77,7 +77,8 @@ export const TONICS = {
     needs: "cures confusion (a confused status: C2's ink, the Muddle mutation)",
     use: (game, p, k) => { addStatus(game, p, "tonic:clearwit", { t: 60, mag: k }); say(game, p, "Everything has edges, and you can count them.", [200, 220, 255]); },
     overdose: (game, p) => {
-      if (game?.zone?.seen) game.zone.seen.fill(0);   // the auto-map: the only thing in the game that forgets it
+      // The auto-map and the pits you had looked into: the only thing in the game that forgets them.
+      for (const k of ["seen", "holeSeen"]) game?.zone?.[k]?.fill?.(0);
       say(game, p, "You know exactly where you are, and nothing else. Your map of this floor is gone.", [200, 220, 255]);
     },
   },
