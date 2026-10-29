@@ -1,13 +1,21 @@
 // The landmarks' authored data (TECH_DESIGN §2.18 content/world/landmarks.js + plans/*.js; bible §5, §15.3): what
-// worldmap.js adds to LANDMARK_INDEX's entry for each landmark that has its plan. C1a: Hollowmere, the start; C1b adds
-// the other 15 (until then they stand on stub footprints, gen/surface.js).
+// worldmap.js adds to LANDMARK_INDEX's entry for each landmark: C1a Hollowmere, the start; C1b the other 15.
 //
-//   LANDMARKS = [{ id, plan, anchor, flatten, visibleFrom, checkpoint, description, lines, letters }]
-//     anchor       the plan's corner in its zone ([x, y]), so its footprint is the plan's size from there
+//   LANDMARKS = [{ id, plan, spanPlans?, anchor, flatten, visibleFrom, checkpoint, description, lines, letters, below?, holy? }]
+//     spanPlans    a multi-span landmark's other spans' plans, { "wx,wy": planId } (Halfnight's Middle and East Wards;
+//                  integration request: gen/surface.js stamps only `plan`, on the landmark's own span)
+//     anchor       the plan's corner in its zone ([x, y]), so its footprint is the plan's size from there (every plan
+//                  of a landmark is anchored the same)
+//     visibleFrom  how many spans away it is known (overworld/discovery.js); checkpoint: a settlement's (commonsLamp)
 //     description  the Deep line (bible §2.1: what you see in 3D); lines: all three registers, Flat, Deep and Dark
-//     letters      who stands on each of the plan's people letters (C5 writes their words; each is placed once its
+//     letters      who stands on each of the plans' people letters (C5 writes their words; each is placed once its
 //                  kind exists: C3, C5). Maren is the temple's own (content/world/temple.js "M")
-//   PLANS = { [id]: plan }   (plans/*.js; gen/surface.js stamps a plan through its `stamp` or stampVault)
+//     below        who lives in its dungeon, [{ who, name, role, floor | up }] (C3's kinds, C5's words: the dungeon's
+//                  floors are generated, so they are placed by code once their kinds exist)
+//     holy         the faction whose holy place it is (C2 #5: a neutral member hostile there below Warm, and its rule),
+//                  or { "wx,wy": factionId } span by span
+//   PLANS = { [id]: plan }   (plans/*.js; gen/surface.js stamps a plan through its `stamp` or stampVault; a plan's
+//                             `texts` are its carvings' words, for check-content's count)
 import { HOLLOWMERE_PLAN } from "./plans/hollowmere.js";
 import { DIAL_FLOOR_PLAN } from "./plans/dialFloor.js";
 import { KETTLE_MESA_PLAN } from "./plans/kettleMesa.js";
@@ -224,7 +232,7 @@ export const LANDMARKS = [
     letters: {   // the gate (bible §5 M: Plumb characters are let in at the gate)
       g: { who: "gateAssizer", name: "the gate's assizer", role: "lets the Plumb in" },
     },
-    below: [{ who: "strade", name: "Hierarch Aurel Strade-Orrum", role: "the Assize's head (beat 10), on the floors up", floor: 5 },
+    below: [{ who: "strade", name: "Hierarch Aurel Strade-Orrum", role: "the Assize's head (beat 10)", up: 2 },
             { who: "lio", name: "Lio", role: "a pressed prisoner in the cells (map only)", floor: 2 },
             { who: "plumbknight", name: "plumbknights and assizers", role: "patrols in dead-straight lines", floor: 1 }],
     holy: "assize",   // a Bent below Bright is trespass (C2 #5)

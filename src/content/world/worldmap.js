@@ -193,6 +193,31 @@ const LANDMARK_DUNGEONS = {
     planned: { layouts: { day: [6, 18], night: [18, 6] }, foldLanding: 1 } },
 };
 for (const l of LANDMARK_INDEX) if (l.dungeon && LANDMARK_DUNGEONS[l.dungeon.id]) Object.assign(l.dungeon, LANDMARK_DUNGEONS[l.dungeon.id]);
+// §15.3's gimmick keys, each mapped onto what builds it (C1b; check-landmarks holds every landmark dungeon's gimmicks to
+// the union of its keys'): gimmicks, the GIMMICKS a dungeon's floors play; vaults, the puzzle rooms it draws; surface,
+// what its plan builds; code, what still needs code (docs/c1.md "C1b: integration requests").
+export const GIMMICK_KEYS = {
+  flatTemple: { gimmicks: [], surface: "the parent's Temple of Angles, its walls forcing the map (C1a)" },
+  threeAccounts: { gimmicks: [], surface: "the Dial Floor's three readings: the mosaic (map), the relief (3D, lit), the rune (3D, dark)", code: "the run's Fifth-Hour event and its nearest site" },
+  shaftDrop: { gimmicks: ["collapsed", "spikeworks", "flooded"], vaults: ["flatLie"], code: "a fall down the shaft is exactly one floor, unhurt; floor 1 in daylight; the culvert to the temple's well" },
+  trueLevel: { gimmicks: ["murals", "allDeep"], code: "the plate whose map number is the sill's 3D height opens the door; the Datum stone read on its plinth" },
+  climbUp: { gimmicks: [], surface: "the Tall Table's climb: steps, two sprinting jumps, ghost planks; perches with nests (zone.perches)", code: "a nest on the map over a perch the map draws as wall; kites carrying to the perches" },
+  borrowedDark: { gimmicks: ["lightless", "flooded", "haunted"], code: "the canals' Chandler lamps locked; a lit torch wakes the watch and its lamp-hounds" },
+  darkMapping: { gimmicks: [], code: "the map records every tile you step on, even unlit" },
+  mapOnlyTown: { gimmicks: [], surface: "Folio drawn in mosaic, its archive a blank stone box", code: "the archive's drawn door (floor on the map, wall in 3D)" },
+  lightIsLaw: { gimmicks: [], surface: "Halfnight's rows (plan.areas): the Lampless north row, the Hour-house", code: "trespass by torch in each, and the north row's permanent night" },
+  mystery: { gimmicks: [], code: "Who Lit the Hush? (C5, beat 6)" },
+  pressing: { gimmicks: ["flatland", "spikeworks", "oneBeat"], code: "pressed rooms unpressed by turning on their centre; plates that press you flat for 10 s" },
+  loweringCeiling: { gimmicks: [], code: "headroom 6, 5, 4 and 3 blocks, then the tall Press-hall" },
+  theDark: { gimmicks: ["lightless", "haunted", "braziers"] },
+  oneBeat: { gimmicks: ["spikeworks", "oneBeat"], code: "doors on the off-beat; machines acting on the beat" },
+  tideOfHours: { gimmicks: ["flooded"], code: "dry 11:00-13:00, the water up a block every 2 hours to 4; the waterline on the map" },
+  identicalRooms: { gimmicks: ["murals", "flatland"], code: "a lattice of identical rooms; patrols' straight traces on the map; the floors up" },
+  ruleBanners: { gimmicks: [], code: "banners that make a 12-tile Trued zone" },
+  sweepingHand: { gimmicks: ["allDeep", "spikeworks", "oneBeat", "flatland"], code: "the inner hand's shadow, a turn every 40 s, pressing flat what it covers" },
+  answerInFloor: { gimmicks: ["murals"], vaults: ["mosaicHall", "speakingDoor"] },
+  twoLayouts: { gimmicks: ["allDeep"], code: "a day and a night layout of each floor, by the hour you enter it" },
+};
 
 // Roads and rivers (§15.5), 4-connected, in order.
 const span = (pairs) => pairs.map(([x, y]) => [x, y]);

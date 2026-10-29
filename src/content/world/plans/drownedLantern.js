@@ -16,7 +16,7 @@ import { Grid, house, cells, column } from "./kit.js";
 const W = 80, D = 43, CX = 40, CY = 22;
 const G = new Grid(W, D, "~");
 G.disc(CX, CY, 11.5, "s").disc(CX, CY, 9.5, ",");
-G.fill(CX - 1, 0, CX + 1, CY - 9, ".");             // the causeway's last stretch, onto the island
+G.fill(CX - 1, 0, CX + 1, CY - 7, ".");             // the causeway's last stretch, onto the island to the landing
 G.disc(CX, CY, 4.5, "#").disc(CX, CY, 3.2, "h").put(CX, CY - 4, "D").put(CX + 1, CY + 1, ">");
 for (const [x, y] of [[33, 27], [34, 28], [47, 18], [46, 26], [32, 19]]) G.put(x, y, "x");
 export const DROWNED_LANTERN_ROWS = G.rows();

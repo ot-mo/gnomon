@@ -63,6 +63,7 @@ export function stampDialFloor(zone, ox, oy) {
 export const DIAL_FLOOR_PLAN = {
   id: "dialFloor", name: "the Dial Floor", rows: DIAL_FLOOR_ROWS, legend: LEGEND, grounds: GROUNDS, stacks: STACKS,
   height: 4, wall: B.STONE, floorBlock: B.TILE, roof: "none",
+  texts: Object.values(DIAL_FLOOR_ACCOUNTS),
   at: [0, 0], hub: [12, 18],   // the gap in the rim's south side, towards Hollowmere
   stamp: (zone, ox, oy) => stampDialFloor(zone, ox, oy),
 };

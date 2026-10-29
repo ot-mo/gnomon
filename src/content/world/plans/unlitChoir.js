@@ -38,6 +38,7 @@ const WALL = 5, SPIRE = 14;
 export const UNLIT_CHOIR_PLAN = {
   id: "unlitChoir", name: "the Unlit Choir", rows: UNLIT_CHOIR_ROWS, legend: LEGEND, stacks: STACKS, rubble: B.PLANK,
   height: WALL, wall: B.MOSS, floorBlock: B.STONE, roof: "slab",
+  texts: [UNLIT_CHOIR_GLOSS],
   at: [0, 0], hub: [4, 14],   // the rune circle before the west door
   stamp(zone, ox, oy) {
     const still = makeRng(seedFor(zone.seed, "unlitChoir"));

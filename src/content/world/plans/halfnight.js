@@ -99,16 +99,16 @@ function stampWard(which, rows) {
 export const HOUR_HOUSE_SIGN = "LAMPS STAY LIT. THE HOURS ARE WATCHING.";
 export const HUSH_RUNE = "put it out\nwe will still be here\nthat is the point";
 
-const plan = (which, rows, extra) => ({
+const plan = (which, rows, extra, texts = []) => ({
   id: `halfnight${which[0].toUpperCase()}${which.slice(1)}`, name: "Halfnight", rows, legend: LEGEND, grounds: GROUNDS, stacks: STACKS,
   ghosts: { k: 1 }, rubble: B.CRATE, height: 4, wall: B.STONE, floorBlock: B.TILE, roof: "none",
-  at: [0, 0], hub: [34, 20],   // the street, north of the Line
+  texts, at: [0, 0], hub: [34, 20],   // the street, north of the Line
   street: STREET, line: LINE,
   // Where each faith's rule holds (bible §5 H, light as law; integration request): the north row is the Lampless
   // quarter (a lit torch there is trespass), and in the West Ward the Hour-house (a torch out there is trespass).
   areas: [{ faction: "lampless", rule: "noTorch", rect: [0, 0, W - 1, STREET[0] - 1] }, ...(extra || [])],
   stamp: stampWard(which, rows),
 });
-export const HALFNIGHT_WEST_PLAN = plan("west", HALFNIGHT_WEST_ROWS, [{ faction: "horary", rule: "torchLit", rect: [20, 25, 49, 39] }]);
+export const HALFNIGHT_WEST_PLAN = plan("west", HALFNIGHT_WEST_ROWS, [{ faction: "horary", rule: "torchLit", rect: [20, 25, 49, 39] }], [HOUR_HOUSE_SIGN]);
 export const HALFNIGHT_MIDDLE_PLAN = plan("middle", HALFNIGHT_MIDDLE_ROWS);
-export const HALFNIGHT_EAST_PLAN = plan("east", HALFNIGHT_EAST_ROWS);
+export const HALFNIGHT_EAST_PLAN = plan("east", HALFNIGHT_EAST_ROWS, undefined, [HUSH_RUNE]);

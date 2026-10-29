@@ -30,6 +30,9 @@ for (let ly = 0; ly < 6 && PRESSYARD_HOUSES.length < 41; ly++)
   }
 // The well and its stair, in the middle of the square.
 G.disc(CX, CY, 2.3, "u").put(CX, CY, ">").fill(CX - 1, CY - 1, CX + 1, CY + 1, ",").put(CX, CY, ">");
+// The engineers' camp.
+for (const [x, y] of [[58, 14], [59, 14], [58, 16], [60, 18], [59, 20]]) G.put(x, y, "x");
+G.put(59, 17, "L");
 // The people: 300 figures on the tiles, none on a house, the well or another figure, none beside the stair.
 let people = 0;
 for (let k = 0; k < 20000 && people < 300; k++) {
@@ -38,9 +41,6 @@ for (let k = 0; k < 20000 && people < 300; k++) {
   G.put(x, y, "w");
   people++;
 }
-// The engineers' camp.
-for (const [x, y] of [[58, 14], [59, 14], [58, 16], [60, 18], [59, 20]]) G.put(x, y, "x");
-G.put(59, 17, "L");
 export const PRESSYARD_ROWS = G.rows();
 export const PRESSYARD_PEOPLE_FIGURES = people;
 

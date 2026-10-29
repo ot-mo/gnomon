@@ -38,9 +38,13 @@ const STACKS = { T: [B.TRUNK, TRUNK], S: [B.STONE, 2], ...Object.fromEntries(Obj
 const LEGEND = { ".": "keep", P: "keep", ">": "stairs", m: "lm.person", w: "lm.person", e: "lm.person",
                  ...Object.fromEntries(Object.keys(STACKS).map((ch) => [ch, "lm.stack"])) };
 
+// The dial-stele at her foot (a relief, read in 3D).
+export const FOLDMOTHER_STELE = "SHE OPENS AT DAWN AND CLOSES AT DUSK. WHAT IS OUT ON A BRANCH AT DUSK IS HERS.";
+
 export const FOLDMOTHER_PLAN = {
   id: "foldmother", name: "Foldmother", rows: FOLDMOTHER_ROWS, legend: LEGEND, stacks: STACKS,
   height: 4, wall: B.TRUNK, floorBlock: B.DIRT, roof: "none",
+  texts: [FOLDMOTHER_STELE],
   at: [0, 0], hub: [CX, D - 3],   // south of her, on the way in
   rings: RINGS,
   stamp(zone, ox, oy) {
@@ -57,5 +61,3 @@ export const FOLDMOTHER_PLAN = {
     return { spawn: null, keyPoints: peopleKeys(FOLDMOTHER_ROWS, FOLDMOTHER_PEOPLE, ox, oy) };
   },
 };
-// The dial-stele at her foot (a relief, read in 3D).
-export const FOLDMOTHER_STELE = "SHE OPENS AT DAWN AND CLOSES AT DUSK. WHAT IS OUT ON A BRANCH AT DUSK IS HERS.";

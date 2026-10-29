@@ -71,6 +71,7 @@ export const BENCHMARK_MARK = "THE DATUM. ALL HEIGHTS FROM HERE. CUT IN THE YEAR
 export const BENCHMARK_PLAN = {
   id: "benchmark", name: "Benchmark", rows: BENCHMARK_ROWS, legend: { ...LEGEND, "#": "wall", D: "door", l: "lamp" }, stacks: STACKS,
   rubble: B.CRATE, height: 4, wall: B.STONE, floorBlock: B.TILE, roof: "none",
+  texts: [BENCHMARK_MARK],
   at: [0, 0], hub: [32, 25],   // the plaza, south of the pillar: where the Old Rule meets itself
   stamp: (zone, ox, oy) => stampBenchmark(zone, ox, oy),
 };

@@ -227,6 +227,59 @@ export function checkContent(m) {
       `${Object.keys(Mu.MUTATIONS).length} + ${Object.keys(Mu.MUTATIONS_WAITING).length} mutations; the area's text ${area.reduce((n, t) => n + words(t), 0)} words`;
   }
 
+  // 1c. C1b's landmarks (content/world/landmarks.js, plans/*.js, worldmap.js LANDMARK_DUNGEONS): every landmark has its
+  // entry and its plans, rectangular, every letter in a plan's own legend or the default legend's structure (walls, doors,
+  // lamps, runes, stairs: never an item or a creature by accident); its three registers (bible §2.1 rule 3: the Flat
+  // line's name in capitals, the Deep line its description, the Dark line lower case with no punctuation but line breaks);
+  // every letter of `letters` someone's place in one of its plans, a name and a role; who is below on a floor its
+  // dungeon has; its holy place a faction; its dungeon's names, floor gimmicks, theme, cradles and vaults real and one a
+  // floor. The area's words go in the stats (bible §15.9: 4,000 for the landmarks' registers and their people's words).
+  if (m.c1b) {
+    const { landmarks: LM, worldmap: WM, dungeon: DG, factions: FC } = m.c1b, V = m.vaults;
+    const STRUCTURE = new Set(["wall", "door", "locked", "gate", "lamp", "rune", "stairs", "chasm", "floor", "step1", "step2", "step3", "ghostPlanks", "brazier", "lever"]);
+    const wordsOf = (t) => (typeof t === "string" ? t.split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w)).length : 0);
+    let words = 0, letters = 0;
+    for (const L of WM.LANDMARK_INDEX) {
+      const e = LM.LANDMARKS.find((l) => l.id === L.id), at = `landmark ${L.id}`;
+      if (!need(e, `${at}: no entry in landmarks.js`)) continue;
+      const plans = [e.plan, ...Object.values(e.spanPlans || {})].map((id) => [id, LM.PLANS[id]]);
+      for (const [id, p] of plans) {
+        if (!need(p?.rows?.length && p.rows.every((r) => r.length === p.rows[0].length), `${at}: plan ${id} missing or ragged`)) continue;
+        for (const ch of new Set(p.rows.join(""))) {
+          const h = p.legend?.[ch] ?? V.DEFAULT_LEGEND[ch] ?? "floor";
+          need(p.legend && (ch in p.legend || STRUCTURE.has(h)), `${at}: plan ${id}'s "${ch}" falls to the default legend's ${h}`);
+        }
+        for (const t of p.texts || []) words += wordsOf(t);
+      }
+      const ln = e.lines || {};
+      need(/^[A-Z][A-Z' -]*\./.test(ln.flat || "") && ln.deep === e.description && str(ln.deep), `${at}: its Flat and Deep lines`);
+      need(/^[a-z ]+(\n[a-z ]+)*$/.test(ln.dark || ""), `${at}: its Dark line (lower case, no punctuation but line breaks)`);
+      words += wordsOf(ln.flat) + wordsOf(ln.deep) + wordsOf(ln.dark);
+      for (const [ch, who] of Object.entries(e.letters || {})) {
+        letters++;
+        need(str(who.who) && str(who.name) && str(who.role) && plans.some(([, p]) => p?.rows.some((r) => r.includes(ch))), `${at}: letter ${ch} (${who.name}) stands nowhere in its plans`);
+        words += wordsOf(who.name) + wordsOf(who.role);
+      }
+      for (const b of e.below || []) {
+        need(str(b.who) && str(b.name) && str(b.role) && (Number.isInteger(b.floor) ? b.floor >= 1 && b.floor <= (L.dungeon?.floors.length || 0) : b.up >= 1 && b.up <= (L.dungeon?.up?.length || 0)),
+          `${at}: ${b.name} on floor ${b.floor ?? `up ${b.up}`}, which its dungeon hasn't`);
+        words += wordsOf(b.name) + wordsOf(b.role);
+      }
+      for (const f of e.holy ? (typeof e.holy === "string" ? [e.holy] : Object.values(e.holy)) : []) need(FC.FACTIONS[f], `${at}: holy to ${f}, which is no faction`);
+      const d = L.dungeon;
+      if (!d || d.legacy) continue;
+      const n = d.floors.length;
+      need(Array.isArray(d.named) && d.named.length === n && d.named.every(str), `${at}: ${d.named?.length} floor names for ${n} floors`);
+      need(!d.floorGimmicks || d.floorGimmicks.length === n, `${at}: ${d.floorGimmicks?.length} floors of gimmicks for ${n} floors`);
+      need([...(d.gimmicks || []), ...(d.floorGimmicks || []).flat()].every((g) => DG.GIMMICKS[g]), `${at}: a gimmick that isn't one of GIMMICKS`);
+      need(DG.DUNGEON_THEMES[d.theme], `${at}: theme ${d.theme}`);
+      need((d.cradle || []).every((z) => Number.isInteger(z) && z >= 1 && z <= n), `${at}: a cradle off its floors`);
+      need((d.vaultPool || []).every((v) => V.vaultById(Array.isArray(v) ? v[0] : v)), `${at}: a vault it can't draw`);
+      words += d.named.reduce((k, t) => k + wordsOf(t), 0);
+    }
+    stats.c1b = `${WM.LANDMARK_INDEX.length} landmarks with their entries and ${Object.keys(LM.PLANS).length} plans, ${letters} people placed by letter; the area's text ${words} words`;
+  }
+
   // Statuses.
   const statuses = Object.entries(m.status.STATUS_DEFS);
   for (const [id, s] of statuses) {
@@ -417,6 +470,9 @@ export const MUTATIONS = [
   ["an elite without info", (m) => { const e = m.creatures.ELITES.swift, old = e.info; delete e.info; return () => { e.info = old; }; }, /elite swift/],
   ["a material off its rung (C4)", (m) => { const d = m.c4.forge.MATERIALS.iron, old = d.tier; d.tier = 5; return () => { d.tier = old; }; }, /materials: tiers 1, 2, 5/],
   ["a worn piece for no faction (C4)", (m) => { const a = m.items.ARMOURS.featheredHood, old = a.wornRep; a.wornRep = { kytes: 250 }; return () => { a.wornRep = old; }; }, /armour featheredHood: reputation kytes/],
+  ["a landmark's dark line punctuated (C1b)", (m) => { const e = m.c1b.landmarks.LANDMARKS.find((l) => l.id === "molar"), old = e.lines.dark; e.lines.dark = "So are we."; return () => { e.lines.dark = old; }; }, /landmark molar: its Dark line/],
+  ["a plan's letter left to the default legend (C1b)", (m) => { const p = m.c1b.landmarks.PLANS.kettleMesa, old = p.legend.k; delete p.legend.k; return () => { p.legend.k = old; }; }, /landmark kettleMesa: plan kettleMesa's "k" falls to the default legend's key/],
+  ["a dungeon short of a floor's name (C1b)", (m) => { const d = m.c1b.worldmap.LANDMARK_INDEX.find((l) => l.id === "metronome").dungeon, old = d.named; d.named = old.slice(1); return () => { d.named = old; }; }, /landmark metronome: 5 floor names for 6 floors/],
   ["a relic's dark line punctuated (C4)", (m) => { const d = m.c4.artifacts.ARTIFACTS_WAITING.noonglass, old = d.dark; d.dark = "It is noon."; return () => { d.dark = old; }; }, /waiting artifact noonglass: a relic's three registers/],
   ["an item kind with no sample", (m) => { m.items.registerItemKind("mutant", { name: () => "mutant", glyph: () => ["w", [1, 2, 3]], stack: false });
     return () => { delete m.items.ITEM_KINDS.mutant; }; }, /item kind mutant: no sample/],
@@ -448,6 +504,8 @@ export async function contentModules(src) {
   const [forge, gear, tonics, artifacts, mutations, backgrounds, implants, body, missiles] = await Promise.all(["content/items/forge.js", "content/items/gear.js",
     "content/items/tonics.js", "content/items/artifacts.js", "content/mutations.js", "content/backgrounds.js", "content/items/implants.js", "body.js",
     "content/items/missiles.js"].map((p) => src(p)));
+  // C1b's landmarks (section 1c).
+  const [landmarks, dungeon, factions] = await Promise.all(["content/world/landmarks.js", "gen/dungeon.js", "content/factions.js"].map((p) => src(p)));
   game.startRun(4242);
   game.game.pages = null;
   return {
@@ -456,6 +514,7 @@ export async function contentModules(src) {
     worlds: [{ id: "test", def: testWorld.TEST_WORLD }, { id: "real", def: worldmap.REAL_WORLD }],
     templeLegends: temple.TEMPLE_LEGENDS, interact, blocks: world.BLOCKS,
     body, c4: { forge, gear, tonics, artifacts, mutations, backgrounds, implants, missiles },
+    c1b: { landmarks, worldmap, dungeon, factions },
   };
 }
 

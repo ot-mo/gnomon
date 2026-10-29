@@ -28,11 +28,11 @@ export const MOLAR_HALLS = [
   { id: "tollHouse", room: [5, 11, 13, 15], door: [9, 16] }, { id: "inn", room: [18, 9, 29, 15], door: [23, 16] },
   { id: "mapSeller", room: [33, 12, 39, 15], door: [36, 16] }, { id: "checkpoint", room: [49, 11, 57, 15], door: [53, 16] },
   { id: "market", room: [6, 23, 21, 30], door: [13, 22] }, { id: "bounty", room: [25, 23, 31, 27], door: [28, 22] },
-  { id: "stele", room: [35, 23, 37, 24], door: [36, 22] }, { id: "canals", room: [42, 23, 51, 29], door: [46, 22] },
+  { id: "stele", room: [35, 23, 37, 25], door: [36, 22] }, { id: "canals", room: [42, 23, 51, 29], door: [46, 22] },
 ];
 for (const h of MOLAR_HALLS) G.fill(...h.room, "H").put(...h.door, "H");
 for (const [x, y] of [[12, 17], [26, 21], [40, 17], [54, 21]]) G.put(x, y, "L");
-G.put(36, 23, "S").put(47, 27, ">");
+G.put(36, 25, "S").put(47, 27, ">");
 G.put(9, 13, "s").put(25, 12, "i").put(36, 14, "m").put(53, 13, "c").put(10, 27, "z").put(28, 25, "r").put(16, 25, "n");
 export const MOLAR_ROWS = G.rows();
 export const MOLAR_PEOPLE = { s: 1, i: 1, m: 1, c: 1, z: 1, r: 1, n: 1 };
@@ -66,6 +66,7 @@ export const MOLAR_STELE = "THE TOLL IS FORTY. THE HOUR IS LATER THAN YOU THINK.
 export const MOLAR_PLAN = {
   id: "molar", name: "Molar", rows: MOLAR_ROWS, legend: LEGEND, stacks: STACKS, halls: HALLS,
   height: 4, wall: B.STONE, floorBlock: B.TILE, roof: "none",
+  texts: [MOLAR_STELE],
   at: [0, 0], hub: [32, 19],   // the middle of the gullet
   stamp: (zone, ox, oy) => stampMolar(zone, ox, oy),
 };
