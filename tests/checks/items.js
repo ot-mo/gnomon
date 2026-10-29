@@ -1297,6 +1297,25 @@ export function checkGear(m) {
       const r3 = TN.injectTonic(game, p, "clearwit", seq(0.99));
       if (r.overdose || has(p, "tonic:ironbark") || has(p, "tonic:clearwit") === false || r3.save?.dc !== 18 || has(p, "tonic:gloam")) fail(`the chain: ${JSON.stringify([r, r3])}, ${JSON.stringify(Object.keys(p.status))}`);
     }
+    // One at a time over time: the chain lasts as long as the tonic (a Bent's gloam works its 60 s at half strength, so a
+    // second 31 s on asks the save), and a pass ends the one before, haste and flat included.
+    {
+      const p = fresh({ genotype: "bent" });
+      TN.injectTonic(game, p, "gloam", seq(0.9));
+      m.status.catchUpStatuses(game, p, 31);
+      const r = TN.injectTonic(game, p, "ironbark", seq(0.99, 0.9));
+      if (!r.save || has(p, "tonic:gloam") || !has(p, "tonic:ironbark")) fail(`a Bent's gloam, then ironbark 31 s on: save ${JSON.stringify(r.save)}, ${JSON.stringify(Object.keys(p.status))}`);
+      for (const [first, st] of [["hasp", "hasted"], ["foldSap", "flat"]]) {
+        const q = fresh();
+        TN.injectTonic(game, q, first, seq(0.9));
+        const r2 = TN.injectTonic(game, q, "ironbark", seq(0.99));
+        if (r2.overdose || has(q, st)) fail(`${first}, then a passed ironbark: ${st} still on (${JSON.stringify(Object.keys(q.status))})`);
+      }
+      const q = fresh();
+      TN.injectTonic(game, q, "balm", seq(0.9)); m.status.catchUpStatuses(game, q, 3.5);
+      const r3 = TN.injectTonic(game, q, "balm", seq(0.9));
+      if (r3.save) fail("a balm after the last one's 3 s asked a save");
+    }
     // An overdone balm: a fresh one 30 s later... still nothing while the sickness lasts.
     {
       const p = fresh(); p.hp = 4;
