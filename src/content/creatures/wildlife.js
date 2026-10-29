@@ -216,7 +216,7 @@ export const WILDLIFE = {
     frames: ART.hound, palette: { h: [[135, 125, 105], 0], e: [[110, 100, 85], 0], E: [[255, 210, 90], 1.1], t: [[120, 110, 95], 0], f: [[80, 72, 60], 0] },
   },
   barrowSkeleton: {
-    name: "barrow skeleton", glyph: "s", color: [200, 205, 180], xp: 9, levels: [3, 13], weight: 2, undead: true, factions: ["unlit"],
+    name: "barrow skeleton", glyph: "s", color: [200, 205, 180], xp: 9, levels: [3, 13], weight: 2, undead: true, factions: ["unlit"], temperament: "aggressive",
     hp: 16, speed: 1.7, damage: [3, 6], cooldown: 1.5, reach: 1.3, sight: 12, w: 0.8, h: 1.6, brittle: true, ...d20(16, 10, 18, 4, 20, 2),
     rule: { rises: "night" }, needs: "rising from the barrows only at night (gen/biomes, clock.js)",
     ...reskin("skeleton", { w: [[200, 205, 180], 0], E: [[150, 230, 140], 1.2] }),
@@ -254,7 +254,7 @@ export const WILDLIFE = {
     ...reskin("spider", { b: [[70, 120, 60], 0], l: [[90, 140, 75], 0], E: [[200, 255, 80], 1.3] }),
   },
   hangvine: {
-    name: "hangvine", glyph: "n", color: [90, 160, 70], xp: 7, levels: [6, 23], weight: 2, factions: ["pleatwood"],
+    name: "hangvine", glyph: "n", color: [90, 160, 70], xp: 7, levels: [6, 23], weight: 2, factions: ["pleatwood"], temperament: "aggressive",
     hp: 14, speed: 1.0, damage: [3, 5], cooldown: 1.4, reach: 1.5, sight: 6, w: 0.6, h: 1.6, hover: 1.2, weak: ["fire"], ...d20(18, 7, 18, 1, 18, 1),
     rule: { drops: true, mapAs: "tree" }, needs: "drawn as a tree on the map, dropping onto whoever passes below (renderMap.js, ai.js)",
     frames: ART.vine, palette: { v: [[70, 130, 60], 0], E: [[230, 90, 60], 1.0] },
@@ -271,7 +271,7 @@ export const WILDLIFE = {
     ...reskin("slimelet", { s: [[190, 140, 205], 0.25], S: [[240, 210, 245], 0.5] }),
   },
   foldmonkey: {
-    name: "foldmonkey", glyph: "y", color: [170, 130, 80], xp: 8, levels: [5, 13], weight: 2, group: [1, 3], factions: ["pleatwood"],
+    name: "foldmonkey", glyph: "y", color: [170, 130, 80], xp: 8, levels: [5, 13], weight: 2, group: [1, 3], factions: ["pleatwood"], temperament: "aggressive",
     hp: 10, speed: 3.6, damage: [2, 4], cooldown: 1.0, reach: 1.2, sight: 12, w: 0.7, h: 0.9, erratic: 0.2, ...d20(10, 21, 10, 12, 10, 14),
     ranged: { range: 8, hold: 5, damage: [2, 4], cooldown: 2.4, speed: 12, gravity: 14, kind: "arrow" },
     rule: { perch: 4, steals: 5 }, needs: "throwing from 4 or more blocks up, and stealing 5 glim and climbing away (ai.js, currency.js)",
@@ -285,7 +285,7 @@ export const WILDLIFE = {
     frames: ART.wasps, palette: { y: [[220, 205, 140], 0.2], b: [[40, 35, 30], 0] },
   },
   mootWalker: {
-    name: "moot-walker", glyph: "F", color: [170, 110, 150], xp: 14, levels: [12, 23], weight: 2, factions: ["sporeMoot"],
+    name: "moot-walker", glyph: "F", color: [170, 110, 150], xp: 14, levels: [12, 23], weight: 2, factions: ["sporeMoot"], temperament: "aggressive",
     hp: 24, speed: 1.6, damage: [4, 8], cooldown: 1.5, reach: 1.4, sight: 10, w: 0.9, h: 1.7, undead: true, weak: ["fire"], ...d20(18, 10, 20, 8, 20, 6),
     rule: { deathCloud: "confused" }, needs: "a cloud of confusing spores when it dies (monsters.js killMonster, status.js)",
     frames: ART.walker, palette: { c: [[175, 110, 160], 0.3], C: [[230, 170, 220], 0.6], s: [[150, 140, 120], 0], E: [[255, 240, 120], 1.2], b: [[95, 80, 70], 0] },
@@ -305,7 +305,7 @@ export const WILDLIFE = {
     frames: ART.hound, palette: { h: [[120, 128, 145], 0], e: [[95, 100, 115], 0], E: [[200, 220, 255], 1.1], t: [[110, 115, 130], 0], f: [[70, 72, 82], 0] },
   },
   mosaicGolem: {
-    name: "mosaic golem", glyph: "G", color: [196, 120, 80], xp: 20, levels: [12, 18], weight: 1, factions: ["plan"],
+    name: "mosaic golem", glyph: "G", color: [196, 120, 80], xp: 20, levels: [12, 18], weight: 1, factions: ["plan"], temperament: "aggressive",
     hp: 34, speed: 1.4, damage: [6, 10], cooldown: 1.9, reach: 1.5, sight: 10, w: 1.2, h: 2.2, armour: 2, brittle: true, weak: ["shock"], ...d20(22, 8, 24, 4, 20, 2),
     rule: { eyeTile: true }, needs: "assembling out of a mosaic when you step on its eye tile (gen/biomes, a floor trigger)",
     ...reskin("golem", { s: [[60, 92, 172], 0], S: [[196, 64, 52], 0], E: [[222, 190, 82], 1.3] }),
@@ -318,7 +318,7 @@ export const WILDLIFE = {
     frames: ART.robe, palette: { h: [[70, 60, 95], 0], E: [[200, 190, 230], 0.8], r: [[90, 80, 115], 0], B: [[40, 35, 55], 0] },
   },
   longshadow: {
-    name: "longshadow", glyph: "Z", color: [90, 80, 120], xp: 16, levels: [12, 28], weight: 2, undead: true, darkSight: true, factions: ["unlit"],
+    name: "longshadow", glyph: "Z", color: [90, 80, 120], xp: 16, levels: [12, 28], weight: 2, undead: true, darkSight: true, factions: ["unlit"], temperament: "aggressive",
     hp: 18, speed: 2.6, damage: [3, 6], cooldown: 1.3, reach: 2.2, sight: 14, w: 0.8, h: 1.8, hover: 0.1, fearsLight: true, ...d20(14, 19, 12, 8, 18, 6),
     rule: { reach: 6, line: true }, needs: "striking along the ground from 6 tiles, its line drawn on the map and only a darkening in 3D (combat.js, renderMap.js)",
     ...reskin("shade", { k: [[25, 20, 40], 0.1], E: [[150, 120, 230], 1.5] }),
@@ -372,20 +372,20 @@ export const WILDLIFE = {
     frames: ART.automaton, palette: { L: [[190, 170, 130], 0.1], E: [[120, 220, 255], 1.4], m: [[150, 130, 95], 0], M: [[210, 190, 140], 0] },
   },
   lensSentry: {
-    name: "lens sentry", glyph: "R", color: [230, 232, 240], xp: 12, levels: [12, 25], weight: 2, factions: ["plan"], plural: "lens sentries",
+    name: "lens sentry", glyph: "R", color: [230, 232, 240], xp: 12, levels: [12, 25], weight: 2, factions: ["plan"], temperament: "aggressive", plural: "lens sentries",
     hp: 18, speed: 0, damage: [2, 4], cooldown: 1.5, reach: 1.2, sight: 12, w: 0.8, h: 1.4, armour: 2, weak: ["shock"], ...d20(10, 8, 16, 14, 18, 2),
     ranged: { range: 12, hold: 12, damage: [4, 7], cooldown: 2.2, speed: 22, gravity: 0, kind: "bolt" },
     rule: { blindPast: 6, umbra: "blind" }, needs: "blinded by umbra (liquids); with your torch out it sees no further than 6 tiles, as sight already has it (12 × 0.55)",
     frames: ART.automaton, palette: { L: [[220, 225, 235], 0.2], E: [[255, 255, 210], 1.8], m: [[150, 155, 165], 0], M: [[200, 205, 215], 0] },
   },
   beatSpider: {
-    name: "beat-spider", glyph: "R", color: [200, 160, 80], xp: 12, levels: [12, 25], weight: 2, factions: ["plan"],
+    name: "beat-spider", glyph: "R", color: [200, 160, 80], xp: 12, levels: [12, 25], weight: 2, factions: ["plan"], temperament: "aggressive",
     hp: 16, speed: 2.6, damage: [3, 6], cooldown: 1.0, reach: 1.3, sight: 10, w: 1.1, h: 0.7, armour: 1, ...d20(16, 17, 16, 4, 16, 2),
     rule: { beat: 0.5 }, needs: "moving only on the beat, twice a second (ai.js; zone.beat)",
     ...reskin("spider", { b: [[170, 135, 70], 0], l: [[190, 155, 85], 0], E: [[255, 230, 120], 1.4], m: [[110, 80, 40], 0] }),
   },
   girderGolem: {
-    name: "girder golem", glyph: "G", color: [130, 135, 150], xp: 26, levels: [15, 25], weight: 1.5, factions: ["plan"],
+    name: "girder golem", glyph: "G", color: [130, 135, 150], xp: 26, levels: [15, 25], weight: 1.5, factions: ["plan"], temperament: "aggressive",
     hp: 40, speed: 1.4, damage: [8, 13], cooldown: 1.9, reach: 1.5, sight: 10, w: 1.2, h: 2.2, armour: 3, brittle: true,
     resist: ["fire", "frost"], weak: ["shock"], ...d20(24, 8, 26, 4, 20, 2),
     ...reskin("golem", { s: [[95, 98, 110], 0], S: [[130, 135, 150], 0], E: [[255, 160, 80], 1.3] }),
@@ -403,7 +403,7 @@ export const WILDLIFE = {
   },
   // --- The Glass Sea's shore (§12.10) --------------------------------------------------------------------------
   glassCrab: {
-    name: "glass crab", glyph: "c", color: [170, 230, 200], xp: 14, levels: [12, 24], weight: 3, group: [1, 3], factions: ["clatter"],
+    name: "glass crab", glyph: "c", color: [170, 230, 200], xp: 14, levels: [12, 24], weight: 3, group: [1, 3], factions: ["clatter"], temperament: "aggressive",
     hp: 20, speed: 2.2, damage: [4, 7], cooldown: 1.3, reach: 1.3, sight: 9, w: 1.0, h: 0.6, armour: 2, ...d20(18, 14, 18, 4, 14, 6),
     rule: { reflects: true }, needs: "throws and bolts bouncing back off its shell (throwing.js, missiles.js); feral, so its Clatter kin don't vouch for it",
     frames: ART.crab, palette: { C: [[180, 235, 215], 0.3], c: [[140, 200, 180], 0.3], E: [[30, 40, 40], 0], l: [[100, 150, 140], 0] },
