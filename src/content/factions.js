@@ -35,7 +35,9 @@
 //   riteVariant  the faction's own Kindling (bible §3.3 "Faction variants"): { name, rite, needs, how, words, narration? }
 //                (a beast says nothing: its `narration` is what you see instead)
 //                where the numbers are the plain rite's and the verbs differ (integration request)
-//   specials     bible §3.3's "Faction specials", bought with rep in the flame-kin menu (integration request)
+//   specials     bible §3.3's "Faction specials", bought with rep in the flame-kin menu (integration request); via: "talk"
+//                (the Askew re-angle you when you talk, paying repPerCrease × the mutation's creases) or "earned" (the dark-pass:
+//                the bible gives no price, so none is set) are not menu rows
 //   torchFriend  the Lantern Moths like you while your torch is lit (bible §6.2; integration request)
 import { registerFaction } from "../factions.js";
 
@@ -141,8 +143,8 @@ export const FACTIONS = {
     buys: { readings: ["dark"] }, sells: "ghost-plank routes, the Hush Stair, Shade Locations, Vesper lore", teaches: ["Shadowcraft", "Lore"],
     specials: [{ id: "snuff", name: "the Snuff", rep: -200, genotype: "bent",
       text: "A mental mutation: you put out a light by looking at it. They teach it to the Bent only." },
-      { id: "darkPass", name: "a dark-pass", rep: -200, genotype: "plumb",
-        text: "A Plumb may carry a lit torch through their holy places without trespass. They will not like it." }],
+      { id: "darkPass", name: "a dark-pass", via: "earned", rep: null, genotype: "plumb",
+        text: "A Plumb may carry a lit torch through their holy places without trespass. The bible says it is earned, not how." }],
     lines: { greet: {
       indifferent: "Put it out. We'll still be here. That's the point.",
       liked: "Sit with us. You may keep the lamp for now. We'll wait.",
@@ -221,7 +223,7 @@ export const FACTIONS = {
     likes: [["pleatwood", "fellow folders"], ["sporeMoot", "it has no corners"]],
     hates: [["assize", "for being square"], ["survey", "for measuring"], ["plan", "for its straight lines"]],
     buys: { readings: ["deep"] }, sells: "nothing", teaches: [],
-    specials: [{ id: "reangle", name: "re-angled", rep: "50 × the mutation's creases", band: "indifferent",
+    specials: [{ id: "reangle", name: "re-angled", via: "talk", repPerCrease: -50, band: "indifferent",
       text: "Talk to one at Grey or better and it re-angles you: a random mental mutation, paid for in reputation." }],
     lines: { greet: {
       indifferent: "Your corners are showing. Hold still. This won't take a right angle.",
