@@ -2,8 +2,9 @@
 // request 17, the dependency table's WS8 look in 3D and WS3's night). Serve the tree first:
 //   node tools/serve.mjs 8660 &           (from the repository root), then
 //   NODE_PATH=$(npm root -g) node tools/browser-ws7.mjs [--port 8660] [--shots DIR]
-// Seed 1 on the test world: Reedwick's quest (village:1,19) is a prayer at a carved shrine (a relief: 3D, in good
-// light), Reedwick Cross's (village:26,15) one at a rune shrine (3D, in the dark, the torch out). Both are given at
+// The test world's first seed with a village whose quest is a prayer at a carved shrine (a relief: 3D, in good light)
+// and one whose quest is a prayer at a rune shrine (3D, in the dark, the torch out), found by building the runs here
+// (content changes move the villages' draws: C2's name lists did; seed 1's were Reedwick and Reedwick Cross). Both are given at
 // their givers (talk.js's options), then in 3D, standing two tiles from the shrine and facing its block, L (WS8's
 // crosshair look): the rune by day with the torch out (no prayer), at 21:00 with the torch lit (none), then F and L (the
 // prayer, and the log's "Pray at the shrine of …: go back to …"); the relief that night with the torch out (none), then
@@ -14,14 +15,24 @@
 // Before any page script, every audio node bound for the speakers is routed through an AnalyserNode and a zero-gain
 // node, and the page is opened with ?silent=1: nothing reaches the speakers. Fails on any console error or warning.
 import { createRequire } from "node:module";
-import { parseArgs } from "./node-env.mjs";
+import { parseArgs, installNodeEnv } from "./node-env.mjs";
 
 const args = parseArgs();
 const port = Number(args.port || 8660), shots = args.shots || null;
 const { chromium } = createRequire(import.meta.url)("playwright");
 const browser = await chromium.launch();
 const problems = [], log = [], errors = [];
-const CASES = { relief: "village:1,19", rune: "village:26,15" };
+await installNodeEnv({ cols: 100, rows: 30 });
+await import("../src/game.js"); await import("../src/content/index.js");
+const { buildRun } = await import("../src/world/run.js"), { TEST_WORLD } = await import("../src/content/world/test-world.js");
+let SEED = null, CASES = null;
+for (let s = 1; s <= 300 && !CASES; s++) {
+  const r = buildRun(s, TEST_WORLD);
+  const at = (shrine) => [...r.villages.values()].find((v) => !v.abandoned && v.quest?.template === "pray" && v.culture.shrine === shrine)?.siteId;
+  if (at("relief") && at("rune")) { SEED = s; CASES = { relief: at("relief"), rune: at("rune") }; }
+}
+if (!CASES) throw new Error("no test-world seed of 1-300 has prayers at both a relief and a rune shrine");
+console.log(`seed ${SEED}: ${JSON.stringify(CASES)}`);
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   page.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") errors.push(`${m.type()}: ${m.text()}`); });
@@ -44,7 +55,7 @@ try {
       return orig.call(this, dest, ...rest);
     };
   });
-  await page.goto(`http://127.0.0.1:${port}/index.html?silent=1&quick=1&world=test&seed=1`);
+  await page.goto(`http://127.0.0.1:${port}/index.html?silent=1&quick=1&world=test&seed=${SEED}`);
   await page.waitForFunction(() => window.game && window.game.zone && window.game.mode === "story");
   const mode = () => page.evaluate(() => window.game.mode);
   const frames = (n = 3) => page.evaluate((n) => new Promise((ok) => { let k = 0; const f = () => (++k >= n ? ok() : requestAnimationFrame(f)); requestAnimationFrame(f); }), n);
