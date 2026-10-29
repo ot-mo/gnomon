@@ -183,7 +183,8 @@ export function checkContent(m) {
     for (const id of Object.keys(Fg.VALUE)) need(I.WEAPONS[id] || I.ARMOURS[id] || m.c4.missiles.MISSILES[id], `value ${id}: no such weapon, armour or missile weapon`);
     for (const [id, c] of Object.entries(Fg.CLASSES)) need(str(c.name) && (c.info === undefined || str(c.info)) && str(c.needs), `class ${id}: name, info and needs`);
     for (const [id, t] of Object.entries(Tn.TONICS)) {
-      need(str(t.name) && num(t.value) && t.value > 0 && num(t.t) && t.t > 0 && str(t.info) && sentences(t.info) <= 3 && fn(t.use) && fn(t.overdose), `tonic ${id}: name, value, time, info, use and overdose`);
+      need(str(t.name) && num(t.value) && t.value > 0 && num(t.t) && t.t > 0 && fn(t.info) && str(t.info(1)) && sentences(t.info(1)) <= 3 && str(t.info(0.5)) && fn(t.use) && fn(t.overdose),
+        `tonic ${id}: name, value, time, info(k), use and overdose`);
     }
     for (const id of ["tonic", "tonic:balm", "tonic:gloam", "tonic:ironbark", "tonic:clearwit", "tonic:sick", "tonic:heavy", "tonic:crash"]) need(m.status.STATUS_DEFS[id], `status ${id} (tonics.js) isn't registered`);
     for (const [id, t] of Object.entries(Gr.TOOLS)) need(str(t.name) && oneGlyph(t.glyph) && RGB(t.color) && str(t.info) && num(t.price), `tool ${id}: name, glyph, colour, info and price`);
@@ -216,7 +217,7 @@ export function checkContent(m) {
       need(Array.isArray(B.kit.wants) && B.kit.wants.every(str), `${bg}'s kit: wants must be a list of lines`);
     }
     const area = [...Object.values(Fg.TEXT), ...Object.values(Fg.MATERIALS).map((d) => d.info), ...Object.values(Fg.CLASSES).map((d) => d.info),
-      ...Object.values(Fg.GEAR_ARMOURS).map((d) => d.info), ...Object.values(Gr.TOOLS).map((d) => d.info), ...Object.values(Tn.TONICS).map((d) => d.info),
+      ...Object.values(Fg.GEAR_ARMOURS).map((d) => d.info), ...Object.values(Gr.TOOLS).map((d) => d.info), ...Object.values(Tn.TONICS).map((d) => d.info(1)),
       ...[...Object.values(Ar.ARTIFACTS), ...Object.values(Ar.ARTIFACTS_WAITING)].flatMap((d) => [d.info, d.vague, d.class, d.flat, d.deep, d.dark]),
       ...Object.values(Ar.CELLS).map((d) => d.info), ...Object.values(m.c4.implants.IMPLANTS).map((d) => d.info),
       ...[...Object.values(Mu.MUTATIONS), ...Object.values(Mu.MUTATIONS_WAITING)].map((d) => d.info(1))];

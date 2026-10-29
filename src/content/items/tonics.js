@@ -1,7 +1,8 @@
 // Tonics (bible §13.8, §10.3; TECH_DESIGN §2.18 "TONICS"; C4): injectors, the kind "tonic" { kind: "tonic", effect: id,
 // count }. items/containers.js reaches this file (content/index.js is frozen), late enough that status.js has loaded.
 //
-//   TONICS[id] = { name, value, info, t, use(game, p, k), overdose(game, p), needs? }
+//   TONICS[id] = { name, value, info(k), t, use(game, p, k), overdose(game, p), needs? }
+//     info       the item's line at strength k (the Bent read half the numbers: the kind passes the player's k)
 //     t          how long it works (seconds at the full effect): the "tonic" status lasts this long × k
 //     use        what it does, at strength k (1 for the Plumb, GENOTYPES.bent.tonics.effect 0.5 for the Bent)
 //     overdose   what a failed save or a bad reaction does instead
@@ -50,33 +51,34 @@ const OWN = ["balm", "gloam", "ironbark", "clearwit"];   // the tonics with a st
 
 export const TONICS = {
   balm: {
-    name: "balm", value: 25, t: 3, info: "Heals 12 over 3 s. Overdone: no healing for 30 s.",
+    name: "balm", value: 25, t: 3, info: (k) => `Heals ${12 * k} over 3 s. Overdone: no rest or balm mends you for 30 s.`,
+    needs: "the overdose's nausea, and no healing from potions either (a nauseous status: C2's brine may share it; effects.js)",
     use: (game, p, k) => { addStatus(game, p, "tonic:balm", { t: 3, mag: k }); say(game, p, `Warmth spreads up your arm. (+${12 * k} HP over 3 s)`, [230, 90, 110]); },
     overdose: (game, p) => { addStatus(game, p, "tonic:sick", { t: 30 }); say(game, p, "The balm curdles. Neither rest nor balm will mend you for a while.", [170, 200, 110]); },
   },
   hasp: {
-    name: "hasp", value: 40, t: 15, info: "Haste for 15 s. Overdone: then 3 s unable to move.",
+    name: "hasp", value: 40, t: 15, info: (k) => `Haste for ${15 * k} s. Overdone: then 3 s unable to move.`,
     use: (game, p, k) => { addStatus(game, p, "hasted", { t: 15 * k, stack: "refresh" }); say(game, p, `Everything else slows down. (${15 * k} s)`, [255, 240, 120]); },
     overdose: (game, p) => { addStatus(game, p, "hasted", { t: 15, stack: "refresh" }); addStatus(game, p, "tonic:crash", { t: 15 }); say(game, p, "Your heart races, and keeps racing.", [255, 200, 120]); },
   },
   gloam: {
-    name: "gloam", value: 35, t: 60, info: "Dark sight and stealth for 60 s. Overdone: blind for 20 s.",
-    needs: "6 tiles with the torch out (player.js torchRange caps darkSight at 4 tiles: a status's darkRange)",
+    name: "gloam", value: 35, t: 60, info: (k) => `Dark sight and ${Math.round(30 * k)}% stealth for 60 s. Overdone: dazzled, your torch a glimmer for 20 s.`,
+    needs: "6 tiles with the torch out (player.js torchRange caps darkSight at 4 tiles: a status's darkRange); the overdose's true blindness in any light (the blinded status does nothing to the player: torchRange, render3d.js)",
     use: (game, p, k) => { addStatus(game, p, "tonic:gloam", { t: 60, mag: k }); say(game, p, "The dark thins, like ink with water in it.", [150, 140, 200]); },
-    overdose: (game, p) => { addStatus(game, p, "blinded", { t: 20 }); say(game, p, "The light is a knife. You can't see.", [120, 120, 140]); },
+    overdose: (game, p) => { addStatus(game, p, "darkened", { t: 20 }); say(game, p, "The light is a knife. Your torch shrinks to a glimmer.", [120, 120, 140]); },
   },
   ironbark: {
-    name: "ironbark", value: 45, t: 60, info: "+2 armour and STR for 60 s. Overdone: half speed for 20 s.",
+    name: "ironbark", value: 45, t: 60, info: (k) => `+${Math.round(2 * k)} armour and STR for 60 s. Overdone: half speed for 20 s.`,
     use: (game, p, k) => { addStatus(game, p, "tonic:ironbark", { t: 60, mag: k }); say(game, p, "Your skin goes stiff and brown at the edges.", [170, 140, 100]); },
     overdose: (game, p) => { addStatus(game, p, "tonic:heavy", { t: 20 }); say(game, p, "Your skin goes stiff, and so does everything under it.", [160, 150, 120]); },
   },
   foldSap: {
-    name: "fold-sap", value: 50, t: 10, info: "Flat for 10 s. Overdone: Flat for 60 s.",
+    name: "fold-sap", value: 50, t: 10, info: (k) => `Flat for ${10 * k} s. Overdone: Flat for 60 s.`,
     use: (game, p, k) => { addStatus(game, p, "flat", { t: 10 * k }); say(game, p, `You fold down into the floor. (${10 * k} s)`, [220, 220, 230]); },
     overdose: (game, p) => { addStatus(game, p, "flat", { t: 60 }); say(game, p, "You fold down into the floor, and the floor keeps you.", [220, 220, 230]); },
   },
   clearwit: {
-    name: "clearwit", value: 35, t: 60, info: "+5 examine, +2 INT for 60 s. Overdone: you forget this floor's map.",
+    name: "clearwit", value: 35, t: 60, info: (k) => `+${Math.round(5 * k)} examine, +${Math.round(2 * k)} INT for 60 s. Overdone: you forget this floor's map.`,
     needs: "cures confusion (a confused status: C2's ink, the Muddle mutation)",
     use: (game, p, k) => { addStatus(game, p, "tonic:clearwit", { t: 60, mag: k }); say(game, p, "Everything has edges, and you can count them.", [200, 220, 255]); },
     overdose: (game, p) => {
@@ -122,7 +124,7 @@ registerItemKind("tonic", {
   stack: true, weight: () => 0,
   name: (game, it) => TONICS[it.effect]?.name ? `${TONICS[it.effect].name} tonic` : "tonic",
   glyph: () => ["!", [150, 220, 200]],
-  info: (game, it) => TONICS[it.effect]?.info || "",
+  info: (game, it) => TONICS[it.effect]?.info(reactionOf(game?.player).effect ?? 1) || "",
   price: (it) => TONICS[it.effect]?.value || 0,
   art: { w: 0.18, h: 0.4, art: [" s ", " s ", "gtg", "gtg", "gtg", "ggg", " h "] },
   palette: () => ({ s: [[200, 205, 215], 0.1], g: [[180, 150, 90], 0.1], t: [[150, 220, 200], 0.5], h: [[120, 95, 60], 0] }),

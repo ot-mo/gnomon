@@ -1272,7 +1272,7 @@ export function checkGear(m) {
       ironbark: (p) => St.bonus(p, "av") === 2 && St.bonus(p, "str") === 2, foldSap: (p) => has(p, "flat"), clearwit: (p) => St.bonus(p, "examine") === 5 && St.bonus(p, "int") === 2,
     };
     const od = {
-      balm: (p) => has(p, "tonic:sick"), hasp: (p) => has(p, "hasted") && has(p, "tonic:crash"), gloam: (p) => has(p, "blinded"),
+      balm: (p) => has(p, "tonic:sick"), hasp: (p) => has(p, "hasted") && has(p, "tonic:crash"), gloam: (p) => has(p, "darkened") && m.player.torchRange(p) < 6,
       ironbark: (p) => has(p, "tonic:heavy"), foldSap: (p) => m.status.statusLeft(p, "flat") === 60, clearwit: () => !game.zone.seen.some(Boolean),
     };
     if (JSON.stringify(Object.keys(TN.TONICS)) !== JSON.stringify(Object.keys(expect))) fail(`tonics ${Object.keys(TN.TONICS).join(", ")}, want bible §13.8's six`);
@@ -1296,6 +1296,24 @@ export function checkGear(m) {
       const r = TN.injectTonic(game, p, "gloam", seq(0.99));
       const r3 = TN.injectTonic(game, p, "clearwit", seq(0.99));
       if (r.overdose || has(p, "tonic:ironbark") || has(p, "tonic:clearwit") === false || r3.save?.dc !== 18 || has(p, "tonic:gloam")) fail(`the chain: ${JSON.stringify([r, r3])}, ${JSON.stringify(Object.keys(p.status))}`);
+    }
+    // An overdone balm: a fresh one 30 s later... still nothing while the sickness lasts.
+    {
+      const p = fresh(); p.hp = 4;
+      TN.injectTonic(game, p, "ironbark", () => 0.9); TN.injectTonic(game, p, "balm", seq(0));
+      m.status.catchUpStatuses(game, p, 20);
+      const before = p.hp;
+      TN.injectTonic(game, p, "balm", seq(0.9));
+      m.status.catchUpStatuses(game, p, 4);
+      if (!has(p, "tonic:sick") || p.hp !== before) fail(`a balm while sick healed ${p.hp - before}`);
+    }
+    // The item line reads the drinker's numbers: the Plumb's 12, the Bent's 6.
+    {
+      const it = { kind: "tonic", effect: "balm" };
+      fresh({ genotype: "plumb" }); const plumb = I.itemInfo(game, it);
+      fresh({ genotype: "bent" }); const bent = I.itemInfo(game, it);
+      if (!plumb.startsWith("Heals 12") || !bent.startsWith("Heals 6")) fail(`the balm's line: "${plumb}" / "${bent}"`);
+      out.lines = `${plumb.split(".")[0]} / ${bent.split(".")[0]}`;
     }
     // The Bent: half, and the bad reaction.
     {
@@ -1421,6 +1439,7 @@ export async function run(env) {
   await Promise.all([load("forge", "content/items/forge.js"), load("gear", "content/items/gear.js"), load("tonics", "content/items/tonics.js"),
     load("artifactTables", "content/items/artifacts.js"), load("mutationsContent", "content/mutations.js"), load("mutations", "progression/mutations.js"),
     load("chargen", "progression/chargen.js"), load("backgrounds", "content/backgrounds.js"), load("missiles", "missiles.js")]);
+  m.player ||= await env.src("player.js");
   m.missileTable = (await env.src("content/items/missiles.js")).MISSILES;
   return [checkItems(m), checkGear(m)];
 }
