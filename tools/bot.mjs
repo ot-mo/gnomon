@@ -854,9 +854,26 @@ export async function runSession({ seed = 1234, zones: want = 10 } = {}) {
 // legacy stack's stairs, the last in 3D) → save (the options' "Save and quit") → reload (the title's Continue) → continue
 // (the same state, then the stairs back up). The seed (18) gives a lived-in village 7 spans from the start whose quest
 // is a prayer at a mosaic shrine. Monsters are cleared on arrival and the bot can't die: this exercises the systems in
-// one run, not fights. → { ok, steps, problems, stats }
-export async function runPlaythrough({ seed = 18 } = {}) {
-  const { openTitle } = await import("../src/screens/title.js");
+// one run, not fights. world: another world to play (the real one since the last wiring merge: Hollowmere's temple
+// holds the cube; give it a seed whose run has such a village, playthroughSeed). → { ok, steps, problems, stats }
+export async function runPlaythrough({ seed = 18, world = null } = {}) {
+  const worldWas = game.world;
+  if (world) game.world = world;
+  try { return await playthrough(seed); } finally { game.world = worldWas; }
+}
+// A seed whose run on `world` has a village whose quest is a prayer at a mosaic shrine (what the playthrough does),
+// the nearest such village no more than `within` spans from the start. → seed | null
+export async function playthroughSeed(world, { from = 1, to = 200, within = 12 } = {}) {
+  const { buildRun } = await import("../src/world/run.js");
+  for (let seed = from; seed <= to; seed++) {
+    const r = buildRun(seed, world), st = r.world.start;
+    if ([...r.villages.values()].some((v) => !v.abandoned && v.quest?.template === "pray" && v.culture.shrine === "mosaic"
+      && Math.max(Math.abs(r.sites.get(v.siteId).at.wx - st.wx), Math.abs(r.sites.get(v.siteId).at.wy - st.wy)) <= within)) return seed;
+  }
+  return null;
+}
+async function playthrough(seed) {
+  const { openTitle, titleItems } = await import("../src/screens/title.js");
   const { wizard } = await import("../src/screens/create.js");
   const { neighbourAddr } = await import("../src/zones.js");
   const { travelPath } = await import("../src/overworld/travel.js");
@@ -975,7 +992,10 @@ export async function runPlaythrough({ seed = 18 } = {}) {
     step = "create";
     await openTitle(game);
     expect(game.mode === "title", `the title: in ${game.mode}`);
-    press("ArrowDown"); press("ArrowDown"); press("Enter");   // the seed line: typed
+    const seedLine = titleItems().findIndex((it) => it.id === "seed");   // (below Continue and Load when a save is there)
+    press("Home"); for (let j = 0; j < seedLine; j++) press("ArrowDown");
+    press("Enter");   // the seed line: typed
+    for (let j = 0; j < 12; j++) press("Backspace");   // (the line keeps the seed typed before)
     for (const ch of String(seed)) press(`Digit${ch}`, ch);
     press("Enter"); press("Home"); press("Enter");   // New game: the wizard, with the seed and mode
     expect(game.mode === "create", `New game on the title: ${game.mode}, not the wizard`);
@@ -988,7 +1008,8 @@ export async function runPlaythrough({ seed = 18 } = {}) {
     expect(game.mode === "story" && game.seed === seed && p0?.genotype && p0?.name && game.state?.mode,
       `the wizard began ${game.mode}, seed ${game.seed}, ${p0?.genotype} "${p0?.name}"`);
     settled();
-    expect(game.mode === "map" && game.zone?.key === "0,0,0", `after the intro: ${game.mode} in ${game.zone?.key}`);
+    const st0 = game.run.world.start;
+    expect(game.mode === "map" && game.zone?.key === `${st0.wx},${st0.wy},0`, `after the intro: ${game.mode} in ${game.zone?.key}`);
     steps.push(`created ${p0.name}, a ${p0.genotype} ${p0.background} (${game.state.mode}), seed ${game.seed}`);
     clear();
     // The Rotation Cube on the temple's altar: until it is touched the world is only seen from above. It lies behind the
@@ -1030,7 +1051,7 @@ export async function runPlaythrough({ seed = 18 } = {}) {
     // --- Ten steps on the world map ------------------------------------------------------------------------------------
     step = "world map";
     const village = [...game.run.villages.values()].filter((v) => !v.abandoned && v.quest?.template === "pray" && v.culture.shrine === "mosaic")
-      .map((v) => ({ v, site: game.run.sites.get(v.siteId) })).sort((a, b) => Math.max(Math.abs(a.site.at.wx), Math.abs(a.site.at.wy)) - Math.max(Math.abs(b.site.at.wx), Math.abs(b.site.at.wy)))[0];
+      .map((v) => ({ v, site: game.run.sites.get(v.siteId) })).sort((a, b) => Math.max(Math.abs(a.site.at.wx - st0.wx), Math.abs(a.site.at.wy - st0.wy)) - Math.max(Math.abs(b.site.at.wx - st0.wx), Math.abs(b.site.at.wy - st0.wy)))[0];
     if (!expect(village, `seed ${seed}: no village with a prayer at a mosaic shrine`)) throw new Error("no village");
     const moveKey = (dx, dy) => Object.keys(WORLD_MOVES).find((c) => WORLD_MOVES[c][0] === dx && WORLD_MOVES[c][1] === dy);
     const onWorld = () => {
@@ -1220,7 +1241,8 @@ export async function runPlaythrough({ seed = 18 } = {}) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = parseArgs();
   if (args.playthrough) {   // (only the 2B playthrough)
-    const r = await runPlaythrough({ seed: Number(args.seed) || 18 });
+    const world = args.world === "real" ? (await import("../src/content/world/worldmap.js")).REAL_WORLD : null;   // (--world real)
+    const r = await runPlaythrough({ seed: Number(args.seed) || (world ? await playthroughSeed(world) : 18), world });
     console.log(`${r.ok ? "OK  " : "FAIL"} playthrough: ${r.steps.join(" · ")}`);
     for (const p of r.problems) console.log(`  ✗ ${p}`);
     process.exit(r.ok ? 0 : 1);
