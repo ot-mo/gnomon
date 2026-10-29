@@ -72,8 +72,8 @@ export const HOLLOWMERE_ROWS = [
   "..TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT.~~~~~~~~~....r.g,..r...........", // 42
   "..TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT..r.g...r........,......rg.r....", // 43
   "..TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTr....r.g...r.....,..............", // 44
-  "..TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT................................", // 45
-  "..TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT.s.............s..........s.....", // 46
+  "..TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT.s.............s..........s.....", // 45
+  "..TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT................................", // 46
   "..............................................................................", // 47
 ];
 const TEMPLE_AT = [2, 2];   // the temple plan's corner in this plan

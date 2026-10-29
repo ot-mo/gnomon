@@ -256,19 +256,20 @@ export function checkSurface({ seeds = [1, 42, 1234], spans = 500, pairs = 50, b
     liquids.mixedEdges = edges;
   }
   // 4d. A river that names its liquid gives it to every span of its path (compileWorld's tile.riverLiquid, at the WS2a
-  // merge), and the ports along it carry it; the other rivers stay plain water.
+  // merge), and the ports along it carry it; the other rivers keep theirs. (The Slake is given quicksilver, a liquid no
+  // river of the real world has: since C1a the Inkrun is ink, check-world.)
   {
-    const inked = { ...REAL_WORLD, world: { ...REAL_WORLD.world, rivers: REAL_WORLD.world.rivers.map((r, i) => (i === 0 ? { ...r, liquid: "ink" } : r)) } };
+    const inked = { ...REAL_WORLD, world: { ...REAL_WORLD.world, rivers: REAL_WORLD.world.rivers.map((r, i) => (i === 0 ? { ...r, liquid: "quicksilver" } : r)) } };
     const run = buildRun(1, inked), world = run.world, path = inked.world.rivers[0].path;
     const onPath = new Set(path.map(([x, y]) => `${x},${y}`));
-    const marked = world.tiles.filter((t) => t.riverLiquid === "ink"), stray = marked.filter((t) => !onPath.has(`${t.wx},${t.wy}`));
-    const along = path.slice(1).filter(([x, y], i) => portsOf(world, run.seed, x, y).some((p) => p.kind === "river" && p.liquid === "ink"));
-    liquids.inkRiver = `${marked.length} of ${path.length} spans, ${along.length} of ${path.length - 1} with ink ports`;
-    if (marked.length !== onPath.size || stray.length || along.length !== path.length - 1) fail(`a river of ink: ${liquids.inkRiver}${stray.length ? `, ${stray.length} off its path` : ""}`);
+    const marked = world.tiles.filter((t) => t.riverLiquid === "quicksilver"), stray = marked.filter((t) => !onPath.has(`${t.wx},${t.wy}`));
+    const along = path.slice(1).filter(([x, y], i) => portsOf(world, run.seed, x, y).some((p) => p.kind === "river" && p.liquid === "quicksilver"));
+    liquids.inkRiver = `${marked.length} of ${path.length} spans, ${along.length} of ${path.length - 1} with quicksilver ports`;
+    if (marked.length !== onPath.size || stray.length || along.length !== path.length - 1) fail(`a river of quicksilver: ${liquids.inkRiver}${stray.length ? `, ${stray.length} off its path` : ""}`);
   }
   // 4c. One liquid per span holds only if rivers of two liquids never meet in a span: the span would hold one of
   // them (liquidOf), and the other river would change liquid at that span's edge. The world's data must keep them
-  // apart (today every river is plain water; integration request 2 gives the Inkrun its ink). A span with two river
+  // apart (the Slake is plain water and the Inkrun ink since C1a; they never share a span). A span with two river
   // ports of different liquids fails here, on every seed's ports.
   {
     const run = buildRun(1, REAL_WORLD), world = run.world;
