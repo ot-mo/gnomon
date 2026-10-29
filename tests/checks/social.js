@@ -1466,7 +1466,15 @@ export async function run(env) {
       ["umbra", "drink", "nightEyes", "t", 60], ["umbra", "drink", "blinded", "t", 20], ["quicksilver", "drink", "poisoned", "t", 6], ["sunwine", "drink", "heal", "heal", 6],
       ["sunwine", "touch", "pinned", "t", 1], ["freshWater", "drink", "heal", "heal", 2], ["clearGlim", "drink", "seePlane", "seePlane", 1800],
       ["clearGlim", "touch", "burns", "burns", 12], ["turnwater", "drink", "shutdown", "days", 1], ["turnwater", "touch", "transform", "transform", "sameTier"],
+      ["blood", "touch", "stain", "stain", { sight: 2, t: 30 }], ["blood", "touch", "draws", "draws", "saltbeasts"],
     ];
+    // A vial's words say what drinking does today: a liquid whose drink waits on a status or effect the game hasn't
+    // got keeps the bible's words in `full`, and its shown words don't name what isn't there.
+    for (const [id, d] of Object.entries(L)) {
+      if (d.sameAs) continue;
+      const waits = (d.effects.drink || []).some((e) => WANTED.includes(e.status) || e.reroll || e.seePlane || e.after);
+      if (waits && (!d.full?.drink || /glow for|nausea|confus|re-roll|see the Plane|blind/.test(d.drink))) fail(`liquid ${id}: "${d.drink}" promises what drinking doesn't do yet`);
+    }
     for (const [id, part, key, field, want] of bible) {
       const got = eff(id, part, key)?.[field];
       if (JSON.stringify(got) !== JSON.stringify(want)) fail(`liquid ${id} ${part} ${key}.${field}: ${JSON.stringify(got)}, bible §13.7 ${JSON.stringify(want)}`);
