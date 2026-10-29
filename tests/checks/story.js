@@ -931,8 +931,8 @@ async function peoplesC2(env, { fail, stats }) {
     if (!(d.cognomens?.length >= 4) || !(d.relicNouns?.length >= 4) || !Array.isArray(d.rgb) || d.rgb.length !== 3) fail(`grammar: ${id}'s cognomens, relic nouns or rgb`);
   }
   // A cult is drawn as "@" in its domain's colour (HOUR_CULT): no faction's colour, and no other domain's (DECISIONS "Glyphs").
-  const rgbs = D.map(([, d]) => d.rgb.join()), taken = Object.values(C.FACTIONS).map((f) => (f.color || []).join());
-  if (new Set(rgbs).size !== rgbs.length || rgbs.some((x) => taken.includes(x))) fail(`grammar: a domain's rgb repeats another's or a faction's: ${rgbs.join(" | ")}`);
+  const rgbs = D.map(([, d]) => d.rgb.join()), factionRgb = Object.values(C.FACTIONS).map((f) => (f.color || []).join());
+  if (new Set(rgbs).size !== rgbs.length || rgbs.some((x) => factionRgb.includes(x))) fail(`grammar: a domain's rgb repeats another's or a faction's: ${rgbs.join(" | ")}`);
   if (D.map(([, d]) => d.guild).sort().join() !== GUILDS.slice().sort().join()) fail(`grammar: the guilds ${D.map(([, d]) => d.guild)}`);
   if (Object.keys(G.factions).sort().join() !== OLD_FACTIONS.slice().sort().join()) fail(`grammar: the old factions ${Object.keys(G.factions)}`);
   for (const id of OLD_FACTIONS) if (!F.FACTIONS[id] || G.factions[id]?.name !== F.FACTIONS[id].name) fail(`grammar: the old faction ${id} isn't the registered ${F.FACTIONS[id]?.name}`);
