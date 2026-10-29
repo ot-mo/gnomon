@@ -966,6 +966,13 @@ async function peoplesC2(env, { fail, stats }) {
   const pools = sum([...V.events.map((e) => e.text), ...V.sacred, ...V.profane, ...V.activities, ...V.proverbs, ...V.dishes,
     ...Object.values(V.dishBook).flatMap((b) => [b.note, b.text]), ...Object.values(V.shrines).flatMap((s) => [s.pray, s.wrong, s.reward.text]),
     ...Object.values(V.commons.lines), ...Object.values(V.styles).map((s) => s.views)]);
+  // The budgets (bible §15.9) held: the lines and the pools within theirs; the history grammar is over its 2,400 (WS7's
+  // second account of each variant, kept so a run's accounts stay apart: docs/sessions/c2.md deviation), so it may not grow.
+  const allFaith = Object.values(C.FAITHS).reduce((n, f) => n + sum(JSON.stringify(f).match(/"[^"]*\s[^"]*"/g) || []), 0);
+  if (fl + faith > 1200) fail(`words: faction and faith lines ${fl + faith}, over §15.9's 1,200`);
+  if (pools > 1000) fail(`words: village pools ${pools}, over §15.9's 1,000`);
+  if (lists + acc + noon > 2864) fail(`words: the history grammar grew to ${lists + acc + noon} (2,864 at C2, §15.9's 2,400)`);
+  stats.peoplesFaiths = `all of FAITHS' text (creeds, holy places, practices, hooks, lines): ${allFaith} words, most of it bible §7's own`;
   stats.peoples = `villages: §9.3's pools, ${Object.keys(BIBLE_FOUNDERS).length} regions' founders and styles, ${Object.keys(V.names).length} name lists; ` +
     `grammar: 10 domains × 6/6/6/6 and 4 relic powers, ${accounts} accounts (16 types, every variant × 3), Noon 18; ` +
     `words: history grammar ${lists + acc + noon} (lists ${lists}, accounts ${acc}, Noon ${noon}; §15.9 2,400), faction and faith lines ${fl + faith} ` +
