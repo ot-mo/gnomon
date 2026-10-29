@@ -52,17 +52,42 @@ try {
   const expect = (ok, what) => { log.push(`${ok ? "ok" : "FAIL"}: ${what}`); if (!ok) problems.push(what); };
   const key = async (k, n = 1) => { for (let i = 0; i < n; i++) await page.keyboard.press(k); await frames(2); };
   const screenText = async () => { await frames(2); return page.evaluate(() => window.__frame.chars.join("")); };
+  // What the examine screen shows: its subject's lines (examineLines), and whether the screen holds the given one.
+  const examined = async (want) => {
+    const ex = await page.evaluate(async () => {
+      const { modeData } = await import("/src/screens.js"), E = await import("/src/screens/examine.js"), g = window.game, d = modeData(g) || {};
+      const subj = (d.subjects || E.examineSubjects(d))[d.k || 0];
+      return { type: subj?.creature?.type || null, lines: subj ? E.examineLines(g, subj).map((l) => l.text) : [] };
+    });
+    const t = await screenText();
+    return { ...ex, shown: !!want && t.includes(want) };
+  };
   const shot = async (name) => { if (!shots) return; fs.mkdirSync(shots, { recursive: true }); await page.screenshot({ path: path.join(shots, `${name}.png`) }); };
   for (let k = 0; k < 12 && (await mode()) === "story"; k++) await key("Space");
   await page.evaluate(() => { window.game.story.cube = true; });   // Tab works once the cube is touched (the checks set it so)
   if ((await mode()) === "explore") await key("Tab");
-  const where = await page.evaluate(() => ({ world: window.game.run.world.id, zone: window.game.zone.key, mode: window.game.mode }));
-  expect(where.world === "real" && where.zone === "5,16,0" && where.mode === "map", `a new game on the real world, at Hollowmere, on the map (${JSON.stringify(where)})`);
+  const where = await page.evaluate(() => { const g = window.game, t = g.run.world.tileAt(5, 16); return { world: g.run.world.id, region: t.region, landmark: t.landmark?.id || t.landmark, zone: g.zone.key, mode: g.mode }; });
+  expect(where.world !== "test" && where.region === "flats" && where.zone === "5,16,0" && where.mode === "map", `a new game on the real world, at Hollowmere, on the map (${JSON.stringify(where)})`);
 
-  // The cast, on free ground 3-6 tiles east and west of you (the saltrat pinned, so it holds still).
+  // Out of the temple (you wake in your room) onto open ground in the village: the first tile east of the temple with
+  // 6 tiles of level, open ground every way (nothing in the line of sight). Then the cast, on free ground 3-8 tiles from
+  // you (all but the moths pinned, so they hold still).
   const placed = await page.evaluate(async () => {
-    const C = await import("/src/creatures.js");
-    const g = window.game, z = g.zone, p = g.player, px = Math.floor(p.x), py = Math.floor(p.y), out = {};
+    const C = await import("/src/creatures.js"), T = await import("/src/turns.js");
+    const g = window.game, z = g.zone, p = g.player, out = {};
+    const level = (x, y, h) => x >= 0 && y >= 0 && x < z.w && y < z.d && z.stand[x + y * z.w] === h;
+    let spot = null;
+    for (let x = 50; x < z.w - 8 && !spot; x++)
+      for (let y = 8; y < z.d - 8 && !spot; y++) {
+        const h = z.stand[x + y * z.w];
+        if (h < 0) continue;
+        let open = true;
+        for (let dy = -6; dy <= 6 && open; dy++) for (let dx = -6; dx <= 6 && open; dx++) open = level(x + dx, y + dy, h) && !C.creatureAt(z, x + dx, y + dy);
+        if (open) spot = [x, y, h];
+      }
+    if (!spot) return { error: "no open ground" };
+    Object.assign(p, { x: spot[0] + 0.5, y: spot[1] + 0.5, z: spot[2], vz: 0 });
+    const px = spot[0], py = spot[1];
     const free = (x, y) => x > 1 && y > 1 && x < z.w - 2 && y < z.d - 2 && z.stand[x + y * z.w] >= 0 && Math.abs(z.stand[x + y * z.w] - p.z) < 1 && !C.creatureAt(z, x, y);
     const spots = [];
     for (let r = 3; r <= 8 && spots.length < 5; r++)
@@ -71,12 +96,13 @@ try {
     ["saltrat", "clatterer", "lanternMoths", "smoother", "drownedKeeper"].forEach((type, k) => {
       const [x, y] = spots[k];
       const c = C.addCreature(z, C.spawnCreature(type, x, y, z.stand[x + y * z.w], { rng: Math.random, level: 2, state: "idle" }));
-      if (type === "saltrat") c.status.pinned = { t: 1e9, mag: 1, src: null, acc: 0 };
+      if (type !== "lanternMoths") c.status.pinned = { t: 1e9, mag: 1, src: null, acc: 0 };   // (they hold still to be looked at)
       out[type] = { id: c.id, x, y };
     });
+    T.refreshView(g);
     return out;
   });
-  expect(Object.keys(placed).length === 5, `five creatures placed beside you (${Object.keys(placed).join(", ")})`);
+  expect(Object.keys(placed).length === 5 && !placed.error, `five creatures placed beside you (${Object.keys(placed).join(", ")})`);
   await frames(4);
   let t = await screenText();
   expect(/o/.test(t) && t.includes("c") && t.includes("r"), "the map draws the smoother (o), the clatterer (c) and the saltrat (r)");
@@ -84,9 +110,9 @@ try {
 
   // The look on the map: L, then L again on the default target (the foe first: the saltrat) → examine.
   await key("KeyL"); await key("KeyL");
-  t = await screenText();
-  expect((await mode()) === "examine" && /Saltrat, level/.test(t) && t.includes("A white-crusted rat, light as a dry reed."), `L L on the map examines the saltrat with its Deep line (${await mode()})`);
-  expect(t.includes("out for you"), "the saltrat is out for you");
+  let ex = await examined("A white-crusted rat, light as a dry reed.");
+  expect((await mode()) === "examine" && ex.type === "saltrat" && ex.shown, `L L on the map examines the saltrat with its Deep line (${await mode()}, ${JSON.stringify(ex)})`);
+  expect(ex.lines.some((l) => l.includes("out for you")), "the saltrat is out for you");
   await shot("2-map-examine-saltrat");
   await key("Escape");
   // The clatterer, by Tab on the look cursor (foes first, then the nearest).
@@ -97,9 +123,9 @@ try {
     if (!onIt) await key("Tab");
   }
   await key("Enter");
-  t = await screenText();
-  expect(onIt && (await mode()) === "examine" && t.includes("A crab the height of a child, claws politely aside.") && t.includes("minding its own business"),
-         `the look cursor's Tab reaches the clatterer, and examine shows its Deep line and its peace (${onIt}, ${await mode()})`);
+  ex = await examined("A crab the height of a child, claws politely aside.");
+  expect(onIt && (await mode()) === "examine" && ex.type === "clatterer" && ex.shown && ex.lines.some((l) => l.includes("minding its own business")),
+         `the look cursor's Tab reaches the clatterer, and examine shows its Deep line and its peace (${onIt}, ${await mode()}, ${JSON.stringify(ex)})`);
   await shot("3-map-examine-clatterer");
   await key("Escape");
   if ((await mode()) !== "map") await key("Escape");
@@ -121,9 +147,15 @@ try {
   expect(!sprites.smoother, "the smoother has no sprite in 3D (a flat hunter: a shadow that bites)");
   expect(!sprites.keeperLit, "the drowned keeper is unseen with your torch lit");
   await shot("4-3d-clatterer");
+  await frames(20);   // (the turn's camera swing done)
+  await page.evaluate((id) => {
+    const g = window.game, p = g.player, c = g.zone.creatures.find((o) => o.id === id);
+    p.yaw = Math.atan2(c.y - p.y, c.x - p.x); p.pitch = Math.atan2(c.z + c.h * 0.5 - (p.z + 1.45), Math.hypot(c.x - p.x, c.y - p.y));
+  }, placed.clatterer.id);
+  await frames(2);
   await key("KeyL");
-  t = await screenText();
-  expect((await mode()) === "examine" && t.includes("A crab the height of a child, claws politely aside."), `L in 3D examines the clatterer with its Deep line (${await mode()})`);
+  ex = await examined("A crab the height of a child, claws politely aside.");
+  expect((await mode()) === "examine" && ex.type === "clatterer" && ex.shown, `L in 3D examines the clatterer with its Deep line (${await mode()}, ${JSON.stringify(ex)})`);
   await shot("5-3d-examine-clatterer");
   await key("Escape");
   // Night, the torch out: the drowned keeper shows.
