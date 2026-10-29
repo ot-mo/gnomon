@@ -36,7 +36,8 @@ export const ARTIFACTS = {
   lanternMote: { name: "lantern-mote", vague: "a warm disc", class: "a lamp", complexity: 2, charge: 10, per: "minute", bonus: { torch: 0.4 }, value: 260,
     info: "Switched on, a mote of light follows you: your torch reaches further, and your hands stay free." },
   glimgun: { name: "glimgun", vague: "an oily brass tube", class: "a weapon", complexity: 2, charge: 0, target: "creature", value: 240,
-    info: "Spits a bolt of burning glim at what you aim at: 2d6 fire. Each shot costs a glim from your purse." },
+    info: "Spits a bolt of burning glim at what you aim at: 2d6 fire. Each shot costs a glim from your purse.",
+    needs: "C4: its shot lights the target's area, a trespass in the Lampless' holy places (bible §13.2: light.js, C2's holy places)" },
   foldKnife: { name: "fold-knife", vague: "a hinged blade with no edge", class: "a mover", complexity: 3, charge: 300, target: "tile", value: 380,
     info: "Blinks you 4 tiles: the way you face in 3D, to a chosen tile on the map." },
   recallBead: { name: "recall bead", vague: "a bead that won't roll", class: "a mover", complexity: 4, charge: 1000, value: 520,
@@ -48,11 +49,14 @@ export const ARTIFACTS = {
   // C4: switched on, each lends its bonus from your pack while its cell lasts (as the lantern-mote does). The bible's
   // per-use charges become charge a minute: 20 a second is 1,200 a minute; a jump-spring's 25 a jump, about 4 a minute.
   featherfallLantern: { name: "featherfall lantern", vague: "a paper lamp that won't hang straight", class: "a lamp", complexity: 2, charge: 1200, per: "minute",
-    bonus: { featherFall: 1 }, value: 280, info: "Held up and lit, it lets you down gently: while it burns, falls never hurt you." },
+    bonus: { featherFall: 1 }, value: 280, info: "Held up and lit, it lets you down gently: while it burns, falls never hurt you.",
+    needs: "the slow fall itself (player.js; a fall is only made harmless now)" },
   jumpSprings: { name: "jump-springs", vague: "two coils with heel straps", class: "a mover", complexity: 3, charge: 100, per: "minute",
-    bonus: { jump: 2 }, value: 360, info: "Strapped on and wound, they add 2 blocks to your jump, and you climb 2 on the map." },
+    bonus: { jump: 2 }, value: 360, info: "Strapped on and wound, they add 2 blocks to your jump, and you climb 2 on the map.",
+    needs: "25 charge a jump rather than 100 a minute (player.js, turns.js: a jump's hook)" },
   mirrorShield: { name: "mirror shield", vague: "a dish that shows you yourself", class: "a ward", complexity: 3, charge: 300, per: "minute",
-    bonus: { ward: 3 }, value: 380, info: "Raised, it turns arrows and bolts aside: they do 3 less." },
+    bonus: { ward: 3 }, value: 380, info: "Raised, it turns arrows and bolts aside: they do 3 less.",
+    needs: "the bible's 50% of missiles reflected (missiles.js), for the ward meanwhile" },
 };
 
 // Bible §13.4's others: data for the code that will do each (docs/c4.md, integration requests). Same shape as ARTIFACTS.

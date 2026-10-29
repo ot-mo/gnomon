@@ -12,6 +12,8 @@
 //     addsPart         a part it gives the body while installed ({ id, type }: the folding rack's second back)
 //     destroyOnRemove  † in the bible: taking it out destroys it
 // The value (what a merchant asks) is IMPLANT_VALUE(grade): 400 to 2,000 glim (bible §3.1).
+//     needs            (C4) what of its line nothing reads yet: the integrator's backlog (docs/ws5.md requests 5-10,
+//                      docs/c4.md); its line says what it is for, so a Cradle can sell it
 export const IMPLANT_VALUE = (grade) => Math.min(2000, 200 * (grade + 1));
 
 export const IMPLANTS = {
@@ -23,7 +25,7 @@ export const IMPLANTS = {
     info: "A smoked lens that drinks the dark. With your torch out you still see a little way." },
   plumbEar: { name: "plumb-line ear", parts: ["head"], grade: 2, effect: "plumbEar",
     info: "A weighted thread in the inner ear. Pits and chasms within 6 tiles mark themselves on your map." },
-  surveyLens: { name: "survey lens", parts: ["head"], grade: 3, effect: "surveyLens",
+  surveyLens: { name: "survey lens", parts: ["head"], grade: 3, effect: "surveyLens", needs: "3D filling the map at twice the range; a minimap in 3D (render3d.js, turns.js)",
     info: "The Survey's own lens. What you see in 3D goes onto your map from twice as far." },
   lampCrown: { name: "lamp crown", parts: ["head"], grade: 2, bonus: { torch: 1 / 3 },   // +2 tiles on the torch's 6
     info: "A ring of oil-lit wicks set in the scalp. Your torch reaches further, and your hands stay free." },
@@ -31,7 +33,7 @@ export const IMPLANTS = {
     info: "A switch behind the ear that folds you down into the Plane: Flat for 4 s." },
   plateGraft: { name: "plate graft", parts: ["body", "back", "head"], grade: 3, bonus: { armour: 1 },
     info: "A plate of truesteel let into the flesh. +1 armour; up to three, one per part." },
-  bellowsLung: { name: "bellows lung", parts: ["body"], grade: 2, effect: "bellowsLung", bonus: { breath: 1 },   // status.js airOf
+  bellowsLung: { name: "bellows lung", parts: ["body"], grade: 2, effect: "bellowsLung", bonus: { breath: 1 }, needs: "sprint +50% (player.js)",   // status.js airOf
     info: "A leather second lung. You hold your breath twice as long in deep water." },
   glimHeart: { name: "glim heart", parts: ["body"], grade: 4, bonus: { maxHp: -5, torchCost: -1 }, effect: "freeTorch", destroyOnRemove: true,   // torch.js torchCost
     info: "A heart that burns glim of its own. Your torch costs nothing; -5 max HP. Destroyed if removed." },
@@ -41,15 +43,15 @@ export const IMPLANTS = {
     info: "Pulls you back to somewhere you have been on this floor (every 100 s)." },
   springTendons: { name: "spring tendons", parts: ["feet"], grade: 2, bonus: { jump: 1 },
     info: "Coiled wire in the heel. You jump a block higher." },
-  gripSoles: { name: "grip soles", parts: ["feet"], grade: 2, effect: "gripSoles",
+  gripSoles: { name: "grip soles", parts: ["feet"], grade: 2, effect: "gripSoles", needs: "no slipping or knockback; ledge edges and the map's 2-block climb (WS8, turns.js)",
     info: "Soles that bite the ground. No slipping, no knockback; you stand on ledge edges." },
   knuckles: { name: "truesteel knuckles", parts: ["gloves"], grade: 2, effect: "knuckles",
     info: "Truesteel under the skin of the hands. Your fists hit for 2d4 and crush." },
-  gyroWrists: { name: "gyro wrists", parts: ["arm"], grade: 2, effect: "gyroWrists",
+  gyroWrists: { name: "gyro wrists", parts: ["arm"], grade: 2, effect: "gyroWrists", needs: "flat throws, +2 damage (throwing.js)",
     info: "Spinning weights in the wrists. Thrown things fly flat and hit for 2 more." },
-  jugglerArm: { name: "juggler's arm", parts: ["arm"], grade: 5, effect: "jugglerArm",
+  jugglerArm: { name: "juggler's arm", parts: ["arm"], grade: 5, effect: "jugglerArm", needs: "up to four knives at once (throwing.js)",
     info: "A second set of tendons. You throw up to four knives at once." },
-  balmPump: { name: "balm pump", parts: ["back"], grade: 3, effect: "balmPump",
+  balmPump: { name: "balm pump", parts: ["back"], grade: 3, effect: "balmPump", needs: "a balm tonic from the pack injected below 40% health (content/items/tonics.js injectTonic; on the HP change)",
     info: "Holds four tonics along the spine and injects a balm when you fall below 40% health." },
   foldingRack: { name: "folding rack", parts: ["back"], grade: 4, addsPart: { id: "back_2", type: "back" },
     info: "A frame that folds out of the shoulders: room for a second thing on your back." },

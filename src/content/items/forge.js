@@ -137,6 +137,8 @@ export const GEAR_ARMOURS = {
   mapCase:       { name: "map case", armour: 0, str: 0, tier: 1, metal: false, slot: "back", bonus: { navigation: 0.03 }, info: "you get lost less on the world map" },
   kiteGlider:    { name: "kite-glider", armour: 0, str: 0, tier: 4, metal: false, slot: "back", bonus: { featherFall: 1 }, info: "falls never hurt you",
                    needs: "glide 4 tiles from a height in 3D (player.js)" },
+  pack:          { name: "pack", armour: 0, str: 0, tier: 1, metal: false, slot: "back", carry: 30,
+                   needs: "+30 carry, once carrying is limited (RULES.encumbrance is off: stats.js carryCap is read by nothing yet)" },
   banner:        { name: "banner", armour: 0, str: 0, tier: 3, metal: false, slot: "back", rally: 1,
                    needs: "allies +1 damage while you carry it (combat.js, followers)" },
   // Arms
@@ -208,6 +210,7 @@ export const TEXT = {
   featherCloak: "Moulted over many years and one argument.",
   mapCase: "It keeps the maps dry and you honest.",
   kiteGlider: "It makes falling a slower kind of falling.",
+  pack: "Canvas and two straps. Room for more than you should carry.",
   banner: "People nearby stand straighter.",
   bracers: "Scuffed on the inside of the wrist.",
   buckler: "For the blows you saw coming.",
