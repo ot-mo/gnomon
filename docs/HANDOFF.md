@@ -393,6 +393,16 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
 
 ## Integration log
 
+**`p3i-c2`** (2026-10-29): `p3-c2` (bd7b772) merged into `integration` (merge commit after `p3i-c4`), cleanly: the 21
+factions' relations and lines, the faiths, village cultures and architecture by region, the grammar's lists and
+accounts, the currency's text, the liquids. Requests applied (`9fd2b07`, each with an assertion and a mutant): #1 (and
+C1a #8) villages' peoples by region first; #2 a faction's own greeting; #4 the Lantern Moths Grey with your torch out;
+#10 a relic's ability ids no longer walked as bonus keys; #14 `GEN_VERSION` 5 (and `VERSION.gen`). `browser-ws7` now
+finds its villages (C2's name lists moved seed 1's draws). Left: #12 worn reputation and C4 #1 (the real world's loot
+and stock) and #2, next; #3, #5-#9, #11, #13 new systems, the backlog. C2's history grammar is about 19% over §15.9's
+word budget (its notes say so; for the user's read-through). Checks: `run-all` 37 of 38 under load (check-overworld's
+world-map draw, 3.05 ms), PASS alone (1.64 ms); `check-save --browser`, browser-2b, browser-ws6, browser-ws7 PASS.
+
 **`p3i-c4`** (2026-10-29): `p3-c4` (c2d59eb) merged into `integration` (`1732c81`), cleanly: bible §13's gear in
 materials and classes for tiers 1-8 (`content/items/gear.js`, `forge.js`), tonics, the 20 missing mutations (waiting
 ones listed with their hooks), implants, artifacts and relics, the backgrounds' kits, the powers' data; the parent's
