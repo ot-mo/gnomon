@@ -867,12 +867,15 @@ async function campaign7b(env, { fail, stats, real, test, json, game, startRun }
 // §8.2's ten domains (six practices, weapon words, omens and ruin words, four relic powers), the 16 event types with
 // all three accounts of every variant, the eleven old factions (registered), the ten guilds and Noon's 18 lines.
 // The words of each budgeted area (bible §15.9) are counted into the stats.
-const BIBLE_FOUNDERS = {   // bible §9.3 "Founding peoples by region", §9.4's style; keys: the bible's region ids
+const BIBLE_FOUNDERS = {   // bible §9.3 "Founding peoples by region", §9.4's style; keys: C1a's region ids (docs/c1.md)
   flats: [["marshfolk", "clatter"], "reed"], waste: [["drovers", "pressed"], "salt"], steps: [["drovers", "kites", "rustbacks"], "ledge"],
   downs: [["farmers", "exiles"], "turf"], pleatwood: [["families", "sporeMoot"], "bark"], deepPleat: [["families", "errata"], "bark"],
   tessellate: [["flatfolk", "pressed"], "page"], shade: [["lampless"], "cell"], stacks: [["plan"], "storey"],
-  glass: [["clatter", "errata"], "glass"], teeth: [["kites", "hermits"], "cave"],
+  glassShore: [["clatter", "errata"], "glass"], teeth: [["kites", "hermits"], "cave"],
 };
+// C1a's 20 region ids (docs/c1.md on ws/c1, fixed 2026-10-29); at C1a's merge content/world/regions.js holds them.
+const C1A_REGIONS = ["flats", "hollowMere", "waste", "steps", "downs", "pleatwood", "deepPleat", "tessellate", "shade", "stacks", "oldCuts",
+  "lattice", "teeth", "glassSea", "glassShore", "oldRule", "straightCut", "glassCauseway", "slake", "inkrun"];
 const OLD_FACTIONS = ["flatfolk", "plan", "kites", "clatter", "unlit", "moths", "saltbeasts", "pleatwood", "sporeMoot", "askew", "errata"];
 const GUILDS = ["the glaziers", "the salt-rakers", "the scribes", "the gravewardens", "the stair-builders", "the smelters", "the chandlers",
   "the clockmen", "the folders", "the herders"];
@@ -898,6 +901,9 @@ async function peoplesC2(env, { fail, stats }) {
     const t = V.byTerrain[r];
     if (!t || t.peoples.join() !== peoples.join() || t.style !== style) fail(`villages: ${r} → ${JSON.stringify(t)}, bible §9.3/§9.4: ${peoples} in ${style}`);
   }
+  const { TEST_WORLD } = await env.src("content/world/test-world.js"), testTerrains = Object.keys(TEST_WORLD.terrains);
+  for (const r of Object.keys(V.byTerrain)) if (!C1A_REGIONS.includes(r) && !testTerrains.includes(r)) fail(`villages: ${r} is neither a region of C1a's nor a test-world terrain`);
+  for (const [id, f] of Object.entries(C.FACTIONS)) for (const r of f.homeRegions || []) if (!C1A_REGIONS.includes(r)) fail(`factions: ${id}'s home region ${r} isn't one of C1a's`);
   for (const [id, S] of Object.entries(V.styles)) {
     for (const k of ["wall", "floor", "roof", "ground"]) if (B[S[k]] === undefined) fail(`villages: style ${id}'s ${k} ${S[k]} isn't a block`);
     const hs = Object.values(S.heights || {}).flat();

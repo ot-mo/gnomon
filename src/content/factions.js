@@ -19,8 +19,8 @@
 // the Hour cults). voice is bible §15.4's, for WS6b's voices.js.
 //
 // What C2 added (bible §6.2, §3.3, §3.4, §7):
-//   homeRegions  the regions it lives in, by the bible's region ids (until C1's regions: the terrain ids they
-//                coincide with, docs/c2.md lists them); [] for "everywhere" or "wherever lamps burn"
+//   homeRegions  the regions it lives in, by C1a's region ids (docs/c1.md; docs/c2.md lists the ones used here); []
+//                for "everywhere" or "wherever lamps burn"
 //   homes        its landmarks (bible §4.3's letters) and places, as text
 //   buys         { readings?, topics? }: what it takes in the Kindling's menu (social/ritual.js wants(); a reading
 //                kind of "flat" | "deep" | "dark", a topic of story/secrets.js's kinds: "location", "history",
@@ -85,7 +85,7 @@ export const FACTIONS = {
   },
   assize: {
     name: "the Plumb Assize", parent: "peoples", temperament: "aggressive", startRep: { bent: -700, plumb: -100 },
-    color: [150, 170, 200], glyph: "K", liquid: "quicksilver", rite: "deep", voice: { hz: 120, wave: "square" }, homeRegions: ["deepPleat", "teeth"], homes: ["M", "F", "the Straight Cut", "the Old Rule"],
+    color: [150, 170, 200], glyph: "K", liquid: "quicksilver", rite: "deep", voice: { hz: 120, wave: "square" }, homeRegions: ["deepPleat", "teeth", "straightCut", "oldRule"], homes: ["M", "F", "the Straight Cut", "the Old Rule"],
     about: "A zealot order of pure-born judges, sitting in the Square. Quicksilver: it always finds the level.",
     likes: [["plan", "straight and obedient"], ["chandlers", "they fund us"], ["horary", "the dial must turn"]],
     hates: [["bent", "crooked lines"], ["flatfolk", "unfinished people"], ["askew", "they won't hold still to be measured"],
@@ -100,7 +100,7 @@ export const FACTIONS = {
   },
   horary: {
     name: "the Horary", parent: "faiths", temperament: "neutral", startRep: both(0), color: [230, 170, 60], glyph: "H",
-    liquid: "sunwine", rite: "deep, at the stele's hour", voice: { hz: 420, wave: "triangle", flags: ["vibrato"] }, homeRegions: ["tessellate"], homes: ["H", "the dial-steles", "the roadside dials"],
+    liquid: "sunwine", rite: "deep, at the stele's hour", voice: { hz: 420, wave: "triangle", flags: ["vibrato"] }, homeRegions: ["tessellate", "oldRule"], homes: ["H", "the dial-steles", "the roadside dials"],
     about: "The faith of the Hours, with an Hour-house in Halfnight and a dial by every road.",
     likes: [["kites", "birds of the high sun"], ["plan", "it built the dials with us"]],
     hates: [["lampless", "across the Line"], ["noonVigil", "Noon stole the hour"]],
@@ -148,7 +148,7 @@ export const FACTIONS = {
   },
   drovers: {
     name: "the Salt Drovers", parent: "peoples", temperament: "neutral", startRep: both(0), color: [220, 150, 60], glyph: "@",
-    liquid: "longbackMilk", rite: "deep", voice: { hz: 165, wave: "sawtooth" }, homeRegions: ["steps", "waste", "teeth"], homes: ["F", "the Steps and Waste roads"],
+    liquid: "longbackMilk", rite: "deep", voice: { hz: 165, wave: "sawtooth" }, homeRegions: ["steps", "waste", "teeth", "oldRule"], homes: ["F", "the Steps and Waste roads"],
     about: "Caravan merchants of the Steps and Waste roads.",
     likes: [["clatter", "trade partners"], ["chandlers", "credit"], ["kites", "scouts"]],
     hates: [["rustbacks", "they raid caravans"], ["assize", "tolls and searches"]],
@@ -226,7 +226,7 @@ export const FACTIONS = {
   },
   plan: {
     name: "the Plan", parent: "engines", temperament: "neutral", startRep: { bent: -100, plumb: 100 }, color: [160, 180, 190], glyph: "R",
-    liquid: "glim", rite: "deep or flat", voice: { hz: [180, 260], wave: "square", flags: ["beat"] }, homeRegions: ["stacks"], homes: ["K", "the Stacks", "Detail C at Benchmark"],
+    liquid: "glim", rite: "deep or flat", voice: { hz: [180, 260], wave: "square", flags: ["beat"] }, homeRegions: ["stacks", "oldCuts"], homes: ["K", "the Stacks", "Detail C at Benchmark"],
     about: "A machine faith of automata, at the Metronome and in the Stacks.",
     likes: [["survey", "accuracy"], ["assize", "clear orders"], ["horary", "the dials we built together"]],
     hates: [["rustbacks", "they strip ruins"], ["askew", "unbuildable"], ["sporeMoot", "rot"]],
@@ -271,7 +271,7 @@ export const FACTIONS = {
   },
   clatter: {
     name: "the Clatter", parent: "beasts", temperament: "docile", startRep: both(50), color: [230, 120, 90], glyph: "c",
-    liquid: "brine", rite: "deep", voice: { hz: 150, wave: "square", flags: ["grit"] }, homeRegions: ["flats", "glass"], homes: ["the Brine Flats", "the Glass shore"],
+    liquid: "brine", rite: "deep", voice: { hz: 150, wave: "square", flags: ["grit"] }, homeRegions: ["flats", "glassShore"], homes: ["the Brine Flats", "the Glass shore"],
     about: "Uplifted crab-folk of the Flats and the Glass shore.",
     likes: [["drovers", "trade partners"], ["hollowmere", "neighbours"]],
     hates: [["saltbeasts", "brinehogs eat crabs"], ["rustbacks", "they wear our cousins' shells as hats"]],
@@ -329,7 +329,7 @@ export const FACTIONS = {
   },
   errata: {
     name: "the Errata", parent: "plane", temperament: "neutral", startRep: both(-250), color: [200, 200, 215], glyph: "E",
-    liquid: "turnwater", rite: "deep, then flat", voice: { hz: 300, wave: "triangle", flags: ["doubled"] }, homeRegions: ["glass", "tessellate"], homes: ["I", "the Glass shore", "the Tessellate's edges"],
+    liquid: "turnwater", rite: "deep, then flat", voice: { hz: 300, wave: "triangle", flags: ["doubled"] }, homeRegions: ["glassShore", "tessellate"], homes: ["I", "the Glass shore", "the Tessellate's edges"],
     about: "Misprinted doubles, along the Glass shore and the edges of the Tessellate.",
     likes: [["askew", "they understand angles"], ["unlit", "two of everything in the dark"]],
     hates: [["assize", "they would correct us"], ["flatfolk", "they call us smudges"]],

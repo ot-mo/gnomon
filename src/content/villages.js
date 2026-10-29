@@ -7,9 +7,10 @@
 //   VILLAGES.sacred, profane, activities, proverbs, dishes, skills, liquids   §9.3's pools ({…} slots in proverbs)
 //   VILLAGES.shrines      §9.2: mosaic (the map), relief (3D in light), rune (the dark), pillar (3D: its height)
 //   VILLAGES.peoples      §9.3 "Founding peoples": { id, name, faction (WS6a's id, a second membership), parent: "bent" | "peoples" }
-//   VILLAGES.byTerrain    a span's region (bible §9.3's, by the bible's region ids; until C1's regions a span's
-//                         region is its terrain, so the keys are the terrain ids they coincide with: docs/c2.md lists
-//                         them) → [people ids], style id; the test world's fixture terrains borrow the nearest
+//   VILLAGES.byTerrain    a span's region (bible §9.3's, by C1a's region ids, docs/c1.md: the terrain's id where the
+//                         two coincide, `glassShore` for the Glass shore) → [people ids], style id; the test world's
+//                         fixture terrains borrow the nearest. story/villages.js looks the terrain up first, so a
+//                         Glass-shore village needs the region first (integration request); docs/c2.md lists the ids
 //   VILLAGES.styles       §9.4 architecture: { name, wall, floor, roof, lamp ("lamp" | "dark"), ground }; block keys of blocks.js;
 //                         C2 adds what the builder doesn't stamp yet (integration request): heights { stilts, ledges,
 //                         canopy, storeys, sunk, cliff } in blocks, and the style's flags (boardwalks, cistern,
@@ -115,8 +116,8 @@ const peoples = {
   hermits: { name: "hermits", faction: "bentVillages", parent: "bent", names: "bent" },
 };
 
-// A span's terrain → founding peoples and architecture (bible §9.3, §9.4). The real world's terrains; the test
-// world's fixture terrains borrow the nearest. Anything else: Bent families in the Downs style.
+// A span's region → founding peoples and architecture (bible §9.3, §9.4), by C1a's region ids (the terrain's id where
+// they coincide); the test world's fixture terrains borrow the nearest. Anything else: the Downs' (story/villages.js).
 const byTerrain = {
   flats: { peoples: ["marshfolk", "clatter"], style: "reed" },
   waste: { peoples: ["drovers", "pressed"], style: "salt" },
@@ -127,7 +128,7 @@ const byTerrain = {
   tessellate: { peoples: ["flatfolk", "pressed"], style: "page" },
   shade: { peoples: ["lampless"], style: "cell" },
   stacks: { peoples: ["plan"], style: "storey" },
-  glass: { peoples: ["clatter", "errata"], style: "glass" },
+  glassShore: { peoples: ["clatter", "errata"], style: "glass" },
   teeth: { peoples: ["kites", "hermits"], style: "cave" },
   lattice: { peoples: ["plan"], style: "storey" },
   // the test world's fixture terrains
