@@ -76,10 +76,10 @@ export const TONICS = {
     overdose: (game, p) => { addStatus(game, p, "hasted", { t: 15, stack: "refresh" }); addStatus(game, p, "tonic:crash", { t: 15 }); say(game, p, "Your heart races, and keeps racing.", [255, 200, 120]); },
   },
   gloam: {
-    name: "gloam", value: 35, t: 60, status: "tonic:gloam", odT: 20, info: (k) => `Dark sight and ${Math.round(30 * k)}% stealth for 60 s. Overdone: dazzled, your torch a glimmer for 20 s.`,
+    name: "gloam", value: 35, t: 60, status: "tonic:gloam", odT: 20, info: (k) => `Dark sight and ${Math.round(30 * k)}% stealth for 60 s. Overdone: dazzled, your torch a flicker for 20 s.`,
     needs: "6 tiles with the torch out (player.js torchRange caps darkSight at 4 tiles: a status's darkRange); the overdose's true blindness in any light (the blinded status does nothing to the player: torchRange, render3d.js)",
     use: (game, p, k) => { addStatus(game, p, "tonic:gloam", { t: 60, mag: k }); say(game, p, "The dark thins, like ink with water in it.", [150, 140, 200]); },
-    overdose: (game, p) => { addStatus(game, p, "darkened", { t: 20 }); say(game, p, "The light is a knife. Your torch shrinks to a glimmer.", [120, 120, 140]); },
+    overdose: (game, p) => { addStatus(game, p, "darkened", { t: 20 }); say(game, p, "The light is a knife. Your torch shrinks to a flicker.", [120, 120, 140]); },
   },
   ironbark: {
     name: "ironbark", value: 45, t: 60, status: "tonic:ironbark", odT: 20, info: (k) => `+${Math.floor(2 * k)} armour and STR for 60 s. Overdone: half speed for 20 s.`,
