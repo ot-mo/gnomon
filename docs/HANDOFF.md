@@ -393,6 +393,17 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
 
 ## Integration log
 
+**`p3i-c1a`** (2026-10-29): `p3-c1a` (3bdcc7e, with `p3i-sinkholes` in) merged into `integration` (`861b82d`), cleanly:
+the real world's 34 regions, the terrains' final numbers, the biomes' counts, the moods, Hollowmere on its plan (the
+parent's temple and the Keeper's Stair under it, the village east of the porch). Requests applied (`46fb55d`, each with
+an assertion and a mutant): #1, #2 villages by quota (16 a seed, by region, the Teeth's on a walk-in span; the real
+world's village chances 0; the test world's draws untouched); #3 a region's biome (the Glass Shore as the sea's shore);
+#4 the region's world-map line, last in the span panel; #6 the real world's `WORLD.version` 2. Left: #5 (the sky:
+backlog), #7 (the cube: the wiring merge), #8 (villages by region: C2's merge). Checks: `run-all` **38 of 38** (180.6 s);
+alone, `check-perf --against p3i-sinkholes --rounds 3`: PASS (surface p95 41.91 ms, ×1.15, the real world's villages
+in the sample; passTime p50 6.9 ms, ×1.29, budget 12: one to watch), check-overworld PASS twice; browser-2b,
+browser-gate, browser-0d2 (184 modules; `test-world.html` 32 passed), browser-silent, browser-ws1 PASS.
+
 **`p3i-sinkholes`** (2026-10-29): C1a's request 9 (`docs/sessions/2B.md` §9). C1a's real-world sites put a dungeon span in
 check-perf's surface sample (p95 68.8 ms, budget 60: the surface made its dungeon's level 1 to place its sinkholes);
 C1a held its tag, and the user chose the code fix over splitting the budget. `4ebca92`: the corridor heap in typed
