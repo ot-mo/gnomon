@@ -13,6 +13,7 @@ import { LIQUIDS } from "../liquids.js";
 import { liquidAt, liquidDef, liquidName, drinkLiquid } from "../../social/liquids.js";
 import { B } from "../../world.js";
 import { RULES } from "../../rules.js";
+import "./tonics.js";   // C4: the injectors (content/index.js is frozen; loaded here, after status.js, as social/liquids.js is)
 
 export const CONTAINERS = {
   vial: { name: "vial", holds: 1, price: 3 },

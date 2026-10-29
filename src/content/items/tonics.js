@@ -1,0 +1,122 @@
+// Tonics (bible §13.8, §10.3; TECH_DESIGN §2.18 "TONICS"; C4): injectors, the kind "tonic" { kind: "tonic", effect: id,
+// count }. items/containers.js reaches this file (content/index.js is frozen), late enough that status.js has loaded.
+//
+//   TONICS[id] = { name, value, info, t, use(game, p, k), overdose(game, p), needs? }
+//     t          how long it works (seconds at the full effect): the "tonic" status lasts this long × k
+//     use        what it does, at strength k (1 for the Plumb, GENOTYPES.bent.tonics.effect 0.5 for the Bent)
+//     overdose   what a failed save or a bad reaction does instead
+//   injectTonic(game, p, id, rng = Math.random) → { ok, overdose, k, save? }   what using one does (the kind's E)
+//
+// The rules (bible §13.8, §10.3):
+//   - one at a time: while one works (the hidden status "tonic", its mag the number taken in a row), taking another
+//     asks a TOU save, d20 + TOU modifier ≥ 12 + 3 × that number; a pass ends the one before and the new one works, a
+//     failure is the new one's overdose;
+//   - the Bent get half of every number (GENOTYPES[g].tonics.effect) and a 5% chance of a bad reaction (badReaction:
+//     the overdose instead); the Plumb get the whole.
+// The statuses are named "tonic:…" so no other content's can clash with them.
+import { registerItemKind, takeOne } from "../../items.js";
+import { addStatus, removeStatus, hasStatus, statusOf, registerStatus } from "../../status.js";
+import { maxHp, mod } from "../../stats.js";
+import { GENOTYPES } from "../genotypes.js";
+import { RULES } from "../../rules.js";
+
+const secs = (s) => Math.max(0, Math.ceil(s.t));
+const T = (id, label, def) => registerStatus(`tonic:${id}`, { color: [150, 220, 200], kind: "good", stack: "refresh", hud: (s) => `${label} ${secs(s)}s`, ...def });
+
+// The chain: there while a tonic works; mag = how many were taken in a row.
+registerStatus("tonic", { color: [150, 220, 200], kind: "good", t: 15, stack: "refresh", hud: () => null });
+// Balm: health over its time, exactly for any steps (status.js advance hands tick the seconds it still runs; the carry
+// in s.acc, so a skip heals what playing it out heals).
+T("balm", "BALM", { t: 3, tick(game, e, s, dt) {
+  s.acc += s.mag * 4 * dt;
+  const n = Math.floor(s.acc + 1e-9);
+  if (n > 0) { s.acc -= n; e.hp = Math.min(maxHp(e), e.hp + n); }
+} });
+T("gloam", "GLOAM", { t: 60, bonus: (s) => ({ darkSight: 3 * s.mag, stealth: 0.3 * s.mag }) });
+T("ironbark", "IRONBARK", { t: 60, bonus: (s) => ({ av: Math.round(2 * s.mag), str: Math.round(2 * s.mag) }) });
+T("clearwit", "CLEARWIT", { t: 60, bonus: (s) => ({ examine: Math.round(5 * s.mag), int: Math.round(2 * s.mag) }) });
+// Overdoses.
+T("sick", "NO HEALING", { color: [170, 200, 110], kind: "bad", t: 30, flags: { noRegen: true }, ended: "Your stomach settles." });
+T("heavy", "SLOWED", { color: [160, 150, 120], kind: "bad", t: 20, speed: 0.5, ended: "Your legs are your own again." });
+T("crash", "HASP", { kind: "bad", t: 15, onEnd(game, e, s, why) {
+  if (why === "expired") { addStatus(game, e, "paralyzed", { t: 3 }); if (game && e === game.player) game.log("The hasp runs out all at once. You can't move.", [200, 120, 255]); }
+} });
+
+const say = (game, p, text, color = [150, 220, 200]) => { if (game && p === game.player) game.log(text, color); };
+const OWN = ["balm", "gloam", "ironbark", "clearwit"];   // the tonics with a status of their own (a pass ends it)
+
+export const TONICS = {
+  balm: {
+    name: "balm", value: 25, t: 3, info: "Heals 12 over 3 s. Overdone: sickness, and no healing for 30 s.",
+    use: (game, p, k) => { addStatus(game, p, "tonic:balm", { t: 3, mag: k }); say(game, p, `Warmth spreads up your arm. (+${12 * k} HP over 3 s)`, [230, 90, 110]); },
+    overdose: (game, p) => { addStatus(game, p, "tonic:sick", { t: 30 }); say(game, p, "The balm curdles. You feel sick, and nothing will heal you for a while.", [170, 200, 110]); },
+  },
+  hasp: {
+    name: "hasp", value: 40, t: 15, info: "Haste for 15 s. Overdone: haste, then 3 s when you can't move at all.",
+    use: (game, p, k) => { addStatus(game, p, "hasted", { t: 15 * k, stack: "refresh" }); say(game, p, `Everything else slows down. (${15 * k} s)`, [255, 240, 120]); },
+    overdose: (game, p) => { addStatus(game, p, "hasted", { t: 15, stack: "refresh" }); addStatus(game, p, "tonic:crash", { t: 15 }); say(game, p, "Your heart races, and keeps racing. This will end badly.", [255, 200, 120]); },
+  },
+  gloam: {
+    name: "gloam", value: 35, t: 60, info: "For 60 s you see in the dark with your torch out, and hide better. Overdone: blind for 20 s.",
+    needs: "6 tiles with the torch out (player.js torchRange caps darkSight at 4 tiles: a status's darkRange)",
+    use: (game, p, k) => { addStatus(game, p, "tonic:gloam", { t: 60, mag: k }); say(game, p, "The dark thins, like ink with water in it.", [150, 140, 200]); },
+    overdose: (game, p) => { addStatus(game, p, "blinded", { t: 20 }); say(game, p, "The light is a knife. You can't see.", [120, 120, 140]); },
+  },
+  ironbark: {
+    name: "ironbark", value: 45, t: 60, info: "+2 armour and +2 STR for 60 s. Overdone: half speed for 20 s.",
+    use: (game, p, k) => { addStatus(game, p, "tonic:ironbark", { t: 60, mag: k }); say(game, p, "Your skin goes stiff and brown at the edges.", [170, 140, 100]); },
+    overdose: (game, p) => { addStatus(game, p, "tonic:heavy", { t: 20 }); say(game, p, "Your skin goes stiff, and so does everything under it.", [160, 150, 120]); },
+  },
+  foldSap: {
+    name: "fold-sap", value: 50, t: 10, info: "You're Flat for 10 s, and fight on the map. Overdone: Flat for 60 s.",
+    use: (game, p, k) => { addStatus(game, p, "flat", { t: 10 * k }); say(game, p, `You fold down into the floor. (${10 * k} s)`, [220, 220, 230]); },
+    overdose: (game, p) => { addStatus(game, p, "flat", { t: 60 }); say(game, p, "You fold down into the floor, and the floor keeps you.", [220, 220, 230]); },
+  },
+  clearwit: {
+    name: "clearwit", value: 35, t: 60, info: "+5 to examine and +2 INT for 60 s. Overdone: you forget this floor's map.",
+    needs: "cures confusion (a confused status: C2's ink, the Muddle mutation)",
+    use: (game, p, k) => { addStatus(game, p, "tonic:clearwit", { t: 60, mag: k }); say(game, p, "Everything has edges, and you can count them.", [200, 220, 255]); },
+    overdose: (game, p) => {
+      if (game?.zone?.seen) game.zone.seen.fill(0);   // the auto-map: the only thing in the game that forgets it
+      say(game, p, "You know exactly where you are, and nothing else. Your map of this floor is gone.", [200, 220, 255]);
+    },
+  },
+};
+
+// What a genotype makes of a tonic: { effect, badReaction } (content/genotypes.js; a creature or a quick start: whole).
+const reactionOf = (p) => GENOTYPES[p?.genotype]?.tonics || { effect: 1, badReaction: 0 };
+export function injectTonic(game, p, id, rng = Math.random) {
+  const def = TONICS[id];
+  if (!def) return { ok: false };
+  const { effect: k = 1, badReaction = 0 } = reactionOf(p);
+  const chain = statusOf(p, "tonic");
+  let overdose = false, save = null;
+  if (chain) {
+    const nat = 1 + Math.floor(rng() * 20), dc = 12 + 3 * chain.mag;
+    save = { nat, total: nat + mod(p, "tou"), dc };
+    overdose = save.total < dc;
+    for (const o of OWN) if (hasStatus(p, `tonic:${o}`)) removeStatus(game, p, `tonic:${o}`);
+  }
+  if (!overdose && badReaction && rng() < badReaction) overdose = "bad";
+  if (overdose === "bad") say(game, p, "Your blood argues with the tonic.", [255, 150, 120]);
+  else if (overdose) say(game, p, `Too many in a row (TOU ${save.total} against ${save.dc}).`, [255, 150, 120]);
+  if (overdose) def.overdose(game, p); else def.use(game, p, k);
+  addStatus(game, p, "tonic", { t: def.t * k, mag: (chain?.mag || 0) + 1, stack: "refresh" });
+  return { ok: true, overdose: !!overdose, k, save };
+}
+
+registerItemKind("tonic", {
+  stack: true, weight: () => 0,
+  name: (game, it) => TONICS[it.effect]?.name ? `${TONICS[it.effect].name} tonic` : "tonic",
+  glyph: () => ["!", [150, 220, 200]],
+  info: (game, it) => TONICS[it.effect]?.info || "",
+  price: (it) => TONICS[it.effect]?.value || 0,
+  art: { w: 0.18, h: 0.4, art: [" s ", " s ", "gtg", "gtg", "gtg", "ggg", " h "] },
+  palette: () => ({ s: [[200, 205, 215], 0.1], g: [[180, 150, 90], 0.1], t: [[150, 220, 200], 0.5], h: [[120, 95, 60], 0] }),
+  use(game, e, it) {
+    if (!TONICS[it.effect]) return 0;
+    takeOne(e, it);
+    injectTonic(game, e, it.effect);
+    return RULES.body.drinkTime;
+  },
+});

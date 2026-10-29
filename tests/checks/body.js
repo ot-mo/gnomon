@@ -47,7 +47,7 @@ function samples() {
   out.push({ kind: "missile", id: "sling", ench: 0 }, { kind: "missile", id: "boltBow", ench: 1 }, { kind: "ammo", effect: "bolt", count: 12 });   // WS8
   out.push({ kind: "implant", id: "lampCrown" }, { kind: "credit", count: 2 }, { kind: "artifact", id: "echoBell", known: false, cell: null }, { kind: "cell", id: "glim", charge: 2500 });   // WS5
   out.push({ kind: "vial", effect: "brine", count: 1 }, { kind: "coinage", effect: "glim", count: 3 });   // WS6b
-  out.push({ kind: "tool", effect: "markerChalk", count: 4 });   // C4 (content/items/gear.js)
+  out.push({ kind: "tool", effect: "markerChalk", count: 4 }, { kind: "tonic", effect: "balm", count: 2 });   // C4 (content/items/gear.js, tonics.js)
   return out;
 }
 
