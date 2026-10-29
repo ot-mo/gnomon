@@ -105,6 +105,7 @@ make. There's no saving yet: a run lasts as long as the page.
 | `?seed=1234` | seeds the run: the same world sites and the same dungeon floors every time |
 | `?quick=1` | skips the title and starts a quick game |
 | `?silent=1` | no sound at all |
+| `?world=real` | a new game starts on GNOMON's real world (42 × 21 spans, at Hollowmere) instead of the test world: a preview before its regions, villages and story arrive, so it starts with the cube, both views open |
 
 Combine them with `&`: `?quick=1&seed=1234`. A new run after death (R) takes a fresh seed.
 

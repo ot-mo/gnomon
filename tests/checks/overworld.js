@@ -26,8 +26,11 @@
 //                  start span nothing); hidden sites asked about (declined: not recorded); travellers' rumours; the
 //                  tier warning
 //   8. screen      the world map drawn at 100×30, 160×64 and 180×56 on both worlds (every span on screen, the panel
-//                  on the right or in the bottom strip), and played by keys and the mouse: O, steps, Enter, Esc, Z
+//                  on the right or in the bottom strip), and played by keys and the mouse: O, steps, Enter, Esc, Z;
+//                  ?world=real (config.js parseWorld, which main.js reads): only that picks the real world, and in
+//                  Node it's the test world (tools/browser-2b.mjs plays a new game on it in the browser)
 import { makeRng, distance } from "../../src/rng.js";
+import { parseWorld, WORLD } from "../../src/config.js";
 import { on } from "../../src/events.js";
 import { setMode, SCREENS } from "../../src/screens.js";
 import { dispatchKey } from "../../src/keys.js";
@@ -976,6 +979,11 @@ function screen(G, scr, problems) {
   if (game.mode !== "explore") problems.push(`screen: Esc on the wait menu left you in ${game.mode}`);
   out.keys = true;
   scr.resize(180, 56);
+  // ?world=real: new games on the real world, a preview before C1 (main.js). Only that value picks it.
+  const flags = [["?world=real", "real"], ["?seed=7&world=real&silent=1", "real"], ["", "test"], ["?world=test", "test"], ["?world=REAL", "test"], ["?world", "test"], ["?quick=1", "test"]];
+  const bad = flags.filter(([q, w]) => parseWorld(q) !== w);
+  if (bad.length || WORLD !== "test") problems.push(`screen: parseWorld ${bad.map(([q, w]) => `"${q}" → ${parseWorld(q)}, want ${w}`).join("; ")}; WORLD in Node ${WORLD}`);
+  out.worldFlag = `${flags.length} URLs, only ?world=real the real world; Node: ${WORLD}`;
   return out;
 }
 

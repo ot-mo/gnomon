@@ -11,6 +11,10 @@
 //   2. The journal's Locations tab: a place learned (away from here), J, 2: the place is marked (>); O shows it on the
 //      world map, to look only, the cursor on its span; Esc comes back to the journal; a click on its title does the
 //      same, and a click on "Esc: close" comes back; Esc closes the journal.
+//   3. ?world=real (config.js WORLD, main.js): a new game from the title (the wizard) and a ?quick=1 game start on
+//      GNOMON's real world (id "gnomon", 42×21) at its start span, holding the cube (it has none to find yet); in the
+//      title's, Tab turns to 3D and back, O opens the world map with every span drawn (at 180×56), and a step goes on.
+//      Part 1's game, without the flag, is on the test world.
 // Fails on any console error or warning, a mode or span that isn't where it should be, or audio that reached the speakers.
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -86,21 +90,31 @@ try {
   };
   const noPrompt = async () => { for (let k = 0; k < 3; k++) { const s = await state(); if (s.trip?.prompt) await key("KeyN"); else break; } };
 
+  // The title's New game: the wizard by its keys (End on the mutations, Tab on the name), then the intro by Space.
+  const newGame = async (url) => {
+    await page.goto(url);
+    await page.waitForFunction(() => window.game && window.game.mode === "title");
+    await capture(); await frames(4);
+    await key("Home"); await key("Enter");
+    await expect("create", "New game on the title");
+    for (let k = 0; k < 20 && (await state()).mode === "create"; k++) {
+      const step = await page.evaluate(async () => (await import("/src/screens/create.js")).wizard().step);
+      if (step === "track") await key("End"); else if (step === "name") await key("Tab");
+      await key("Enter");
+    }
+    await page.waitForFunction(() => window.game.zone && window.game.mode !== "create", null, { timeout: 20000 }).catch(() => {});
+    out(`  the wizard: ${await page.evaluate(() => `${window.game.player.name}, a ${window.game.player.genotype}, seed ${window.game.seed}`)}`);
+    for (let k = 0; k < 8 && (await state()).mode === "story"; k++) await key("Space");
+    return expect("map", "Space through the intro");
+  };
+  const runWorld = () => page.evaluate(() => { const g = window.game, W = g.run.world;
+    return { id: W.id, size: `${W.w}×${W.h}`, start: `${W.start.wx},${W.start.wy},0`, zone: g.zone?.key, cube: !!g.story.cube }; });
+
   // --- 1. A travel save, reloaded ---------------------------------------------------------------------------------
-  await page.goto(`${base}/index.html?silent=1&seed=${seed}`);
-  await page.waitForFunction(() => window.game && window.game.mode === "title");
-  await capture(); await frames(4);
-  await key("Home"); await key("Enter");
-  await expect("create", "New game on the title");
-  for (let k = 0; k < 20 && (await state()).mode === "create"; k++) {
-    const step = await page.evaluate(async () => (await import("/src/screens/create.js")).wizard().step);
-    if (step === "track") await key("End"); else if (step === "name") await key("Tab");
-    await key("Enter");
-  }
-  await page.waitForFunction(() => window.game.zone && window.game.mode !== "create", null, { timeout: 20000 }).catch(() => {});
-  out(`  the wizard: ${await page.evaluate(() => `${window.game.player.name}, a ${window.game.player.genotype}, seed ${window.game.seed}`)}`);
-  for (let k = 0; k < 8 && (await state()).mode === "story"; k++) await key("Space");
-  const s0 = await expect("map", "Space through the intro");
+  const s0 = await newGame(`${base}/index.html?silent=1&seed=${seed}`);
+  const w0 = await runWorld();
+  out(`  without ?world: the ${w0.id} world, ${w0.size}`);
+  if (w0.id !== "test") problems.push(`a new game without ?world is on the ${w0.id} world, not the test world`);
   const [wx0, wy0] = s0.zone.split(",").map(Number);
   await key("KeyO");
   await expect("world", "O on the map");
@@ -158,6 +172,45 @@ try {
     await key("Escape");
     const s5 = await expect("map", "Esc closes the journal");
     if (s5.trip) problems.push(`the look left a journey: ${JSON.stringify(s5.trip)}`);
+  }
+
+  // --- 3. ?world=real ----------------------------------------------------------------------------------------------
+  for (const how of ["title", "quick"]) {
+    if (how === "title") await newGame(`${base}/index.html?silent=1&world=real&seed=${seed}`);
+    else {
+      await page.goto(`${base}/index.html?silent=1&quick=1&world=real&seed=${seed}`);
+      await page.waitForFunction(() => window.game && window.game.zone && window.game.mode === "story");
+      await capture();
+      for (let k = 0; k < 8 && (await state()).mode === "story"; k++) await key("Space");
+      await expect("map", "?quick=1: Space through the intro");
+    }
+    const r = await runWorld();
+    out(`  ?world=real, ${how}: the ${r.id} world, ${r.size}, in ${r.zone} (its start ${r.start}), the cube ${r.cube ? "held" : "NOT held"}`);
+    if (r.id !== "gnomon" || r.size !== "42×21" || r.zone !== r.start || !r.cube) problems.push(`?world=real, ${how}: ${JSON.stringify(r)}`);
+    if (how !== "title") continue;
+    await key("Tab");
+    await page.waitForFunction(() => window.game.mode !== "rotate", null, { timeout: 10000 }).catch(() => {});
+    await expect("explore", "?world=real: Tab");
+    await key("Tab");
+    await expect("map", "?world=real: Tab back");
+    const cellH = await page.evaluate(async () => (await import("/src/screen.js")).cellH);
+    await page.setViewportSize({ width: 180 * 6, height: 56 * cellH }); await frames(4);
+    await key("KeyO");
+    await expect("world", "?world=real: O");
+    const drawn = await page.evaluate(async () => {
+      const R = await import("/src/overworld/renderWorld.js"), v = R.worldView, W = window.game.run.world, f = window.__frame;
+      let n = 0;
+      for (let sy = 0; sy < v.viewH; sy++) for (let sx = 0; sx < v.viewW; sx++)
+        if (W.inBounds(v.sx0 + sx, v.sy0 + sy) && f.chars[(v.y0 + sy) * f.cols + v.x0 + sx * 2] !== " ") n++;
+      return { n, of: W.w * W.h };
+    });
+    out(`  ?world=real: ${drawn.n} of ${drawn.of} spans drawn at 180×56`);
+    if (drawn.n !== drawn.of) problems.push(`?world=real: ${drawn.n} of ${drawn.of} spans drawn`);
+    const before = await state();
+    for (const k of ["ArrowRight", "ArrowUp", "ArrowLeft", "ArrowDown"]) { await key(k); await noPrompt(); const s = await state(); if (s.trip && (s.trip.wx !== before.trip.wx || s.trip.wy !== before.trip.wy)) break; }
+    const after = await expect("world", "?world=real: a step");
+    if (!after.trip || (after.trip.wx === before.trip.wx && after.trip.wy === before.trip.wy)) problems.push(`?world=real: no step went anywhere from (${before.trip?.wx}, ${before.trip?.wy})`);
+    await page.setViewportSize({ width: 600, height: 300 }); await frames(4);
   }
 
   const audio = await page.evaluate(() => window.__audio);
