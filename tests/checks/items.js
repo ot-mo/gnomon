@@ -1069,6 +1069,38 @@ export function checkItems(m) {
   return { name: "items", ok: problems.length === 0, problems, stats };
 }
 
+// --- C4: the parent's gear as the parent showed it (golden (b) for item text) ---------------------------------------
+// parentGearTrace(m) → { [label]: fnv hash }: every piece of the parent's gear (its 7 weapons and 15 armours by id,
+// written out: C4's new entries are left out), its rings, amulets and relics, at enchantment -1, 0, +2, known and not,
+// plain, flaming and with a property: its name, info line, price, glyph, palette, bonuses and armour value. It needs
+// only items.js and a game, so it runs on any tree since WS5's merge: PARENT_GEAR below is its trace at p3i-props
+// (7959ea0), recorded once (docs/sessions/c4.md §6). Examine's description line (TEXT) is C4's, beside the parent's
+// line: itemDetails is not in the trace.
+const PARENT_WEAPONS = ["dagger", "shortsword", "mace", "spear", "longsword", "waraxe", "greatsword"];
+const PARENT_ARMOURS = ["clothes", "leather", "chain", "scale", "plate", "reedHat", "copperCap", "ironHelm", "goggles", "cloak", "bracers",
+  "gloves", "gauntlets", "sandals", "boots"];
+export function parentGearTrace(m) {
+  const I = m.items, game = m.game.game, out = {};
+  const look = (it) => JSON.stringify([I.itemName(game, it), I.itemInfo(game, it), I.itemPrice(it), I.itemGlyph(game, it), I.itemPalette(game, it),
+    I.itemBonuses(it), I.ITEM_KINDS[it.kind].av?.(it) ?? null]);
+  const add = (label, it) => { out[label] = fnv(look(it)); };
+  for (const ench of [-1, 0, 2]) for (const known of [false, true]) {
+    for (const id of PARENT_WEAPONS) {
+      add(`weapon ${id} ${ench} ${known}`, { kind: "weapon", id, ench, known });
+      add(`weapon ${id} ${ench} ${known} fire keen`, { kind: "weapon", id, ench, known, element: "fire", props: ["keen"] });
+    }
+    for (const id of PARENT_ARMOURS) {
+      add(`armour ${id} ${ench} ${known}`, { kind: "armour", id, ench, known });
+      add(`armour ${id} ${ench} ${known} light thorns`, { kind: "armour", id, ench, known, props: ["light", "thorns"] });
+    }
+    for (const kind of ["ring", "amulet"]) for (const id of Object.keys(kind === "ring" ? I.RINGS : I.AMULETS)) add(`${kind} ${id} ${ench} ${known}`, { kind, id, ench, known });
+  }
+  for (const key of Object.keys(I.RELICS)) add(`relic ${key}`, I.makeRelic(key));
+  return out;
+}
+// Recorded from p3i-props (7959ea0) with parentGearTrace against its own modules: the fnv of the whole trace, and its size.
+const PARENT_GEAR = { entries: 352, hash: "7e4a7549" };
+
 // --- C4: the real world's gear, tonics, artifacts, mutations and kits (owner C4; Phase 3) -----------------------------
 // checkGear(m) → { name: "gear", ok, problems, stats }: C4's own data, held to the bible's numbers written out here (not
 // read from the tables under test).
@@ -1115,6 +1147,14 @@ export function checkGear(m) {
   // Bible §13.1, written out: [material, tier, damage, armour].
   const LADDER = [["bone", 1, -1, 0], ["copper", 2, 0, 0], ["iron", 3, 1, 0], ["saltsteel", 4, 2, 1], ["blackglass", 5, 3, 1],
     ["truesteel", 6, 4, 2], ["pleatmetal", 7, 5, 2], ["noonsilver", 8, 6, 3]];
+
+  section("the parent's gear", () => {
+    const trace = parentGearTrace(m), n = Object.keys(trace).length, h = fnv(JSON.stringify(trace));
+    if (n !== PARENT_GEAR.entries || h !== PARENT_GEAR.hash) {
+      fail(`the parent's gear reads differently from p3i-props: ${n} entries hashing ${h}, want ${PARENT_GEAR.entries} hashing ${PARENT_GEAR.hash}`);
+    }
+    stats.parentGear = `${n} pieces of the parent's gear read as at p3i-props (${h})`;
+  });
 
   section("ladder", () => {
     const ids = Object.keys(F.MATERIALS);
