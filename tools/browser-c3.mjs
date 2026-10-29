@@ -104,8 +104,21 @@ try {
   });
   expect(Object.keys(placed).length === 5 && !placed.error, `five creatures placed beside you (${Object.keys(placed).join(", ")})`);
   await frames(4);
-  let t = await screenText();
-  expect(/o/.test(t) && t.includes("c") && t.includes("r"), "the map draws the smoother (o), the clatterer (c) and the saltrat (r)");
+  // The map's cells at the pinned three (renderMap.js tileAtCell's inverse: a tile is TILE_W cells wide from the view's
+  // corner, its glyph in the first or second).
+  const cells = await page.evaluate(async (placed) => {
+    const { mapView, tileAtCell } = await import("/src/renderMap.js"), F = window.__frame, out = {};
+    let tw = 1;
+    while (tw < 4 && tileAtCell({ x: tw, y: mapView.top }).x === mapView.tx0) tw++;
+    for (const id of ["smoother", "clatterer", "saltrat"]) {
+      const { x, y } = placed[id], cx = (x - mapView.tx0) * tw, cy = mapView.top + y - mapView.ty0;
+      out[id] = [F.chars[cy * F.cols + cx], F.chars[cy * F.cols + cx + 1]].join("");
+    }
+    return out;
+  }, placed);
+  expect(cells.smoother.includes("o") && cells.clatterer.includes("c") && cells.saltrat.includes("r"),
+         `the map draws the smoother (o), the clatterer (c) and the saltrat (r) on their tiles (${JSON.stringify(cells)})`);
+  let t;
   await shot("1-map-hollowmere-cast");
 
   // The look on the map: L, then L again on the default target (the foe first: the saltrat) → examine.
