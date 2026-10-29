@@ -1581,6 +1581,10 @@ export function realBand(game, tier, level) {
     const sum = rows.reduce((a, r) => a + r[1], 0);
     for (const [type, w] of rows) counts[type] = (counts[type] || 0) + 2000 * (n / total) * (w / sum);
   }
+  // Back to 2000 in all: a region of the tier with no kind out for a stranger at the level shares nothing out, and
+  // its spans' share goes to the others (not to nobody, which would pull the band's averages down).
+  const all = Object.values(counts).reduce((a, n) => a + n, 0);
+  if (all > 0) for (const type of Object.keys(counts)) counts[type] *= 2000 / all;
   return counts;
 }
 export function ttkTables(ctx, { blows = 1500 } = {}) {
