@@ -2,12 +2,10 @@
 
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
-**Updated:** 2026-10-29, the integrator (local session), on `integration`. **Phase 1 is done and fully merged
-(`p2-ws3` … `p2-ws1`, the flip `p2-flip`). Phase 2's 2B hardening is done and tagged `p2-2b` (e0b7c9b), with the
-Phase 2 items that need no C1; since then `?world=real` (a new game on the real world, a preview; `p2-realworld`,
-2602aff), the Phase 3 plan (approved by the user) and its first step, props named (`p3i-props`, 7959ea0), then C1a's request 9
-(`p3i-sinkholes`, 76bb63a: a surface no longer makes its dungeon's level 1); `main` = `p3i-sinkholes`. What's left of Phase 2 is the last wiring merge, which waits on C1:
-"Next step" below. Nothing is running.** From here on only the integrator edits this file and
+**Updated:** 2026-10-29, the integrator (local session), on `integration`. **Phases 1 and 2 are done; Phase 3 is under
+way.** C1a, C4 and C2 are merged (`p3i-c1a`, `p3i-c4`, `p3i-c2`), and §8.5's last wiring merge is done
+(`p3i-wiring`): **new games start on GNOMON's real world at Hollowmere** (`?world=test` for the test world). `main` =
+`p3i-c2` (7c2ff54). Nothing is running. From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
@@ -46,17 +44,16 @@ Hollowmere, holding the cube (it has none to find yet); without the flag nothing
 the real world the default: then `main.js`'s `?world=real` branch and its cube hook go (`config.js` `WORLD` can stay
 or go with it; browser-2b part 3 and check-overworld's 7 URLs follow).
 
-**Next step:** §8.5's last wiring merge (title → create → the start landmark → the first village; the legacy fixture
-site leaves the default world, staying in the test world) waits on C1's regions and villages: `game.js` still builds
-runs on the test world. Its first step, once C1 is in: `git fetch origin --tags`, then in the worktree
-`C:\Users\Otto Mörner\Code\gnomon-wt\integration` on branch `integration` (at `p2-2b` or later) run
-`node tools/run-all.mjs` (38 of 38 at `p2-2b`) and `NODE_PATH="$(npm root -g)" node tools/browser-2b.mjs` (PASS), merge
-C1's tag, and point `game.js`'s new runs at the real world; then run the playthrough on the real world too (it runs on
-the test world today, seed 18, because the real world has no village before C1). The Phase 3 plan below is approved
-(the user, 2026-10-29), and its first step is done: props are named (`p3i-props`, `docs/sessions/2B.md` §8). **C1a, C4
-and C2 are started** (the user, 2026-10-29: "start C1a, C4 and C2 from p3i-props, as the Phase 3 plan says"), each in
-its worktree at `p3i-props` (the plan's table). Next for the integrator: merge C1a's tag when it comes, then the last
-wiring merge; C1b takes C1a's slot, C3 the next free one.
+**Next step:** two pieces, both waiting on the user's word (nothing is started):
+- **C1b and C3** (the Phase 3 plan's table): their worktrees from `p3i-c2` (`c1` again for C1b, on `ws/c1`; a new `c3` on
+  `ws/c3`): `git worktree add "C:UsersOtto MörnerCodegnomon-wtc3" -b ws/c3 p3i-c2`; C1b merges `p3i-c2` into `ws/c1`
+  first (a merge, no rebase). C5 after C1b, C2 and C3 are merged.
+- **The integrator's next merge work** (promised at C4's and C2's merges): C4 #1 (the real world's loot and stock through
+  `randomGear`/`randomTonic`), C4 #2 with C2 #12 (worn reputation). Then the backlog below ("Carried integration
+  requests" and the integration log's "Left" lists): C1a #5; C4 #4-#10, #12-#14; C2 #3, #5-#9, #11, #13.
+- `passTime` read ×1.29 against `p3i-sinkholes` after C1a's merge (6.9 ms, budget 12): one to watch at the next timed run.
+- `run-all`'s check-overworld world-map draw reads 3.0-3.8 ms with 11 checks running on this machine and 1.5-1.7 alone:
+  run it alone before calling it a regression.
 
 **On `main` since `p2-ws6a`** (both at the user's request, without a tag of their own): the root README for GNOMON as
 it stands at `p2-ws5` (`6645658`, from `wip/readme`; an interim update before Phase 4's rewrite; the secret rooms'
