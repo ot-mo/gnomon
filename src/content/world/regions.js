@@ -7,7 +7,7 @@
 //   tier           the lowest tier of its spans (each span's own tier is worldmap.js TIER_ROWS, bible §4.5)
 //   music          a mood of music.js (content/moods.js: a landmark's own mood comes first, the terrain's after)
 //   sky            what the sky does over it: "clear", "haze", "glare" (the noon glare of bible §4.9: the Salt
-//                  Waste and the Glass shore), "canopy" (the Pleat's green dimness), "ashen" (the Shade), "crystal"
+//                  Waste and the Glass shore, with the sea and the causeway over it), "canopy" (the Pleat's green dimness), "ashen" (the Shade), "crystal"
 //                  (the Lattice). Read by nothing yet (docs/c1.md, integration requests); the Shade's dusk is its
 //                  terrain's `dark`
 //   fog            haze density added to the sky's (clock.js fogFor: HAZE 0.022, and 0.02 more on a dark terrain)
@@ -20,7 +20,11 @@
 //                  under its sites draw from them (world/sites.js dungeonParams, gen/dungeon.js pickFrom; a type not
 //                  registered yet is skipped, C3 adds the species). Levels are the bible's tiers ±2 (tier t is
 //                  level 3t − 1), widened to the region's deepest floor where its own creatures are the ones there
-//                  (bible §12: deeper floors raise them), so every level the region makes has three kinds or more
+//                  (bible §12: deeper floors raise them), so every level the region makes has three kinds or more;
+//                  lowered only where its lowest spans would have fewer than three (the Pleatwood's tier-2 rim: the
+//                  sporeling and the foldmonkey from 5; the Glass Sea's and the Causeway's tier-5 spans: the glass crab
+//                  and the salamander from 12). §15.2's spawn keys win over §12's tiers: the glowfin is in the Inkrun.
+//                  A registered kind's factions are among the region's (check-world)
 //   factions       who lives or holds sway there (bible §15.4's Home column, §9.3's founding peoples)
 //   sites          the chance per eligible span of each per-run kind (world/sites.js placeSites): village, ruin,
 //                  lair, station (a Truing Cradle); historic is 0 everywhere, as Hour sites go by tier (§8.7)
@@ -33,7 +37,7 @@ export const REGIONS = {
     villages: 1,
     creatures: [row("saltrat", 6, 1, 8), row("brineGrub", 3, 1, 8), row("brinehog", 3, 1, 8), row("glowfin", 2, 1, 10),
                 row("clatterer", 2, 1, 8), row("flatling", 1, 1, 10), row("lanternMoths", 1, 1, 30), row("drownedKeeper", 1, 1, 8)],
-    factions: ["hollowmere", "noonVigil", "clatter", "moths", "saltbeasts"],
+    factions: ["hollowmere", "noonVigil", "clatter", "moths", "saltbeasts", "unlit", "flatfolk"],
     sites: { village: 0.036, ruin: 0, lair: 0.053, station: 0, historic: 0 },
     line: "The glimseed leans towards the Gnomon here, the way everything does eventually.",
   },
@@ -44,14 +48,14 @@ export const REGIONS = {
                 row("clatterer", 1, 1, 7)],
     factions: ["hollowmere", "clatter", "saltbeasts"],
     sites: { village: 0, ruin: 0, lair: 0, station: 0, historic: 0 },
-    line: "Brine to the knee and silt below that; the eels think it is the whole world.",
+    line: "A shallow lagoon of brine south of Hollowmere; the eels in it think it is the whole world.",
   },
   waste: {
     name: "the Salt Waste", tier: 1, music: "waste", sky: "glare", fog: 0, liquid: "brine", encounterRate: 0.08,
     villages: 1,
     creatures: [row("brinehog", 3, 1, 11), row("rustbackScav", 2, 1, 11), row("chaffDevil", 3, 3, 11), row("saltrat", 1, 1, 7),
                 row("saltMirage", 2, 3, 11), row("longback", 1, 1, 11)],
-    factions: ["drovers", "pressed", "saltbeasts"],
+    factions: ["drovers", "pressed", "saltbeasts", "rustbacks"],
     sites: { village: 0.013, ruin: 0.021, lair: 0.023, station: 0, historic: 0 },
     line: "A sea that was pressed and left to dry; the Drovers count its dunes and get a different number every time.",
   },
@@ -87,7 +91,7 @@ export const REGIONS = {
     villages: 1,
     creatures: [row("paperWasps", 3, 9, 23), row("mootWalker", 2, 12, 23), row("hangvine", 2, 9, 23), row("creasebeetle", 3, 9, 16),
                 row("plumbknight", 1, 12, 23), row("assizer", 1, 12, 23)],
-    factions: ["pleatwood", "sporeMoot", "assize", "saltbeasts"],
+    factions: ["pleatwood", "sporeMoot", "assize", "saltbeasts", "errata"],
     sites: { village: 0.016, ruin: 0.012, lair: 0.024, station: 0, historic: 0 },
     line: "The same forest, folded more times than anyone has counted; the Assize cut one straight line through it and called it a road.",
   },
@@ -96,7 +100,7 @@ export const REGIONS = {
     villages: 2,
     creatures: [row("tileMimic", 3, 9, 18), row("pressHound", 3, 9, 18), row("mosaicGolem", 1, 12, 18), row("erratum", 1, 9, 18),
                 row("flatfolkWanderer", 2, 9, 13), row("pressedPilgrim", 1, 9, 13), row("chimePriest", 1, 9, 16), row("lampHound", 1, 6, 16)],
-    factions: ["flatfolk", "pressed", "errata", "horary", "chandlers", "plan"],
+    factions: ["flatfolk", "pressed", "errata", "horary", "chandlers", "plan", "lampless", "noonVigil", "assize"],
     sites: { village: 0.054, ruin: 0, lair: 0.031, station: 0, historic: 0 },
     line: "A plain paved with pressed towns; from above you can read their names, and the Flatfolk would rather you didn't stand on them.",
   },
@@ -107,7 +111,7 @@ export const REGIONS = {
                 row("umbralEel", 2, 12, 19)],
     factions: ["unlit", "lampless"],
     sites: { village: 0.11, ruin: 0.17, lair: 0.094, station: 0, historic: 0 },
-    line: "Noon's shadow, burnt in and never lifted; the Lampless call it the only honest light.",
+    line: "The Horary calls it Noon's shadow, burnt in and never lifted; the Lampless call it the only honest light.",
   },
   stacks: {
     name: "the Stacks", tier: 5, music: "waste", sky: "haze", fog: 0.008, liquid: "water", encounterRate: 0.1,
@@ -123,7 +127,7 @@ export const REGIONS = {
     villages: 0,
     creatures: [row("rustbackScav", 5, 1, 10), row("rustbackSlinger", 2, 3, 10), row("ledgeSpider", 2, 3, 10), row("duskBat", 2, 3, 10),
                 row("brinehog", 1, 1, 8)],
-    factions: ["rustbacks", "plan"],
+    factions: ["rustbacks", "plan", "saltbeasts"],
     sites: { village: 0, ruin: 0.4, lair: 0, station: 0, historic: 0 },
     line: "Two Deepwright cuts that the Rustbacks reached first, and have been taking apart ever since.",
   },
@@ -140,7 +144,7 @@ export const REGIONS = {
     villages: 1,
     creatures: [row("kite", 3, 3, 14), row("ledgehorn", 3, 3, 14), row("barrowTroll", 1, 9, 16), row("duskBat", 2, 3, 14),
                 row("lampHound", 1, 6, 16), row("chandlerGuard", 1, 9, 16)],
-    factions: ["kites", "drovers", "chandlers", "saltbeasts"],
+    factions: ["kites", "drovers", "chandlers", "saltbeasts", "assize"],
     // (its crag village waits for sites on walk-in spans: docs/c1.md, integration requests)
     sites: { village: 0, ruin: 0, lair: 0, station: 0, historic: 0 },
     line: "A wall of crags that no road crosses but the Molar pass; the Kites cross it every morning to show that they can.",
@@ -156,9 +160,10 @@ export const REGIONS = {
   glassShore: {
     name: "the Glass Shore", tier: 4, music: "shore", sky: "glare", fog: 0.006, liquid: "brine", encounterRate: 0.1,
     villages: 1,
-    creatures: [row("glassCrab", 3, 9, 21), row("slagSalamander", 2, 9, 21), row("erratum", 2, 9, 21), row("mirrorEel", 2, 12, 21),
-                row("clatterer", 1, 9, 21)],
-    factions: ["clatter", "errata"],
+    // (its land is the Tessellate's or the Stacks': their kinds hold its tier-4 and tier-5 spans, the sea's the rest)
+    creatures: [row("glassCrab", 3, 15, 21), row("slagSalamander", 2, 15, 21), row("mirrorEel", 2, 15, 21), row("erratum", 2, 9, 21),
+                row("tileMimic", 2, 9, 16), row("pressHound", 1, 9, 16)],
+    factions: ["clatter", "errata", "assize"],
     sites: { village: 0.035, ruin: 0.021, lair: 0.04, station: 0.027, historic: 0 },
     line: "Where the sea gives up being liquid; the Clatter build their huts of its glass and can see who is coming.",
   },
@@ -168,7 +173,7 @@ export const REGIONS = {
     creatures: [row("rustbackScav", 3, 1, 10), row("brinehog", 2, 1, 8), row("saltrat", 1, 1, 7), row("cairnHound", 1, 3, 11),
                 row("kite", 1, 3, 14), row("assizeOutrider", 2, 6, 17), row("pressHound", 1, 9, 17), row("rustbackBrute", 1, 12, 17),
                 row("lensSentry", 1, 13, 17), row("pressedPilgrim", 1, 9, 17)],
-    factions: ["assize", "drovers", "survey"],
+    factions: ["assize", "drovers", "survey", "rustbacks", "saltbeasts", "kites", "plan", "pressed"],
     sites: { village: 0, ruin: 0, lair: 0, station: 0, historic: 0 },
     line: "The Deepwright road, laid true to the width of a hair; the milestones still count down to something.",
   },
@@ -177,14 +182,14 @@ export const REGIONS = {
     villages: 0,
     creatures: [row("assizeOutrider", 3, 6, 17), row("plumbknight", 1, 12, 19), row("assizer", 1, 12, 19), row("pressHound", 2, 9, 17),
                 row("paperWasps", 1, 9, 17), row("longshadow", 1, 12, 17)],
-    factions: ["assize"],
+    factions: ["assize", "saltbeasts", "unlit"],
     sites: { village: 0, ruin: 0, lair: 0, station: 0, historic: 0 },
     line: "The Assize's road from the Square, which goes round nothing on principle.",
   },
   glassCauseway: {
     name: "the Glass Causeway", tier: 5, music: "shore", sky: "glare", fog: 0.006, liquid: "water", encounterRate: 0.08,
     villages: 0,
-    creatures: [row("glassCrab", 3, 9, 22), row("erratum", 2, 9, 22), row("slagSalamander", 1, 12, 22), row("clatterer", 1, 9, 22)],
+    creatures: [row("glassCrab", 3, 12, 22), row("erratum", 2, 9, 22), row("slagSalamander", 1, 12, 22)],
     factions: ["clatter", "errata"],
     sites: { village: 0, ruin: 0, lair: 0, station: 0, historic: 0 },
     line: "A road laid over the glass to the Drowned Lantern; the sea on either side keeps its own counsel.",
@@ -202,7 +207,7 @@ export const REGIONS = {
     villages: 0,
     creatures: [row("umbralEel", 3, 12, 19), row("glowfin", 1, 9, 16), row("sporeling", 2, 9, 16), row("longshadow", 1, 12, 17),
                 row("pressHound", 1, 9, 16)],
-    factions: ["unlit", "flatfolk"],
+    factions: ["unlit", "flatfolk", "sporeMoot", "assize"],
     sites: { village: 0, ruin: 0, lair: 0, station: 0, historic: 0 },
     line: "Ink wells up black out of the Shade and runs to the sea; whoever wades it comes out written on.",
   },

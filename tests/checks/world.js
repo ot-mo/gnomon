@@ -35,6 +35,7 @@ import { LIQUIDS } from "../../src/content/liquids.js";
 import { FACTIONS } from "../../src/factions.js";
 import "../../src/content/factions.js";   // (registers the fixed factions into FACTIONS)
 import { biomeOf } from "../../src/content/biomes.js";
+import { WILDLIFE } from "../../src/content/creatures/wildlife.js";
 import { worldFns } from "../../src/gen/terrain.js";
 import { moodNames } from "../../src/music.js";
 import { CURRENCY } from "../../src/content/currency.js";
@@ -449,6 +450,8 @@ function checkRegions(problems, bibleText, seeds) {
       if (!(Array.isArray(row) && row.length === 4 && typeof row[0] === "string" && /^[a-z][A-Za-z]+$/.test(row[0]) && row[1] > 0
             && Number.isInteger(row[2]) && Number.isInteger(row[3]) && row[2] >= 1 && row[2] <= row[3] && row[3] <= 30)) bad(`${at}: creature row ${JSON.stringify(row)}`);
     for (const t of sp) if (!r.creatures.some(([, , a, b]) => t.level >= a && t.level <= b)) { bad(`${at}: nothing lives at level ${t.level}`); break; }
+    // A registered kind's factions (WS2's wildlife; C3 adds the rest) live there too.
+    for (const [type] of r.creatures) for (const f of WILDLIFE[type]?.factions || []) if (!r.factions?.includes(f)) bad(`${at}: ${type} is ${f}'s, which isn't among its factions`);
   }
   out.tiers = tiered;
   // §4.10's village quotas, read out of the bible's Village row; 16 in all.
