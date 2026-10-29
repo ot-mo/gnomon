@@ -1395,6 +1395,69 @@ export async function run(env) {
     stats.liquids = `${Object.keys(L).length} liquids (every faction's sacrament among them); a vial filled with brine; fresh water +2 HP; ink, Flat`;
   }
 
+  // --- 14b. C2's liquids and money (bible §3.1, §13.7) -------------------------------------------------------------------
+  // Every liquid is whole (a name, a colour, a vial's worth of 1-30 glim, its drink and touch words, its effects) and
+  // its sacrament list and the factions' `liquid` agree both ways; the effects hold bible §13.7's numbers, name only
+  // statuses the game has or the four it waits for, and where drinkLiquid already acts (heals, Flat, poison, night
+  // eyes) it does what the data says. The money's words and reference numbers are §3.1's.
+  {
+    const L = (await m("content/liquids.js")).LIQUIDS, { CURRENCY: CUR } = await m("content/currency.js"), ST = await m("status.js");
+    const WANTED = ["glowing", "nausea", "confused", "stuck"];   // statuses §13.7 needs that status.js hasn't (integration request)
+    const KNOWN = ["heal", "hurt", "status", "save", "burns", "douse", "clean", "ward", "stain", "draws", "shortcut", "dark", "seek", "reroll",
+      "shutdown", "transform", "seePlane", "rep", "again"];
+    let effects = 0;
+    for (const [id, d] of Object.entries(L)) {
+      if (d.sameAs) { if (!L[d.sameAs] || L[d.sameAs].sameAs) fail(`liquid ${id}: sameAs ${d.sameAs}`); continue; }
+      if (!d.name || d.color?.length !== 3 || !Number.isInteger(d.value) || d.value < 1 || d.value > 30 || !d.drink || !d.touch) fail(`liquid ${id} isn't whole: ${JSON.stringify(d).slice(0, 90)}`);
+      for (const f of d.sacramentOf || []) if (F.FACTIONS[f]?.liquid !== id) fail(`liquid ${id}: ${f}'s sacrament is ${F.FACTIONS[f]?.liquid}`);
+      for (const e of [...(d.effects?.drink || []), ...(d.effects?.touch || [])]) {
+        effects++;
+        if (!Object.keys(e).some((k) => KNOWN.includes(k))) fail(`liquid ${id}: an effect ${JSON.stringify(e)}`);
+        for (const s of [e.status, e.fail?.status].filter(Boolean)) if (!ST.STATUS_DEFS[s] && !WANTED.includes(s)) fail(`liquid ${id}: status ${s} isn't one`);
+      }
+      if (!Array.isArray(d.effects?.drink) || !Array.isArray(d.effects?.touch)) fail(`liquid ${id}: no effects`);
+    }
+    for (const f of Object.values(F.FACTIONS)) if (!f.hidden && L[f.liquid] && !L[f.liquid].sacramentOf?.includes(f.id)) fail(`${f.id}'s sacrament ${f.liquid} doesn't list it`);
+    const eff = (id, part, key) => (L[id].effects[part] || []).find((e) => e[key] !== undefined || e.status === key);
+    const bible = [   // bible §13.7: [liquid, part, finder, field, want]
+      ["glim", "drink", "glowing", "t", 10], ["glim", "touch", "burns", "burns", 6], ["brine", "drink", "nausea", "t", 3], ["brine", "touch", "ward", "ward", 3],
+      ["ink", "drink", "confused", "t", 5], ["ink", "drink", "flat", "t", 60], ["ink", "drink", "flat", "perTou", -3], ["ink", "touch", "stain", "stain", { sight: 2, t: 30 }],
+      ["umbra", "drink", "nightEyes", "t", 60], ["umbra", "drink", "blinded", "t", 20], ["quicksilver", "drink", "poisoned", "t", 6], ["sunwine", "drink", "heal", "heal", 6],
+      ["sunwine", "touch", "stuck", "t", 1], ["freshWater", "drink", "heal", "heal", 2], ["clearGlim", "drink", "seePlane", "seePlane", 1800],
+      ["clearGlim", "touch", "burns", "burns", 12], ["turnwater", "drink", "shutdown", "days", 1], ["turnwater", "touch", "transform", "transform", "sameTier"],
+    ];
+    for (const [id, part, key, field, want] of bible) {
+      const got = eff(id, part, key)?.[field];
+      if (JSON.stringify(got) !== JSON.stringify(want)) fail(`liquid ${id} ${part} ${key}.${field}: ${JSON.stringify(got)}, bible §13.7 ${JSON.stringify(want)}`);
+    }
+    if (eff("clearGlim", "drink", "rep")?.rep?.lampless !== -100 || L.clearGlim.value !== 5) fail("clear glim: Lampless −100 if seen, worth 5 a unit (bible §3.1, §13.7)");
+    // Where drinkLiquid acts today, it acts as the data says.
+    for (const id of ["freshWater", "sunwine", "longbackMilk", "mulchWine", "sap"]) {
+      fresh(1234, { genotype: "bent" });
+      p().hp = 1;
+      liquids.drinkLiquid(game, p(), id);
+      const want = 1 + eff(id, "drink", "heal").heal;
+      if (p().hp !== want) fail(`${id}: drinking it heals ${p().hp - 1}, the data says ${want - 1}`);
+    }
+    fresh(1234, { genotype: "bent" });
+    for (const [id, s] of [["quicksilver", "poisoned"], ["umbra", "nightEyes"]]) {
+      liquids.drinkLiquid(game, p(), id);
+      if (!p().status?.[s] || Math.abs(p().status[s].t - eff(id, "drink", s).t) > 0.01) fail(`${id}: ${s} ${p().status?.[s]?.t}, the data ${eff(id, "drink", s).t}`);
+    }
+    // The money: purses as flasks, the banks, the words, §3.1's anchors.
+    const A = CUR.anchors;
+    if (CUR.flasks.map((f) => f.size).join() !== CUR.purses.join() || CUR.flasks.map((f) => f.price).join() !== "0,150,450" || CUR.startPurse !== CUR.purses[0])
+      fail(`the flasks ${JSON.stringify(CUR.flasks.map((f) => [f.size, f.price]))}, bible §3.1: 200 at the start, 500 for 150, 1,000 for 450`);
+    if (CUR.banks.join() !== "F,H,D" || CUR.bankFee !== 0.05) fail(`the banks ${CUR.banks} at ${CUR.bankFee}, bible §3.1: Molar, Halfnight, Benchmark at 5%`);
+    for (const [k, s] of Object.entries(CUR.lines)) if (!s || s.length > 128) fail(`the money's line ${k}: "${s}"`);
+    const P = A.prices, S = A.sources;
+    if (P.throwingKnife !== 8 || P.bomb !== 20 || P.balmTonic !== 25 || P.copperShortSword !== 40 || P.ironLongsword !== 120 || P.innNight !== 10 ||
+        P.homingPip !== 300 || P.implant.join() !== "400,2000" || P.clearGlim !== 5 || S.questPerTier !== 25 || S.floorPiles.base !== 10 ||
+        S.floorPiles.perTier !== 4 || S.commonsLampPerDay !== 5 || A.torch.glim !== 1 || A.torch.hours !== 4) fail(`the money's anchors aren't bible §3.1's: ${JSON.stringify(A).slice(0, 120)}`);
+    stats.liquidsC2 = `${Object.keys(L).length - 1} liquids whole, ${effects} effects (statuses the game has, or ${WANTED.join(", ")}), ${bible.length} of §13.7's numbers; ` +
+      `drinkLiquid as the data for 5 heals, poison and night eyes; the money: 3 flasks, 3 banks at 5%, ${Object.keys(CUR.lines).length} lines, §3.1's anchors`;
+  }
+
   // --- 15. Shrines -------------------------------------------------------------------------------------------------------
   {
     fresh(1234, { genotype: "bent" });

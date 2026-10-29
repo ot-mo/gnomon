@@ -5,7 +5,8 @@
 //     domains:  { [domainId]: { noun, leaning, guild, profession, colour, rgb, practices, weapons, omens, ruins, cognomens,
 //                               relicNouns: [[noun, { kind, id }]], powers: [{ power: bonus | abilityId, text }] } }
 //                bible §8.2: a domain's lists colour every line its Hour writes, and its powers predict its relics
-//                (its four relic powers as §8.2 lists them; a bonus key nothing reads yet is an integration request: docs/c2.md);
+//                (its four relic powers as §8.2 lists them: a bonus of stats.js BONUS_KEYS, else an ability id; the ids nothing
+//                implements yet are integration requests, docs/c2.md);
 //                rgb is the colour's, for the Hour's cult (content/factions.js HOUR_CULT)
 //     eras:     [[domainId…] × 5]   the domains each period's Hours draw their first domain from (bible §8.3, end)
 //     factions: { [factionId]: { name, domains: [domainId] } }   the old factions an Hour can favour or hate (§8.1)
@@ -41,7 +42,7 @@ export const GRAMMAR = {
                    ["Maul", { kind: "weapon", id: "mace" }], ["Cellar Ring", { kind: "ring", id: "protection" }]],
       powers: [{ power: { wil: 2 }, text: "+2 WIL" }, { power: { resistPoison: 1 }, text: "poison passes over" },
                { power: "saltWard", text: "ward: ghosts and shades, 3 lines a day" },
-               { power: { neverBreaks: 1 }, text: "never breaks" }],
+               { power: "neverBreaks", text: "never breaks" }],
     },
     glass: {
       noun: "the glass", leaning: "deep", guild: "the glaziers", profession: "glazier", colour: "pale green", rgb: [170, 220, 180],
@@ -56,7 +57,7 @@ export const GRAMMAR = {
                    ["Pane", { kind: "armour", id: "scale" }], ["Eyeglass", { kind: "amulet", id: "sight" }]],
       powers: [{ power: { examine: 5 }, text: "+5 to examine" }, { power: "seeThrough", text: "see through 1 block of wall for 5 s" },
                { power: "lensFlash", text: "a flash: everything within 6 tiles blind for 3 s" },
-               { power: { reflectMissiles: 0.25 }, text: "reflects 25% of missiles" }],
+               { power: "reflectMissiles", text: "reflects 25% of missiles" }],
     },
     ink: {
       noun: "the ink", leaning: "flat", guild: "the scribes", profession: "scribe", colour: "indigo", rgb: [70, 75, 160],
@@ -71,7 +72,7 @@ export const GRAMMAR = {
                    ["Ledger", { kind: "amulet", id: "sight" }], ["Nib", { kind: "weapon", id: "dagger" }]],
       powers: [{ power: { int: 2 }, text: "+2 INT" }, { power: "halfMap", text: "each new floor half drawn on arrival" },
                { power: "markStruck", text: "what you strike stays on the map" },
-               { power: { outlineFlat: 1 }, text: "flat beings outlined in 3D" }],
+               { power: "outlineFlat", text: "flat beings outlined in 3D" }],
     },
     shade: {
       noun: "the shade", leaning: "dark", guild: "the gravewardens", profession: "gravewarden", colour: "violet", rgb: [150, 110, 190],
@@ -86,7 +87,7 @@ export const GRAMMAR = {
                    ["Spade", { kind: "weapon", id: "spear" }], ["Veil", { kind: "amulet", id: "dark" }]],
       powers: [{ power: { darkSight: 5 }, text: "see 5 tiles with the torch out" }, { power: { stealth: 0.3 }, text: "noticed 30% later" },
                { power: { darkRegen: 1 }, text: "a shade's death heals 1" },
-               { power: { ghostSight: 1 }, text: "see ghosts with the torch lit" }],
+               { power: "ghostSight", text: "see ghosts with the torch lit" }],
     },
     stairs: {
       noun: "the stair", leaning: "deep", guild: "the stair-builders", profession: "stair-builder", colour: "sky blue", rgb: [140, 190, 235],
@@ -101,7 +102,7 @@ export const GRAMMAR = {
                    ["Sandal", { kind: "amulet", id: "feather" }], ["Plumb", { kind: "ring", id: "accuracy" }]],
       powers: [{ power: { jump: 1 }, text: "+1 jump" }, { power: { featherFall: 1 }, text: "falls never hurt" },
                { power: "highStrike", text: "+50% damage from 2 blocks above" },
-               { power: { mapClimb: 2 }, text: "climb 2 blocks on the map" }],
+               { power: "mapClimb", text: "climb 2 blocks on the map" }],
     },
     rust: {
       noun: "the rust", leaning: "none", guild: "the smelters", profession: "smelter", colour: "rust red", rgb: [175, 80, 50],
@@ -116,7 +117,7 @@ export const GRAMMAR = {
                    ["Nail", { kind: "weapon", id: "dagger" }], ["Lock", { kind: "ring", id: "thorns" }]],
       powers: [{ power: { sunder: 1 }, text: "each hit takes 1 armour" }, { power: "rustGrip", text: "machines' grabs fail" },
                { power: "automatonBane", text: "double damage to automata" },
-               { power: { noCorrode: 1 }, text: "your gear never corrodes" }],
+               { power: "noCorrode", text: "your gear never corrodes" }],
     },
     wax: {
       noun: "the wax", leaning: "lamp", guild: "the chandlers", profession: "chandler", colour: "honey", rgb: [230, 180, 80],
@@ -131,7 +132,7 @@ export const GRAMMAR = {
                    ["Spear", { kind: "weapon", id: "spear" }], ["Hive", { kind: "amulet", id: "life" }]],
       powers: [{ power: { torch: 2 }, text: "torch radius +2" }, { power: "stickyStrike", text: "what you strike sticks for 1 s" },
                { power: "sealDoor", text: "seal a door shut once a floor" },
-               { power: { balmDouble: 1 }, text: "balms heal double" }],
+               { power: "balmDouble", text: "balms heal double" }],
     },
     gears: {
       noun: "the beat", leaning: "beat", guild: "the clockmen", profession: "clockman", colour: "brass", rgb: [200, 170, 90],
@@ -146,7 +147,7 @@ export const GRAMMAR = {
                    ["Bell", { kind: "amulet", id: "warding" }], ["Key", { kind: "ring", id: "haste" }]],
       powers: [{ power: "killHaste", text: "10 s of haste on a kill" }, { power: "beatSight", text: "the next spikes glow in 3D" },
                { power: "slowAura", text: "enemies within 3 tiles act 15% slower" },
-               { power: { beatCrit: 4 }, text: "every 4th second's strike is a sure crit" }],
+               { power: "beatCrit", text: "every 4th second's strike is a sure crit" }],
     },
     paper: {
       noun: "the fold", leaning: "flat", guild: "the folders", profession: "folder", colour: "cream", rgb: [235, 225, 200],
@@ -161,7 +162,7 @@ export const GRAMMAR = {
                    ["Fan", { kind: "weapon", id: "dagger" }], ["Folio", { kind: "armour", id: "leather" }]],
       powers: [{ power: "goFlat", text: "go flat for 4 s, every 30 s" }, { power: { cutsFlat: 1 }, text: "cut flat beings in 3D" },
                { power: "blink", text: "blink 3 tiles" },
-               { power: { slipGaps: 1 }, text: "slip under 1-block gaps" }],
+               { power: "slipGaps", text: "slip under 1-block gaps" }],
     },
     horn: {
       noun: "the horn", leaning: "deep", guild: "the herders", profession: "herder", colour: "bone", rgb: [225, 215, 190],
@@ -176,7 +177,7 @@ export const GRAMMAR = {
                    ["Brand", { kind: "weapon", id: "longsword" }], ["Yoke", { kind: "armour", id: "chain" }]],
       powers: [{ power: { str: 2 }, text: "+2 STR" }, { power: "chargeKnockback", text: "a sprinting charge knocks back 2 tiles" },
                { power: "bleedHit", text: "hits make the target bleed" },
-               { power: { saltbeastRep: 200 }, text: "Saltbeasts +200" }],
+               { power: "saltbeastFriend", text: "Saltbeasts +200" }],
     },
   },
 
