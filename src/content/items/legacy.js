@@ -12,6 +12,11 @@ import { CURRENCY } from "../currency.js";
 import { RULES } from "../../rules.js";
 import { receive, formatPrice, purseRoom } from "../../currency.js";
 import { hasKey } from "../../keyset.js";
+// The real world's gear (C4): the material ladder, the new classes and pieces (forge.js, plain tables), and making them
+// (gear.js: makeGear, randomGear, the tool kind). Everything below reads a material only from an item that has one
+// (`made`), so the parent's items, golden (b) and the legacy fights are as they were.
+import { GEAR_WEAPONS, GEAR_ARMOURS, MATERIALS, TEXT, VALUE, CLASSES, CLASS_OF, materialLine } from "./forge.js";
+import "./gear.js";
 
 // --- Potions ----------------------------------------------------------------
 // Each run shuffles which colour is which effect. Drinking one tells you, for the rest of the run.
@@ -111,6 +116,7 @@ export const WEAPONS = {
     held: { length: 0.82, pivot: 35 / 40, art: ["     w     ", "    wWs    ", ...rep("   wWWWs   ", 28), "ggggggggggg", " gGgGgGgGg ",
       ...alt("     h     ", "     H     ", 6), "    ppp    ", "     p     "] },
   },
+  ...GEAR_WEAPONS,   // C4: the bible's other classes (tier 0: not in the parent's loot)
 };
 export const WEAPON_PALETTE = PALETTE;
 
@@ -134,6 +140,7 @@ export const ARMOURS = {
   gauntlets: { name: "gauntlets",    armour: 1, str: 11, tier: 2, metal: true,  slot: "gloves" },
   sandals:   { name: "sandals",      armour: 0, str: 0,  tier: 1, metal: false, slot: "feet" },
   boots:     { name: "boots",        armour: 1, str: 8,  tier: 1, metal: false, slot: "feet" },
+  ...GEAR_ARMOURS,   // C4: bible §13.3's other pieces (each with a slot: not in the parent's loot)
 };
 
 // --- Bonuses ------------------------------------------------------------------------
@@ -271,16 +278,34 @@ function gearName(game, it) {
   const adj = props.filter((pr) => pr.adj).map((pr) => pr.adj + " ").join("");
   const suffix = props.filter((pr) => pr.suffix).map((pr) => " " + pr.suffix).join("");
   const el = it.element ? `${ELEMENTS[it.element].adj} ` : "";
+  const made = it.made && MATERIALS[it.made] ? `${MATERIALS[it.made].name} ` : "";   // C4: "saltsteel scale mail"
   const fixed = jewel && jewelTable(it)[it.id].fixed;
-  return `${it.known && it.ench && !fixed ? signed(it.ench) + " " : ""}${adj}${el}${base}${suffix}`;
+  return `${it.known && it.ench && !fixed ? signed(it.ench) + " " : ""}${adj}${el}${made}${base}${suffix}`;
 }
 // What the peddler charges at level 0 (deeper down, everything costs more: currency.js priceLevel).
 function gearPrice(it) {
   if (shines(it)) return 400;
   if (it.ench < 0 && it.known) return 5;
   const tier = isJewel(it) ? 3 : (it.kind === "weapon" ? WEAPONS : ARMOURS)[it.id].tier;
-  return 30 + tier * 30 + Math.max(0, it.ench) * 30 + (it.props?.length || 0) * 40 + (it.element ? 40 : 0);
+  // C4: forged gear is worth its class's copper value times its material's (forge.js VALUE, MATERIALS); the parent's
+  // gear (no material) the parent's 30 a tier.
+  const base = it.made && MATERIALS[it.made] ? Math.round((VALUE[it.id] || 30) * MATERIALS[it.made].value) : 30 + tier * 30;
+  return base + Math.max(0, it.ench) * 30 + (it.props?.length || 0) * 40 + (it.element ? 40 : 0);
 }
+// C4: what the real world's gear says beyond the parent's line (only for a forged item or a new piece, so the parent's
+// lines read as they did): the class's or piece's own line, then its material's. TEXT is examine's description.
+const isNew = (it) => !!(it.made || (it.kind === "weapon" ? GEAR_WEAPONS : GEAR_ARMOURS)[it.id]);
+function newInfo(it) {
+  if (!isNew(it)) return "";
+  const def = (it.kind === "weapon" ? WEAPONS : ARMOURS)[it.id], cls = it.kind === "weapon" && CLASSES[CLASS_OF[it.id]];
+  const parts = [cls?.info, def.info, it.made && materialLine(it.made)].filter(Boolean);
+  return parts.length ? " · " + parts.join(" · ") : "";
+}
+const materialDmg = (it) => (it.made ? MATERIALS[it.made]?.dmg || 0 : 0);
+const materialAv = (it) => (it.made ? MATERIALS[it.made]?.av || 0 : 0);
+const gearDetails = (info) => (game, it) => [TEXT[it.id], info(game, it)].filter(Boolean);
+// A forged item's colour: the metal letters of its art (and its glyph) in its material's.
+const shade = (c, k) => c.map((v) => Math.max(0, Math.min(255, Math.round(v * k))));
 const gearAura = (game, it) => (it.known || it.auraKnown ? (it.ench > 0 ? "good" : it.ench < 0 ? "bad" : "neutral") : null);
 // Every bonus of its own (a ring or amulet's power); properties and relic gifts are added by items.js
 // itemBonuses for any kind.
@@ -313,31 +338,38 @@ registerItemKind("scroll", {
   palette: () => ({ p: [[190, 165, 120], 0.1], P: [[235, 220, 180], 0.15] }),
   use: "read",
 });
+function weaponInfo(game, it) {
+  const w = WEAPONS[it.id], m = materialDmg(it);
+  const el = it.element ? ` · ${ELEMENTS[it.element].info}` : "";
+  return `${w.dmg[0] + m}-${w.dmg[1] + m} damage · ${w.swing}s per swing · reach ${w.reach}${w.thrust ? " · thrusts" : ""}${el}${extrasInfo(it)}${newInfo(it)} · needs ${strNeeded(it)} STR`;
+}
 registerItemKind("weapon", gear({
   slot: () => "hand", hands: (it) => WEAPONS[it.id].hands || 1, req: strReq, stands: true,
-  glyph: (game, it) => [")", shines(it) ? RELIC_COLOR : it.element ? ELEMENTS[it.element].color : [205, 210, 225]],
-  info(game, it) {
-    const w = WEAPONS[it.id];
-    const el = it.element ? ` · ${ELEMENTS[it.element].info}` : "";
-    return `${w.dmg[0]}-${w.dmg[1]} damage · ${w.swing}s per swing · reach ${w.reach}${w.thrust ? " · thrusts" : ""}${el}${extrasInfo(it)} · needs ${strNeeded(it)} STR`;
-  },
+  glyph: (game, it) => [")", shines(it) ? RELIC_COLOR : it.element ? ELEMENTS[it.element].color : it.made ? MATERIALS[it.made].color : [205, 210, 225]],
+  info: weaponInfo,
+  details: gearDetails(weaponInfo),
+  bonuses: (it) => ({ ...(it.made ? MATERIALS[it.made]?.bonus || {} : {}) }),   // C4: noonsilver cuts flat beings
   art: FLOOR_ART.weapon,
   palette(game, it) {
-    // A weapon with an element glows with it.
+    // A weapon with an element glows with it; a forged one is the colour of its material.
     const el = it.element && ELEMENTS[it.element];
     const color = el ? el.color : shines(it) ? RELIC_COLOR : null;
+    if (!color && it.made && MATERIALS[it.made]) { const c = MATERIALS[it.made].color; return { w: [shade(c, 1.1), 0], W: [c, 0], s: [shade(c, 0.55), 0], ...GOLD, ...GRIP }; }
     return color ? { ...STEEL, w: [color, 0.6], W: [color, 0.4], ...GOLD, ...GRIP } : { ...STEEL, ...GOLD, ...GRIP };
   },
 }));
+const armourInfo = (game, it) => `armour ${ARMOURS[it.id].armour + materialAv(it)}${extrasInfo(it)}${newInfo(it)}${ARMOURS[it.id].slot ? ` · worn on the ${{ arm: "arms", gloves: "hands" }[ARMOURS[it.id].slot] || ARMOURS[it.id].slot}` : ""} · needs ${strNeeded(it)} STR`;
 registerItemKind("armour", gear({
   slot: (it) => ARMOURS[it.id].slot || "body", req: strReq,
   bonuses: (it) => ({ ...(ARMOURS[it.id].bonus || {}) }),
-  glyph: (game, it) => ["[", shines(it) ? RELIC_COLOR : [175, 180, 195]],
-  info: (game, it) => `armour ${ARMOURS[it.id].armour}${extrasInfo(it)}${ARMOURS[it.id].slot ? ` · worn on the ${{ arm: "arms", gloves: "hands" }[ARMOURS[it.id].slot] || ARMOURS[it.id].slot}` : ""} · needs ${strNeeded(it)} STR`,
-  av: (it) => ARMOURS[it.id].armour + it.ench,   // stats.js av() adds up what's worn (not a bonus)
+  glyph: (game, it) => ["[", shines(it) ? RELIC_COLOR : it.made ? MATERIALS[it.made].color : [175, 180, 195]],
+  info: armourInfo,
+  details: gearDetails(armourInfo),
+  av: (it) => ARMOURS[it.id].armour + it.ench + materialAv(it),   // stats.js av() adds up what's worn (not a bonus); C4: + material
   art: FLOOR_ART.armour,
   palette(game, it) {
     if (shines(it)) return { d: [[150, 120, 50], 0.4], D: [RELIC_COLOR, 0.7] };
+    if (it.made && MATERIALS[it.made]) { const c = MATERIALS[it.made].color; return { d: [shade(c, 0.55), 0], D: [c, 0] }; }
     return ARMOURS[it.id].metal ? { d: [[80, 84, 98], 0], D: [[160, 165, 182], 0] } : { d: [[90, 55, 30], 0], D: [[150, 100, 60], 0] };
   },
 }));
