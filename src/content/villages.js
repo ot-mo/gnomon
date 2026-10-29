@@ -220,7 +220,7 @@ const dishBook = {
   "ash-baked ledgehorn": { note: "Baked under the ashes for a day. The horns are a garnish, not food.", bonus: { av: 1 }, text: "+1 armour" },
   "spore broth": { note: "The Moot's own recipe. Don't ask the Moot what's in it; it will tell you, slowly.", bonus: { maxHp: 2 }, text: "+2 max HP" },
   "shore crab boiled in brine": { note: "Never served to the Clatter, who would have questions.", bonus: { maxHp: 2 }, text: "+2 max HP" },
-  "dusk soup": { note: "Eaten cold and in the dark, as the recipe insists.", bonus: { darkSight: 2 }, text: "you see 2 tiles with the torch out" },
+  "dusk soup": { note: "Eaten cold and in the dark, as the recipe insists.", bonus: { darkSight: 2 }, text: "you see 3 tiles with the torch out" },
 };
 
 // The commons lamp (bible §3.1, §9.1): anyone may take 5 glim a day from it without giving offence; more costs 25
