@@ -1316,6 +1316,17 @@ export function checkGear(m) {
       const r3 = TN.injectTonic(game, q, "balm", seq(0.9));
       if (r3.save) fail("a balm after the last one's 3 s asked a save");
     }
+    // The hasp's crash, played out and skipped alike: paralysed 3 s after its 15, gone by 40.
+    {
+      const run = (skip) => {
+        const p = fresh(); TN.injectTonic(game, p, "ironbark", seq(0.9)); TN.injectTonic(game, p, "hasp", seq(0));
+        const at = (sec) => { if (skip) m.status.catchUpStatuses(game, p, sec); else for (let k = 0; k < Math.round(sec * 60); k++) m.status.tickStatuses(game, p, 1 / 60); };
+        at(16); const mid = +m.status.statusLeft(p, "paralyzed").toFixed(2);
+        at(24); return [mid, has(p, "paralyzed")];
+      };
+      const played = run(false), skipped = run(true);
+      if (JSON.stringify(played) !== JSON.stringify([2, false]) || JSON.stringify(skipped) !== JSON.stringify(played)) fail(`the hasp's crash: played ${JSON.stringify(played)}, skipped ${JSON.stringify(skipped)} (want 2 s left at 16 s, none at 40)`);
+    }
     // An overdone balm: a fresh one 30 s later... still nothing while the sickness lasts.
     {
       const p = fresh(); p.hp = 4;

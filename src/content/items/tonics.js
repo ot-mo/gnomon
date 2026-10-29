@@ -44,9 +44,22 @@ T("clearwit", "CLEARWIT", { t: 60, bonus: (s) => ({ examine: Math.round(5 * s.ma
 // Overdoses.
 T("sick", "SICK", { color: [170, 200, 110], kind: "bad", t: 30, flags: { noRegen: true }, ended: "Your stomach settles." });
 T("heavy", "SLOWED", { color: [160, 150, 120], kind: "bad", t: 20, speed: 0.5, ended: "Your legs are your own again." });
-T("crash", "HASP", { kind: "bad", t: 15, onEnd(game, e, s, why) {
-  if (why === "expired") { addStatus(game, e, "paralyzed", { t: 3 }); if (game && e === game.player) game.log("The hasp runs out all at once. You can't move.", [200, 120, 255]); }
-} });
+// The hasp's crash: when it runs out, 3 s paralysed. A skip over its end (status.js catchUpStatuses lists the statuses
+// before any runs, so it would never advance a paralysis added here) runs the paralysis for the time that is left.
+const CRASH = 3;
+const crash = (game, e, t) => {
+  if (t > 1e-9) addStatus(game, e, "paralyzed", { t });
+  if (game && e === game.player) game.log("The hasp runs out all at once. You can't move.", [200, 120, 255]);
+};
+T("crash", "HASP", { kind: "bad", t: 15,
+  onEnd(game, e, s, why) { if (why === "expired") crash(game, e, CRASH); },
+  catchUp(game, e, s, seconds) {
+    if (seconds < s.t - 1e-9) { s.t -= seconds; return; }
+    const after = seconds - s.t;
+    removeStatus(game, e, "tonic:crash");   // (removed, not expired: its onEnd stays quiet)
+    crash(game, e, CRASH - after);
+  },
+});
 
 const say = (game, p, text, color = [150, 220, 200]) => { if (game && p === game.player) game.log(text, color); };
 
