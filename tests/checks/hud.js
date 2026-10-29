@@ -14,7 +14,9 @@
 //      "DEPTH n" beat) don't toast.
 //   3. Overlays and describers: the map's layers and the inspect line's parts are registered in order;
 //      a registered overlay draws over the tiles, a registered describer adds its part, and both can be
-//      replaced. Drawing the map and describing every tile leaves the game's state as it was (pure).
+//      replaced. Drawing the map and describing every tile leaves the game's state as it was (pure). A prop
+//      (WS2b's zone.props; integrator, WS2b #7) on a seen floor tile is named on the inspect line and in the outdoor
+//      legend; on an unseen tile or one the map draws as wall, in neither.
 //   4. Hover: a hover held still on a seen tile of the map for 0.5 s (real time, through the game's real
 //      onHover and step) emits one `inspect` { zone, x, y, z, item?, creature?, open: false }; moving
 //      on starts again; an unseen tile, the 3D view and a screen over the map emit nothing.
@@ -209,7 +211,7 @@ export function checkHud({ game, startRun, inputHandlers, hud, renderMap, events
     fresh();
     const want = ["slam", "items", "markers", "route", "areas", "damage", "people", "sightings", "you"];
     if (renderMap.mapOverlays().join() !== want.join()) fail(`overlays: ${renderMap.mapOverlays()}`);
-    if (renderMap.describers().join() !== "tile,people,items,sightings,murals,markers") fail(`describers: ${renderMap.describers()}`);   // WS7: P0's five and WS7's "murals" (story/murals.js), nothing else
+    if (renderMap.describers().join() !== "tile,people,items,props,sightings,murals,markers") fail(`describers: ${renderMap.describers()}`);   // WS7: P0's five and WS7's "murals" (story/murals.js); integrator (WS2b #7): "props", approved by the user with the Phase 3 plan; nothing else
     const z = game.zone, p = game.player, tx = Math.floor(p.x), ty = Math.floor(p.y);
     z.seen[tx + ty * z.w] = 1;
     let drew = 0;
@@ -226,6 +228,32 @@ export function checkHud({ game, startRun, inputHandlers, hud, renderMap, events
     renderMap.registerDescriber("t:say", () => null, { order: 5 });
     game.debug.draw();
     if (capture.chars[sy * capture.cols + sx] !== "@" || renderMap.describeTile(game, { x: tx, y: ty }).startsWith("Test")) fail("re-registering an overlay or describer didn't replace it");
+    // Props (WS2b's zone.props; integrator, WS2b #7): one on a seen floor tile is named on the inspect line and in the
+    // outdoor legend; one on a tile you haven't seen, or on a tile the map draws as wall, in neither.
+    {
+      const FLOOR = 1, WALL = 2;   // (blocks.js KIND)
+      const near = [];
+      for (let r = 1; r <= 8; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+        const x = tx + dx, y = ty + dy, i = x + y * z.w;
+        if (Math.max(Math.abs(dx), Math.abs(dy)) === r && x > 0 && y > 0 && x < z.w - 1 && y < z.d - 1) near.push({ x, y, i, kind: z.kind[i] });
+      }
+      const floors = near.filter((t) => t.kind === FLOOR), wall = near.find((t) => t.kind === WALL);
+      if (floors.length < 2 || !wall || !z.hasSky) fail(`props: no two floor tiles and a wall near you on a zone with sky (${floors.length}, ${!!wall}, ${z.hasSky})`);
+      else {
+        const [a, b] = floors;
+        z.seen[a.i] = 1; z.seen[b.i] = 0; z.seen[wall.i] = 1;
+        z.props = [{ x: a.x + 0.5, y: a.y + 0.5, z: p.z, kind: "nest" }, { x: b.x + 0.5, y: b.y + 0.5, z: p.z, kind: "web" },
+                   { x: wall.x + 0.5, y: wall.y + 0.5, z: p.z, kind: "glassShard" }];
+        const lineA = renderMap.describeTile(game, a), lineB = renderMap.describeTile(game, b), lineW = renderMap.describeTile(game, wall);
+        renderMap.setMapLegendMode("on"); game.debug.draw();
+        const shown = Array.from({ length: capture.rows }, (_, y) => rowText(y)).join("\n");
+        renderMap.setMapLegendMode("auto");
+        const inLegend = { nest: /° +nest/.test(shown), web: /- +web\b/.test(shown), glass: /glass shard/.test(shown) };
+        if (!lineA.includes("A nest.") || lineB !== "Unexplored." || /glass shard/i.test(lineW) || !inLegend.nest || inLegend.web || inLegend.glass)
+          fail(`props: the inspect line "${lineA}" (want "A nest."), unseen "${lineB}", on a wall "${lineW}"; the legend ${JSON.stringify(inLegend)} (want the nest only)`);
+        else stats.props = `a nest named on the inspect line ("${lineA}") and in the legend; an unseen web and a glass shard on a wall in neither`;
+      }
+    }
     // Pure: drawing and describing every tile changes nothing.
     const stateOf = () => JSON.stringify({ t: game.time, ui: game.uiTime, p: [p.x, p.y, p.z, p.yaw, p.hp], msgs: game.messages.length, travel: game.travel,
       seen: z.seen.reduce((n, v, i) => (n + v * (i % 9973)) % 1e9, 0), items: z.items.map((it) => [it.x, it.y, it.kind]),

@@ -390,7 +390,9 @@ function drawLegend(x, y, game) {
 }
 
 // The legend outdoors: the ground looks you have seen here (the commonest first), the features you have seen
-// here (doors, stairs, levers…: the parent's legend rows), then what matters outdoors.
+// here (doors, stairs, levers…: the parent's legend rows), the props you have seen here (up to PROP_ROWS, the
+// commonest first, where there is room after the rest; integrator, WS2b #7), then what matters outdoors.
+const PROP_ROWS = 4;
 const FEATURES = [
   [KIND.DOOR, "+", [200, 130, 60], "door"], [KIND.LOCKED, "+", [240, 200, 80], "locked door"], [KIND.GATE, "|", [160, 165, 185], "gate"],
   [KIND.LEVER, "&", [210, 210, 220], "lever"], [KIND.STAIRS, ">", [255, 255, 255], "stairs down"], [KIND.STAIRS_UP, "<", [190, 220, 255], "stairs up"],
@@ -425,13 +427,27 @@ function drawTerrainLegend(x, y, game) {
   ];
   const features = FEATURES.filter(([k]) => kinds.has(k)).map(([, g, c, label]) => [g, c, label]);
   const lines = room - 2 - (legendHint ? 2 : 0);
-  const rows = [...ground.slice(0, Math.max(2, lines - fixed.length - features.length)), ...features, ...fixed].slice(0, Math.max(0, lines));
+  const props = seenProps(zone).slice(0, Math.max(0, Math.min(PROP_ROWS, lines - 2 - features.length - fixed.length)));
+  const rows = [...ground.slice(0, Math.max(2, lines - fixed.length - features.length - props.length)), ...features, ...props, ...fixed].slice(0, Math.max(0, lines));
   S.text(x, y, "LEGEND", 255, 255, 255);
   rows.forEach(([g, c, label], k) => {
     S.text(x, y + 2 + k, g, ...c);
     S.text(x + 4, y + 2 + k, label.slice(0, width), 170, 170, 170);
   });
   if (legendHint) S.text(x, S.rows - 3, `${legendHint}: legend`.slice(0, LEGEND_NARROW - 1), 120, 120, 120);
+}
+
+// The props the map shows you here (seen, on a tile it doesn't draw as wall), by kind, the commonest first:
+// [glyph, color, name without its article].
+function seenProps(zone) {
+  const counts = new Map();
+  for (const pr of zone.props || []) {
+    const P = PROPS[pr.kind], i = Math.floor(pr.x) + Math.floor(pr.y) * zone.w;
+    if (!P || !zone.seen[i] || zone.kind[i] === KIND.WALL) continue;
+    const e = counts.get(pr.kind) || { glyph: P.glyph, color: P.color, name: P.name.replace(/^an? /, ""), n: 0 };
+    e.n++; counts.set(pr.kind, e);
+  }
+  return [...counts.values()].sort((a, b) => b.n - a.n).map((e) => [e.glyph, e.color, e.name]);
 }
 
 // Map a screen cell to the tile under it.
@@ -528,6 +544,15 @@ registerDescriber("sightings", (game, tile, { zone }) => {
     }
   return out;
 }, { order: 40 });
+
+// The dressing's props on the tile (zone.props), by name, as the map draws them: not on a tile drawn as wall (a cliff
+// top's are 3D's). Integrator, WS2b #7.
+registerDescriber("props", (game, tile, { zone, i }) => {
+  if (zone.kind[i] === KIND.WALL) return null;
+  const names = new Set();
+  for (const pr of zone.props || []) if (PROPS[pr.kind] && Math.floor(pr.x) === tile.x && Math.floor(pr.y) === tile.y) names.add(PROPS[pr.kind].name);
+  return names.size ? [...names].map((n) => `${capitalize(n)}.`) : null;
+}, { order: 35 });
 
 registerDescriber("markers", (game, tile, { zone }) =>
   (zone.markers.some((m) => m.x === tile.x && m.y === tile.y) ? "Your marker." : null), { order: 50 });
