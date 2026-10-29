@@ -130,7 +130,6 @@ const byTerrain = {
   stacks: { peoples: ["plan"], style: "storey" },
   glassShore: { peoples: ["clatter", "errata"], style: "glass" },
   teeth: { peoples: ["kites", "hermits"], style: "cave" },
-  lattice: { peoples: ["plan"], style: "storey" },
   // the test world's fixture terrains
   hills: { peoples: ["farmers", "exiles"], style: "turf" },
   forest: { peoples: ["families", "sporeMoot"], style: "bark" },
@@ -147,6 +146,7 @@ const byTerrain = {
 //   canopy [a, b] pods on platforms a to b up, rope bridges between them that fold away at dusk
 //   storeys [a, b] a to b storeys of 4 blocks round a lift shaft you can fall down (the map shows one storey)
 //   cliff [a, b]  caves and eyries from a to b up a cliff, the market at the top
+// The highest floor of any style stays 10 up at most, so its 3-block walls and roof fit under the scenery cap of 14.
 const styles = {
   reed: { name: "reed houses on stilts, with boardwalks", wall: "REED", floor: "PLANK", roof: "THATCH", ground: "PLANK", lamp: "lamp",
     heights: { stilts: 1 }, boardwalks: true, views: "Boardwalks read as floor on the map; in 3D the brine under them is shallow water." },
@@ -167,7 +167,7 @@ const styles = {
   glass: { name: "huts of glass brick", wall: "GLASS", floor: "SAND", roof: "GLASS", ground: "SAND", lamp: "lamp",
     heights: {}, seeThrough: true, views: "You can see through the walls in 3D; on the map they're walls." },
   cave: { name: "caves and eyries up a cliff", wall: "ROCK", floor: "DIRT", roof: "ROCK", ground: "DIRT", lamp: "lamp",
-    heights: { cliff: [4, 12] }, marketAtTop: true, views: "A vertical climb; the market sits at the top." },
+    heights: { cliff: [4, 10] }, marketAtTop: true, views: "A vertical climb; the market sits at the top." },
 };
 
 // Building plans: a hall (the leader's), houses, a workshop. 5 rows deep; the door in the middle of the south row with
