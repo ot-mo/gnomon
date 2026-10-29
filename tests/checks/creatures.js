@@ -25,10 +25,11 @@
 //      villagers, waiting) has its six attributes and dv = its AGI modifier, levels within 1-30, its AI hook
 //      registered, and `needs` with its `rule`; every one of the 63 has its three registers (the Flat line a ledger's,
 //      the Dark line lower case without punctuation) within §15.9's 1,300 words, and a type's info is its Deep line;
-//      the real world's level table holds three kinds or more at every level 1-30; who is out for a Bent stranger
+//      the real world's level table holds three kinds or more at every level 1-30, every one from level 20 on out for a
+//      stranger; who is out for a Bent stranger
 //      at the start (the moths friendly while your torch burns, the longback and the chime-priest not, the outrider
 //      for the Bent only); the test world's villagers as before C3 (a DV term of 0, the tinker's general stock); and its
-//      teeth: seven mutants each fail it.
+//      teeth: eight mutants each fail it.
 //
 // game/startRun: the real game (game.js). srcFiles: [{ file, text }] of every src/ module.
 import { Zone, B, FLOOR_Z } from "../../src/world.js";
@@ -321,11 +322,17 @@ export function rosterProblems(game) {
   if (thin.length) fail(`the real world's level table is thin at ${thin.join(", ")}`);
   stats.levelPool = `${LEVEL_POOL.length} kinds; at levels 1-30 between ${Math.min(...Array.from({ length: 30 }, (_, k) => rowsAt(LEVEL_POOL, k + 1).length))} and ${Math.max(...Array.from({ length: 30 }, (_, k) => rowsAt(LEVEL_POOL, k + 1).length))}`;
 
-  // Who is out for a stranger at the start.
+  // Who is out for a stranger at the start; and from level 20 on (the draws request 1 sends to the level table) every
+  // kind of the level table is.
   const p = game.player, saved = { genotype: p.genotype, torch: p.torch, rep: game.state.rep };
   let felt = 0;
   try {
-    game.state.rep = {};
+    game.state.rep = {}; p.genotype = "bent"; p.torch = true;
+    const calm = new Set();
+    for (let L = 20; L <= 30; L++)
+      for (const [type] of rowsAt(LEVEL_POOL, L))
+        if (attitude(game, spawnCreature(type, 1, 1, FLOOR_Z, { rng: () => 0.5, level: L }), p) !== "hostile") calm.add(`${type} (level ${L})`);
+    if (calm.size) fail(`the level table holds kinds not out for a stranger from level 20 on: ${[...calm].slice(0, 4).join(", ")}`);
     for (const [id, want, set = {}] of FEELINGS) {
       if (!CREATURE_TYPES[id]) { fail(`feelings: ${id} isn't registered`); continue; }
       p.genotype = set.genotype || "bent"; p.torch = set.torch ?? true;
@@ -346,6 +353,7 @@ const MUTANTS = [
   ["a waiting creature in another's colour", () => { const t = CREATURES_WAITING.mirrorEel, old = t.color; t.color = CREATURES_WAITING.umbralEel.color; return () => { t.color = old; }; }, /share the glyph and colour/],
   ["the level table short at the top", () => { const out = LEVEL_POOL.filter(([id]) => id === "askewAngle" || id === "fold"); for (const r of out) LEVEL_POOL.splice(LEVEL_POOL.indexOf(r), 1);
     return () => LEVEL_POOL.push(...out); }, /thin at .*level 30/],
+  ["a neutral kind in the level table above 20", () => { LEVEL_POOL.push(["chimePriest", 1, 9, 24]); return () => LEVEL_POOL.pop(); }, /not out for a stranger from level 20 on: chimePriest/],
   ["a villager quicker than before C3", () => { const t = VILLAGERS.villager; t.attrs.agi = 18; t.dv = 1; return () => { t.attrs.agi = 16; t.dv = 0; }; }, /villagers villager: dv 1/],
   ["a creature of the 63 gone", () => { const v = CREATURES_WAITING.vesper; delete CREATURES_WAITING.vesper; return () => { CREATURES_WAITING.vesper = v; }; }, /vesper .*neither registered nor waiting/],
 ];
