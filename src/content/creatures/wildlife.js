@@ -422,24 +422,24 @@ export const WILDLIFE = {
   // --- The Lattice (§12.11) -------------------------------------------------------------------------------
   askewAngle: {
     name: "Askew angle", glyph: "A", color: [200, 220, 255], xp: 20, levels: [18, 30], weight: 3, factions: ["askew"],
-    hp: 26, speed: 3.0, damage: [5, 9], cooldown: 1.2, reach: 1.4, sight: 12, w: 0.8, h: 1.5, erratic: 0.3, ...d20(18, 20, 16, 16, 18, 10),
+    hp: 22, speed: 3.0, damage: [5, 8], cooldown: 1.2, reach: 1.4, sight: 12, w: 0.8, h: 1.5, erratic: 0.3, ...d20(18, 19, 16, 16, 18, 10),
     rule: { diagonal: true, jumps: "grid" }, needs: "moving only along diagonals and jumping between grid crossings; a shimmer at a wrong angle in 3D (ai.js, render3d.js)",
     frames: ART.angle, palette: { a: [[190, 215, 250], 0.6], E: [[255, 255, 255], 1.6] },
   },
   fold: {
     name: "fold", glyph: "A", color: [120, 230, 240], xp: 22, levels: [18, 30], weight: 2, factions: ["askew"],
-    hp: 24, speed: 3.2, damage: [5, 8], cooldown: 1.1, reach: 1.4, sight: 12, w: 0.8, h: 1.5, erratic: 0.4, ...d20(16, 20, 16, 14, 18, 10),
+    hp: 20, speed: 3.2, damage: [4, 8], cooldown: 1.1, reach: 1.4, sight: 12, w: 0.8, h: 1.5, erratic: 0.4, ...d20(16, 19, 16, 14, 18, 10),
     rule: { mirrors: "centre" }, needs: "its hit folding you to the mirror-image tile across the zone's centre (combat.js onHit, zones.js)",
     frames: ART.angle, palette: { a: [[110, 220, 235], 0.7], E: [[220, 255, 255], 1.6] },
   },
   latticeTroll: {
     name: "lattice troll", glyph: "T", color: [180, 220, 240], xp: 30, levels: [18, 30], weight: 2, factions: [],
-    hp: 50, speed: 2.0, damage: [8, 13], cooldown: 1.7, reach: 1.6, sight: 11, w: 1.3, h: 2.1, regen: 1, brittle: true, weak: ["fire"], ...d20(26, 10, 26, 6, 16, 6),
+    hp: 42, speed: 2.0, damage: [6, 11], cooldown: 1.7, reach: 1.6, sight: 11, w: 1.3, h: 2.1, regen: 1, brittle: true, weak: ["fire"], ...d20(24, 10, 24, 6, 16, 6),
     ...reskin("troll", { t: [[170, 210, 230], 0.3], l: [[120, 160, 200], 0.2], c: [[140, 180, 210], 0.2], C: [[200, 230, 245], 0.3] }),
   },
   planarQueen: {   // (the Flat Queen's rule, as the Twice-pressed legend has it: guardians.js "legend:twicePressed")
     name: "planar queen", glyph: "Q", color: [180, 140, 255], xp: 40, levels: [18, 30], weight: 1, flat: true, factions: [], ai: "legend:twicePressed",
-    hp: 60, speed: 1.8, damage: [4, 8], cooldown: 1.3, reach: 1.3, sight: 14, w: 1.2, h: 2.2, ...d20(18, 16, 22, 16, 22, 20),
+    hp: 40, speed: 1.8, damage: [3, 7], cooldown: 1.3, reach: 1.3, sight: 14, w: 1.2, h: 2.2, ...d20(16, 16, 20, 16, 22, 20),
     ...reskin("flatqueen", { p: [[90, 70, 170], 0.4] }),
   },
   // --- Anywhere: the Cast hunters (§12.12) ---------------------------------------------------------------
