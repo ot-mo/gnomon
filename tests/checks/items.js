@@ -1069,6 +1069,317 @@ export function checkItems(m) {
   return { name: "items", ok: problems.length === 0, problems, stats };
 }
 
+// --- C4: the real world's gear, tonics, artifacts, mutations and kits (owner C4; Phase 3) -----------------------------
+// checkGear(m) → { name: "gear", ok, problems, stats }: C4's own data, held to the bible's numbers written out here (not
+// read from the tables under test).
+//   1. The material ladder (bible §13.1): each material's tier, damage and armour; every weapon class in every material
+//      wielded and put away in both formula sets: the spec's material is the ladder's, the item line shows the range
+//      with it, the derived numbers come back exactly (the stat cache verified); noonsilver cuts flat while wielded; a
+//      forged armour piece in every material adds the ladder's armour; a piece that isn't forged takes none.
+//   2. Prices on bible §3.1's anchors (a copper short sword 40, an iron longsword 120, a balm tonic 25, a homing pip 300)
+//      and the names ("copper short sword", "saltsteel scale mail").
+//   3. randomGear by level (1-30, seeded): materials never above the zone's tier, the tier's own the commonest, heavy
+//      classes held back to their tier, only pieces that do something, never clothes, the same draws for the same seed;
+//      and the parent's randomEquipment never draws a new piece (golden (b) holds its numbers).
+//   4. The three switched-on artifacts: on, their bonus (and the HUD's status); off, gone.
+//   5. Marker chalk in both views: a mark on your tile in the zone's markers, a stick used; a second on the same tile and
+//      a tenth on the floor refused, nothing used.
+//   6. Tonics: each one's effect and its overdose; the second in a row's TOU save (a pass ends the one before, a failure
+//      overdoses); the Bent's half and bad reaction; the balm the same played out (1/60 s) and skipped.
+//   7. The kits: every background's character holds its bible pieces (forged in their material, the tonics, vials,
+//      chalk, the glimgun), each named.
+//   8. The waiting tables: the artifacts and relics with ARTIFACTS are bible §13.4's 30, the mutations with MUTATIONS
+//      §13.5's 40 (20 physical, 12 mental, 8 defects; the planar ones the bible's); none waiting is offered or laid as
+//      loot; each says what it needs; a relic has its three registers (the dark one lower case, no punctuation).
+export function checkGear(m) {
+  const problems = [], stats = {};
+  const fail = (msg) => problems.push(msg);
+  const { game, startRun } = m.game, I = m.items, Bd = m.body, St = m.stats, F = m.forge, GR = m.gear, TN = m.tonics, AR = m.artifacts, ARC = m.artifactTables;
+  const section = (name, fn) => { try { fn(); } catch (err) { fail(`${name}: threw ${err.stack?.split("\n").slice(0, 3).join(" / ") || err}`); } };
+  const entity = () => ({ body: Bd.makeBody("humanoid"), inv: [], attrs: St.makeAttrs(30), level: 1, maxHpGain: 0, hp: 20, perks: {}, status: {} });
+  const snap = (e) => JSON.stringify({ hp: St.maxHp(e), av: St.av(e), dv: St.dv(e), attrs: St.ATTRS.map((k) => St.attr(e, k)), b: St.bonusTable(e) });
+  const fresh = ({ view = "map", genotype = "plumb" } = {}) => {
+    startRun(7);
+    game.pages = null; game.pendingPages = null; game.story.cube = true; game.modeStack = [];
+    const s = game.run.world.start;
+    game.debug.enterZone(`${s.wx},${s.wy},3`, "down");
+    game.view = view; game.mode = view === "map" ? "map" : "explore"; game.paused = false;
+    game.zone.creatures = game.zone.creatures.filter((c) => c.talk);
+    const p = game.player;
+    p.genotype = genotype; p.status = {}; game.messages = [];
+    St.invalidateStats(p);
+    return p;
+  };
+  const seq = (...v) => { let i = 0; return () => v[Math.min(i++, v.length - 1)]; };
+
+  // Bible §13.1, written out: [material, tier, damage, armour].
+  const LADDER = [["bone", 1, -1, 0], ["copper", 2, 0, 0], ["iron", 3, 1, 0], ["saltsteel", 4, 2, 1], ["blackglass", 5, 3, 1],
+    ["truesteel", 6, 4, 2], ["pleatmetal", 7, 5, 2], ["noonsilver", 8, 6, 3]];
+
+  section("ladder", () => {
+    const ids = Object.keys(F.MATERIALS);
+    if (JSON.stringify(ids) !== JSON.stringify(LADDER.map((r) => r[0]))) fail(`materials ${ids.join(", ")}, want the bible's eight in order`);
+    for (const [id, tier, dmg, av] of LADDER) {
+      const d = F.MATERIALS[id];
+      if (!d || d.tier !== tier || d.dmg !== dmg || d.av !== av) fail(`${id}: tier ${d?.tier}, damage ${d?.dmg}, armour ${d?.av}; want ${tier}, ${dmg}, ${av}`);
+    }
+    let pieces = 0;
+    const undo = [];
+    for (const set of ["legacy", "attributes"]) {
+      const back = m.rules.overrideRules("stats", set);
+      St.STATS_DEBUG.verify = true;
+      try {
+        for (const id of Object.keys(I.WEAPONS)) for (const [mat, , dmg] of LADDER) {
+          const e = entity(), it = GR.makeGear("weapon", id, mat), before = snap(e);
+          if (it.made !== mat || it.material !== dmg) { fail(`${set}: makeGear weapon ${id} ${mat}: made ${it.made}, material ${it.material}`); continue; }
+          const r = Bd.equip(game, e, it, "hand_r");
+          if (!r.ok) { fail(`${set}: ${mat} ${id} won't go in hand (${r.reason})`); continue; }
+          const spec = m.combat.weaponSpec(e);
+          if (spec.material !== dmg) fail(`${set}: ${mat} ${id}: the spec's material is ${spec.material}, want ${dmg}`);
+          const w = I.WEAPONS[id], line = I.itemInfo(game, it);
+          if (!line.startsWith(`${w.dmg[0] + dmg}-${w.dmg[1] + dmg} damage`) || !line.includes(F.MATERIALS[mat].info)) fail(`${set}: ${mat} ${id}'s line: "${line}"`);
+          if ((St.bonus(e, "cutsFlat") > 0) !== (mat === "noonsilver")) fail(`${set}: ${mat} ${id}: cutsFlat ${St.bonus(e, "cutsFlat")}`);
+          if (!Bd.unequip(game, e, "hand_r").ok || snap(e) !== before) fail(`${set}: ${mat} ${id} on and off changed the derived numbers`);
+          pieces++;
+        }
+        for (const id of Object.keys(I.ARMOURS)) for (const [mat, , , av] of LADDER) {
+          const e = entity(), it = GR.makeGear("armour", id, mat), before = snap(e);
+          const forged = F.FORGED.armour.includes(id);
+          if (forged !== (it.made === mat)) { fail(`${set}: armour ${id} in ${mat}: made ${it.made}, forged ${forged}`); continue; }
+          const part = Bd.slotsFor(e, it)[0];
+          const plain = { kind: "armour", id, ench: 0, known: true }, pe = entity();
+          if (!Bd.equip(game, pe, plain, part).ok || !Bd.equip(game, e, it, part).ok) { fail(`${set}: ${mat} ${id} won't go on ${part}`); continue; }
+          if (St.av(e) - St.av(pe) !== (forged ? av : 0)) fail(`${set}: ${mat} ${id}: armour ${St.av(e)} against ${St.av(pe)} plain, want +${forged ? av : 0}`);
+          if (!Bd.unequip(game, e, part).ok || snap(e) !== before) fail(`${set}: ${mat} ${id} on and off changed the derived numbers`);
+          pieces++;
+        }
+      } finally { St.STATS_DEBUG.verify = false; back(); }
+    }
+    for (const u of undo) u();
+    stats.ladder = `${pieces} pieces in their materials, on and off, in both formula sets (${Object.keys(I.WEAPONS).length} classes, ${F.FORGED.armour.length} forged armours)`;
+  });
+
+  section("prices", () => {
+    const want = [[GR.makeGear("weapon", "shortsword", "copper"), 40, "copper short sword"], [GR.makeGear("weapon", "longsword", "iron"), 120, "iron longsword"],
+      [GR.makeGear("armour", "scale", "saltsteel"), Math.round(110 * 2), "saltsteel scale mail"], [{ kind: "tonic", effect: "balm" }, 25, "balm tonic"]];
+    for (const [it, price, name] of want) {
+      if (I.itemPrice(it) !== price || I.itemName(game, it) !== name) fail(`${name}: ${I.itemName(game, it)} at ${I.itemPrice(it)}, want ${name} at ${price}`);
+    }
+    if (ARC.ARTIFACTS_WAITING.homingPip.value !== 300) fail(`the homing pip's value ${ARC.ARTIFACTS_WAITING.homingPip.value}, want 300`);
+    // Up the ladder, worth more at every rung.
+    const ladder = LADDER.map(([mat]) => I.itemPrice(GR.makeGear("weapon", "longsword", mat)));
+    if (ladder.some((v, k) => k && v <= ladder[k - 1])) fail(`a longsword's price up the ladder: ${ladder.join(", ")}`);
+    stats.prices = `copper short sword 40, iron longsword 120, saltsteel scale mail 220, balm 25; a longsword ${ladder.join(" / ")}`;
+  });
+
+  section("randomGear", () => {
+    const tierOf = (level) => Math.min(8, Math.ceil((level + 1) / 3));
+    const HEAVY = { greatsword: 4, maul: 4, glaive: 4, waraxe: 3, longsword: 3 };
+    const tally = {};
+    for (let level = 1; level <= 30; level++) {
+      const tier = tierOf(level), rng = m.rng.makeRng(4100 + level), mats = {};
+      for (let k = 0; k < 400; k++) {
+        const it = GR.randomGear(rng, level);
+        if (!I.ITEM_KINDS[it.kind] || !(it.kind === "weapon" ? I.WEAPONS : I.ARMOURS)[it.id]) { fail(`level ${level}: drew ${JSON.stringify(it)}`); continue; }
+        if (it.id === "clothes") fail(`level ${level}: drew plain clothes`);
+        if (!GR.useful(it.kind, it.id)) fail(`level ${level}: drew ${it.id}, which does nothing yet`);
+        if (it.made) {
+          mats[it.made] = (mats[it.made] || 0) + 1;
+          if (F.MATERIALS[it.made].tier > tier) fail(`level ${level} (tier ${tier}): ${it.made} (tier ${F.MATERIALS[it.made].tier})`);
+          if (it.kind === "weapon" && it.material !== F.MATERIALS[it.made].dmg) fail(`level ${level}: ${it.made} ${it.id} with material ${it.material}`);
+        } else if (it.kind === "weapon") fail(`level ${level}: a weapon with no material`);
+        if (HEAVY[it.id] > tier) fail(`level ${level} (tier ${tier}): a ${it.id} before tier ${HEAVY[it.id]}`);
+        if (I.ARMOURS[it.id]?.tier > tier && !F.FORGED.armour.includes(it.id)) fail(`level ${level}: ${it.id} of tier ${I.ARMOURS[it.id].tier}`);
+      }
+      const top = Object.entries(mats).sort((a, b) => b[1] - a[1])[0]?.[0];
+      const own = LADDER.find((r) => r[1] === tier)[0];
+      if (top !== own) fail(`level ${level} (tier ${tier}): the commonest material is ${top} (${JSON.stringify(mats)}), want ${own}`);
+      tally[level] = top;
+    }
+    const a = [], b = [];
+    for (let k = 0, r1 = m.rng.makeRng(9), r2 = m.rng.makeRng(9); k < 50; k++) { a.push(GR.randomGear(r1, 12)); b.push(GR.randomGear(r2, 12)); }
+    if (JSON.stringify(a) !== JSON.stringify(b)) fail("randomGear: two draws from the same seed differ");
+    // The parent's loot: nothing new, ever.
+    const fresh = new Set([...Object.keys(F.GEAR_WEAPONS), ...Object.keys(F.GEAR_ARMOURS)]);
+    let parent = 0;
+    for (let depth = 1; depth <= 20; depth++) {
+      const rng = m.rng.makeRng(700 + depth);
+      for (let k = 0; k < 200; k++, parent++) { const it = I.randomEquipment(rng, depth); if (fresh.has(it.id) || it.made) fail(`randomEquipment at depth ${depth} drew ${it.id}${it.made ? ` in ${it.made}` : ""}`); }
+    }
+    stats.randomGear = `30 levels × 400 draws; the commonest material by tier: ${[1, 4, 7, 10, 13, 16, 19, 22].map((l) => `${tierOf(l)} ${tally[l]}`).join(", ")}; randomEquipment ${parent} draws, none new`;
+  });
+
+  section("switched on", () => {
+    const p = fresh(), out = {};
+    for (const [id, key, n] of [["featherfallLantern", "featherFall", 1], ["jumpSprings", "jump", 2], ["mirrorShield", "ward", 3]]) {
+      const it = { kind: "artifact", id, known: true, cell: { id: "glim", charge: 2500 } };
+      p.inv.push(it);
+      const before = St.bonus(p, key);
+      const t1 = AR.useArtifact(game, p, it), on = St.bonus(p, key) - before, hud = m.status.statusLine(game, p).some((s) => s.text === ARC.ARTIFACTS[id].name.toUpperCase());
+      const t2 = AR.useArtifact(game, p, it), off = St.bonus(p, key) - before;
+      if (!(t1 > 0) || on !== n || !hud || !(t2 > 0) || off !== 0) fail(`${id}: on +${on} ${key} (want +${n}), HUD ${hud}; off +${off}`);
+      out[id] = `+${on} ${key}`;
+      p.inv.splice(p.inv.indexOf(it), 1);
+    }
+    stats.switchedOn = out;
+  });
+
+  section("marker chalk", () => {
+    const out = {};
+    for (const view of ["map", "3d"]) {
+      const p = fresh({ view }), z = game.zone;
+      z.markers.length = 0;
+      const chalk = { kind: "tool", effect: "markerChalk", count: 3 };
+      p.inv.push(chalk);
+      const t = I.useItem(game, p, chalk), x = Math.floor(p.x), y = Math.floor(p.y);
+      const marked = z.markers.some((mk) => mk.x === x && mk.y === y);
+      const again = I.useItem(game, p, chalk);
+      for (let k = 0; z.markers.length < 9; k++) z.markers.push({ x: k, y: 0 });
+      p.x += 1;
+      const full = I.useItem(game, p, chalk);
+      if (!(t > 0) || !marked || chalk.count !== 2 || again !== 0 || full !== 0 || z.markers.length !== 9) fail(`${view}: chalk ${t} s, marked ${marked}, ${chalk.count} left, again ${again}, a tenth ${full}`);
+      out[view] = `a mark at (${x}, ${y}), ${chalk.count} sticks left`;
+    }
+    stats.chalk = out;
+  });
+
+  section("tonics", () => {
+    const out = {};
+    const has = (p, id) => m.status.hasStatus(p, id);
+    const expect = {
+      balm: (p, h0) => p.hp - h0 === 12, hasp: (p) => m.status.statusLeft(p, "hasted") === 15, gloam: (p) => St.bonus(p, "darkSight") === 3 && St.bonus(p, "stealth") === 0.3,
+      ironbark: (p) => St.bonus(p, "av") === 2 && St.bonus(p, "str") === 2, foldSap: (p) => has(p, "flat"), clearwit: (p) => St.bonus(p, "examine") === 5 && St.bonus(p, "int") === 2,
+    };
+    const od = {
+      balm: (p) => has(p, "tonic:sick"), hasp: (p) => has(p, "hasted") && has(p, "tonic:crash"), gloam: (p) => has(p, "blinded"),
+      ironbark: (p) => has(p, "tonic:heavy"), foldSap: (p) => m.status.statusLeft(p, "flat") === 60, clearwit: () => !game.zone.seen.some(Boolean),
+    };
+    if (JSON.stringify(Object.keys(TN.TONICS)) !== JSON.stringify(Object.keys(expect))) fail(`tonics ${Object.keys(TN.TONICS).join(", ")}, want bible §13.8's six`);
+    for (const id of Object.keys(expect)) {
+      let p = fresh(); p.hp = 4;
+      const h0 = p.hp, it = { kind: "tonic", effect: id, count: 2 };
+      p.inv.push(it);
+      const t = I.useItem(game, p, it);
+      if (id === "balm") for (let k = 0; k < 200; k++) m.status.tickStatuses(game, p, 1 / 60);
+      if (t !== m.rules.RULES.body.drinkTime || it.count !== 1 || !expect[id](p, h0)) fail(`${id}: ${t} s, ${it.count} left, its effect ${expect[id](p, h0)} (${JSON.stringify(Object.keys(p.status))})`);
+      p = fresh(); game.zone.seen.fill(1);
+      TN.injectTonic(game, p, "ironbark", () => 0.9);
+      const r = TN.injectTonic(game, p, id, seq(0));   // nat 1: the second in a row fails its save
+      if (!r.overdose || r.save?.dc !== 15 || !od[id](p) || has(p, "tonic:ironbark")) fail(`${id} overdosed: ${JSON.stringify(r)}, its overdose ${od[id](p)}, ironbark ${has(p, "tonic:ironbark")}`);
+      out[id] = "ok";
+    }
+    // A pass (nat 20 against 15) ends the one before and the new one works; the third in a row asks 18.
+    {
+      const p = fresh();
+      TN.injectTonic(game, p, "ironbark", () => 0.9);
+      const r = TN.injectTonic(game, p, "gloam", seq(0.99));
+      const r3 = TN.injectTonic(game, p, "clearwit", seq(0.99));
+      if (r.overdose || has(p, "tonic:ironbark") || has(p, "tonic:clearwit") === false || r3.save?.dc !== 18 || has(p, "tonic:gloam")) fail(`the chain: ${JSON.stringify([r, r3])}, ${JSON.stringify(Object.keys(p.status))}`);
+    }
+    // The Bent: half, and the bad reaction.
+    {
+      let p = fresh({ genotype: "bent" }); p.hp = 4;
+      TN.injectTonic(game, p, "balm", seq(0.9));
+      m.status.catchUpStatuses(game, p, 5);
+      const ironbark = (TN.injectTonic(game, (p = fresh({ genotype: "bent" })), "ironbark", seq(0.9)), St.bonus(p, "av"));
+      p = fresh({ genotype: "bent" });
+      const bad = TN.injectTonic(game, p, "hasp", seq(0.01));
+      if (bad.k !== 0.5 || !bad.overdose || !has(p, "tonic:crash") || ironbark !== 1) fail(`the Bent: ironbark +${ironbark} armour, a bad reaction ${JSON.stringify(bad)}`);
+      out.bent = `ironbark +${ironbark} armour, bad reaction on 0.01`;
+    }
+    // The balm played out and skipped heal the same.
+    {
+      const a = fresh(); a.hp = 3; TN.injectTonic(game, a, "balm", seq(0.9));
+      for (let k = 0; k < 6 * 60; k++) m.status.tickStatuses(game, a, 1 / 60);
+      const played = a.hp;
+      const b = fresh(); b.hp = 3; TN.injectTonic(game, b, "balm", seq(0.9));
+      m.status.catchUpStatuses(game, b, 6);
+      if (played !== 15 || b.hp !== 15) fail(`the balm: played out to ${played}, skipped to ${b.hp}, want 15 both`);
+      out.balmExact = `${played} and ${b.hp}`;
+    }
+    stats.tonics = out;
+  });
+
+  section("kits", () => {
+    const C = m.chargen, BG = m.backgrounds.BACKGROUNDS, out = {};
+    const WANT = {
+      reedcutter: [["weapon", "handAxe", "copper"], ["armour", "reedCloak"], ["tonic", "balm", null, 2]],
+      mothTender: [["weapon", "lanternFlail", "copper"]],
+      mesaRunner: [["weapon", "dagger", "bone"], ["armour", "stiltSandals"], ["knife", null, null, 6], ["missile", "sling"]],
+      droversChild: [["weapon", "shortsword", "copper"]],
+      hushNovice: [["weapon", "dagger", "bone"], ["vial", "umbra"]],
+      pressedPilgrim: [["weapon", "staff", "bone"], ["armour", "mapCase"], ["vial", "ink", null, 3], ["tool", "markerChalk", null, 12]],
+      archivistOfVey: [["weapon", "stylus", "bone"], ["armour", "examiningKit"]],
+      surveyorOfVey: [["armour", "mapCase"], ["missile", "boltBow"], ["ammo", "bolt", null, 20]],
+      forgehandOfOrrum: [["weapon", "mace", "iron"], ["armour", "leather"]],
+      aspirantOfTheRule: [["weapon", "longsword", "iron"], ["armour", "chain", "iron"], ["armour", "assizeWrit"]],
+      lamplighterOfCassin: [["artifact", "glimgun"]],
+      nightWardenOfCassin: [["weapon", "dagger", "copper"]],
+    };
+    for (const [bg, want] of Object.entries(WANT)) {
+      const B = BG[bg], p = C.makeCharacter({ genotype: B.genotype, background: bg, attrs: C.suggestSpread(B.genotype, bg), name: "Test", mode: "oneWick" });
+      const all = [...Object.values(p.body.equip).filter((v) => v && typeof v === "object"), p.body.belt, ...p.inv].filter(Boolean);
+      for (const [kind, id, made, count] of want) {
+        const it = all.find((x) => x.kind === kind && (id === null || x.id === id || x.effect === id) && (!made || x.made === made));
+        if (!it) { fail(`${bg}: no ${made ? made + " " : ""}${kind} ${id || ""}`); continue; }
+        if (count && it.count !== count) fail(`${bg}: ${count} ${id || kind} wanted, ${it.count} in the kit`);
+        if (made && it.kind === "weapon" && it.material !== F.MATERIALS[made].dmg) fail(`${bg}: a ${made} ${id} with material ${it.material}`);
+      }
+      for (const it of all) { const n = I.itemName(game, it); if (!n || /undefined|NaN/.test(n)) fail(`${bg}: a kit piece named ${JSON.stringify(n)}`); }
+      out[bg] = all.map((it) => I.itemName(game, it)).join(", ");
+    }
+    if (BG.nightWardenOfCassin && !(BG.nightWardenOfCassin.kit.belt?.made === "copper")) fail("the Night-warden's second copper dagger is not on the belt");
+    stats.kits = out;
+  });
+
+  section("waiting", () => {
+    const ART = ["homingPip", "programmablePip", "plumbBob", "theodolite", "lanternMote", "snuffer", "shadowLamp", "paneCutter", "unpressLens",
+      "handPress", "echoBell", "bridgeReel", "featherfallLantern", "jumpSprings", "glimgun", "lancet", "forcePane", "mirrorShield", "stillDial",
+      "foldKnife", "beatBox", "turnKey", "kiteDrone", "inkStamp", "quicksilverLevel", "heightLens", "recallBead", "rotationPip", "noonglass", "greatTheodolite"];
+    const live = ARC.ARTIFACTS, wait = ARC.ARTIFACTS_WAITING;
+    const have = new Set([...Object.keys(live), ...Object.keys(wait)]);
+    for (const id of ART) if (!have.has(id)) fail(`artifact ${id} (bible §13.4) is in neither table`);
+    if (have.size !== ART.length) fail(`${have.size} artifacts and relics, want the bible's ${ART.length}`);
+    for (const id in wait) {
+      const d = wait[id];
+      if (live[id]) fail(`${id} is both live and waiting`);
+      if (!(typeof d.needs === "string" && d.needs.length > 10) || !d.name || !d.info) fail(`waiting artifact ${id}: name, info and needs`);
+      if (d.relic && !(d.flat && d.deep && /^[a-z \n]+$/.test(d.dark || ""))) fail(`relic ${id}: its three registers (dark "${d.dark}")`);
+    }
+    const MUT = { physical: ["shellback", "thistlehide", "extraArms", "wings", "stiltLegs", "geckoPads", "lampskin", "nightEyes", "diggingHands", "regeneration",
+      "spareHeart", "bellowsThroat", "inkGlands", "flatwise", "deepEyes", "heavyBones", "gills", "horns", "silkGlands", "echoThroat"],
+      mental: ["foldStep", "overlook", "shadowsense", "kindle", "snuff", "endear", "muddle", "forcePlane", "timeLag", "foresight", "backglass", "readhand"],
+      defect: ["lightsick", "brittleBones", "shadowless", "mothKissed", "sleepwalker", "crookedManner", "beatDeaf", "darkFear"] };
+    const PLANAR = ["wings", "stiltLegs", "geckoPads", "lampskin", "nightEyes", "inkGlands", "flatwise", "deepEyes", "heavyBones", "gills", "silkGlands", "echoThroat",
+      "foldStep", "overlook", "shadowsense", "kindle", "snuff", "forcePlane", "foresight"];
+    const REFUND = { lightsick: 2, brittleBones: 3, shadowless: 3, mothKissed: 2, sleepwalker: 2, crookedManner: 2, beatDeaf: 3, darkFear: 3 };
+    const MU = m.mutationsContent, all = { ...MU.MUTATIONS, ...MU.MUTATIONS_WAITING };
+    for (const [kind, ids] of Object.entries(MUT)) for (const id of ids) {
+      const d = all[id];
+      if (!d) { fail(`mutation ${id} (bible §13.5) is in neither table`); continue; }
+      if (d.kind !== kind) fail(`${id}: ${d.kind}, want ${kind}`);
+      if (!!d.planar !== PLANAR.includes(id)) fail(`${id}: planar ${!!d.planar}`);
+      if (kind === "defect" ? d.cost !== -REFUND[id] : d.cost !== 4) fail(`${id}: cost ${d.cost}`);
+      if (MU.MUTATIONS[id] && MU.MUTATIONS_WAITING[id]) fail(`${id} is both live and waiting`);
+      if (MU.MUTATIONS_WAITING[id] && !(typeof d.needs === "string" && d.needs.length > 10)) fail(`waiting mutation ${id} says nothing of what it needs`);
+      for (const x of d.excludes || []) if (!all[x]) fail(`${id} excludes ${x}, which is no mutation`);
+      if (typeof d.info(1) !== "string" || typeof d.info(10) !== "string") fail(`${id}: info`);
+    }
+    if (Object.keys(all).length !== 40) fail(`${Object.keys(all).length} mutations, want the bible's 40`);
+    // None waiting is offered: 300 seeded offers to a fresh Bent with creases to spare.
+    const p = fresh({ genotype: "bent" }); p.mutations = {}; p.creases = 99;
+    let offered = 0;
+    for (let k = 0; k < 300; k++) for (const id of m.mutations.mutationOffers(game, p, m.rng.makeRng(k))) { offered++; if (MU.MUTATIONS_WAITING[id]) fail(`a waiting mutation offered: ${id}`); }
+    // ...nor laid as loot.
+    let mods = 0;
+    for (let k = 0, rng = m.rng.makeRng(5); k < 2000; k++) { const it = AR.randomBodyMod(rng, 1 + (k % 30)); mods++; if (it.kind === "artifact" && wait[it.id]) fail(`randomBodyMod laid a waiting ${it.id}`); }
+    stats.waiting = `${Object.keys(live).length} artifacts live and ${Object.keys(wait).length} waiting (${Object.values(wait).filter((d) => d.relic).length} relics); ` +
+      `${Object.keys(MU.MUTATIONS).length} mutations live and ${Object.keys(MU.MUTATIONS_WAITING).length} waiting; ${offered} offers and ${mods} loot draws, none waiting`;
+  });
+
+  return { name: "items: C4's gear", ok: problems.length === 0, problems, stats };
+}
+
 // tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser).
 export async function run(env) {
   const { S, capture, resize } = await env.screen({ cols: 180, rows: 56 });
@@ -1085,5 +1396,9 @@ export async function run(env) {
   ]);
   m.implantTable = (await env.src("content/items/implants.js")).IMPLANTS;
   m.artifactTable = (await env.src("content/items/artifacts.js")).ARTIFACTS;
-  return checkItems(m);
+  // C4's (checkGear): its tables and the modules it drives.
+  await Promise.all([load("forge", "content/items/forge.js"), load("gear", "content/items/gear.js"), load("tonics", "content/items/tonics.js"),
+    load("artifactTables", "content/items/artifacts.js"), load("mutationsContent", "content/mutations.js"), load("mutations", "progression/mutations.js"),
+    load("chargen", "progression/chargen.js"), load("backgrounds", "content/backgrounds.js")]);
+  return [checkItems(m), checkGear(m)];
 }
