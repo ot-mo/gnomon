@@ -58,7 +58,7 @@ const fill = (text, vars) => text.replace(/\{(\w+)\}/g, (m, k) => (vars[k] ?? m)
 export function generateVillage(run, site) {
   const rng = makeRng(seedFor(run.seed, "run", "villages", site.id));
   const V = VILLAGES, tile = run.world?.tileAt?.(site.at.wx, site.at.wy);
-  const terr = V.byTerrain[tile?.terrain] || V.byTerrain[tile?.region] || V.byTerrain.downs;
+  const terr = V.byTerrain[tile?.region] || V.byTerrain[tile?.terrain] || V.byTerrain.downs;   // (the region first: a Glass-shore village on Tessellate ground is the Glass Shore's; integrator, C2 #1, C1a #8)
   const peopleId = rng.pick(terr.peoples), people = V.peoples[peopleId], style = terr.style;
   const tier = site.tier || tile?.tier || 1, level = levelOfTier(tier);
 

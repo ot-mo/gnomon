@@ -798,6 +798,29 @@ export async function run(env) {
       const open = talk.talkTo(game, mix).options.find((o) => /what you have/.test(o.label))?.go();
       if (open?.trade !== "theirs") fail(`a Grey merchant's pack opens on ${JSON.stringify(open?.trade ?? open?.shop)}, want the trade screen on theirs (WS6b)`);
     }
+    // A faction's own greeting (C2's lines.greet; integrator, C2 #2): a Grey talker of it says its line, without " New
+    // face."; a village's person (the village's own faction has no lines) their people's faction's; curt, the role's.
+    {
+      game.state.rep = {};
+      const fid = Object.keys(F.FACTIONS).find((id) => F.FACTIONS[id].lines?.greet?.indifferent), own = F.FACTIONS[fid]?.lines.greet.indifferent;
+      const t1 = talk.talkTo(game, person("mira", "villager", fid)).text;
+      const vp = person("mira", "villager", null); vp.faction = { "village:test": 1, [fid]: 0.3 };
+      const t2 = talk.talkTo(game, vp).text;
+      const cp = person("mira", "villager", fid); cp.brain = { grudges: { player: 1 } };
+      const t3 = talk.talkTo(game, cp).text;
+      if (!own || t1 !== own || t2 !== own || t3 !== builders.GREET.villager.disliked) fail(`${fid}'s own greeting: "${t1}"; a village's person of it: "${t2}"; curt: "${t3}" (want "${own}", the same, then the role's)`);
+      else stats.ownGreeting = `${fid}: "${own.slice(0, 40)}…", a village's person of it too, curt the role's`;
+    }
+    // The Lantern Moths (torchFriend; integrator, C2 #4): Warm or better with you while your torch is lit, Grey with it out.
+    {
+      game.state.rep = { moths: 600 };
+      const moth = mob("moths");
+      p().torch = true; const lit = F.bandToward(game, moth);
+      p().torch = false; const dark = F.bandToward(game, moth);
+      p().torch = true; game.state.rep = {};
+      if (!(F.REP_BANDS.indexOf(lit) > F.REP_BANDS.indexOf("indifferent")) || dark !== "indifferent") fail(`the Moths at 600: ${lit} with the torch lit, ${dark} with it out (want Warm or better, then Grey)`);
+      else stats.mothsTorch = `at 600: ${lit} lit, ${dark} out`;
+    }
     // A talker with no faction (the roles work for anyone).
     for (const role of builders.ROLES) {
       const w = builders.walkDialogue(game, person("rook", role, null));

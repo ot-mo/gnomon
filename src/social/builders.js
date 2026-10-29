@@ -135,8 +135,12 @@ export function buildDialogue(role) {
       options.push({ label: "How do your people see me?", go: () => node(STANDING[st.band], [back, bye()]) });
     }
     if (role === "merchant") options.unshift({ label: "Show me what you have.", go: () => shopOf(game, c, curt, back) });
-    const greet = GREET[role][curt ? "disliked" : st.band] ?? GREET[role].indifferent;
-    return node(first && !curt && st.band === "indifferent" ? `${greet} New face.` : greet, [...options, bye()]);
+    // A faction's own greeting for your band (C2's `lines.greet`), from the heaviest membership that has one (a
+    // village's people: their people's, as the village's own faction has none); the role's otherwise, and always when
+    // curt. " New face." only after the role's line (integrator, C2 #2).
+    const own = curt ? null : [...membershipsOf(c)].sort((x, y) => y[1] - x[1]).map(([id]) => FACTIONS[id]?.lines?.greet?.[st.band]).find(Boolean) || null;
+    const greet = own || (GREET[role][curt ? "disliked" : st.band] ?? GREET[role].indifferent);
+    return node(first && !own && !curt && st.band === "indifferent" ? `${greet} New face.` : greet, [...options, bye()]);
   };
 }
 

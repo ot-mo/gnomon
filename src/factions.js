@@ -128,8 +128,10 @@ export function bandToward(game, c) {
   const mine = membershipsOf(c);
   if (!mine.length) return null;
   if (mine.some(([id, w]) => w >= 0.25 && band(repOf(game, id)) === "hated")) return "hated";
-  const total = mine.reduce((s, [, w]) => s + w, 0);
-  return band(mine.reduce((s, [id, w]) => s + repOf(game, id) * w, 0) / total);
+  const total = mine.reduce((s, [, w]) => s + w, 0), b = band(mine.reduce((s, [id, w]) => s + repOf(game, id) * w, 0) / total);
+  // The Lantern Moths like you while your torch is lit (bible §6.2): with it out, no warmer than Grey (integrator, C2 #4).
+  if (game.player && !game.player.torch && mine.some(([id]) => FACTIONS[id]?.torchFriend) && REP_BANDS.indexOf(b) > REP_BANDS.indexOf("indifferent")) return "indifferent";
+  return b;
 }
 
 // depth: how many leaders deep the question has gone; a chain longer than MAX_DEPTH (a cycle of leaders, which

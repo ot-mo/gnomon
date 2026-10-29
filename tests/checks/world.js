@@ -31,6 +31,7 @@ import { TEST_WORLD } from "../../src/content/world/test-world.js";
 import { REAL_WORLD, WORLD_ROWS, TIER_ROWS, LANDMARK_INDEX, ROADS, RIVERS, TERRAIN_COUNTS, REGION_ROWS } from "../../src/content/world/worldmap.js";
 import { TERRAINS } from "../../src/content/world/terrains.js";
 import { REGIONS } from "../../src/content/world/regions.js";   // C1a
+import { VILLAGES } from "../../src/content/villages.js";   // (integrator, C2 #1)
 import { LIQUIDS } from "../../src/content/liquids.js";
 import { FACTIONS } from "../../src/factions.js";
 import "../../src/content/factions.js";   // (registers the fixed factions into FACTIONS)
@@ -478,6 +479,17 @@ function checkRegions(problems, bibleText, seeds) {
       for (const id of ids) if ((got[id] || 0) !== (R[id].villages || 0)) off.push(`seed ${seed} ${id}: ${got[id] || 0} of ${R[id].villages}`);
     }
     if (off.length) bad(`villages by quota: ${off.slice(0, 4).join("; ")}`);
+    // A village's people by its region first (integrator, C2 #1, C1a #8): a Glass Shore village on Tessellate or
+    // Stacks ground is the Clatter's or the Errata's, as content/villages.js keys the Glass Shore.
+    const wrong = [];
+    for (const seed of seeds) {
+      const run = buildRun(seed, REAL_WORLD);
+      for (const v of run.villages.values()) {
+        const s = run.sites.get(v.siteId), t = run.world.tileAt(s.at.wx, s.at.wy), e = VILLAGES.byTerrain[t.region];
+        if (e && !e.peoples.includes(v.people)) wrong.push(`seed ${seed} ${v.name} (${t.region}): ${v.people}`);
+      }
+    }
+    if (wrong.length) bad(`villages' peoples not their region's: ${wrong.slice(0, 3).join("; ")}`);
     out.villagesPlaced = `${seeds.length} seeds × 16, each region its quota`;
   }
   // §15.2's spawn keys: every key's creatures in its regions' rows (C3 adds the species; the ids are the bible's).

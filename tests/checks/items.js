@@ -1541,6 +1541,13 @@ export function checkGear(m) {
       `${Object.keys(MU.MUTATIONS).length} mutations live and ${Object.keys(MU.MUTATIONS_WAITING).length} waiting; ${offered} offers and ${mods} loot draws, none waiting`;
   });
 
+  // A history relic's ability ids (strings) aren't bonuses (integrator, C2 #10: their letters were walked as keys "0"…).
+  {
+    const base = { kind: "amulet", id: Object.keys(I.AMULETS)[0] }, b0 = I.itemBonuses(base);
+    const b = I.itemBonuses({ ...base, histRelic: true, powers: ["saltWard", { wil: 2 }] });
+    const keys = Object.keys(b).filter((k) => !St.BONUS_KEYS.includes(k));
+    if (keys.length || (b.wil || 0) - (b0.wil || 0) !== 2) problems.push(`a relic with an ability id and +2 WIL: bonuses ${JSON.stringify(b)}`);
+  }
   return { name: "items: C4's gear", ok: problems.length === 0, problems, stats };
 }
 

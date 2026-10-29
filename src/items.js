@@ -79,7 +79,7 @@ export function itemBonuses(it) {
   if (own) add(own(it));
   for (const k of it.props || []) add(PROPERTIES[k].bonus);
   if (it.relic) add(RELICS[it.relic].bonus);
-  if (it.histRelic) for (const b of it.powers || []) add(b);   // a history relic's powers (gen/vaults.js BOTTOM_LOOT.relic)
+  if (it.histRelic) for (const b of it.powers || []) if (b && typeof b === "object") add(b);   // a history relic's bonus powers (gen/vaults.js BOTTOM_LOOT.relic); an ability id's (a string) isn't a bonus (integrator, C2 #10: its letters were walked as keys)
   return out;
 }
 
