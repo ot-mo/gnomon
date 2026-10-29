@@ -9,7 +9,8 @@
 //     visibleFrom  how many spans away it is known (overworld/discovery.js); checkpoint: a settlement's (commonsLamp)
 //     description  the Deep line (bible §2.1: what you see in 3D); lines: all three registers, Flat, Deep and Dark
 //     letters      who stands on each of the plans' people letters (C5 writes their words; each is placed once its
-//                  kind exists: C3, C5). Maren is the temple's own (content/world/temple.js "M")
+//                  kind exists: C3, C5; `kind` names C3's creature where its tag p3-c3 has one). Maren is the temple's own
+//                  (content/world/temple.js "M")
 //     below        who lives in its dungeon, [{ who, name, role, floor | up }] (C3's kinds, C5's words: the dungeon's
 //                  floors are generated, so they are placed by code once their kinds exist)
 //     holy         the faction whose holy place it is (C2 #5: a neutral member hostile there below Warm, and its rule),
@@ -88,7 +89,7 @@ export const LANDMARKS = [
       t: { who: "quintVey", name: "Surveyor-General Teodor Quint-Vey", role: "the Survey's head" },
       a: { who: "saaraTovi", name: "Saara Tovi", role: "instrument-master (the tinker)" },
       e: { who: "benchmarkLeech", name: "the leech", role: "healer" },
-      c: { who: "detailC", name: "Detail C", role: "an automaton on loan from the Plan; works Truing Cradle #1" },
+      c: { who: "detailC", kind: "detailC", name: "Detail C", role: "an automaton on loan from the Plan; works Truing Cradle #1" },
       b: { who: "benchmarkBanker", name: "the Chandler banker", role: "a Chandler bank" },
       d: { who: "benchmarkDrover", name: "the caravan-master", role: "the Drovers' caravan stop" },
       n: { who: "pell", name: "Pell", role: "peddler (days 3-4 of his round)" },
@@ -188,9 +189,9 @@ export const LANDMARKS = [
     },
     letters: {   // bible §5 J
       t: { who: "thol", name: "thol", role: "the choirmaster ghost (seen only with your torch out)" },
-      c: { who: "lamplessChanter", name: "a Lampless chanter", role: "keeps the song" },
+      c: { who: "lamplessChanter", kind: "lamplessChanter", name: "a Lampless chanter", role: "keeps the song" },
     },
-    below: [{ who: "gloamWarden", name: "the Gloam Warden", role: "a mini-boss: the parent game's Gloom Warden, now a legendary template", floor: 4 },
+    below: [{ who: "gloamWarden", kind: "gloamWarden", name: "the Gloam Warden", role: "a mini-boss: the parent game's Gloom Warden, now a legendary template", floor: 4 },
             { who: "noon", name: "Noon", role: "a flat ghost, only on the map and only with your torch out: a mosaic of a woman with no shadow", floor: 6 }],
     holy: "lampless",   // a lit torch inside is trespass, unless you carry the dark-pass (FAITHS.lampless; beyond C2's six)
   },
@@ -204,9 +205,9 @@ export const LANDMARKS = [
     },
     letters: {   // bible §5 K
       s: { who: "sectionNine", name: "Section Nine", role: "Chief Draughtsman (legendary automaton)" },
-      d: { who: "draughtsman", name: "a draughtsman", role: "of the Plan" },
+      d: { who: "draughtsman", kind: "draughtsman", name: "a draughtsman", role: "of the Plan" },
     },
-    below: [{ who: "escapement", name: "the Escapement", role: "the boss, on the Colossus pattern: its core on its head, so climb the pendulum's gantries (up to 5 up); its slams telegraphed on the map", floor: 6 }],
+    below: [{ who: "escapement", kind: "escapement", name: "the Escapement", role: "the boss, on the Colossus pattern: its core on its head, so climb the pendulum's gantries (up to 5 up); its slams telegraphed on the map", floor: 6 }],
     holy: "plan",   // bombing walls here is desecration (C2 #5)
   },
   {
@@ -218,7 +219,7 @@ export const LANDMARKS = [
       dark: "the bell still rings\nunder the water\nfor the noon",
     },
     letters: {},
-    below: [{ who: "drownedBellwether", name: "the Drowned Bellwether", role: "a legendary bell-headed ghost whose toll forces every flat thing deep for 3 s", floor: 5 },
+    below: [{ who: "drownedBellwether", kind: "drownedBellwether", name: "the Drowned Bellwether", role: "a legendary bell-headed ghost whose toll forces every flat thing deep for 3 s", floor: 5 },
             { who: "noonglass", name: "the Noonglass", role: "the relic on a dais that is dry only at noon", floor: 5 }],
   },
   {
@@ -230,11 +231,11 @@ export const LANDMARKS = [
       dark: "every room is the same room\nexcept the one you are in",
     },
     letters: {   // the gate (bible §5 M: Plumb characters are let in at the gate)
-      g: { who: "gateAssizer", name: "the gate's assizer", role: "lets the Plumb in" },
+      g: { who: "gateAssizer", kind: "assizer", name: "the gate's assizer", role: "lets the Plumb in" },
     },
     below: [{ who: "strade", name: "Hierarch Aurel Strade-Orrum", role: "the Assize's head (beat 10)", up: 2 },
             { who: "lio", name: "Lio", role: "a pressed prisoner in the cells (map only)", floor: 2 },
-            { who: "plumbknight", name: "plumbknights and assizers", role: "patrols in dead-straight lines", floor: 1 }],
+            { who: "plumbknight", kind: "plumbknight", name: "plumbknights and assizers", role: "patrols in dead-straight lines", floor: 1 }],
     holy: "assize",   // a Bent below Bright is trespass (C2 #5)
   },
   {
@@ -246,7 +247,7 @@ export const LANDMARKS = [
       dark: "the works are turning\nthe works are always turning",
     },
     letters: {},
-    below: [{ who: "vesper", name: "Vesper", role: "waits in the Noon Socket, where the age's hand is set", floor: 8 }],
+    below: [{ who: "vesper", kind: "vesper", name: "Vesper", role: "waits in the Noon Socket, where the age's hand is set", floor: 8 }],
   },
   {
     id: "saltpage", plan: "saltpage", anchor: [7, 4], flatten: true, visibleFrom: 1, checkpoint: true,
