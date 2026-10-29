@@ -142,8 +142,8 @@ export const MUTATIONS = {
 };
 
 // Bible §13.5's other 20 (C4): the data for each, waiting for its code. Costs are 4 as above (§15.6), a defect's
-// refund the bible's; exclusions where two bodies can't agree (heavy bones sink where gills swim; a fear of the beat
-// can't see it coming).
+// refund the bible's; exclusions where two bodies can't agree, none of them the bible's (heavy bones sink where gills
+// swim, are too heavy for wings and can't be brittle; a deafness to the beat can't foresee it).
 export const MUTATIONS_WAITING = {
   // --- Physical ---
   extraArms: {
