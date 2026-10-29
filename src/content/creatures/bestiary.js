@@ -93,7 +93,7 @@ export const BESTIARY = {
   mosaicGolem: B("12.6", "mosaic golem", "G", [5, 5], "MOSAIC GOLEM. Eye tile 1. Crushing: x2.",
     "Red and blue tiles that stood up, still grouted.", "tiles fall like teeth"),
   pressedPilgrim: B("12.6", "pressed pilgrim", "@", [4, 4], "PRESSED PILGRIM. Harm 0. Striking one: desecration.",
-    "A pilgrim lying full length on the tiles, content.", "breath in the floor\nnearly there"),
+    "A pilgrim lying full length on the tiles, arms out.", "breath in the floor\nnearly there"),
 
   // --- §12.7 The Shade and the Unlit Choir -------------------------------------------------------------------------
   shade: B("12.7", "shade", "z", [5, 6], "SHADE. Sees in the dark. Burns in torchlight.",
