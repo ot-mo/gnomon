@@ -442,7 +442,8 @@ const range = (xs) => (xs.length ? { n: xs.length, min: +Math.min(...xs).toFixed
 // Every real-world region with an encounter rate has rows; each row a registered kind out for a Bent stranger at the
 // start, weight > 0, levels within 1-30; every level its spans make held by two kinds or more; a region's kinds only
 // band, travellers and legend; no entry for a test-world region (its draws stay as they were); pickRow draws each kind
-// of a level by its weight (20,000 draws, within 1.5 points) and nothing outside the level. Three mutants, each caught.
+// of a level by its weight (20,000 draws, within 1.5 points), nothing outside the level and no kind that isn't registered
+// (a waiting one in C1a's rows). Three mutants, each caught.
 function tableProblems(game) {
   const out = [], W = compileWorld(REAL_WORLD), E = ENCOUNTERS.regions, levels = {};
   for (const t of W.tiles) if (t.encounterRate > 0) (levels[t.region] ||= new Set()).add(t.level);
@@ -476,6 +477,12 @@ function encounterTables(G, problems) {
     for (const [type, w] of live) if (Math.abs(got[type] / 20000 - w / want) > 0.015) problems.push(`pickRow: the downs' ${type} drawn ${(got[type] / 200).toFixed(1)}%, its weight ${(100 * w / want).toFixed(1)}%`);
     for (const t of Object.keys(got)) if (!live.some(([x]) => x === t)) problems.push(`pickRow: drew ${t}, not of level ${L}`);
     if (pickRow(rng, rows, 31) !== null) problems.push("pickRow: drew at a level no row holds");
+    // Only registered kinds: the Hollow Mere's rows (C1a's) name the glowfin, which waits (content/creatures/waiting.js).
+    const mere = REAL_WORLD.regions.hollowMere.creatures, waiting = mere.filter(([type]) => !CREATURE_TYPES[type]).map(([type]) => type);
+    let drewWaiting = 0;
+    for (let n = 0; n < 5000; n++) if (waiting.includes(pickRow(rng, mere, 2))) drewWaiting++;
+    if (!waiting.length || drewWaiting) problems.push(`pickRow: ${drewWaiting} of 5000 draws on the Hollow Mere's rows a kind that isn't registered (${waiting.join(", ") || "none to test"})`);
+    if (pickRow(rng, [["glowfin", 5, 1, 30]], 2) !== null) problems.push("pickRow: drew from rows holding no registered kind");
     // Its teeth.
     const mutants = [
       ["an unregistered kind", () => { const r = ENCOUNTERS.regions.flats.rows; r.push(["noSuchThing", 1, 1, 8]); return () => r.pop(); }, /flats row \["noSuchThing"/],

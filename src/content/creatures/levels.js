@@ -2,19 +2,24 @@
 // get tables of their own; TECH_DESIGN §8.6 "C3"; C3). The parent's tables (legacy.js, by `depths`) reach level 20 and
 // stay as they are; every level the real world makes (spans 2-23, its sites' floors up to 30) has these rows instead,
 // one per roaming species at its own levels and weight (wildlife.js). The regions' rows (content/world/regions.js)
-// are the same species, region by region; this table is for the draws that have no region (a legend's species where its
-// region has no list, the time-to-kill tables, a draw above the parent's level 20).
+// are the same species, region by region; this table is for the draws that have no region (a draw above the parent's
+// level 20: integration request 1).
 //
-//   LEVEL_POOL               [[type, weight, lo, hi]]: every wildlife species that roams (weight > 0) and isn't docile
-//   pickRow(rand, rows, level) → type | null   a type by weight among the rows whose levels hold `level` (rand: a
-//                            0..1 function; one draw), as gen/dungeon.js pickFrom draws a region's rows
-//   rowsAt(rows, level) → rows               the rows that hold `level`
+//   LEVEL_POOL               [[type, weight, lo, hi]]: every wildlife species that roams (a weight above 0) and isn't
+//                            docile or harmless: what lives at a level, out for a stranger or not (below level 20 the
+//                            neutral folk of the factions are among them: the clatterer, the chime-priest, the
+//                            draughtsman…; from level 20 on every kind in it is out for one, check-creatures 6)
+//   pickRow(rand, rows, level) → type | null   a type by weight among the rows whose levels hold `level`, registered
+//                            kinds only (rand: a 0..1 function; one draw), as gen/dungeon.js pickFrom draws a region's
+//                            rows; null when no registered kind's row holds the level (the caller falls back)
+//   rowsAt(rows, level) → rows               the rows of registered kinds, weight above 0, that hold `level`
+import { CREATURE_TYPES } from "../../creatures.js";
 import { WILDLIFE } from "./wildlife.js";
 
 const roams = (t) => t.weight > 0 && t.levels && t.temperament !== "docile" && !(t.damage[1] <= 1);
 export const LEVEL_POOL = Object.entries(WILDLIFE).filter(([, t]) => roams(t)).map(([id, t]) => [id, t.weight, t.levels[0], t.levels[1]]);
 
-export const rowsAt = (rows, level) => rows.filter(([, w, lo, hi]) => w > 0 && level >= lo && level <= hi);
+export const rowsAt = (rows, level) => rows.filter(([type, w, lo, hi]) => CREATURE_TYPES[type] && w > 0 && level >= lo && level <= hi);
 export function pickRow(rand, rows, level) {
   const live = rowsAt(rows, level);
   if (!live.length) return null;
