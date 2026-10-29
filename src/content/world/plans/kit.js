@@ -53,7 +53,7 @@ export const peopleKeys = (rows, letters, ox, oy) => Object.keys(letters).flatMa
 
 export function house(zone, ox, oy, rows, h, still, legend = {}) {
   const plan = rows.slice(h.y, h.y + h.d).map((r) => r.slice(h.x, h.x + h.w));
-  stampVault(zone, { name: h.id, plan, height: h.wallHeight ?? 4, wall: h.wall, floorBlock: h.floor ?? B.PLANK, links: [],
+  stampVault(zone, { name: h.id, plan, height: h.wallHeight ?? 4, wall: h.wall, floorBlock: h.floor ?? B.PLANK, links: [], rubble: h.rubble,
                      legend: { h: "floor", ...legend } },
              ox + h.x, oy + h.y, still, { roof: h.roof ?? "slab", wallHeight: h.wallHeight ?? 4, baseZ: FLOOR_Z + (h.up || 0) });
 }

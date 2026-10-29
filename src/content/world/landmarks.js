@@ -14,6 +14,16 @@ import { KETTLE_MESA_PLAN } from "./plans/kettleMesa.js";
 import { BENCHMARK_PLAN } from "./plans/benchmark.js";
 import { TALL_TABLE_PLAN } from "./plans/tallTable.js";
 import { MOLAR_PLAN } from "./plans/molar.js";
+import { FOLIO_PLAN } from "./plans/folio.js";
+import { HALFNIGHT_WEST_PLAN, HALFNIGHT_MIDDLE_PLAN, HALFNIGHT_EAST_PLAN } from "./plans/halfnight.js";
+import { PRESSYARD_PLAN } from "./plans/pressyard.js";
+import { UNLIT_CHOIR_PLAN } from "./plans/unlitChoir.js";
+import { METRONOME_PLAN } from "./plans/metronome.js";
+import { DROWNED_LANTERN_PLAN } from "./plans/drownedLantern.js";
+import { SQUARE_PLAN } from "./plans/square.js";
+import { GNOMON_PLAN } from "./plans/gnomon.js";
+import { SALTPAGE_PLAN } from "./plans/saltpage.js";
+import { FOLDMOTHER_PLAN } from "./plans/foldmother.js";
 
 export const LANDMARKS = [
   {
@@ -108,6 +118,164 @@ export const LANDMARKS = [
       n: { who: "pell", name: "Pell", role: "peddler (days 5-6 of his round)" },
     },
   },
+  {
+    id: "folio", plan: "folio", anchor: [9, 6], flatten: true, visibleFrom: 1, checkpoint: true,
+    description: "An empty paved plain, and several hundred shadows sliding over the stones with nobody casting them.",
+    lines: {   // bible §5 G
+      flat: "FOLIO. Streets 31. Inn: the Margin. Archive 1.",
+      deep: "An empty paved plain, and several hundred shadows sliding over the stones with nobody casting them.",
+      dark: "the scratching is writing\nthey are writing you down",
+    },
+    letters: {   // bible §5 G: Flatfolk, met only on the map
+      e: { who: "ell", name: "Ell, once the Flat Queen", role: "Folio's magistrate (\"a person now\"); keeps the Margin court; gives Folio's side quest" },
+      k: { who: "kay", name: "Kay of the Long Line", role: "archivist (legendary): buys deep readings, sells the Flat Accounts of every Hour" },
+      l: { who: "doubleEll", name: "Double-Ell", role: "merchant: ink, stencils, maps" },
+      m: { who: "marginKeeper", name: "the Margin's keeper", role: "the Margin: rest" },
+      s: { who: "folioSurvey", name: "the teacher of Survey", role: "teaches Survey" },
+      o: { who: "folioLore", name: "the teacher of Lore", role: "teaches Lore" },
+    },
+  },
+  {
+    // Three spans, a plan each: `plan` is the West Ward's (the landmark's own span, which gen/surface.js stamps today);
+    // spanPlans the other two wards' (integration request: a multi-span landmark's other spans on their own plans).
+    id: "halfnight", plan: "halfnightWest", spanPlans: { "25,11": "halfnightMiddle", "26,11": "halfnightEast" },
+    anchor: [6, 2], flatten: true, visibleFrom: 1, checkpoint: true,
+    description: "Sundials on one side of the street, shuttered cells on the other, and a brass line down the middle that nobody steps on.",
+    lines: {   // bible §5 H
+      flat: "HALFNIGHT. Length 3 spans. Width 1 street. Line 1.",
+      deep: "Sundials on one side of the street, shuttered cells on the other, and a brass line down the middle that nobody steps on.",
+      dark: "the north side is listening\nthe south side is ringing",
+    },
+    letters: {   // bible §5 H, by ward
+      p: { who: "ilyendra", name: "Primate Ilyendra", role: "of the Horary, in the Hour-house (West Ward); teaches Lore" },
+      g: { who: "gudri", name: "Linekeeper Hasay Gudri", role: "the city's reeve, at the Line Court (Middle Ward)" },
+      b: { who: "halfnightBanker", name: "the Chandler banker", role: "a Chandler bank (Middle Ward)" },
+      q: { who: "horaryTrader", name: "a Horary trader", role: "the Horary's readings (Middle Ward)" },
+      w: { who: "lamplessTrader", name: "a Lampless trader", role: "the Lampless' readings (Middle Ward)" },
+      a: { who: "wisse", name: "Abbess Wisse", role: "of the Lampless, in the Hush (East Ward); teaches Shadowcraft" },
+      v: { who: "ghostTrader", name: "a ghost trader", role: "the ghost market (East Ward): seen only with your torch out, at night" },
+    },
+    holy: { "24,11": "horary", "26,11": "lampless" },   // the Hour-house, the Hush (C2 #5)
+  },
+  {
+    id: "pressyard", plan: "pressyard", anchor: [9, 5], flatten: true, visibleFrom: 1,
+    description: "Faded tiles in a field, and a stair going down where a well should be.",
+    lines: {   // bible §5 I
+      flat: "PRESSYARD. Houses 41. People 300, all mid-stride. Well 1 (stair).",
+      deep: "Faded tiles in a field, and a stair going down where a well should be.",
+      dark: "they are still walking\nthe floor is very tight",
+    },
+    letters: {},
+    below: [{ who: "pressMaster", name: "Press-Master Sevrin Marr-Orrum", role: "the Press's master, fought with the Press itself: break its three pistons on their gantries (3-5 up) while you watch the beat on the map", floor: 5 },
+            { who: "assizeEngineer", name: "Assize engineers", role: "with press-hounds, mosaic golems, pressed captives and errata at the margins", floor: 1 }],
+    holy: "pressed",   // the Pressyard's surface mosaic (FAITHS.pressed; beyond C2's six)
+  },
+  {
+    id: "unlitChoir", plan: "unlitChoir", anchor: [14, 9], flatten: true, visibleFrom: 1,
+    description: "A cathedral sunk to its shoulders in the dusk, full of a song that doesn't come from anywhere.",
+    lines: {   // bible §5 J
+      flat: "UNLIT CHOIR. Floors 6. Lamps 0.",
+      deep: "A cathedral sunk to its shoulders in the dusk, full of a song that doesn't come from anywhere.",
+      dark: "we sing\nso you can find the stairs",
+    },
+    letters: {   // bible §5 J
+      t: { who: "thol", name: "thol", role: "the choirmaster ghost (seen only with your torch out)" },
+      c: { who: "lamplessChanter", name: "a Lampless chanter", role: "keeps the song" },
+    },
+    below: [{ who: "gloamWarden", name: "the Gloam Warden", role: "a mini-boss: the parent game's Gloom Warden, now a legendary template", floor: 4 },
+            { who: "noon", name: "Noon", role: "a flat ghost, only on the map and only with your torch out: a mosaic of a woman with no shadow", floor: 6 }],
+    holy: "lampless",   // a lit torch inside is trespass, unless you carry the dark-pass (FAITHS.lampless; beyond C2's six)
+  },
+  {
+    id: "metronome", plan: "metronome", anchor: [12, 4], flatten: true, visibleFrom: 2,
+    description: "A tower of iron floors threaded on a pendulum that never stops.",
+    lines: {   // bible §5 K
+      flat: "METRONOME. Floors 6. Beat: 2 per second.",
+      deep: "A tower of iron floors threaded on a pendulum that never stops.",
+      dark: "tick\ntick\nit has been counting to something",
+    },
+    letters: {   // bible §5 K
+      s: { who: "sectionNine", name: "Section Nine", role: "Chief Draughtsman (legendary automaton)" },
+      d: { who: "draughtsman", name: "a draughtsman", role: "of the Plan" },
+    },
+    below: [{ who: "escapement", name: "the Escapement", role: "the boss, on the Colossus pattern: its core on its head, so climb the pendulum's gantries (up to 5 up); its slams telegraphed on the map", floor: 6 }],
+    holy: "plan",   // bombing walls here is desecration (C2 #5)
+  },
+  {
+    id: "drownedLantern", plan: "drownedLantern", anchor: [0, 5], flatten: true, visibleFrom: 3,
+    description: "A lighthouse standing in glass up to its knees, its lamp long dead.",
+    lines: {   // bible §5 L
+      flat: "DROWNED LANTERN. Floors 5, below sea. Water: by the hour.",
+      deep: "A lighthouse standing in glass up to its knees, its lamp long dead.",
+      dark: "the bell still rings\nunder the water\nfor the noon",
+    },
+    letters: {},
+    below: [{ who: "drownedBellwether", name: "the Drowned Bellwether", role: "a legendary bell-headed ghost whose toll forces every flat thing deep for 3 s", floor: 5 },
+            { who: "noonglass", name: "the Noonglass", role: "the relic on a dais that is dry only at noon", floor: 5 }],
+  },
+  {
+    id: "square", plan: "square", anchor: [18, 2], flatten: true, visibleFrom: 2,
+    description: "A clearing cut perfectly square out of the folding forest, the stumps in rows, and in the middle a cube with no windows.",
+    lines: {   // bible §5 M
+      flat: "THE SQUARE. Sides 4, equal. Rooms 144, equal.",
+      deep: "A clearing cut perfectly square out of the folding forest, the stumps in rows, and in the middle a cube with no windows.",
+      dark: "every room is the same room\nexcept the one you are in",
+    },
+    letters: {   // the gate (bible §5 M: Plumb characters are let in at the gate)
+      g: { who: "gateAssizer", name: "the gate's assizer", role: "lets the Plumb in" },
+    },
+    below: [{ who: "strade", name: "Hierarch Aurel Strade-Orrum", role: "the Assize's head (beat 10), on the floors up", floor: 5 },
+            { who: "lio", name: "Lio", role: "a pressed prisoner in the cells (map only)", floor: 2 },
+            { who: "plumbknight", name: "plumbknights and assizers", role: "patrols in dead-straight lines", floor: 1 }],
+    holy: "assize",   // a Bent below Bright is trespass (C2 #5)
+  },
+  {
+    id: "gnomon", plan: "gnomon", anchor: [25, 14], flatten: true, visibleFrom: 6,
+    description: "A black needle leaning over the world, so tall that the top of it is weather.",
+    lines: {   // bible §5 N
+      flat: "GNOMON. Height: off the page. Shadow: 15.5 spans at noon, and lengthening.",
+      deep: "A black needle leaning over the world, so tall that the top of it is weather.",
+      dark: "the works are turning\nthe works are always turning",
+    },
+    letters: {},
+    below: [{ who: "vesper", name: "Vesper", role: "waits in the Noon Socket, where the age's hand is set", floor: 8 }],
+  },
+  {
+    id: "saltpage", plan: "saltpage", anchor: [7, 4], flatten: true, visibleFrom: 1, checkpoint: true,
+    description: "A salt pan so flat your footsteps come back off the horizon.",
+    lines: {   // bible §5 O
+      flat: "SALTPAGE. Storeys 1. Page 1 (city, drowned, 9 × 9 spans of mosaic).",
+      deep: "A salt pan so flat your footsteps come back off the horizon.",
+      dark: "the page is a city\nthe city is reading you back",
+    },
+    letters: {   // bible §5 O
+      b: { who: "bramwyn", name: "Father Bramwyn the Flattened", role: "the Pressing rite: once a floor, turn flat for 3 s, for a world day (free at Pressed +250, else -100)" },
+      i: { who: "inkSeller", name: "the ink-and-brine seller", role: "ink and brine" },
+      y: { who: "pressedLibrarian", name: "the librarian", role: "the Pressed's library of flat readings" },
+    },
+    below: [{ who: "speakingDoor", name: "the Speaking Door", role: "guards floor 2: it asks for the number written upon its floor", floor: 2 },
+            { who: "secondHourStele", name: "a Second-Hour stele", role: "all three accounts, the Pressed's founding relic and a reading that names Vesper", floor: 3 }],
+    holy: "pressed",   // the monastery and the Page (C2 #5)
+  },
+  {
+    id: "foldmother", plan: "foldmother", anchor: [20, 5], flatten: true, visibleFrom: 3, checkpoint: true,
+    description: "A tree as tall as a mesa, pleated like a paper lantern, with houses in the pleats.",
+    lines: {   // bible §5 P
+      flat: "FOLDMOTHER. Platforms 30 (day), 0 (night).",
+      deep: "A tree as tall as a mesa, pleated like a paper lantern, with houses in the pleats.",
+      dark: "at dusk she closes\nlike a hand\ncount your children",
+    },
+    letters: {   // bible §5 P
+      m: { who: "foldmother", name: "Foldmother", role: "a speaking tree (legendary): the knot at her foot where she speaks" },
+      w: { who: "lumo", name: "Warden Lumo", role: "the Pleatwood's warden" },
+      e: { who: "sporeHerbalist", name: "the Spore Moot's herbalist", role: "tonics, and fungal limbs for reputation" },
+    },
+  },
 ];
 
-export const PLANS = { hollowmere: HOLLOWMERE_PLAN, dialFloor: DIAL_FLOOR_PLAN, kettleMesa: KETTLE_MESA_PLAN, benchmark: BENCHMARK_PLAN, tallTable: TALL_TABLE_PLAN, molar: MOLAR_PLAN };
+export const PLANS = {
+  hollowmere: HOLLOWMERE_PLAN, dialFloor: DIAL_FLOOR_PLAN, kettleMesa: KETTLE_MESA_PLAN, benchmark: BENCHMARK_PLAN, tallTable: TALL_TABLE_PLAN,
+  molar: MOLAR_PLAN, folio: FOLIO_PLAN, halfnightWest: HALFNIGHT_WEST_PLAN, halfnightMiddle: HALFNIGHT_MIDDLE_PLAN, halfnightEast: HALFNIGHT_EAST_PLAN,
+  pressyard: PRESSYARD_PLAN, unlitChoir: UNLIT_CHOIR_PLAN, metronome: METRONOME_PLAN, drownedLantern: DROWNED_LANTERN_PLAN, square: SQUARE_PLAN,
+  gnomon: GNOMON_PLAN, saltpage: SALTPAGE_PLAN, foldmother: FOLDMOTHER_PLAN,
+};

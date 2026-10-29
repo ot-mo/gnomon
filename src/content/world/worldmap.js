@@ -139,6 +139,61 @@ export const LANDMARK_INDEX = [
     dungeon: { id: "rootfold", floors: floors(8, 10), optional: true } },
 ];
 
+// The landmark dungeons (C1b; bible §5, §15.3): what world/sites.js landmarkDungeon reads beside the floors, by dungeon
+// id. gimmicks (every floor) or floorGimmicks (floor by floor) are gen/dungeon.js GIMMICKS ids, the bible's gimmick key
+// mapped onto what the generator builds (docs/c1.md "C1b": the map); theme a DUNGEON_THEMES id; named the floors'
+// names; cradle the floors with a Truing Cradle; vaultPool the puzzle rooms its floors draw; bottom what its last floor
+// holds that the code builds today (the Metronome's Escapement stands in the Colossus's hall, the pattern the bible
+// builds it on). `planned` is what the bible gives the dungeon that the code doesn't build yet (integration requests):
+// its true bottom (a legend, a relic, a boss), a guardian's hall on a floor that isn't the last, each floor's headroom,
+// the murals' words, a day and a night layout, the tide, the floors up, floors opened by a beat.
+const LANDMARK_DUNGEONS = {
+  kettleMesa: { theme: "horn", floorGimmicks: [["collapsed"], ["collapsed", "spikeworks"], ["flooded"]],
+    named: ["Kettle Mesa, the Rim", "Kettle Mesa, the Ledges", "Kettle Mesa, the Kettle's Bottom"],
+    planned: { bottom: { kind: "legend", id: "grubMother", name: "the Grub Mother", species: "brineGrub", template: "plain" },
+               daylight: [1], vaults: { 2: "flatLie" }, culvert: { from: 3, to: "hollowmere" } } },
+  datum: { theme: "deepwright", floorGimmicks: [["murals"], ["murals", "allDeep"], ["murals", "allDeep"], ["murals", "allDeep"]],
+    named: ["the Datum, the Gauge Room", "the Datum, the Plate Hall", "the Datum, the Long Level", "the Datum, the Stone"],
+    planned: { bottom: { kind: "reading", id: "datumStone", name: "the Datum stone", plinth: 2 }, opensAtBeat: { 3: 2, 4: 2 },
+               murals: [{ text: "A height mark cut in a pillar: THIS SILL IS 3 BLOCKS UP.", map: "A brass plate set in the floor, numbered 3." }] } },
+  rootCanals: { theme: "deepwright", gimmicks: ["lightless", "flooded", "haunted"],
+    named: ["the Root Canals, the Dry Cut", "the Root Canals, the Smugglers' Run"], planned: { darkMapping: true, watch: "chandlerWatch" } },
+  press: { theme: "gears", floorGimmicks: [["flatland"], ["flatland"], ["flatland", "spikeworks", "oneBeat"], ["flatland", "spikeworks", "oneBeat"], ["spikeworks", "oneBeat"]],
+    named: ["the Press, the Feed Floor", "the Press, the Platen Rooms", "the Press, the Beat Floor", "the Press, the Low Floor", "the Press-hall"],
+    planned: { bottom: { kind: "boss", id: "pressMaster", name: "Press-Master Sevrin Marr-Orrum", with: "the Press, its three pistons on gantries 3-5 up" },
+               headroom: [6, 5, 4, 3, null], pressedRooms: true } },
+  unlitChoir: { theme: "shade", gimmicks: ["lightless", "haunted", "braziers"],
+    named: ["the Unlit Choir, the Narthex", "the Unlit Choir, the Nave", "the Unlit Choir, the Quire", "the Unlit Choir, the Warden's Crypt",
+            "the Unlit Choir, the Undercroft", "the Unlit Choir, Noon's Floor"],
+    planned: { bottom: { kind: "boss", id: "noon", name: "Noon", flat: true, darkOnly: true }, vaults: { 4: "warden" }, darkMapping: true } },
+  metronome: { theme: "gears", gimmicks: ["spikeworks", "oneBeat"], cradle: [1],
+    named: ["the Metronome, the Casting Floor", "the Metronome, the Gear Floor", "the Metronome, the Rack Floor", "the Metronome, the Spring Floor",
+            "the Metronome, the Bob Floor", "the Metronome, the Escapement"],
+    bottom: { kind: "guardian", id: "colossus" },
+    planned: { bottom: { kind: "boss", id: "escapement", name: "the Escapement", pattern: "colossus" }, offBeatDoors: true } },
+  drownedLantern: { theme: "glass", gimmicks: ["flooded"],
+    named: ["the Drowned Lantern, the Lamp Room", "the Drowned Lantern, the Keeper's Floor", "the Drowned Lantern, the Bell Floor",
+            "the Drowned Lantern, the Wet Stair", "the Drowned Lantern, the Noonglass Dais"],
+    planned: { bottom: { kind: "relic", id: "noonglass", name: "the Noonglass", dryOnlyAtNoon: true },
+               legend: { floor: 5, id: "drownedBellwether", name: "the Drowned Bellwether" }, tide: { dry: [11, 13], rise: 1, every: 2, max: 4 } } },
+  square: { theme: "deepwright", floorGimmicks: [["murals"], ["flatland", "murals"], ["flatland", "murals"]], cradle: [1],
+    named: ["the Square, the Hall Below", "the Square, the Cells", "the Square, the Deep Cells"],
+    planned: { up: ["the Square, the Rule Floor", "the Square, the Hierarch's Floor"], identicalRooms: true, ruleBanners: true, freeFittings: true } },
+  dialWorks: { theme: "gears",
+    floorGimmicks: Array.from({ length: 8 }, (_, k) => (k % 2 === 0 ? ["allDeep", "spikeworks", "oneBeat"] : ["flatland", "spikeworks", "oneBeat"])),
+    named: ["the Dial-works, the Great Wheel", "the Dial-works, the Train", "the Dial-works, the Fusee", "the Dial-works, the Mainspring",
+            "the Dial-works, the Escape Wheel", "the Dial-works, the Pallets", "the Dial-works, the Hand's Root", "the Noon Socket"],
+    planned: { bottom: { kind: "boss", id: "vesper", name: "Vesper" }, sweepingHand: { period: 40 }, door: { hours: [11, 13] } } },
+  underPage: { theme: "salt", gimmicks: ["murals"], vaultPool: ["mosaicHall", "speakingDoor"],
+    named: ["the Under-Page, the First Leaf", "the Under-Page, the Speaking Door", "the Under-Page, the Founding"],
+    planned: { bottom: { kind: "relic", id: "pressedFounding", name: "the Pressed's founding relic", with: "a Second-Hour stele with all three accounts; a reading that names Vesper" },
+               vaults: { 2: "speakingDoor" } } },
+  rootfold: { theme: "horn", gimmicks: ["allDeep"],
+    named: ["the Rootfold, the Upper Roots", "the Rootfold, the Fold", "the Rootfold, the Heartroot"],
+    planned: { layouts: { day: [6, 18], night: [18, 6] }, foldLanding: 1 } },
+};
+for (const l of LANDMARK_INDEX) if (l.dungeon && LANDMARK_DUNGEONS[l.dungeon.id]) Object.assign(l.dungeon, LANDMARK_DUNGEONS[l.dungeon.id]);
+
 // Roads and rivers (§15.5), 4-connected, in order.
 const span = (pairs) => pairs.map(([x, y]) => [x, y]);
 export const ROADS = [
