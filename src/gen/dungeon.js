@@ -89,6 +89,12 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   f.hasBelow = !final;
   f.hasUp = p.hasUp !== false;
   f.bottom = p.bottom || null;         // { kind, id }: the hall on the last level (validation reads it)
+  // Where a fall from the surface lands (level 1 of a site: world/sites.js sinkholeSpots): each must end up floor you
+  // can reach, not stairs. The vault keeps off them, a corridor reaches each one outside a room, no door is hung
+  // there, and the rooms' features keep clear as they do of doorways; validation holds the rest.
+  const landings = (p.landings || []).map(([x, y]) => ({ x, y }));
+  if (landings.length) f.landings = landings.map(({ x, y }) => [x, y]);
+  const isLanding = (x, y) => landings.some((l) => l.x === x && l.y === y);
   f.blocks.fill(B.ROCK);
   const roomAt = new Int16Array(W * D).fill(-1);   // room interiors
   const ringAt = new Int16Array(W * D).fill(-1);   // room walls
@@ -101,7 +107,9 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   let vaultRect = null, entrance = null;
   for (let tries = 0; tries < 60 && !vaultRect; tries++) {
     const vx = rng.int(2, W - vault.w - 2), vy = rng.int(2, D - vault.d - 4);
-    vaultRect = { x0: vx, y0: vy, x1: vx + vault.w - 1, y1: vy + vault.d - 1 };
+    const rect = { x0: vx, y0: vy, x1: vx + vault.w - 1, y1: vy + vault.d - 1 };
+    if (tries < 59 && landings.some((l) => l.x >= rect.x0 - 2 && l.x <= rect.x1 + 2 && l.y >= rect.y0 - 2 && l.y <= rect.y1 + 2)) continue;
+    vaultRect = rect;
     entrance = stampVault(f, vault, vx, vy, rng, final && p.bottom ? { cosmetic, bottom: p.bottom } : { cosmetic });
   }
   // A guardian's hall at the bottom of a dungeon (a site's last level, 0A2): its gate opens onto
@@ -187,13 +195,23 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   const nearest = rooms.reduce((best, r) =>
     distance(r.cx - vaultDoor.x, r.cy - vaultDoor.y) < distance(best.cx - vaultDoor.x, best.cy - vaultDoor.y) ? r : best);
   dig(route(vaultDoor.x, vaultDoor.y, nearest.cx, nearest.cy));
+  // A corridor to each landing outside a room, from the nearest room. A room a landing lies in, or that its corridor
+  // opens into, is never the locked treasure room (9.): the landing would be behind its door.
+  const landingRooms = new Set();
+  for (const l of landings) {
+    if (roomAt[l.x + l.y * W] >= 0) { landingRooms.add(roomAt[l.x + l.y * W]); continue; }
+    const r = rooms.reduce((best, o) => (distance(o.cx - l.x, o.cy - l.y) < distance(best.cx - l.x, best.cy - l.y) ? o : best));
+    const before = rooms.map((o) => o.doors.length);
+    dig(route(l.x, l.y, r.cx, r.cy));
+    rooms.forEach((o, k) => { if (o.doors.length !== before[k]) landingRooms.add(o.id); });
+  }
 
   // --- 4. Doors in some doorways (only where there's a proper frame on both sides).
   for (const r of rooms) {
     for (const d of r.doors) {
       const sideWall = d.x === r.x0 - 1 || d.x === r.x1 + 1;
       const [ax, ay, bx, by] = sideWall ? [d.x, d.y - 1, d.x, d.y + 1] : [d.x - 1, d.y, d.x + 1, d.y];
-      if (f.get(ax, ay, FLOOR_Z) && f.get(bx, by, FLOOR_Z) && rng.chance(0.4)) {
+      if (f.get(ax, ay, FLOOR_Z) && f.get(bx, by, FLOOR_Z) && rng.chance(0.4) && !isLanding(d.x, d.y)) {
         f.set(d.x, d.y, FLOOR_Z, B.DOOR);
         f.set(d.x, d.y, FLOOR_Z + 1, B.DOOR);
       }
@@ -214,11 +232,16 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   // --- 6. Height features, so the map's flat picture can mislead.
   // Cells next to doorways stay clear so rooms can't be sealed off by accident.
   // The last level has no holes at all (pits, chasms, deep water): there's nowhere lower to fall.
-  const nearDoor = (r, x, y) => r.doors.some((d) => Math.abs(d.x - x) <= 2 && Math.abs(d.y - y) <= 2);
+  const nearDoor = (r, x, y) => r.doors.some((d) => Math.abs(d.x - x) <= 2 && Math.abs(d.y - y) <= 2)
+    || landings.some((l) => Math.abs(l.x - x) <= 1 && Math.abs(l.y - y) <= 1);
   const holesOk = (r) => !p.holesIn || (r.x0 >= p.holesIn.x0 && r.x1 <= p.holesIn.x1 && r.y0 >= p.holesIn.y0 && r.y1 <= p.holesIn.y1);
   if (!simple) {
     for (const r of rooms) {
       if (r === start) continue;
+      if (landingRooms.has(r.id)) {   // (a landing's room stays one floor you can cross: no water, drop or height to cut it off)
+        if (r.hall) addPillars(f, r, nearDoor); else if (rng() < 0.34) addCrates(f, rng, r, nearDoor);
+        continue;
+      }
       if (r.hall && (final || !holesOk(r))) { addPillars(f, r, nearDoor); continue; }
       if (r.hall) {
         if (depth >= 2 && rng.chance(0.45)) addBigChasm(f, rng, r, nearDoor, depth);
@@ -288,7 +311,7 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   }
 
   // --- 9. Sometimes: a locked treasure room, with its key somewhere else.
-  const lockable = rooms.filter((r) => r !== start && r !== stairsRoom && r.doors.length > 0 && r.doors.length <= 2);
+  const lockable = rooms.filter((r) => r !== start && r !== stairsRoom && r.doors.length > 0 && r.doors.length <= 2 && !landingRooms.has(r.id));
   if (rng.chance(0.45) && lockable.length) {
     const r = rng.pick(lockable);
     for (const d of r.doors) { f.set(d.x, d.y, FLOOR_Z, B.LOCKED); f.set(d.x, d.y, FLOOR_Z + 1, B.LOCKED); }
@@ -1009,15 +1032,17 @@ function placeItem(f, rng, room, item) {
 // Corridor routing: cheapest path with a penalty for turning, so corridors come out
 // as long straight runs. Walls of rooms are expensive (enter through them, don't follow them).
 const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+// (The search's arrays and heap are reused from call to call: a level routes dozens of corridors, and a surface over a
+// dungeon makes its level 1 too. Integrator, C1a #9.)
+const COST = new Float64Array(W * D * 4), PREV = new Int32Array(W * D * 4);
 function findPath(ax, ay, bx, by, blocked, ringAt, corridor, jitter) {
-  const n = W * D * 4;
-  const cost = new Float64Array(n).fill(Infinity);   // must match the heap keys' precision exactly
-  const prev = new Int32Array(n).fill(-1);
-  const heap = new MinHeap();
+  const cost = COST.fill(Infinity);   // must match the heap keys' precision exactly
+  const prev = PREV.fill(-1);
+  const heap = HEAP.clear();
   for (let d = 0; d < 4; d++) { cost[(ax + ay * W) * 4 + d] = 0; heap.push(0, (ax + ay * W) * 4 + d); }
   let end = -1;
   while (heap.size) {
-    const [c, s] = heap.pop();
+    const c = heap.topKey(), s = heap.pop();
     if (c > cost[s]) continue;
     const cell = s >> 2, dir = s & 3;
     const x = cell % W, y = (cell - x) / W;
@@ -1037,34 +1062,44 @@ function findPath(ax, ay, bx, by, blocked, ringAt, corridor, jitter) {
   return path.reverse();
 }
 
+// A binary min-heap of (key, value) pairs in two typed arrays. It makes exactly the comparisons and swaps of the
+// array-of-pairs heap it replaced (sift up on <=, down on <, the left child first), so pops come out in the same
+// order, ties included: every corridor, and so every level, is as before (golden's levels 2-20 byte for byte).
 class MinHeap {
-  constructor() { this.items = []; }
-  get size() { return this.items.length; }
+  constructor(cap = 4096) { this.keys = new Float64Array(cap); this.vals = new Int32Array(cap); this.size = 0; }
+  clear() { this.size = 0; return this; }
+  topKey() { return this.keys[0]; }
   push(key, value) {
-    const a = this.items;
-    a.push([key, value]);
-    for (let i = a.length - 1; i > 0;) {
+    if (this.size === this.keys.length) {
+      const k = new Float64Array(this.size * 2), v = new Int32Array(this.size * 2);
+      k.set(this.keys); v.set(this.vals); this.keys = k; this.vals = v;
+    }
+    const K = this.keys, V = this.vals;
+    let i = this.size++;
+    K[i] = key; V[i] = value;
+    while (i > 0) {
       const p = (i - 1) >> 1;
-      if (a[p][0] <= a[i][0]) break;
-      [a[p], a[i]] = [a[i], a[p]]; i = p;
+      if (K[p] <= K[i]) break;
+      const tk = K[p], tv = V[p]; K[p] = K[i]; V[p] = V[i]; K[i] = tk; V[i] = tv; i = p;
     }
   }
-  pop() {
-    const a = this.items, top = a[0], last = a.pop();
-    if (a.length) {
-      a[0] = last;
+  pop() {   // → the top's value (its key: topKey() before the pop)
+    const K = this.keys, V = this.vals, top = V[0], n = --this.size;
+    if (n) {
+      K[0] = K[n]; V[0] = V[n];
       for (let i = 0; ;) {
         const l = 2 * i + 1, r = l + 1;
         let m = i;
-        if (l < a.length && a[l][0] < a[m][0]) m = l;
-        if (r < a.length && a[r][0] < a[m][0]) m = r;
+        if (l < n && K[l] < K[m]) m = l;
+        if (r < n && K[r] < K[m]) m = r;
         if (m === i) break;
-        [a[m], a[i]] = [a[i], a[m]]; i = m;
+        const tk = K[m], tv = V[m]; K[m] = K[i]; V[m] = V[i]; K[i] = tk; V[i] = tv; i = m;
       }
     }
     return top;
   }
 }
+const HEAP = new MinHeap();
 
 // ---------------------------------------------------------------------------
 // Can this level be finished? Returns a list of problems (empty = fine).
@@ -1137,6 +1172,11 @@ export function validateDungeonLevel(f, p = {}) {
   }
   for (const m of f.creatures) if (!canTalk(m) && f.stand[m.tx + m.ty * w] < 0) problems.push(`${m.type} stuck in a wall`);
   if (f.leverRecord && !f.leverRecordAt) problems.push("the Rune Lever room's record is missing");
+  // A fall from a sinkhole lands right under it (level 1 of a site: world/sites.js sinkholeSpots).
+  for (const [x, y] of p.landings ?? f.landings ?? []) {
+    const g = f.get(x, y, FLOOR_Z - 1);
+    if (f.stand[x + y * w] < 0 || noLocked[x + y * w] < 0 || g === B.STAIRS || g === B.STAIRS_UP) problems.push(`the landing at (${x}, ${y}) isn't floor you can reach`);
+  }
   return problems;
 }
 

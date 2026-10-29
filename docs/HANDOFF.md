@@ -5,13 +5,14 @@ Update this file as the last act of every session (see `CLAUDE.md`, "Handing off
 **Updated:** 2026-10-29, the integrator (local session), on `integration`. **Phase 1 is done and fully merged
 (`p2-ws3` … `p2-ws1`, the flip `p2-flip`). Phase 2's 2B hardening is done and tagged `p2-2b` (e0b7c9b), with the
 Phase 2 items that need no C1; since then `?world=real` (a new game on the real world, a preview; `p2-realworld`,
-2602aff), and `main` = `p2-realworld`. What's left of Phase 2 is the last wiring merge, which waits on C1:
+2602aff), the Phase 3 plan (approved by the user) and its first step, props named (`p3i-props`, 7959ea0); `main` =
+`p3i-props`. What's left of Phase 2 is the last wiring merge, which waits on C1:
 "Next step" below. Nothing is running.** From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p2-realworld` (`?world=real`, on `p2-2b`) on `integration`; before it `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+- **Last tag:** `p3i-props` (props named in the legend and inspect, on `p2-realworld`; C1a's base) on `integration`; before it `p2-realworld`, `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
   `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b`, `p1-ws10`, the flip, `p1-ws2a`, `p1-ws7a`,
   `p1-ws7b`, `p1-ws2b`, `p1-ws9` and `p1-ws1`, with their integration requests; `p2-ws3` … `p2-ws9` before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
@@ -52,9 +53,10 @@ runs on the test world. Its first step, once C1 is in: `git fetch origin --tags`
 `node tools/run-all.mjs` (38 of 38 at `p2-2b`) and `NODE_PATH="$(npm root -g)" node tools/browser-2b.mjs` (PASS), merge
 C1's tag, and point `game.js`'s new runs at the real world; then run the playthrough on the real world too (it runs on
 the test world today, seed 18, because the real world has no village before C1). The Phase 3 plan below is approved
-(the user, 2026-10-29); its sessions start on the user's word, none yet. Before C1a starts, the integrator adds the
-`props` describer (the user's answer 3; it changes P0's `tests/checks/hud.js:199`, approved with the plan) and tags it,
-so C1a starts from a tag that names the props.
+(the user, 2026-10-29), and its first step is done: props are named (`p3i-props`, `docs/sessions/2B.md` §8). **C1a, C4
+and C2 are started** (the user, 2026-10-29: "start C1a, C4 and C2 from p3i-props, as the Phase 3 plan says"), each in
+its worktree at `p3i-props` (the plan's table). Next for the integrator: merge C1a's tag when it comes, then the last
+wiring merge; C1b takes C1a's slot, C3 the next free one.
 
 **On `main` since `p2-ws6a`** (both at the user's request, without a tag of their own): the root README for GNOMON as
 it stands at `p2-ws5` (`6645658`, from `wip/readme`; an interim update before Phase 4's rewrite; the secret rooms'
@@ -125,9 +127,9 @@ single piece of authoring.
 
 | # | Session | Its data files (§8.4's "C" row, split) | Waits on | Worktree, branch |
 |---|---|---|---|---|
-| 1 | **C1a The world: regions and terrain** | `content/world/worldmap.js` (the regions rows and `regionKey`; the Inkrun's `liquid: "ink"`), `content/world/terrains.js` (the world function's final numbers), new `content/world/regions.js`, `content/biomes.js` (final counts and spawn weights), `content/moods.js` (a region's music and fog), and Hollowmere's plan (`content/world/plans/hollowmere.js`: the start) | nothing | `c1`, `ws/c1` (both halves) |
-| 2 | **C4 Gear and characters** | `content/items/*` (the parent's `items/legacy.js` entries stay as they are: golden), `content/mutations.js genotypes.js backgrounds.js powers.js` | nothing | `c4`, `ws/c4` |
-| 3 | **C2 Peoples** | `content/factions.js villages.js grammar.js currency.js liquids.js` | nothing (it names regions by the bible's ids; checked against C1a's at the merge) | `c2`, `ws/c2` |
+| 1 | **C1a The world: regions and terrain** (started 2026-10-29) | `content/world/worldmap.js` (the regions rows and `regionKey`; the Inkrun's `liquid: "ink"`), `content/world/terrains.js` (the world function's final numbers), new `content/world/regions.js`, `content/biomes.js` (final counts and spawn weights), `content/moods.js` (a region's music and fog), and Hollowmere's plan (`content/world/plans/hollowmere.js`: the start) | nothing | `c1`, `ws/c1` (both halves) |
+| 2 | **C4 Gear and characters** (started 2026-10-29) | `content/items/*` (the parent's `items/legacy.js` entries stay as they are: golden), `content/mutations.js genotypes.js backgrounds.js powers.js` | nothing | `c4`, `ws/c4` |
+| 3 | **C2 Peoples** (started 2026-10-29) | `content/factions.js villages.js grammar.js currency.js liquids.js` | nothing (it names regions by the bible's ids; checked against C1a's at the merge) | `c2`, `ws/c2` |
 | 4 | **C1b The landmarks** | new `content/world/landmarks.js` and `content/world/plans/*.js` (the other 15 plans, the Gnomon's foot among them), the landmark dungeons' data in `worldmap.js`'s landmark index | C1a merged | `c1`, `ws/c1` |
 | 5 | **C3 Creatures** | `content/creatures/*` (the parent's `creatures/legacy.js` tables stay: golden), `content/encounters.js`, `content/dungeons.js` | C1a merged (creatures and encounters by region) | `c3`, `ws/c3` |
 | 6 | **C5 Story** | `content/quests.js` (the quest texts, the campaign's 11 beats, the starter chain), the landmark people's dialogue (C1b places them; C5 writes their words), the intro on a real-world run | C1b, C2 and C3 merged (it reads their ids) | `c5`, `ws/c5` |
@@ -139,8 +141,8 @@ real world too), and C1b takes C1a's slot. C3 takes the next free slot, C5 the l
 the tags come, C1a always first; each merge gets its tag and `main` fast-forwards to it.
 
 **How a content session works** (as a Phase 1 workstream, CLAUDE.md and the steps under "Phase 1 plan" below):
-- Its worktree is made from the integrator's latest tag when it starts (`p2-realworld`, or `p3i-c1a` and later), so it
-  sees what is merged; its branch is `ws/<c>`.
+- Its worktree is made from the integrator's latest tag when it starts (`p3i-props` for the first three, `p3i-c1a` and
+  later after), so it sees what is merged; its branch is `ws/<c>`.
 - It edits only its data files above, and may add assertions for its own data to `tests/checks/content.js` (§8.4
   passes `check-content` to C) and to the owner check its files feed (listed below). A change to code, or to anyone
   else's file, goes in `docs/<c>.md` "Integration requests", for the integrator: a system the data needs (a bleeding
@@ -208,8 +210,8 @@ own tables; name props in the map legend and the inspect text; Esc on the map st
 2. **Golden (b) stays held:** the test world's legacy stack keeps the parent's numbers, and C3 gives the real world's
    levels (up to 23) tables of their own; `creatures/legacy.js`'s and `items/legacy.js`'s entries don't change.
 3. **Props are named** in the map legend and the inspect text: a `props` describer, with P0's
-   `tests/checks/hud.js:199` changed to allow it. The integrator does it before C1a starts (its own commit, marked
-   `// integrator (WS2b #7)`, with a mutant), and C1a's final props are named through it.
+   `tests/checks/hud.js:199` changed to allow it. **Done** (`de12966`, tagged `p3i-props`); C1a's final props are
+   named through it (a prop is named as `content/biomes.js` PROPS names it).
 4. **Esc on the map stays "turn to 3D"** for now (P0's `tests/checks/shell.js:366` unchanged); TECH §4.2's options
    stay reached by Tab and Esc twice, or the title.
 
@@ -284,8 +286,7 @@ job does. For a timed gate number, run that check alone on an idle machine and a
 
 ## Waiting on the user
 
-- **Starting Phase 3's sessions** (the plan above is approved, 2026-10-29): C1a, C4 and C2 start on the user's word,
-  after the integrator's props describer is tagged.
+- Nothing: C1a, C4 and C2 are running (2026-10-29). C1b, C3 and C5 start as the plan says, as slots free.
 
 - **The flip** (decided by the user on 2026-10-27, given in chat in the coordinating session: "Flip as built now:
   switch to the attribute set and d20 combat, and settle the tuning (creature scaling, kill XP) in the balance phase
@@ -391,6 +392,14 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p3i-props`** (2026-10-29): props named in the map legend and on the inspect line (`de12966`; integrator, WS2b #7;
+the user's answer 3 with the Phase 3 plan), on `p2-realworld`. A `props` describer in `renderMap.js` and the outdoor
+legend's prop rows (seen, not on a wall tile, up to 4, after what the legend showed before); P0's `tests/checks/hud.js`
+changed as approved, with an assertion; four mutants fail. `run-all` 37 of 38: check-overworld's timed world-map draw
+3.06 ms under 11 parallel checks, PASS alone twice (1.59 and 1.52 ms p50, budget 3; its renderer untouched).
+`browser-0d1 --against p2-realworld` (27 of 27 modes, golden (b) 27 of 27, per tick within +1.3%), `browser-2b`,
+`browser-silent` PASS. `main` fast-forwarded. Notes: `docs/sessions/2B.md` §8.
 
 **`p2-realworld`** (2026-10-29): `?world=real` on `p2-2b` (`3343302`; `docs/sessions/2B.md` §7). `config.js` exports
 `WORLD` (its own export: P0's check-config holds `FLAGS` to four flags, untouched); `main.js` builds new runs on

@@ -8,6 +8,7 @@
 //   dungeonLevelOf(spec, z) → level       the level of dungeon floor z (1-based)
 //   siteWithDungeon(run, wx, wy) → Site | null    the span's site that has a dungeon below it
 //   dungeonParams(run, site, z) → p       generateDungeonLevel's parameters for its level z
+//   sinkholeSpots(run, site) → [[lx, ly]]  where the surface may open a sinkhole over level 1 (level coordinates)
 //   placeLegends(run) → Map<uid, LegendDef>   the run's legends (every lair's owner), for run.legends
 //   legendOf(run, uid) → LegendDef | null
 //   SITE_BUILDERS[kind](ctx, site)        how a site is stamped into its surface zone (WS7: village; here: ruin,
@@ -40,12 +41,13 @@
 //      last level is the legend's hall); a ruin rolls a gimmick per floor, and a third of them are toppled
 //      (bible §4.10: murals and mosaics); a station holds a Truing Cradle (WS5) on its surface.
 //   4. A site's footprint keeps SITE_MARGIN (6) tiles from every zone edge; only landmarks may touch one.
-import { runRng } from "./run.js";
+import { runRng, zoneSeed } from "./run.js";
 import { levelOfTier, tierOfLevel, SIDES, SITE_MARGIN } from "./worldmodel.js";
 import { SURFACE, B, FLOOR_Z } from "../world.js";
 import { makeRng, seedFor } from "../rng.js";
 import { countGen } from "./genstats.js";
 import { stampVault } from "../gen/vaults.js";
+import { DUNGEON_W, DUNGEON_D } from "../gen/dungeon.js";
 import { pickCreatureType, CREATURE_TYPES } from "../creatures.js";
 import { DUNGEONS } from "../content/dungeons.js";
 import { LEGENDS } from "../content/creatures/legends.js";
@@ -128,6 +130,22 @@ function vaultPoolFor(spec, level) {
   return band ? band.pool.map((e) => (Array.isArray(e) ? [...e] : e)) : null;
 }
 
+// The spots over level 1 where the surface may open a sinkhole (gen/surface.js), in level coordinates: SINKHOLE_SPOTS
+// of them, at least 4 apart, from the span's own seed. Level 1 makes each one floor you can reach and not stairs
+// (dungeonParams' `landings`, gen/dungeon.js), so a fall lands right under its sinkhole and the surface needn't
+// make level 1 to know where it can open one (integrator, C1a #9: that cost a dungeon level a span). None for the
+// legacy stack, whose levels are the parent's.
+export const SINKHOLE_SPOTS = 6;
+export function sinkholeSpots(run, site) {
+  if (!site?.dungeon || site.dungeon.legacy) return [];
+  const rng = makeRng(seedFor(zoneSeed(run, site.at.wx, site.at.wy, 1), "sinkholes")), out = [];
+  for (let k = 0; k < 200 && out.length < SINKHOLE_SPOTS; k++) {
+    const x = rng.int(4, DUNGEON_W - 5), y = rng.int(4, DUNGEON_D - 5);
+    if (out.every(([a, b]) => Math.max(Math.abs(a - x), Math.abs(b - y)) >= 4)) out.push([x, y]);
+  }
+  return out;
+}
+
 // Level z of a site's dungeon (1-based): its level from the spec (DECISIONS.md: listed floors for a
 // landmark, else the surface level + z), its theme, gimmicks and vaults, the region's creatures, and on the
 // last level its bottom: a guardian's hall, a boss's throne, a legend's lair, an Hour site's reliquary ("none":
@@ -152,6 +170,7 @@ export function dungeonParams(run, site, z) {
     creatureTable: run.world.regions?.[tile?.region]?.creatures || null, holesIn: null,
     cradle: !!spec.cradle?.includes(z), murals: spec.murals ? spec.murals.map((m) => ({ ...m })) : null,
     name: spec.named?.[z - 1] || `${site.name}, level ${z}`,
+    landings: z === 1 ? sinkholeSpots(run, site).map(([x, y]) => [x, y]) : null,
   };
 }
 

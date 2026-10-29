@@ -7,7 +7,9 @@
 //   checkVaultOptions() · checkDungeonParams()
 //   checkDungeons({ seeds = 50, depths = 20, p95Budget = 40 })      the legacy stack (tools/check-dungeons.mjs)
 //   checkRandomLevels({ count = 1000, p95Budget = 40 })             random site parameters (check-dungeons)
-//   checkSites({ seeds })            every site × every level × the seeds, both worlds (tools/check-sites.mjs)
+//   checkSites({ seeds })            every site × every level × the seeds, both worlds (tools/check-sites.mjs); every
+//                                    sinkhole over a site's dungeon on one of its spots, a fall into it landing right
+//                                    under it on level 1 (zones.js arrivalPoint "fall"; integrator, C1a #9)
 //   checkHistoric({ seeds })         the fixture history's two site requests, built (check-sites)
 //   checkLegends({ seeds })          a legend lives in exactly one zone; a dead one never returns (check-sites)
 //   randomParams(i) → { seed, p }    the i-th random level (test.html draws the same ones)
@@ -20,7 +22,8 @@ import { Zone, B, FLOOR_Z } from "../../src/world.js";
 import { makeRng, seedFor } from "../../src/rng.js";
 import { canTalk } from "../../src/creatures.js";
 import { ITEM_KINDS } from "../../src/items.js";
-import { makeLegend, dungeonParams, SITE_KINDS, SITE_BUILDERS } from "../../src/world/sites.js";
+import { makeLegend, dungeonParams, sinkholeSpots, SITE_KINDS, SITE_BUILDERS } from "../../src/world/sites.js";
+import { arrivalPoint } from "../../src/zones.js";
 import { buildRun, zoneSeed } from "../../src/world/run.js";
 import { compileWorld, tierOfLevel } from "../../src/world/worldmodel.js";
 import { generateSurface, validateSurface } from "../../src/gen/surface.js";
@@ -333,7 +336,7 @@ const withStations = (def) => ({ ...def, regions: Object.fromEntries(Object.entr
 const SEEDS = [1, 7, 42, 1234, 31337];
 
 export function checkSites({ seeds = SEEDS } = {}) {
-  const problems = [], stats = { sites: 0, levels: 0, surfaces: 0, kinds: {}, bottoms: {}, legends: 0 };
+  const problems = [], stats = { sites: 0, levels: 0, surfaces: 0, kinds: {}, bottoms: {}, legends: 0, sinkholes: 0, sinkholeSpans: 0 };
   const t0 = performance.now();
   for (const [name, def] of [...WORLDS, ["test with stations", withStations(TEST_WORLD)]]) {
     const W = compileWorld(def);
@@ -358,6 +361,7 @@ export function checkSites({ seeds = SEEDS } = {}) {
           }
         }
         if (s.kind === "station" && s.dungeon) problems.push(`${where}: a station with a dungeon`);
+        let level1 = null;
         if (s.dungeon) {
           const d = s.dungeon;
           for (const g of [...(d.gimmicks || []), ...(d.floorGimmicks || []).flat()]) if (!GIMMICKS[g]) problems.push(`${where}: unknown gimmick ${g}`);
@@ -365,11 +369,27 @@ export function checkSites({ seeds = SEEDS } = {}) {
             const p = d.legacy ? legacyParams(z, seed) : dungeonParams(run, s, z);
             const f = generateDungeonLevel(d.legacy ? seed : zoneSeed(run, s.at.wx, s.at.wy, z), p);
             stats.levels++;
+            if (z === 1) level1 = f;
             const bad = [...validateDungeonLevel(f, p), ...(d.legacy ? [] : siteLevelProblems(f, p))];
             if (bad.length) problems.push(`${where} level ${z} (level ${p.level}): ${bad.join(", ")}`);
             if (p.final && p.bottom) stats.bottoms[p.bottom.kind] = (stats.bottoms[p.bottom.kind] || 0) + 1;
             if (p.final && p.bottom?.kind === "guardian" && !f.creatures.some((c) => c.guardian === p.bottom.id)) problems.push(`${where}: the guardian ${p.bottom.id} isn't in its hall`);
           }
+        }
+        // Every sinkhole over a site's dungeon (landmarks' too) is on one of the span's spots, and a fall into it lands
+        // right under it on level 1, by the fall's own rule (the surface no longer makes level 1 to place them).
+        if (s.dungeon && !s.dungeon.legacy && level1) {
+          const zone = generateSurface(run, s.at.wx, s.at.wy), r = zone?.dungeonRect, spots = sinkholeSpots(run, s);
+          let here = 0;
+          if (r) for (let y = 0; y < zone.d; y++) for (let x = 0; x < zone.w; x++) {
+            if (zone.get(x, y, 0) || zone.get(x, y, FLOOR_Z - 1)) continue;   // (a sinkhole: open down to the bottom)
+            const lx = x - r.ox, ly = y - r.oy, a = arrivalPoint(level1, "fall", { fx: lx + 0.5, fy: ly + 0.5 });
+            here++;
+            if (!spots.some(([sx, sy]) => sx === lx && sy === ly)) problems.push(`${where}: a sinkhole at (${x}, ${y}) off the span's spots`);
+            else if (Math.floor(a.x) !== lx || Math.floor(a.y) !== ly) problems.push(`${where}: a fall into the sinkhole at (${x}, ${y}) lands at (${Math.floor(a.x)}, ${Math.floor(a.y)}) on level 1, not (${lx}, ${ly})`);
+          }
+          stats.sinkholes += here;
+          if (here) stats.sinkholeSpans++;
         }
         if (s.kind !== "landmark") {
           const zone = generateSurface(run, s.at.wx, s.at.wy);
