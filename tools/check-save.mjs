@@ -120,7 +120,7 @@ if (args.browser) {
       const page = await ctx.newPage();
       page.on("pageerror", (e) => errors.push(`page error: ${e.message}`));
       page.on("console", (m) => { if (m.type() === "error") errors.push(`console error: ${m.text()}`); });
-      await page.goto(`${base}/index.html?silent=1${q}`);
+      await page.goto(`${base}/index.html?silent=1&world=test${q}`);
       await page.waitForFunction(() => window.game?.mode, null, { timeout: 30000 });
       return page;
     };

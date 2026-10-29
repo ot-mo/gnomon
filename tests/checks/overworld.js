@@ -27,8 +27,8 @@
 //                  tier warning
 //   8. screen      the world map drawn at 100×30, 160×64 and 180×56 on both worlds (every span on screen, the panel
 //                  on the right or in the bottom strip), and played by keys and the mouse: O, steps, Enter, Esc, Z;
-//                  ?world=real (config.js parseWorld, which main.js reads): only that picks the real world, and in
-//                  Node it's the test world (tools/browser-2b.mjs plays a new game on it in the browser)
+//                  the browser game's world (config.js parseWorld, which main.js reads): the real one unless ?world=test;
+//                  Node's game builds on the test world (tools/browser-2b.mjs plays the real world in the browser)
 import { makeRng, distance } from "../../src/rng.js";
 import { parseWorld, WORLD } from "../../src/config.js";
 import { on } from "../../src/events.js";
@@ -990,11 +990,12 @@ function screen(G, scr, problems) {
     if (!R?.line || lines.at(-1) !== R.line) problems.push(`screen: the panel of (${st.wx}, ${st.wy}) ends "${lines.at(-1)}", not its region's line`);
     out.regionLine = `${t.region}: "${(R?.line || "").slice(0, 40)}…"`;
   }
-  // ?world=real: new games on the real world, a preview before C1 (main.js). Only that value picks it.
-  const flags = [["?world=real", "real"], ["?seed=7&world=real&silent=1", "real"], ["", "test"], ["?world=test", "test"], ["?world=REAL", "test"], ["?world", "test"], ["?quick=1", "test"]];
+  // The browser game's world (config.js WORLD, read by main.js; the last wiring merge): the real one, unless the URL
+  // says ?world=test (the browser tools'). Node's checks build on the test world whatever it says (game.js).
+  const flags = [["", "real"], ["?quick=1", "real"], ["?world=real", "real"], ["?world=test", "test"], ["?seed=7&world=test&silent=1", "test"], ["?world=TEST", "real"], ["?world", "real"]];
   const bad = flags.filter(([q, w]) => parseWorld(q) !== w);
-  if (bad.length || WORLD !== "test") problems.push(`screen: parseWorld ${bad.map(([q, w]) => `"${q}" → ${parseWorld(q)}, want ${w}`).join("; ")}; WORLD in Node ${WORLD}`);
-  out.worldFlag = `${flags.length} URLs, only ?world=real the real world; Node: ${WORLD}`;
+  if (bad.length || WORLD !== "real" || G.game.world?.world?.id !== "test") problems.push(`screen: parseWorld ${bad.map(([q, w]) => `"${q}" → ${parseWorld(q)}, want ${w}`).join("; ")}; WORLD in Node ${WORLD}; Node's game world ${G.game.world?.world?.id}`);
+  out.worldFlag = `${flags.length} URLs, only ?world=test the test world; Node: WORLD ${WORLD}, its game on the ${G.game.world?.world?.id} world`;
   return out;
 }
 

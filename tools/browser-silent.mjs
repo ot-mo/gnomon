@@ -68,7 +68,7 @@ async function play(browser, silent) {
   page.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") errors.push(`${m.type()}: ${m.text()}`); });
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
   await page.addInitScript(probe);
-  await page.goto(`${base}/index.html?${silent ? "silent=1&" : ""}quick=1&seed=${SEED}`);
+  await page.goto(`${base}/index.html?${silent ? "silent=1&" : ""}quick=1&world=test&seed=${SEED}`);
   await page.waitForFunction(() => window.game && window.game.zone && window.game.mode);
   for (let k = 0; k < 12 && (await page.evaluate(() => window.game.mode)) === "story"; k++) { await page.keyboard.press("Space"); await page.waitForTimeout(150); }
   await page.keyboard.press("ArrowDown");   // a step on the map: the music runs

@@ -7,7 +7,7 @@
 // from the repository's root, e.g. `python -m http.server 8130`: http://127.0.0.1:8130). Before any page script an init script sends
 // every connect() into an AudioDestinationNode to a muted sink (an AnalyserNode, then a zero-gain GainNode), in
 // every frame. Every console error or warning, page error and failed request (but the favicon) fails the run.
-//   boot     index.html?silent=1&quick=1&seed=1234 (src/main.js with content/index.js and features.js: the game
+//   boot     index.html?silent=1&quick=1&world=test&seed=1234 (src/main.js with content/index.js and features.js: the game
 //            boots into the start span) and index.html?silent=1 (the title screen); a few keys and frames in each.
 //   imports  test-world.html?only=imports: tests/checks/imports.js in the browser, which loads every module of src/
 //            the game and the checks reach (but main.js, booted above), every Phase 1 stub and every check module
@@ -82,7 +82,7 @@ const say = (ok, line, problems = []) => {
 try {
   // --- boot ----------------------------------------------------------------------------------------------------
   if (!skip.has("boot")) {
-    for (const [url, want] of [["index.html?silent=1&quick=1&seed=1234", "play"], ["index.html?silent=1", "title"]]) {
+    for (const [url, want] of [["index.html?silent=1&quick=1&world=test&seed=1234", "play"], ["index.html?silent=1", "title"]]) {
       const t0 = performance.now();
       const { page, errors, requests } = await open(browser, url);
       const problems = [];

@@ -67,7 +67,7 @@ async function gate(browser, seed) {
       return orig.call(this, dest, ...rest);
     };
   });
-  await page.goto(`${base}/index.html?silent=1&quick=1&seed=${seed}`);
+  await page.goto(`${base}/index.html?silent=1&quick=1&world=test&seed=${seed}`);
   await page.waitForFunction(() => window.game && window.game.zone && window.game.mode);
   await page.waitForTimeout(500);
   // Helpers inside the page.

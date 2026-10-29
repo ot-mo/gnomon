@@ -8,8 +8,10 @@
 //                                            flag is off and seed is null
 //   storageKey(name) → "gnomon:<name>"       the one way to name a localStorage key
 //   parseFlags(search) → FLAGS               (exported for checks)
-//   WORLD = "test" | "real"                  ?world=real: new games start on GNOMON's real world (main.js), a
-//                                            preview before C1's content; anything else, the test world
+//   WORLD = "real" | "test"                  the world the browser game's new runs are built on (main.js): GNOMON's
+//                                            real world, or with ?world=test the test world (the browser tools'; it
+//                                            holds the parent's stack under (0, 0)). Node's checks build on the test
+//                                            world whatever this says (game.js)
 //   parseWorld(search) → WORLD               (exported for checks)
 //
 // seed: a whole number > 0, or null (a random one). silent: audio goes into an analyser and a zero-gain
@@ -30,7 +32,7 @@ const SEARCH = typeof location !== "undefined" && typeof location.search === "st
 export const FLAGS = parseFlags(SEARCH);
 
 // (Its own export, not a FLAGS field: P0's check-config holds FLAGS to its four flags.)
-export const parseWorld = (search = "") => (new URLSearchParams(search).get("world") === "real" ? "real" : "test");
+export const parseWorld = (search = "") => (new URLSearchParams(search).get("world") === "test" ? "test" : "real");
 export const WORLD = parseWorld(SEARCH);
 
 export const storageKey = (name) => `${GAME_ID}:${name}`;

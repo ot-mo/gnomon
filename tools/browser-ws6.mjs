@@ -36,7 +36,7 @@ try {
     page.on("console", (m) => { if (m.type() === "error") errors.push(`${w}: ${m.text()}`); });
     page.on("pageerror", (e) => errors.push(`${w}: pageerror ${e.message}`));
     await page.addInitScript(silence);
-    await page.goto(`${base}/index.html?silent=1&quick=1&seed=1234`);
+    await page.goto(`${base}/index.html?silent=1&quick=1&world=test&seed=1234`);
     await page.waitForFunction(() => window.game && window.game.zone && window.game.mode);
     const frames = (n = 3) => page.evaluate((n) => new Promise((ok) => { let k = 0; const f = () => (++k >= n ? ok() : requestAnimationFrame(f)); requestAnimationFrame(f); }), n);
     await page.evaluate(async () => {

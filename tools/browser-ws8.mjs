@@ -39,7 +39,7 @@ try {
       return orig.call(this, dest, ...rest);
     };
   });
-  await page.goto(`http://127.0.0.1:${port}/index.html?silent=1&quick=1&seed=${seed}`);
+  await page.goto(`http://127.0.0.1:${port}/index.html?silent=1&quick=1&world=test&seed=${seed}`);
   await page.waitForFunction(() => window.game && window.game.zone && window.game.mode === "story");
   const mode = () => page.evaluate(() => window.game.mode);
   const frames = (n = 3) => page.evaluate((n) => new Promise((ok) => { let k = 0; const f = () => (++k >= n ? ok() : requestAnimationFrame(f)); requestAnimationFrame(f); }), n);

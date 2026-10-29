@@ -61,7 +61,7 @@ import "./content/legacy/story-hooks.js";   // last, so its bus handlers run aft
 
 export const game = {
   seed: 0, zone: null, player: null,
-  world: TEST_WORLD,   // the world definition new runs are built on (the real one waits for its content)
+  world: TEST_WORLD,   // the world definition new runs are built on: the test world for Node's checks; main.js gives the browser game the real one
   run: null,           // the run: buildRun(seed, world) for a new game
   zones: new Map(),    // "wx,wy,z" → Zone: every zone you've visited stays as you left it
   state: null,         // persistent plain data (zones.js: uids, zonePatches, zoneLeft)

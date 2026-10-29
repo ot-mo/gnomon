@@ -97,7 +97,7 @@ async function openPage(base, width, height, seed = 1234) {
   page.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") errors.push(`${base === here.base ? "" : `${AGAINST}: `}${m.type()}: ${m.text()}`); });
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
   await page.addInitScript(silence);
-  await page.goto(`${base}/index.html?silent=1&quick=1&seed=${seed}`);
+  await page.goto(`${base}/index.html?silent=1&quick=1&world=test&seed=${seed}`);
   await page.waitForFunction(() => window.game && window.game.zone && window.game.mode);
   return page;
 }
@@ -166,7 +166,7 @@ try {
     // title's seed and mode (WS4 #12) and whose keys begin the run (End on the mutations' list, Tab on the name, Enter),
     // else "New quick game".
     for (const how of ["keys", "mouse"]) {
-      await page.goto(`${here.base}/index.html?silent=1&seed=1234`);
+      await page.goto(`${here.base}/index.html?silent=1&world=test&seed=1234`);
       await page.waitForFunction(() => window.game && window.game.mode === "title");
       await page.evaluate(async () => {   // (a new page: what it presents is kept again, for click())
         const { canvasBackend } = await import("/src/screen-canvas.js");

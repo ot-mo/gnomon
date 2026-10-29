@@ -57,7 +57,7 @@ try {
         return orig.call(this, dest, ...rest);
       };
     });
-    await page.goto(`http://127.0.0.1:${port}/index.html?silent=1&quick=1&seed=1234`);
+    await page.goto(`http://127.0.0.1:${port}/index.html?silent=1&quick=1&world=test&seed=1234`);
     await page.waitForFunction(() => window.game && window.game.zone && window.game.mode === "story");
     await page.evaluate(async () => {
       const { canvasBackend } = await import("/src/screen-canvas.js");
