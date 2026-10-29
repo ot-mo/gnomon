@@ -25,7 +25,7 @@ export const BESTIARY = {
   glowfin: B("12.1", "glowfin", "i", [1, 3], "GLOWFIN. Water only. Harm 0.",
     "A thin fish with a green lamp under its chin.", "it knows the way"),
   clatterer: B("12.1", "clatterer", "c", [1, 2], "CLATTERER. Moves: diagonal.",
-    "A crab the height of a child, claws politely aside.", "tk tk\nsomething sideways is selling"),
+    "A crab the height of a child, claws held aside.", "tk tk\nsomething sideways is selling"),
   flatling: B("12.1", "flatling", "f", [1, 3], "FLATLING. Thickness 0. Bites.",
     "A shadow on the floor with nothing over it.", "a shape with no edge"),
   lanternMoths: B("12.1", "lantern moths", "m", [1, 8], "LANTERN MOTHS. Harm 0. Follow: lit torches.",
@@ -37,7 +37,7 @@ export const BESTIARY = {
 
   // --- §12.2 The Rust Steps and the Tall Table ------------------------------------------------------------------
   rustbackScav: B("12.2", "Rustback scav", "g", [1, 3], "RUSTBACK SCAV. Takes drops. Flees at 25%.",
-    "A Rustback leaning towards the next good thing.", "scrap clinks\nin your pockets"),
+    "A lean Rustback with quick hands.", "scrap clinks\nin your pockets"),
   rustbackSlinger: B("12.2", "Rustback slinger", "g", [2, 3], "RUSTBACK SLINGER. Range 10. Perch: 2 blocks up.",
     "A thin Rustback with a long arm, fond of ledges.", "a whistle\nthen the stone"),
   ledgehorn: B("12.2", "ledgehorn", "q", [2, 3], "LEDGEHORN. Climb 2. Knock 2.",
@@ -47,7 +47,7 @@ export const BESTIARY = {
   ledgeSpider: B("12.2", "ledge spider", "x", [2, 3], "LEDGE SPIDER. Webs: bridges, drawn -.",
     "A rust-coloured spider that ropes the gaps.", "a thread across the dark"),
   chaffDevil: B("12.2", "chaff devil", "Y", [2, 2], "CHAFF DEVIL. Path: spiral. Blinds 3 s.",
-    "A whirl of dust and husks, turning patiently.", "grit in the eyes\nround again"),
+    "A whirl of dust and husks, turning on itself.", "grit in the eyes\nround again"),
 
   // --- §12.3 The Salt Waste ---------------------------------------------------------------------------------
   saltMirage: B("12.3", "salt mirage", "I", [2, 3], "SALT MIRAGE. On this map: nothing.",
@@ -77,7 +77,7 @@ export const BESTIARY = {
   sporeling: B("12.5", "sporeling", "j", [3, 5], "SPORELING. Splits. Its touch roots limbs.",
     "A soft lilac lump, faintly warm, sprouting caps.", "it smells of cellars\nit agrees with you"),
   foldmonkey: B("12.5", "foldmonkey", "y", [3, 4], "FOLDMONKEY. Throws from 4 blocks up. Steals 5 glim.",
-    "A brown monkey with folding arms, laughing out of reach.", "your purse is lighter"),
+    "A brown monkey with folding arms and a long reach.", "your purse is lighter"),
   paperWasps: B("12.5", "paper wasps", "P", [4, 6], "PAPER WASPS. Under doors: yes. Stain: 30 s.",
     "Wasps with wings like torn pages.", "a ledger opening\non your name"),
   mootWalker: B("12.5", "moot-walker", "F", [5, 6], "MOOT-WALKER. On death: confusing spores.",
@@ -87,13 +87,13 @@ export const BESTIARY = {
   tileMimic: B("12.6", "tile mimic", "t", [4, 5], "TILE MIMIC. One shade off. Moves while you are deep.",
     "A floor tile. A red one. Possibly.", "the floor is listening"),
   flatfolkWanderer: B("12.6", "Flatfolk wanderer", "@", [4, 4], "FLATFOLK WANDERER. Thickness 0. Directions: free.",
-    "A trader drawn on the ground, edge-on and polite.", "no\nthe other left"),
+    "A trader drawn on the ground, seen edge-on.", "no\nthe other left"),
   pressHound: B("12.6", "press-hound", "d", [4, 5], "PRESS-HOUND. Bite: pressed flat, 3 s.",
     "A steel-grey hound with a jaw like a book press.", "a page closing on you"),
   mosaicGolem: B("12.6", "mosaic golem", "G", [5, 5], "MOSAIC GOLEM. Eye tile 1. Crushing: x2.",
     "Red and blue tiles that stood up, still grouted.", "tiles fall like teeth"),
   pressedPilgrim: B("12.6", "pressed pilgrim", "@", [4, 4], "PRESSED PILGRIM. Harm 0. Striking one: desecration.",
-    "A pilgrim lying full length on the tiles, arms out.", "breath in the floor\nnearly there"),
+    "A pilgrim of the Plane, as flat as devotion allows.", "breath in the floor\nnearly there"),
 
   // --- §12.7 The Shade and the Unlit Choir -------------------------------------------------------------------------
   shade: B("12.7", "shade", "z", [5, 6], "SHADE. Sees in the dark. Burns in torchlight.",
@@ -116,7 +116,7 @@ export const BESTIARY = {
     "A tall judge whose voice makes things smaller.", "the rule is read\nsomething in you stops"),
   chimePriest: B("12.8", "chime-priest", "H", [4, 5], "CHIME-PRIEST. On the hour: hastes allies.",
     "A Horary priest who rings faintly as it breathes.", "bong\nyou are late"),
-  chandlerGuard: B("12.8", "Chandler guard", "J", [4, 5], "CHANDLER GUARD. Glimgun: range 8.",
+  chandlerGuard: B("12.8", "Chandler guard", "J", [4, 5], "CHANDLER GUARD. Range 8. Oil: set alight.",
     "A broad watchman smelling of lamp oil.", "a click\nthe floor lights up"),
   lampHound: B("12.8", "lamp-hound", "d", [3, 5], "LAMP-HOUND. Tracks light. Torch out: lost.",
     "A tawny hound following lamplight, not scent.", "it waits for the match"),

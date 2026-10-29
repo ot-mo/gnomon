@@ -136,7 +136,7 @@ try {
     if (!onIt) await key("Tab");
   }
   await key("Enter");
-  ex = await examined("A crab the height of a child, claws politely aside.");
+  ex = await examined("A crab the height of a child, claws held aside.");
   expect(onIt && (await mode()) === "examine" && ex.type === "clatterer" && ex.shown && ex.lines.some((l) => l.includes("minding its own business")),
          `the look cursor's Tab reaches the clatterer, and examine shows its Deep line and its peace (${onIt}, ${await mode()}, ${JSON.stringify(ex)})`);
   await shot("3-map-examine-clatterer");
@@ -167,7 +167,7 @@ try {
   }, placed.clatterer.id);
   await frames(2);
   await key("KeyL");
-  ex = await examined("A crab the height of a child, claws politely aside.");
+  ex = await examined("A crab the height of a child, claws held aside.");
   expect((await mode()) === "examine" && ex.type === "clatterer" && ex.shown, `L in 3D examines the clatterer with its Deep line (${await mode()}, ${JSON.stringify(ex)})`);
   await shot("5-3d-examine-clatterer");
   await key("Escape");
