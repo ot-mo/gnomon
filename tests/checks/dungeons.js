@@ -31,6 +31,9 @@ import { TEST_WORLD } from "../../src/content/world/test-world.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
 import { DUNGEONS } from "../../src/content/dungeons.js";
 import { legendLooks } from "../../src/content/creatures/legends.js";
+import * as LEGENDS_MOD from "../../src/content/creatures/legends.js";
+import * as CREATURES_MOD from "../../src/creatures.js";
+import * as FACTIONS_MOD from "../../src/factions.js";
 import { DENY } from "./names.js";
 
 const pct = (sorted, q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))];
@@ -611,7 +614,74 @@ export async function checkLegends({ seed = 7 } = {}) {
     if (laid !== 1 || claimedBy !== hDeep || dropped !== 1 || twice !== 0) problems.push(`a history relic: ${stats.relic}`);
   } else problems.push("no historic site with a relic");
   stats.cases = 8;
+  // 9. C3's legend data (content/creatures/legends.js): the real world's lair owners by region, the reasons, the
+  //    waiting templates.
+  const data = legendDataProblems(game);
+  problems.push(...data.problems);
+  stats.c3 = data.stats;
   return { name: "legends", ok: problems.length === 0, problems, stats };
+}
+
+// The real world's legends (C3): LEGENDS.regions names real regions, every region whose spans may hold a lair has an
+// entry; its species are registered kinds out for a Bent stranger (a lair's owner is), its herds among them or kinds
+// of its own, its factions registered and each with reasons; LEGENDS.reasons covers the 21 fixed factions, two loves
+// and two hates each, short, lower case and unpunctuated as a clause; the waiting templates have a name, three
+// epithets, a hall and what they need, and none is pickable yet (makeLegend's draws stay as they were). Two mutants.
+const FIXED_FACTIONS = ["hollowmere", "noonVigil", "survey", "assize", "horary", "pressed", "lampless", "drovers", "chandlers", "rustbacks",
+  "flatfolk", "unlit", "askew", "plan", "moths", "kites", "clatter", "saltbeasts", "sporeMoot", "pleatwood", "errata"];
+function legendData(game, LEGENDS, CREATURE_TYPES, FACTIONS, attitude, spawnCreature) {
+  const out = [], R = REAL_WORLD.regions;
+  for (const [r, e] of Object.entries(LEGENDS.regions)) {
+    if (!R[r]) { out.push(`legends: ${r} isn't a real-world region`); continue; }
+    if (!e.species?.length) out.push(`legends: ${r} has no species`);
+    for (const [type, w] of e.species || []) {
+      const T = CREATURE_TYPES[type];
+      if (!T || T.talks || !(w > 0)) { out.push(`legends: ${r}'s species ${type} (${w})`); continue; }
+      const feel = attitude(game, spawnCreature(type, 1, 1, FLOOR_Z, { rng: () => 0.5, level: 9 }), game.player);
+      if (feel !== "hostile") out.push(`legends: ${r}'s ${type} isn't out for a stranger (${feel})`);
+    }
+    for (const h of e.herds || []) if (!CREATURE_TYPES[h] || CREATURE_TYPES[h].talks) out.push(`legends: ${r}'s herd ${h}`);
+    for (const f of e.factions || []) if (!FACTIONS[f] || !LEGENDS.reasons[f]) out.push(`legends: ${r}'s faction ${f} unknown or without reasons`);
+    if (!e.factions?.length) out.push(`legends: ${r} has no factions`);
+  }
+  for (const [r, def] of Object.entries(R)) if (def.sites?.lair > 0 && !LEGENDS.regions[r]) out.push(`legends: ${r} holds lairs and no entry`);
+  const clause = (s) => typeof s === "string" && /^[a-z0-9][A-Za-z0-9 ',-]*[a-z0-9]$/.test(s) && s.split(" ").length <= 9;
+  for (const f of FIXED_FACTIONS) {
+    const e = LEGENDS.reasons[f];
+    if (!e || !(e.loves?.length >= 2 && e.hates?.length >= 2)) { out.push(`legends: reasons for ${f}`); continue; }
+    for (const s of [...e.loves, ...e.hates]) if (!clause(s)) out.push(`legends: ${f}'s reason "${s}"`);
+  }
+  for (const [id, t] of Object.entries(LEGENDS.waiting)) {
+    if (!(t.name && t.epithets?.length >= 3 && t.hall && typeof t.needs === "string" && t.needs.length > 20 && t.info)) out.push(`legends: waiting template ${id}`);
+    if (LEGENDS.templates[id]) out.push(`legends: ${id} is waiting and pickable`);
+  }
+  return out;
+}
+function legendDataProblems(game) {
+  const problems = [], stats = {};
+  const L = LEGENDS_MOD.LEGENDS, C = CREATURES_MOD, F = FACTIONS_MOD;
+  const p = game.player, saved = { genotype: p.genotype, rep: game.state.rep };
+  try {
+    p.genotype = "bent"; game.state.rep = {};
+    const run = () => legendData(game, L, C.CREATURE_TYPES, F.FACTIONS, F.attitude, C.spawnCreature);
+    problems.push(...run());
+    const mutants = [
+      ["a docile owner", () => { const s = L.regions.waste.species; s.push(["longback", 1]); return () => s.pop(); }, /waste's longback isn't out for a stranger/],
+      ["a faction without reasons", () => { const old = L.reasons.drovers; delete L.reasons.drovers; return () => { L.reasons.drovers = old; }; }, /reasons for drovers|faction drovers unknown or without reasons/],
+    ];
+    let caught = 0;
+    for (const [what, apply, re] of mutants) {
+      const undo = apply();
+      let o;
+      try { o = run(); } finally { undo(); }
+      if (o.some((x) => re.test(x))) caught++; else problems.push(`legend data: the mutant "${what}" isn't caught`);
+    }
+    stats.regions = Object.keys(L.regions).length;
+    stats.reasons = `${Object.keys(L.reasons).length} factions, ${Object.values(L.reasons).reduce((a, e) => a + e.loves.length + e.hates.length, 0)} reasons`;
+    stats.waiting = Object.keys(L.waiting).join(", ");
+    stats.mutants = `${caught} of ${mutants.length}`;
+  } finally { p.genotype = saved.genotype; game.state.rep = saved.rep; }
+  return { problems, stats };
 }
 
 // --- Spikes: a flat you is spared (WS8 #3), a creature's spike wound is nobody's (WS6a #2) ------------------
