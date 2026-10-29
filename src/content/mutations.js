@@ -1,9 +1,8 @@
 // Mutations (TECH_DESIGN §2.18, §8.3 "WS4"; bible §10.3, §10.4, §13.5; WS4, then C4): the Bent's creases bought as
-// bodies. Bible §13.5 lists 20 physical and 12 mental mutations and 8 defects; this table holds the ones the game has
-// the hooks for (12 physical, 4 mental, 4 defects). The rest wait for theirs: Extra Arms is out of scope (§15.9: no
-// limbs), Gecko Pads, Horns and Silk Glands need movement rules (WS8), Digging Hands the Stacks' desecration (WS10),
-// Deep Eyes, Heavy Bones and Ink Glands the map's and the fall's hooks, Endear followers (WS6a), Muddle, Time Lag and
-// Foresight the AI's (WS8), Snuff and Force Plane light and panes, Backglass mental attacks, Readhand artifacts (WS5).
+// bodies. Bible §13.5 lists 20 physical and 12 mental mutations and 8 defects. MUTATIONS holds the 20 the game has the
+// hooks for (12 physical, 4 mental, 4 defects): progression/mutations.js offers every one of them. MUTATIONS_WAITING
+// (C4) holds the other 20 in the same shape, each with `needs`, the code it waits for (docs/c4.md): one moves across
+// when its hook is built, since a mutation offered before then would take 4 creases and do nothing.
 //
 //   MUTATIONS[id] = { name, kind: "physical" | "mental" | "defect", cost, max, excludes: [id], planar, bridge?,
 //                     info(lvl) → string, bonus?(lvl, e) → { key: n }, ability?: id, rep?: { faction: n },
@@ -139,5 +138,121 @@ export const MUTATIONS = {
   crookedManner: {
     name: "Crooked Manner", kind: "defect", cost: -2, max: 1, excludes: [], repAll: -50,
     info: () => "Everything you say comes out wrong: -50 with every faction.",
+  },
+};
+
+// Bible §13.5's other 20 (C4): the data for each, waiting for its code. Costs are 4 as above (§15.6), a defect's
+// refund the bible's; exclusions where two bodies can't agree, none of them the bible's (heavy bones sink where gills
+// swim, are too heavy for wings and can't be brittle; a deafness to the beat can't foresee it).
+export const MUTATIONS_WAITING = {
+  // --- Physical ---
+  extraArms: {
+    name: "Extra Arms", kind: "physical", cost: 4, max: 10, excludes: [],
+    info: (l) => `A second weapon strikes on ${10 + 3 * l}% of your attacks.`,
+    needs: "a third holding part (body.js addPart) and the second weapon's strike (combat.js)",
+  },
+  geckoPads: {
+    name: "Gecko Pads", kind: "physical", cost: 4, max: 10, excludes: [], planar: true,
+    info: (l) => `Cling to a wall in 3D for ${2 + 0.5 * l} s, climbing a block a second.`,
+    needs: "clinging to walls in 3D (player.js movement)",
+  },
+  diggingHands: {
+    name: "Digging Hands", kind: "physical", cost: 4, max: 10, excludes: [],
+    info: () => "Dig a block in 1 s, in either view. The Stacks call it desecration.",
+    needs: "digging in both views (turns.js, player.js, world.js) and the Stacks' desecration (WS10, C2)",
+  },
+  inkGlands: {
+    name: "Ink Glands", kind: "physical", cost: 4, max: 10, excludes: [], planar: true,
+    bridge: "a cloud of dark in either view, where 3D shows what only the dark shows",
+    info: () => "A 3 × 3 cloud of ink for 8 s: runes and planks show in it, torch or no.",
+    rep: { flatfolk: 100 },
+    needs: "an ability: the dark cloud and dark sight inside it (light.js, render3d.js, progression/abilities.js)",
+  },
+  deepEyes: {
+    name: "Deep Eyes", kind: "physical", cost: 4, max: 1, excludes: [], planar: true,
+    bridge: "pits and chasms seen from the map count as looked into, as only 3D could before",
+    info: () => "Holes you see from the map count as looked into; through one you see a floor down.",
+    needs: "the map's holes marked looked-into (renderMap.js, zone.holeSeen) and a floor down through holes (render3d.js)",
+  },
+  heavyBones: {
+    name: "Heavy Bones", kind: "physical", cost: 4, max: 1, excludes: ["gills", "wings", "brittleBones"], planar: true,
+    info: () => "No knockback, half fall damage, and in deep water you walk the bottom.",
+    needs: "knockback immunity (WS8), half fall damage (player.js), walking the bottom of deep water (status.js drowning, world.js)",
+  },
+  horns: {
+    name: "Horns", kind: "physical", cost: 4, max: 10, excludes: [],
+    info: () => "A sprinting charge in 3D knocks the target back 2 tiles.",
+    rep: { saltbeasts: 100 },
+    needs: "a charge in 3D with knockback (player.js sprint, combat.js)",
+  },
+  silkGlands: {
+    name: "Silk Glands", kind: "physical", cost: 4, max: 10, excludes: [], planar: true,
+    info: (l) => `A web across a gap of ${3 + l / 2} tiles: it holds you for 20 s and slows pursuers.`,
+    rep: { kites: -100 },
+    needs: "a web that comes and goes and slows pursuers (world.js, ai.js, progression/abilities.js)",
+  },
+  // --- Mental: their levels add EGO's, and count in your Cast ---
+  snuff: {
+    name: "Snuff", kind: "mental", cost: 4, max: 10, excludes: [], planar: true,
+    info: () => "Every light within 6 tiles goes out, monsters' lamps too. The shades are pleased.",
+    needs: "putting out lights (light.js: braziers, creatures' lamps, your torch) and the shades' courage (ai.js)",
+  },
+  endear: {
+    name: "Endear", kind: "mental", cost: 4, max: 10, excludes: [],
+    info: () => "Make a creature your follower: your EGO against its WIL.",
+    needs: "followers won by a contest of EGO and WIL (social: the Kindling's recruits)",
+  },
+  muddle: {
+    name: "Muddle", kind: "mental", cost: 4, max: 10, excludes: [],
+    info: (l) => `Confuse everything in a cone for ${3 + l / 2} s.`,
+    needs: "a confused status for creatures, and its cone (status.js, ai.js, progression/abilities.js)",
+  },
+  forcePlane: {
+    name: "Force Plane", kind: "mental", cost: 4, max: 10, excludes: [], planar: true,
+    bridge: "a pane in both views that stops deep and flat beings alike",
+    info: () => "Raise a pane of force that stops deep and flat beings alike.",
+    needs: "a pane that comes and goes, solid to flat beings too (world.js, creatures.js), as the force pane artifact's",
+  },
+  timeLag: {
+    name: "Time Lag", kind: "mental", cost: 4, max: 10, excludes: [],
+    info: () => "Enemies within 4 tiles act 30% slower for 6 s.",
+    needs: "a slowed status for creatures (status.js speed, ai.js)",
+  },
+  foresight: {
+    name: "Foresight", kind: "mental", cost: 4, max: 10, excludes: ["beatDeaf"], planar: true,
+    bridge: "the map shows what comes next; 3D slows before a blow lands",
+    info: () => "The map shows the next 2 spike beats and every monster's next step; in 3D, blows come slower.",
+    needs: "the next beats and steps on the map (traps.js, ai.js, renderMap.js), and a slow second in 3D (time.js)",
+  },
+  backglass: {
+    name: "Backglass", kind: "mental", cost: 4, max: 1, excludes: [],
+    info: () => "The next mental attack on you goes back to its sender.",
+    needs: "mental attacks to turn back (the Assize's Overrule, C2's Chime, Endear)",
+  },
+  readhand: {
+    name: "Readhand", kind: "mental", cost: 4, max: 1, excludes: [],
+    info: () => "You know an artifact by touch, and read the account on any engraving.",
+    needs: "identify on touch (bodymods/artifacts.js identify, on pickup) and engraved items' accounts (story, WS7)",
+  },
+  // --- Defects ---
+  brittleBones: {
+    name: "Brittle Bones", kind: "defect", cost: -3, max: 1, excludes: ["heavyBones"],
+    info: () => "Falls of 3 blocks hurt, and blunt blows do half again.",
+    needs: "fall damage from 3 blocks (player.js) and +50% from cudgels and fists (combat.js)",
+  },
+  shadowless: {
+    name: "Shadowless", kind: "defect", cost: -3, max: 1, excludes: [],
+    info: () => "Flat beings can't perceive you: the Flatfolk won't talk, but Smoothers ignore you.",
+    needs: "flat beings that don't perceive you (ai.js, talk.js with the Flatfolk; Folio needs another route, C1b, C5)",
+  },
+  sleepwalker: {
+    name: "Sleepwalker", kind: "defect", cost: -2, max: 1, excludes: [],
+    info: () => "Each world-map move has a 1 in 10 chance of drifting a span off.",
+    needs: "a drift on world-map moves (overworld/travel.js)",
+  },
+  beatDeaf: {
+    name: "Beat-deaf", kind: "defect", cost: -3, max: 1, excludes: ["foresight"],
+    info: () => "The map stops warning you of spike beats.",
+    needs: "hiding the map's spike warnings (renderMap.js, traps.js)",
   },
 };

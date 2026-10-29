@@ -12,6 +12,7 @@
 // (missiles.js), in 3D where you look and on the map at the target screen's cursor, and your hands keep
 // your blade for the swing. E on one in the pack readies it.
 import { registerItemKind } from "../../items.js";
+import { MATERIALS, VALUE } from "./forge.js";   // C4: a forged bolt-bow (`made`, and `material`: the damage its shot adds)
 
 export const MISSILES = {
   sling: { name: "sling", dmg: [1, 4], acc: 0, range: 10, speed: 14, gravity: 16, reload: 0.7, hands: 1, ammo: null, noun: "stone",
@@ -35,17 +36,18 @@ const ART = {
   bolt: { w: 0.3, h: 0.1, art: ["IhhhH"] },
 };
 
+const made = (it) => (it.made && MATERIALS[it.made]) || null;
 registerItemKind("missile", {
   stack: false, weight: () => 0,
-  price: (it) => MISSILES[it.id].price + 30 * Math.max(0, it.ench || 0),
-  name: (game, it) => `${it.ench ? `${signed(it.ench)} ` : ""}${MISSILES[it.id].name}`,
-  glyph: () => [")", [200, 165, 110]],   // a weapon (bible §15.7), in the colour of its wood
+  price: (it) => (made(it) ? Math.round((VALUE[it.id] || MISSILES[it.id].price) * made(it).value) : MISSILES[it.id].price) + 30 * Math.max(0, it.ench || 0),
+  name: (game, it) => `${it.ench ? `${signed(it.ench)} ` : ""}${made(it) ? `${made(it).name} ` : ""}${MISSILES[it.id].name}`,
+  glyph: (game, it) => [")", made(it)?.color || [200, 165, 110]],   // a weapon (bible §15.7), in the colour of its wood (or its metal)
   info(game, it) {
-    const m = MISSILES[it.id], ammo = m.ammo ? `shoots ${AMMO[m.ammo].plural}` : `shoots ${m.noun}s, free`;
-    return `${m.dmg[0]}-${m.dmg[1]} damage · range ${m.range} · ${m.reload} s a shot · ${ammo} · ${m.info} · V fires it`;
+    const m = MISSILES[it.id], ammo = m.ammo ? `shoots ${AMMO[m.ammo].plural}` : `shoots ${m.noun}s, free`, d = made(it)?.dmg || 0;
+    return `${m.dmg[0] + d}-${m.dmg[1] + d} damage · range ${m.range} · ${m.reload} s a shot · ${ammo} · ${m.info}${made(it) ? ` · ${made(it).name}: ${made(it).info}` : ""} · V fires it`;
   },
   art: ART.launcher,
-  palette: () => ({ ...WOOD, ...STRING, ...IRON }),
+  palette: (game, it) => (made(it) ? { ...WOOD, ...STRING, i: [made(it).color.map((v) => Math.round(v * 0.7)), 0.15], I: [made(it).color, 0.25] } : { ...WOOD, ...STRING, ...IRON }),
   // E in the pack: this is the one V fires from now on (missiles.js readyLauncher). It takes no time.
   use(game, e, it) {
     e.readyMissile = it.id;
