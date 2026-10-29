@@ -1142,6 +1142,11 @@ export function checkGear(m) {
           if (!Bd.unequip(game, e, "hand_r").ok || snap(e) !== before) fail(`${set}: ${mat} ${id} on and off changed the derived numbers`);
           pieces++;
         }
+        for (const [mat, , dmg] of LADDER) {   // the bolt-bow's shot adds its material (missiles.js missileSpec)
+          const p = { ...entity(), readyMissile: "boltBow" }, it = GR.makeGear("missile", "boltBow", mat), spec = m.missiles.missileSpec(p, it);
+          if (it.made !== mat || spec.material !== dmg || !I.itemName(game, it).startsWith(`${mat} bolt-bow`)) fail(`${set}: a ${mat} bolt-bow: made ${it.made}, the shot's material ${spec.material}, named ${I.itemName(game, it)}`);
+          pieces++;
+        }
         for (const id of Object.keys(I.ARMOURS)) for (const [mat, , , av] of LADDER) {
           const e = entity(), it = GR.makeGear("armour", id, mat), before = snap(e);
           const forged = F.FORGED.armour.includes(id);
@@ -1174,20 +1179,22 @@ export function checkGear(m) {
 
   section("randomGear", () => {
     const tierOf = (level) => Math.min(8, Math.ceil((level + 1) / 3));
+    let launchers = 0;
     const HEAVY = { greatsword: 4, maul: 4, glaive: 4, waraxe: 3, longsword: 3 };
     const tally = {};
     for (let level = 1; level <= 30; level++) {
       const tier = tierOf(level), rng = m.rng.makeRng(4100 + level), mats = {};
       for (let k = 0; k < 400; k++) {
         const it = GR.randomGear(rng, level);
-        if (!I.ITEM_KINDS[it.kind] || !(it.kind === "weapon" ? I.WEAPONS : I.ARMOURS)[it.id]) { fail(`level ${level}: drew ${JSON.stringify(it)}`); continue; }
+        if (!I.ITEM_KINDS[it.kind] || !({ weapon: I.WEAPONS, armour: I.ARMOURS, missile: m.missileTable }[it.kind] || {})[it.id]) { fail(`level ${level}: drew ${JSON.stringify(it)}`); continue; }
         if (it.id === "clothes") fail(`level ${level}: drew plain clothes`);
         if (!GR.useful(it.kind, it.id)) fail(`level ${level}: drew ${it.id}, which does nothing yet`);
         if (it.made) {
           mats[it.made] = (mats[it.made] || 0) + 1;
           if (F.MATERIALS[it.made].tier > tier) fail(`level ${level} (tier ${tier}): ${it.made} (tier ${F.MATERIALS[it.made].tier})`);
-          if (it.kind === "weapon" && it.material !== F.MATERIALS[it.made].dmg) fail(`level ${level}: ${it.made} ${it.id} with material ${it.material}`);
-        } else if (it.kind === "weapon") fail(`level ${level}: a weapon with no material`);
+          if (it.kind !== "armour" && it.material !== F.MATERIALS[it.made].dmg) fail(`level ${level}: ${it.made} ${it.id} with material ${it.material}`);
+        } else if (it.kind === "weapon" || it.id === "boltBow") fail(`level ${level}: a ${it.id} with no material`);
+        if (it.kind === "missile") launchers++;
         if (HEAVY[it.id] > tier) fail(`level ${level} (tier ${tier}): a ${it.id} before tier ${HEAVY[it.id]}`);
         if (I.ARMOURS[it.id]?.tier > tier && !F.FORGED.armour.includes(it.id)) fail(`level ${level}: ${it.id} of tier ${I.ARMOURS[it.id].tier}`);
       }
@@ -1206,7 +1213,10 @@ export function checkGear(m) {
       const rng = m.rng.makeRng(700 + depth);
       for (let k = 0; k < 200; k++, parent++) { const it = I.randomEquipment(rng, depth); if (fresh.has(it.id) || it.made) fail(`randomEquipment at depth ${depth} drew ${it.id}${it.made ? ` in ${it.made}` : ""}`); }
     }
-    stats.randomGear = `30 levels × 400 draws; the commonest material by tier: ${[1, 4, 7, 10, 13, 16, 19, 22].map((l) => `${tierOf(l)} ${tally[l]}`).join(", ")}; randomEquipment ${parent} draws, none new`;
+    const tonics = {};
+    for (let k = 0, rng = m.rng.makeRng(31); k < 1400; k++) { const t = TN.randomTonic(rng); tonics[t.effect] = (tonics[t.effect] || 0) + 1; if (!TN.TONICS[t.effect]) fail(`randomTonic: ${t.effect}`); }
+    if (Object.keys(tonics).length !== 6 || Object.entries(tonics).sort((a, b) => b[1] - a[1])[0][0] !== "balm") fail(`randomTonic: ${JSON.stringify(tonics)} (all six, the balm the commonest)`);
+    stats.randomGear = `${launchers} launchers among them; randomTonic ${JSON.stringify(tonics)}; 30 levels × 400 draws; the commonest material by tier: ${[1, 4, 7, 10, 13, 16, 19, 22].map((l) => `${tierOf(l)} ${tally[l]}`).join(", ")}; randomEquipment ${parent} draws, none new`;
   });
 
   section("switched on", () => {
@@ -1399,6 +1409,7 @@ export async function run(env) {
   // C4's (checkGear): its tables and the modules it drives.
   await Promise.all([load("forge", "content/items/forge.js"), load("gear", "content/items/gear.js"), load("tonics", "content/items/tonics.js"),
     load("artifactTables", "content/items/artifacts.js"), load("mutationsContent", "content/mutations.js"), load("mutations", "progression/mutations.js"),
-    load("chargen", "progression/chargen.js"), load("backgrounds", "content/backgrounds.js")]);
+    load("chargen", "progression/chargen.js"), load("backgrounds", "content/backgrounds.js"), load("missiles", "missiles.js")]);
+  m.missileTable = (await env.src("content/items/missiles.js")).MISSILES;
   return [checkItems(m), checkGear(m)];
 }

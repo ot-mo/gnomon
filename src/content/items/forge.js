@@ -38,10 +38,11 @@ export const MATERIALS = {
 };
 export const MATERIAL_ORDER = Object.keys(MATERIALS);
 
-// Which gear takes a material: every weapon class; of the armour, the body's metal and the plain helm (bible §13.1:
-// "an armour's material adds to its armour value"). The parent's copper cap and iron helm are already their metal, and
-// bracers, gauntlets and boots keep their own +1, so a tier-8 body tops out near AV 10 rather than 20.
-export const FORGED = { armour: ["chain", "scale", "plate", "helm"] };
+// Which gear takes a material: every weapon class and the bolt-bow (its shot adds the material: missiles.js
+// missileSpec; the sling throws stones); of the armour, the body's metal and the plain helm (bible §13.1: "an armour's
+// material adds to its armour value"). The parent's copper cap and iron helm are already their metal, and bracers,
+// gauntlets and boots keep their own +1, so a tier-8 body tops out near AV 10 rather than 20.
+export const FORGED = { missile: ["boltBow"], armour: ["chain", "scale", "plate", "helm"] };
 
 // --- Weapon classes (bible §13.2) --------------------------------------------------------------------------------------
 // CLASSES[id] = { name, info?, needs }: a class's identity. info: what the game does now (the item's line shows it);
@@ -161,7 +162,7 @@ export const GEAR_ARMOURS = {
 export const VALUE = {
   dagger: 20, stylus: 12, shortsword: 40, longsword: 80, mace: 45, maul: 110, staff: 25, handAxe: 35, waraxe: 100,
   spear: 45, glaive: 110, greatsword: 140, lanternFlail: 70,
-  chain: 70, scale: 110, plate: 160, helm: 40,
+  chain: 70, scale: 110, plate: 160, helm: 40, boltBow: 90,
 };
 
 // What examine says of a class or a piece (bible §2: plain, at most 3 sentences; about one in five from above). The
@@ -223,4 +224,4 @@ export const TEXT = {
 
 // The line an item's info shows for its material: "copper: soft and green".
 export const materialLine = (made) => (MATERIALS[made] ? `${MATERIALS[made].name}: ${MATERIALS[made].info}` : "");
-export const isForged = (kind, id) => kind === "weapon" || (kind === "armour" && FORGED.armour.includes(id));
+export const isForged = (kind, id) => kind === "weapon" || !!FORGED[kind]?.includes(id);

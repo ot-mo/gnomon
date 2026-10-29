@@ -180,7 +180,7 @@ export function checkContent(m) {
       if (a.wornRep !== undefined) need(str(a.needs), `${at}: a worn reputation with no needs (the hook is a request)`);
     }
     for (const id of Fg.FORGED.armour) need(I.ARMOURS[id], `forged armour ${id}: no such armour`);
-    for (const id of Object.keys(Fg.VALUE)) need(I.WEAPONS[id] || I.ARMOURS[id], `value ${id}: no such weapon or armour`);
+    for (const id of Object.keys(Fg.VALUE)) need(I.WEAPONS[id] || I.ARMOURS[id] || m.c4.missiles.MISSILES[id], `value ${id}: no such weapon, armour or missile weapon`);
     for (const [id, c] of Object.entries(Fg.CLASSES)) need(str(c.name) && (c.info === undefined || str(c.info)) && str(c.needs), `class ${id}: name, info and needs`);
     for (const [id, t] of Object.entries(Tn.TONICS)) {
       need(str(t.name) && num(t.value) && t.value > 0 && num(t.t) && t.t > 0 && str(t.info) && sentences(t.info) <= 3 && fn(t.use) && fn(t.overdose), `tonic ${id}: name, value, time, info, use and overdose`);
@@ -440,8 +440,9 @@ export async function contentModules(src) {
       "world/run.js", "world/sites.js", "world/worldmodel.js", "content/world/test-world.js", "content/world/worldmap.js", "content/world/temple.js",
       "game.js", "interact.js", "world.js"].map((p) => src(p)));
   // C4's tables (section 1b).
-  const [forge, gear, tonics, artifacts, mutations, backgrounds, implants, body] = await Promise.all(["content/items/forge.js", "content/items/gear.js",
-    "content/items/tonics.js", "content/items/artifacts.js", "content/mutations.js", "content/backgrounds.js", "content/items/implants.js", "body.js"].map((p) => src(p)));
+  const [forge, gear, tonics, artifacts, mutations, backgrounds, implants, body, missiles] = await Promise.all(["content/items/forge.js", "content/items/gear.js",
+    "content/items/tonics.js", "content/items/artifacts.js", "content/mutations.js", "content/backgrounds.js", "content/items/implants.js", "body.js",
+    "content/items/missiles.js"].map((p) => src(p)));
   game.startRun(4242);
   game.game.pages = null;
   return {
@@ -449,7 +450,7 @@ export async function contentModules(src) {
     buildRun: run.buildRun, dungeonLevelOf: sites.dungeonLevelOf, compileWorld: worldmodel.compileWorld, contentLevel: stats.contentLevel,
     worlds: [{ id: "test", def: testWorld.TEST_WORLD }, { id: "real", def: worldmap.REAL_WORLD }],
     templeLegends: temple.TEMPLE_LEGENDS, interact, blocks: world.BLOCKS,
-    body, c4: { forge, gear, tonics, artifacts, mutations, backgrounds, implants },
+    body, c4: { forge, gear, tonics, artifacts, mutations, backgrounds, implants, missiles },
   };
 }
 

@@ -6,6 +6,7 @@
 //     use        what it does, at strength k (1 for the Plumb, GENOTYPES.bent.tonics.effect 0.5 for the Bent)
 //     overdose   what a failed save or a bad reaction does instead
 //   injectTonic(game, p, id, rng = Math.random) → { ok, overdose, k, save? }   what using one does (the kind's E)
+//   randomTonic(rand) → { kind: "tonic", effect }   one for loot or stock, by TONIC_WEIGHT
 //
 // The rules (bible §13.8, §10.3):
 //   - one at a time: while one works (the hidden status "tonic", its mag the number taken in a row), taking another
@@ -32,7 +33,8 @@ T("balm", "BALM", { t: 3, tick(game, e, s, dt) {
   const n = Math.floor(s.acc + 1e-9);
   if (n > 0) { s.acc -= n; e.hp = Math.min(maxHp(e), e.hp + n); }
 } });
-T("gloam", "GLOAM", { t: 60, bonus: (s) => ({ darkSight: 3 * s.mag, stealth: 0.3 * s.mag }) });
+// (darkRange: the bible's 6 tiles with the torch out, for player.js torchRange once it reads a status's: docs/c4.md #10.)
+T("gloam", "GLOAM", { t: 60, bonus: (s) => ({ darkSight: 3 * s.mag, stealth: 0.3 * s.mag }), darkRange: (s) => 6 * s.mag });
 T("ironbark", "IRONBARK", { t: 60, bonus: (s) => ({ av: Math.round(2 * s.mag), str: Math.round(2 * s.mag) }) });
 T("clearwit", "CLEARWIT", { t: 60, bonus: (s) => ({ examine: Math.round(5 * s.mag), int: Math.round(2 * s.mag) }) });
 // Overdoses.
@@ -83,6 +85,15 @@ export const TONICS = {
     },
   },
 };
+
+// A tonic for loot or a shelf: the balm the commonest (bible §3.1's anchor, 25 glim), fold-sap the rarest.
+const TONIC_WEIGHT = { balm: 5, hasp: 2, gloam: 2, ironbark: 2, foldSap: 1, clearwit: 2 };
+export function randomTonic(rand = Math.random) {
+  const total = Object.values(TONIC_WEIGHT).reduce((a, b) => a + b, 0);
+  let pick = rand() * total;
+  for (const [effect, w] of Object.entries(TONIC_WEIGHT)) if ((pick -= w) < 0) return { kind: "tonic", effect };
+  return { kind: "tonic", effect: "balm" };
+}
 
 // What a genotype makes of a tonic: { effect, badReaction } (content/genotypes.js; a creature or a quick start: whole).
 const reactionOf = (p) => GENOTYPES[p?.genotype]?.tonics || { effect: 1, badReaction: 0 };

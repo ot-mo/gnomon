@@ -2,7 +2,8 @@
 // that suits a level, and the kit tools (marker chalk). items/legacy.js reaches this file (content/index.js is frozen).
 //
 //   makeGear(kind, id, made, extra?) → item        { kind, id, made, material, ench: 0, known: true, ...extra }; made:
-//                                                  a MATERIALS id for a forged piece (forge.js isForged), else ignored
+//                                                  a MATERIALS id for a forged piece (forge.js isForged), else ignored;
+//                                                  material (weapons and the bolt-bow): the damage it adds
 //   randomGear(rand, level, luck = 0) → item       a weapon or armour for a zone of that level (the real world's
 //                                                  counterpart of items.js randomEquipment, which the legacy stack keeps):
 //                                                  the zone's tier's material most often, the tier below half as often,
@@ -27,7 +28,7 @@ export function makeGear(kind, id, made = null, extra = {}) {
   if (made && isForged(kind, id)) {
     if (!MATERIALS[made]) throw new Error(`makeGear: no material ${made}`);
     it.made = made;
-    if (kind === "weapon") it.material = MATERIALS[made].dmg;
+    if (kind === "weapon" || kind === "missile") it.material = MATERIALS[made].dmg;
   }
   return it;
 }
@@ -36,6 +37,7 @@ export function makeGear(kind, id, made = null, extra = {}) {
 // nothing else: a buckler, a banner) stays out of the loot until it is built.
 export function useful(kind, id) {
   if (kind === "weapon") return !!WEAPONS[id];
+  if (kind === "missile") return id in LAUNCHER_TIER;
   const a = ARMOURS[id];
   return !!a && (a.armour > 0 || Object.keys(a.bonus || {}).length > 0);
 }
@@ -45,6 +47,9 @@ export function useful(kind, id) {
 // parent's own tiers (1-4, for floors) are not the bible's, so its pieces are placed here. (Clothes are nobody's loot.)
 const CLASS_TIER = { dagger: 1, stylus: 1, staff: 1, handAxe: 1, shortsword: 1, mace: 2, spear: 2, lanternFlail: 2, longsword: 3, waraxe: 3,
   glaive: 4, maul: 4, greatsword: 4 };
+// The missile weapons (content/items/missiles.js MISSILES; named here, not imported: missiles.js registers its kinds when
+// content/index.js reaches it, and this file loads earlier), in the weapons' share.
+const LAUNCHER_TIER = { sling: 1, boltBow: 2 };
 const PIECE_TIER = { leather: 1, chain: 2, scale: 3, plate: 4, reedHat: 1, copperCap: 1, ironHelm: 3, goggles: 2, cloak: 1, bracers: 1,
   gloves: 1, gauntlets: 2, sandals: 1, boots: 1 };
 const pieceTier = (id) => PIECE_TIER[id] ?? ARMOURS[id]?.tier ?? 1;
@@ -60,7 +65,8 @@ export function randomGear(rand, level, luck = 0) {
   const near = (t) => (t === tier ? 4 : t === tier - 1 ? 2 : 1);
   // Half weapons, half armour; every class open at the tier weighs the same (its material carries the tier).
   const pool = rand() < 0.5
-    ? Object.keys(CLASS_OF).filter((id) => WEAPONS[id] && (CLASS_TIER[id] || 1) <= tier).map((id) => [{ kind: "weapon", id }, 1])
+    ? [...Object.keys(CLASS_OF).filter((id) => WEAPONS[id] && (CLASS_TIER[id] || 1) <= tier).map((id) => [{ kind: "weapon", id }, 1]),
+       ...Object.keys(LAUNCHER_TIER).filter((id) => LAUNCHER_TIER[id] <= tier).map((id) => [{ kind: "missile", id }, 1])]
     : Object.keys(ARMOURS).filter((id) => id !== "clothes" && useful("armour", id) && pieceTier(id) <= tier)
       .map((id) => [{ kind: "armour", id }, isForged("armour", id) ? 2 : near(pieceTier(id))]);
   const pick = weighted(rand, pool);
@@ -71,6 +77,7 @@ export function randomGear(rand, level, luck = 0) {
   const roll = rand(), size = 1 + Math.floor(rand() * Math.min(4, 1 + level / 6));
   if (roll < 0.2 - luck) it.ench = -size;
   else if (roll > 0.8 - luck) it.ench = size;
+  if (it.kind === "missile") return it;   // (a launcher takes no element or property: missiles.js)
   if (it.kind === "weapon" && rand() < 0.03 + level * 0.008) it.element = Object.keys(ELEMENTS)[Math.floor(rand() * 4)];
   const props = Object.keys(PROPERTIES).filter((k) => PROPERTIES[k].slot === it.kind);
   const count = level < 5 ? 0 : rand() < Math.min(0.55, 0.05 * level) ? (level >= 14 && rand() < 0.35 ? 2 : 1) : 0;
