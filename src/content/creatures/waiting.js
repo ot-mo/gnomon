@@ -68,14 +68,14 @@ export const CREATURES_WAITING = {
     frames: ART.eel, palette: { e: [[185, 195, 210], 0.4], E: [[255, 255, 255], 1.8] },
   },
   escapement: {
-    name: "Escapement", glyph: "C", color: [214, 168, 88], xp: 150,
+    name: "Escapement", glyph: "C", color: [214, 168, 88], xp: 150, factions: ["plan"], temperament: "aggressive",
     hp: 200, speed: 0, damage: [10, 15], cooldown: 2.6, reach: 3.2, sight: 18, w: 2.2, h: 4.2, brittle: true, weak: ["shock"], ...d20(28, 6, 30, 10, 24, 4),
     rule: { colossus: true, core: "head", slams: "map" },
     needs: "the Colossus's rules for a type that isn't the guardian (combat.js colossusCore, guardians.js colossus, keyed by guardian === \"colossus\" today), with a wake line of its own; its hall at the Metronome's bottom (C1b)",
     ...reskin("colossus", { s: [[150, 110, 60], 0], S: [[195, 150, 80], 0], C: [[255, 220, 120], 1.6], c: [[255, 170, 60], 1.2] }),
   },
   drownedBellwether: {
-    name: "Drowned Bellwether", glyph: "U", color: [196, 140, 80], xp: 120, factions: ["unlit"],
+    name: "Drowned Bellwether", glyph: "U", color: [196, 140, 80], xp: 120, factions: ["unlit"], temperament: "aggressive",
     hp: 150, speed: 1.6, damage: [6, 11], cooldown: 1.6, reach: 1.6, sight: 16, w: 1.4, h: 2.6, hover: 0.4,
     undead: true, darkSight: true, resist: ["frost"], ...d20(20, 12, 24, 14, 24, 18),
     rule: { toll: 3, every: 8 },
@@ -83,7 +83,7 @@ export const CREATURES_WAITING = {
     frames: ART.bell, palette: { B: [[196, 140, 80], 0.6], c: [[255, 220, 150], 1.4], g: [[110, 130, 150], 0.5] },
   },
   vesper: {
-    name: "Vesper", glyph: "V", color: [60, 50, 90], xp: 0,
+    name: "Vesper", glyph: "V", color: [60, 50, 90], xp: 0, factions: ["unlit"], temperament: "aggressive",
     hp: 400, speed: 1.6, damage: [8, 13], cooldown: 1.5, reach: 2.0, sight: 20, w: 1.6, h: 3.2, darkSight: true, ...d20(24, 18, 30, 22, 26, 24),
     rule: { phases: ["flat", "dark", "deep"] },
     needs: "beat 11's fight in three phases (flat: a sweeping shadow; dark: the Gloom Warden's rules; deep: the Colossus's, climbed by the hour numerals) at the Noon Socket (C1b, C5; guardians.js); never the Lich King's `boss` (that wins the parent's game)",
