@@ -29,7 +29,7 @@
 //      stranger; who is out for a Bent stranger
 //      at the start (the moths friendly while your torch burns, the longback and the chime-priest not, the outrider
 //      for the Bent only); the test world's villagers as before C3 (a DV term of 0, the tinker's general stock); and its
-//      teeth: eight mutants each fail it.
+//      teeth: nine mutants each fail it. Every wildlife species' levels hold the rows its regions give it (C1a's).
 //
 // game/startRun: the real game (game.js). srcFiles: [{ file, text }] of every src/ module.
 import { Zone, B, FLOOR_Z } from "../../src/world.js";
@@ -48,6 +48,7 @@ import { PEOPLE } from "../../src/content/creatures/people.js";
 import { VILLAGERS } from "../../src/content/creatures/villagers.js";
 import { CREATURES_WAITING } from "../../src/content/creatures/waiting.js";
 import { LEVEL_POOL, rowsAt } from "../../src/content/creatures/levels.js";
+import { REGIONS } from "../../src/content/world/regions.js";
 
 // Bible §15.7: reserved for terrain, items and features; and the creature families' letters.
 export const RESERVED_GLYPHS = ["@", "#", ".", ":", "~", "=", "+", "|", "&", ">", "<", "!", "?", "/", "0", "%", ")", "[", "\"",
@@ -310,6 +311,17 @@ export function rosterProblems(game) {
       if (t.rule && !(typeof t.needs === "string" && t.needs.length > 20)) fail(`${at}: a rule with nothing saying what it needs`);
     }
   stats.species = `${species} C3 species with attributes and dv`;
+  // A wildlife species' levels hold every row its regions give it (content/world/regions.js, C1a's): the type and the
+  // rows agree on where it lives.
+  let rowsHeld = 0;
+  for (const [region, R] of Object.entries(REGIONS))
+    for (const [type, , lo, hi] of R.creatures || []) {
+      const t = WILDLIFE[type];
+      if (!t?.levels) continue;
+      rowsHeld++;
+      if (lo < t.levels[0] || hi > t.levels[1]) fail(`wildlife ${type}: levels ${t.levels.join("-")} don't hold ${region}'s row ${lo}-${hi}`);
+    }
+  stats.regionRows = `${rowsHeld} region rows within their kind's levels`;
   // The types the test world's villages use keep what they had before C3: a DV term of 0, the tinker's general stock.
   for (const [id, t] of Object.entries(VILLAGERS)) if (t.dv !== 0) fail(`villagers ${id}: dv ${t.dv} (the test world's villages fight as before C3: 0)`);
   const tinker = VILLAGERS.villageTinker.merchant;
@@ -354,6 +366,7 @@ const MUTANTS = [
   ["the level table short at the top", () => { const out = LEVEL_POOL.filter(([id]) => id === "askewAngle" || id === "fold"); for (const r of out) LEVEL_POOL.splice(LEVEL_POOL.indexOf(r), 1);
     return () => LEVEL_POOL.push(...out); }, /thin at .*level 30/],
   ["a neutral kind in the level table above 20", () => { LEVEL_POOL.push(["chimePriest", 1, 9, 24]); return () => LEVEL_POOL.pop(); }, /not out for a stranger from level 20 on: chimePriest/],
+  ["a species narrower than its rows", () => { const t = WILDLIFE.saltrat, old = t.levels; t.levels = [1, 3]; return () => { t.levels = old; }; }, /wildlife saltrat: levels 1-3 don't hold/],
   ["a villager quicker than before C3", () => { const t = VILLAGERS.villager; t.attrs.agi = 18; t.dv = 1; return () => { t.attrs.agi = 16; t.dv = 0; }; }, /villagers villager: dv 1/],
   ["a creature of the 63 gone", () => { const v = CREATURES_WAITING.vesper; delete CREATURES_WAITING.vesper; return () => { CREATURES_WAITING.vesper = v; }; }, /vesper .*neither registered nor waiting/],
 ];

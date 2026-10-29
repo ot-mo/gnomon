@@ -443,7 +443,8 @@ const range = (xs) => (xs.length ? { n: xs.length, min: +Math.min(...xs).toFixed
 // start, weight > 0, levels within 1-30; every level its spans make held by two kinds or more; a region's kinds only
 // band, travellers and legend; no entry for a test-world region (its draws stay as they were); pickRow draws each kind
 // of a level by its weight (20,000 draws, within 1.5 points), nothing outside the level and no kind that isn't registered
-// (a waiting one in C1a's rows). Three mutants, each caught.
+// (a waiting one in C1a's rows); every row within its kind's own levels, and no kind that doesn't roam (the Gloam Warden,
+// the Cast hunters). Five mutants, each caught.
 function tableProblems(game) {
   const out = [], W = compileWorld(REAL_WORLD), E = ENCOUNTERS.regions, levels = {};
   for (const t of W.tiles) if (t.encounterRate > 0) (levels[t.region] ||= new Set()).add(t.level);
@@ -456,6 +457,10 @@ function tableProblems(game) {
       if (!T || T.talks || !(w > 0) || !Number.isInteger(lo) || !Number.isInteger(hi) || lo < 1 || hi > 30 || lo > hi) { out.push(`encounters: ${r} row ${JSON.stringify(row)}`); continue; }
       const c = spawnCreature(type, 1, 1, FLOOR_Z, { rng: () => 0.5, level: lo });
       if (attitude(game, c, game.player) !== "hostile") out.push(`encounters: ${r}'s ${type} isn't out for a stranger (${attitude(game, c, game.player)})`);
+      // Within the kind's own levels (wildlife.js), and only a kind that roams (the Gloam Warden and the Cast hunters
+      // are placed by their systems: levels and no weight).
+      if (T.levels && (lo < T.levels[0] || hi > T.levels[1])) out.push(`encounters: ${r}'s ${type} at ${lo}-${hi}, outside its levels ${T.levels.join("-")}`);
+      if (T.levels && !(T.weight > 0)) out.push(`encounters: ${r}'s ${type} doesn't roam`);
     }
     for (const L of set) if (rowsAt(rows, L).length < 2) out.push(`encounters: ${r} level ${L}: ${rowsAt(rows, L).length} kind(s), want 2 or more`);
     const k = E[r].kinds;
@@ -488,6 +493,8 @@ function encounterTables(G, problems) {
       ["an unregistered kind", () => { const r = ENCOUNTERS.regions.flats.rows; r.push(["noSuchThing", 1, 1, 8]); return () => r.pop(); }, /flats row \["noSuchThing"/],
       ["one kind at a level", () => { const r = ENCOUNTERS.regions.lattice.rows, old = r.slice(); r.splice(1); return () => { r.length = 0; r.push(...old); }; }, /lattice level \d+: 1 kind/],
       ["a docile kind in a band", () => { const r = ENCOUNTERS.regions.waste.rows; r.push(["longback", 1, 1, 11]); return () => r.pop(); }, /waste's longback isn't out for a stranger/],
+      ["a kind far outside its levels", () => { const r = ENCOUNTERS.regions.flats.rows; r.push(["askewAngle", 1, 1, 8]); return () => r.pop(); }, /flats's askewAngle at 1-8, outside its levels/],
+      ["the Gloam Warden in a band", () => { const r = ENCOUNTERS.regions.shade.rows; r.push(["gloamWarden", 1, 17, 20]); return () => r.pop(); }, /shade's gloamWarden doesn't roam/],
     ];
     let caught = 0;
     for (const [what, apply, re] of mutants) {

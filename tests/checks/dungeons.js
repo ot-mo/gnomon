@@ -623,10 +623,11 @@ export async function checkLegends({ seed = 7 } = {}) {
 }
 
 // The real world's legends (C3): LEGENDS.regions names real regions, every region whose spans may hold a lair has an
-// entry; its species are registered kinds out for a Bent stranger (a lair's owner is), its herds among them or kinds
-// of its own, its factions registered and each with reasons; LEGENDS.reasons covers the 21 fixed factions, two loves
+// entry; its species are registered kinds out for a Bent stranger (a lair's owner is), its herds among them, its
+// factions registered and each with reasons; LEGENDS.reasons covers the 21 fixed factions, two loves
 // and two hates each, short, lower case and unpunctuated as a clause; the waiting templates have a name, three
-// epithets, a hall and what they need, and none is pickable yet (makeLegend's draws stay as they were). Two mutants.
+// epithets, a hall and what they need, and none is pickable yet (makeLegend's draws stay as they were); no lair owner
+// that doesn't roam (the Gloam Warden, the Cast hunters), every herd among its region's species. Four mutants.
 const FIXED_FACTIONS = ["hollowmere", "noonVigil", "survey", "assize", "horary", "pressed", "lampless", "drovers", "chandlers", "rustbacks",
   "flatfolk", "unlit", "askew", "plan", "moths", "kites", "clatter", "saltbeasts", "sporeMoot", "pleatwood", "errata"];
 function legendData(game, LEGENDS, CREATURE_TYPES, FACTIONS, attitude, spawnCreature) {
@@ -639,8 +640,12 @@ function legendData(game, LEGENDS, CREATURE_TYPES, FACTIONS, attitude, spawnCrea
       if (!T || T.talks || !(w > 0)) { out.push(`legends: ${r}'s species ${type} (${w})`); continue; }
       const feel = attitude(game, spawnCreature(type, 1, 1, FLOOR_Z, { rng: () => 0.5, level: 9 }), game.player);
       if (feel !== "hostile") out.push(`legends: ${r}'s ${type} isn't out for a stranger (${feel})`);
+      if (T.levels && !(T.weight > 0)) out.push(`legends: ${r}'s ${type} doesn't roam (a boss or a Cast hunter owns no lair)`);
     }
-    for (const h of e.herds || []) if (!CREATURE_TYPES[h] || CREATURE_TYPES[h].talks) out.push(`legends: ${r}'s herd ${h}`);
+    for (const h of e.herds || []) {
+      if (!CREATURE_TYPES[h] || CREATURE_TYPES[h].talks) out.push(`legends: ${r}'s herd ${h}`);
+      if (!(e.species || []).some(([s]) => s === h)) out.push(`legends: ${r}'s herd ${h} isn't among its species`);
+    }
     for (const f of e.factions || []) if (!FACTIONS[f] || !LEGENDS.reasons[f]) out.push(`legends: ${r}'s faction ${f} unknown or without reasons`);
     if (!e.factions?.length) out.push(`legends: ${r} has no factions`);
   }
@@ -668,6 +673,8 @@ function legendDataProblems(game) {
     const mutants = [
       ["a docile owner", () => { const s = L.regions.waste.species; s.push(["longback", 1]); return () => s.pop(); }, /waste's longback isn't out for a stranger/],
       ["a faction without reasons", () => { const old = L.reasons.drovers; delete L.reasons.drovers; return () => { L.reasons.drovers = old; }; }, /reasons for drovers|faction drovers unknown or without reasons/],
+      ["the Gloam Warden owning a lair", () => { const s = L.regions.shade.species; s.push(["gloamWarden", 1]); return () => s.pop(); }, /shade's gloamWarden doesn't roam/],
+      ["a herd from elsewhere", () => { const h = L.regions.flats.herds; h.push("askewAngle"); return () => h.pop(); }, /flats's herd askewAngle isn't among its species/],
     ];
     let caught = 0;
     for (const [what, apply, re] of mutants) {
