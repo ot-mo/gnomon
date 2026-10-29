@@ -86,6 +86,8 @@ const liquids = ["glim", "water", "brine", "ink", "umbra", "sunwine", "longbackM
 // (bible §7); one in the right view, once a world day, gives the shrine's reward: the mosaic and the carving one of
 // the village's own two tales as a reading (`tale`: 1 is the flat one, 2 the deep one), the rune a minute of night
 // eyes, the pillar a full heal (an inn's worth: 10 glim). Small on purpose: money is never plentiful.
+// A pillar is honoured standing 8 blocks up on it (bible §7); the builder's is 4 blocks, read by looking up at its
+// crown, so its words say that, and `full` holds the bible's for when the pillar is built to climb (request 8).
 const shrines = {
   mosaic: { name: "a mosaic shrine", view: "map", pray: "Kneel on it with the map before you: from above, the picture is the prayer.",
     wrong: "The mosaic can't hear you from up there.", reward: { tale: 1, heal: 5, text: "The picture comes clear: the village's first tale, as a flat reading." } },
@@ -94,7 +96,8 @@ const shrines = {
   rune: { name: "a rune shrine", view: "dark", pray: "Stand before it with your torch out, in the dark, and read it.",
     wrong: "The rune is shy of your light. Put it out.", reward: { status: "nightEyes", t: 60, text: "The rune reads you back. The dark opens a little. (Night eyes, 60 s)" } },
   pillar: { name: "a shrine pillar", view: "3d", pray: "Look up at its crown, in 3D: from above it is only a dot.",
-    wrong: "From above, the pillar is a dot, and dots don't listen.", reward: { heal: "full", text: "You look up at the crown until your neck aches, and then it doesn't." } },
+    wrong: "From above, the pillar is a dot, and dots don't listen.", reward: { heal: "full", text: "You look up at the crown until your neck aches, and then it doesn't." },
+    height: 8, full: { pray: "Climb to its crown and pray there, in 3D, 8 blocks up or more.", wrong: "Down here the pillar can't hear you. Climb." } },
 };
 
 // Founding peoples (bible §9.3). faction: the WS6a faction the villagers carry as a second membership.
