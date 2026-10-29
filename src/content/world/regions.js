@@ -34,7 +34,7 @@ export const REGIONS = {
     creatures: [row("saltrat", 6, 1, 8), row("brineGrub", 3, 1, 8), row("brinehog", 3, 1, 8), row("glowfin", 2, 1, 10),
                 row("clatterer", 2, 1, 8), row("flatling", 1, 1, 10), row("lanternMoths", 1, 1, 30), row("drownedKeeper", 1, 1, 8)],
     factions: ["hollowmere", "noonVigil", "clatter", "moths", "saltbeasts"],
-    sites: { village: 0.03, ruin: 0, lair: 0.03, station: 0, historic: 0 },
+    sites: { village: 0.036, ruin: 0, lair: 0.053, station: 0, historic: 0 },
     line: "The glimseed leans towards the Gnomon here, the way everything does eventually.",
   },
   hollowMere: {
@@ -52,7 +52,7 @@ export const REGIONS = {
     creatures: [row("brinehog", 3, 1, 11), row("rustbackScav", 2, 1, 11), row("chaffDevil", 3, 3, 11), row("saltrat", 1, 1, 7),
                 row("saltMirage", 2, 3, 11), row("longback", 1, 1, 11)],
     factions: ["drovers", "pressed", "saltbeasts"],
-    sites: { village: 0.018, ruin: 0.018, lair: 0.018, station: 0, historic: 0 },
+    sites: { village: 0.013, ruin: 0.021, lair: 0.023, station: 0, historic: 0 },
     line: "A sea that was pressed and left to dry; the Drovers count its dunes and get a different number every time.",
   },
   steps: {
@@ -61,7 +61,7 @@ export const REGIONS = {
     creatures: [row("rustbackScav", 5, 1, 10), row("brineGrub", 2, 1, 7), row("saltrat", 1, 1, 7), row("rustbackSlinger", 2, 3, 10),
                 row("ledgehorn", 3, 3, 10), row("kite", 2, 3, 13), row("ledgeSpider", 2, 3, 10), row("chaffDevil", 1, 3, 8)],
     factions: ["rustbacks", "drovers", "kites", "saltbeasts"],
-    sites: { village: 0.04, ruin: 0.06, lair: 0.03, station: 0, historic: 0 },
+    sites: { village: 0.053, ruin: 0.096, lair: 0.08, station: 0, historic: 0 },
     line: "Red mesas stacked like a stair nobody finished; up here height is the only rank there is.",
   },
   downs: {
@@ -70,7 +70,7 @@ export const REGIONS = {
     creatures: [row("cairnHound", 3, 3, 11), row("barrowSkeleton", 2, 3, 13), row("duskBat", 2, 3, 13), row("brinehog", 2, 1, 8),
                 row("barrowTroll", 1, 9, 16), row("assizeOutrider", 1, 6, 13)],
     factions: ["survey", "rustbacks", "unlit", "assize", "saltbeasts"],
-    sites: { village: 0.03, ruin: 0.045, lair: 0.022, station: 0, historic: 0 },
+    sites: { village: 0.028, ruin: 0.051, lair: 0.031, station: 0, historic: 0 },
     line: "Grass over barrows, and the Survey's towers on every rise, measuring the grass.",
   },
   pleatwood: {
@@ -79,7 +79,7 @@ export const REGIONS = {
     creatures: [row("creasebeetle", 4, 3, 15), row("pleatSpider", 3, 3, 15), row("hangvine", 2, 6, 16), row("sporeling", 2, 5, 16),
                 row("foldmonkey", 2, 5, 13)],
     factions: ["pleatwood", "sporeMoot", "saltbeasts"],
-    sites: { village: 0.025, ruin: 0.012, lair: 0.018, station: 0, historic: 0 },
+    sites: { village: 0.021, ruin: 0.017, lair: 0.022, station: 0, historic: 0 },
     line: "The trees fold their branches away at dusk, which the Pleatwood says is manners and the Survey says is weather.",
   },
   deepPleat: {
@@ -88,7 +88,7 @@ export const REGIONS = {
     creatures: [row("paperWasps", 3, 9, 23), row("mootWalker", 2, 12, 23), row("hangvine", 2, 9, 23), row("creasebeetle", 3, 9, 16),
                 row("plumbknight", 1, 12, 23), row("assizer", 1, 12, 23)],
     factions: ["pleatwood", "sporeMoot", "assize", "saltbeasts"],
-    sites: { village: 0.02, ruin: 0.01, lair: 0.02, station: 0, historic: 0 },
+    sites: { village: 0.016, ruin: 0.012, lair: 0.024, station: 0, historic: 0 },
     line: "The same forest, folded more times than anyone has counted; the Assize cut one straight line through it and called it a road.",
   },
   tessellate: {
@@ -97,7 +97,7 @@ export const REGIONS = {
     creatures: [row("tileMimic", 3, 9, 18), row("pressHound", 3, 9, 18), row("mosaicGolem", 1, 12, 18), row("erratum", 1, 9, 18),
                 row("flatfolkWanderer", 2, 9, 13), row("pressedPilgrim", 1, 9, 13), row("chimePriest", 1, 9, 16), row("lampHound", 1, 6, 16)],
     factions: ["flatfolk", "pressed", "errata", "horary", "chandlers", "plan"],
-    sites: { village: 0.04, ruin: 0, lair: 0.02, station: 0, historic: 0 },
+    sites: { village: 0.054, ruin: 0, lair: 0.031, station: 0, historic: 0 },
     line: "A plain paved with pressed towns; from above you can read their names, and the Flatfolk would rather you didn't stand on them.",
   },
   shade: {
@@ -106,7 +106,7 @@ export const REGIONS = {
     creatures: [row("shade", 4, 12, 28), row("wraith", 2, 12, 28), row("longshadow", 2, 12, 28), row("lamplessChanter", 1, 12, 16),
                 row("umbralEel", 2, 12, 19)],
     factions: ["unlit", "lampless"],
-    sites: { village: 0.05, ruin: 0.05, lair: 0.05, station: 0, historic: 0 },
+    sites: { village: 0.11, ruin: 0.17, lair: 0.094, station: 0, historic: 0 },
     line: "Noon's shadow, burnt in and never lifted; the Lampless call it the only honest light.",
   },
   stacks: {
@@ -115,7 +115,7 @@ export const REGIONS = {
     creatures: [row("beatSpider", 3, 12, 25), row("rustbackBrute", 3, 12, 25), row("lensSentry", 2, 12, 25), row("rustOoze", 2, 12, 25),
                 row("girderGolem", 1, 15, 25), row("draughtsman", 2, 9, 19)],
     factions: ["plan", "rustbacks"],
-    sites: { village: 0.026, ruin: 0.045, lair: 0.02, station: 0.026, historic: 0 },
+    sites: { village: 0.029, ruin: 0.056, lair: 0.026, station: 0.037, historic: 0 },
     line: "Deepwright towers twenty storeys deep, still being kept by automata who were never told to stop.",
   },
   oldCuts: {
@@ -124,7 +124,7 @@ export const REGIONS = {
     creatures: [row("rustbackScav", 5, 1, 10), row("rustbackSlinger", 2, 3, 10), row("ledgeSpider", 2, 3, 10), row("duskBat", 2, 3, 10),
                 row("brinehog", 1, 1, 8)],
     factions: ["rustbacks", "plan"],
-    sites: { village: 0, ruin: 0.3, lair: 0, station: 0, historic: 0 },
+    sites: { village: 0, ruin: 0.4, lair: 0, station: 0, historic: 0 },
     line: "Two Deepwright cuts that the Rustbacks reached first, and have been taking apart ever since.",
   },
   lattice: {
@@ -143,7 +143,7 @@ export const REGIONS = {
     factions: ["kites", "drovers", "chandlers", "saltbeasts"],
     // (its crag village waits for sites on walk-in spans: docs/c1.md, integration requests)
     sites: { village: 0, ruin: 0, lair: 0, station: 0, historic: 0 },
-    line: "A wall of crags that the world map can't cross; the Kites cross it every morning to show that they can.",
+    line: "A wall of crags that no road crosses but the Molar pass; the Kites cross it every morning to show that they can.",
   },
   glassSea: {
     name: "the Glass Sea", tier: 5, music: "shore", sky: "glare", fog: 0.008, liquid: "brine", encounterRate: 0,
@@ -159,7 +159,7 @@ export const REGIONS = {
     creatures: [row("glassCrab", 3, 9, 21), row("slagSalamander", 2, 9, 21), row("erratum", 2, 9, 21), row("mirrorEel", 2, 12, 21),
                 row("clatterer", 1, 9, 21)],
     factions: ["clatter", "errata"],
-    sites: { village: 0.035, ruin: 0.015, lair: 0.035, station: 0.015, historic: 0 },
+    sites: { village: 0.035, ruin: 0.021, lair: 0.04, station: 0.027, historic: 0 },
     line: "Where the sea gives up being liquid; the Clatter build their huts of its glass and can see who is coming.",
   },
   oldRule: {
