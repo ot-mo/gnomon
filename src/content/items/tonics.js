@@ -47,39 +47,39 @@ const OWN = ["balm", "gloam", "ironbark", "clearwit"];   // the tonics with a st
 
 export const TONICS = {
   balm: {
-    name: "balm", value: 25, t: 3, info: "Heals 12 over 3 s. Overdone: sickness, and no healing for 30 s.",
+    name: "balm", value: 25, t: 3, info: "Heals 12 over 3 s. Overdone: no healing for 30 s.",
     use: (game, p, k) => { addStatus(game, p, "tonic:balm", { t: 3, mag: k }); say(game, p, `Warmth spreads up your arm. (+${12 * k} HP over 3 s)`, [230, 90, 110]); },
-    overdose: (game, p) => { addStatus(game, p, "tonic:sick", { t: 30 }); say(game, p, "The balm curdles. You feel sick, and nothing will heal you for a while.", [170, 200, 110]); },
+    overdose: (game, p) => { addStatus(game, p, "tonic:sick", { t: 30 }); say(game, p, "The balm curdles. Nothing will heal you for a while.", [170, 200, 110]); },
   },
   hasp: {
-    name: "hasp", value: 40, t: 15, info: "Haste for 15 s. Overdone: haste, then 3 s when you can't move at all.",
+    name: "hasp", value: 40, t: 15, info: "Haste for 15 s. Overdone: then 3 s unable to move.",
     use: (game, p, k) => { addStatus(game, p, "hasted", { t: 15 * k, stack: "refresh" }); say(game, p, `Everything else slows down. (${15 * k} s)`, [255, 240, 120]); },
-    overdose: (game, p) => { addStatus(game, p, "hasted", { t: 15, stack: "refresh" }); addStatus(game, p, "tonic:crash", { t: 15 }); say(game, p, "Your heart races, and keeps racing. This will end badly.", [255, 200, 120]); },
+    overdose: (game, p) => { addStatus(game, p, "hasted", { t: 15, stack: "refresh" }); addStatus(game, p, "tonic:crash", { t: 15 }); say(game, p, "Your heart races, and keeps racing.", [255, 200, 120]); },
   },
   gloam: {
-    name: "gloam", value: 35, t: 60, info: "For 60 s you see in the dark with your torch out, and hide better. Overdone: blind for 20 s.",
+    name: "gloam", value: 35, t: 60, info: "Dark sight and stealth for 60 s. Overdone: blind for 20 s.",
     needs: "6 tiles with the torch out (player.js torchRange caps darkSight at 4 tiles: a status's darkRange)",
     use: (game, p, k) => { addStatus(game, p, "tonic:gloam", { t: 60, mag: k }); say(game, p, "The dark thins, like ink with water in it.", [150, 140, 200]); },
     overdose: (game, p) => { addStatus(game, p, "blinded", { t: 20 }); say(game, p, "The light is a knife. You can't see.", [120, 120, 140]); },
   },
   ironbark: {
-    name: "ironbark", value: 45, t: 60, info: "+2 armour and +2 STR for 60 s. Overdone: half speed for 20 s.",
+    name: "ironbark", value: 45, t: 60, info: "+2 armour and STR for 60 s. Overdone: half speed for 20 s.",
     use: (game, p, k) => { addStatus(game, p, "tonic:ironbark", { t: 60, mag: k }); say(game, p, "Your skin goes stiff and brown at the edges.", [170, 140, 100]); },
     overdose: (game, p) => { addStatus(game, p, "tonic:heavy", { t: 20 }); say(game, p, "Your skin goes stiff, and so does everything under it.", [160, 150, 120]); },
   },
   foldSap: {
-    name: "fold-sap", value: 50, t: 10, info: "You're Flat for 10 s, and fight on the map. Overdone: Flat for 60 s.",
+    name: "fold-sap", value: 50, t: 10, info: "Flat for 10 s. Overdone: Flat for 60 s.",
     use: (game, p, k) => { addStatus(game, p, "flat", { t: 10 * k }); say(game, p, `You fold down into the floor. (${10 * k} s)`, [220, 220, 230]); },
     overdose: (game, p) => { addStatus(game, p, "flat", { t: 60 }); say(game, p, "You fold down into the floor, and the floor keeps you.", [220, 220, 230]); },
   },
   clearwit: {
-    name: "clearwit", value: 35, t: 60, info: "+5 to examine and +2 INT for 60 s. Overdone: you forget this floor's map.",
+    name: "clearwit", value: 35, t: 60, info: "+5 examine, +2 INT for 60 s. Overdone: you forget this floor's map.",
     needs: "cures confusion (a confused status: C2's ink, the Muddle mutation)",
     use: (game, p, k) => { addStatus(game, p, "tonic:clearwit", { t: 60, mag: k }); say(game, p, "Everything has edges, and you can count them.", [200, 220, 255]); },
     overdose: (game, p) => {
       // The auto-map and the pits you had looked into: the only thing in the game that forgets them.
       for (const k of ["seen", "holeSeen"]) game?.zone?.[k]?.fill?.(0);
-      say(game, p, "You know exactly where you are, and nothing else. Your map of this floor is gone.", [200, 220, 255]);
+      say(game, p, "You know exactly where you are, and nothing else.", [200, 220, 255]);
     },
   },
 };

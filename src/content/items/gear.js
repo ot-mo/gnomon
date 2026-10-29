@@ -82,7 +82,7 @@ export function randomGear(rand, level, luck = 0) {
 export const TOOLS = {
   markerChalk: {
     name: "marker chalk", glyph: "~", color: [235, 232, 220], price: 3,
-    info: "Chalk a mark on the floor where you stand: it shows on your map, and in 3D where you made it. A stick a mark.",
+    info: "A mark where you stand, on your map and in 3D. A stick a mark.",
   },
 };
 const CHALK_MAX = 9;   // screens/play.js toggleMarker's limit: a floor holds at most 9 markers

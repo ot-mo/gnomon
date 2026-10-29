@@ -148,7 +148,7 @@ export const MUTATIONS_WAITING = {
   // --- Physical ---
   extraArms: {
     name: "Extra Arms", kind: "physical", cost: 4, max: 10, excludes: [],
-    info: (l) => `A second pair of arms: a second weapon strikes on ${10 + 3 * l}% of your attacks.`,
+    info: (l) => `A second weapon strikes on ${10 + 3 * l}% of your attacks.`,
     needs: "a third holding part (body.js addPart) and the second weapon's strike (combat.js)",
   },
   geckoPads: {
@@ -158,43 +158,43 @@ export const MUTATIONS_WAITING = {
   },
   diggingHands: {
     name: "Digging Hands", kind: "physical", cost: 4, max: 10, excludes: [],
-    info: () => "Dig through a block in 1 s, in either view. In the Stacks this is called desecration.",
+    info: () => "Dig a block in 1 s, in either view. The Stacks call it desecration.",
     needs: "digging in both views (turns.js, player.js, world.js) and the Stacks' desecration (WS10, C2)",
   },
   inkGlands: {
     name: "Ink Glands", kind: "physical", cost: 4, max: 10, excludes: [], planar: true,
     bridge: "a cloud of dark in either view, where 3D shows what only the dark shows",
-    info: () => "Squirt ink: a 3 × 3 cloud of dark for 8 s, where runes and planks show even with your torch lit.",
+    info: () => "A 3 × 3 cloud of ink for 8 s: runes and planks show in it, torch or no.",
     rep: { flatfolk: 100 },
     needs: "an ability: the dark cloud and dark sight inside it (light.js, render3d.js, progression/abilities.js)",
   },
   deepEyes: {
     name: "Deep Eyes", kind: "physical", cost: 4, max: 1, excludes: [], planar: true,
     bridge: "pits and chasms seen from the map count as looked into, as only 3D could before",
-    info: () => "Pits and chasms you see from the map count as looked into, and through a hole you see a floor down.",
+    info: () => "Holes you see from the map count as looked into; through one you see a floor down.",
     needs: "the map's holes marked looked-into (renderMap.js, zone.holeSeen) and a floor down through holes (render3d.js)",
   },
   heavyBones: {
     name: "Heavy Bones", kind: "physical", cost: 4, max: 1, excludes: ["gills", "wings", "brittleBones"], planar: true,
-    info: () => "Nothing knocks you back, falls hurt half as much, and in deep water you sink and walk the bottom.",
+    info: () => "No knockback, half fall damage, and in deep water you walk the bottom.",
     needs: "knockback immunity (WS8), half fall damage (player.js), walking the bottom of deep water (status.js drowning, world.js)",
   },
   horns: {
     name: "Horns", kind: "physical", cost: 4, max: 10, excludes: [],
-    info: () => "A sprinting charge in 3D knocks the target back 2 tiles, off ledges where there are ledges.",
+    info: () => "A sprinting charge in 3D knocks the target back 2 tiles.",
     rep: { saltbeasts: 100 },
     needs: "a charge in 3D with knockback (player.js sprint, combat.js)",
   },
   silkGlands: {
     name: "Silk Glands", kind: "physical", cost: 4, max: 10, excludes: [], planar: true,
-    info: (l) => `Spin a web across a gap of up to ${3 + l / 2} tiles; it holds your weight for 20 s and slows whatever follows.`,
+    info: (l) => `A web across a gap of ${3 + l / 2} tiles: it holds you for 20 s and slows pursuers.`,
     rep: { kites: -100 },
     needs: "a web that comes and goes and slows pursuers (world.js, ai.js, progression/abilities.js)",
   },
   // --- Mental: their levels add EGO's, and count in your Cast ---
   snuff: {
     name: "Snuff", kind: "mental", cost: 4, max: 10, excludes: [], planar: true,
-    info: () => "Put out every light within 6 tiles, monsters' lamps too. The dark comes in, and the shades are pleased.",
+    info: () => "Every light within 6 tiles goes out, monsters' lamps too. The shades are pleased.",
     needs: "putting out lights (light.js: braziers, creatures' lamps, your torch) and the shades' courage (ai.js)",
   },
   endear: {
@@ -221,33 +221,33 @@ export const MUTATIONS_WAITING = {
   foresight: {
     name: "Foresight", kind: "mental", cost: 4, max: 10, excludes: ["beatDeaf"], planar: true,
     bridge: "the map shows what comes next; 3D slows before a blow lands",
-    info: () => "On the map you see the next 2 spike beats and every monster's next step. In 3D, time slows for 1 s before a blow lands.",
+    info: () => "The map shows the next 2 spike beats and every monster's next step; in 3D, blows come slower.",
     needs: "the next beats and steps on the map (traps.js, ai.js, renderMap.js), and a slow second in 3D (time.js)",
   },
   backglass: {
     name: "Backglass", kind: "mental", cost: 4, max: 1, excludes: [],
-    info: () => "The next mental attack on you goes back to whoever sent it: Overrule, the Chime or Endear.",
+    info: () => "The next mental attack on you goes back to its sender.",
     needs: "mental attacks to turn back (the Assize's Overrule, C2's Chime, Endear)",
   },
   readhand: {
     name: "Readhand", kind: "mental", cost: 4, max: 1, excludes: [],
-    info: () => "You know an artifact by touching it, and read the account on any engraved item or relic.",
+    info: () => "You know an artifact by touch, and read the account on any engraving.",
     needs: "identify on touch (bodymods/artifacts.js identify, on pickup) and engraved items' accounts (story, WS7)",
   },
   // --- Defects ---
   brittleBones: {
     name: "Brittle Bones", kind: "defect", cost: -3, max: 1, excludes: ["heavyBones"],
-    info: () => "Falls of 3 blocks or more hurt you, and blunt blows do half again as much.",
+    info: () => "Falls of 3 blocks hurt, and blunt blows do half again.",
     needs: "fall damage from 3 blocks (player.js) and +50% from cudgels and fists (combat.js)",
   },
   shadowless: {
     name: "Shadowless", kind: "defect", cost: -3, max: 1, excludes: [],
-    info: () => "Flat beings can't perceive you: the Flatfolk won't talk to you, but flatlings and Smoothers ignore you too.",
+    info: () => "Flat beings can't perceive you: the Flatfolk won't talk, but Smoothers ignore you.",
     needs: "flat beings that don't perceive you (ai.js, talk.js with the Flatfolk; Folio needs another route, C1b, C5)",
   },
   sleepwalker: {
     name: "Sleepwalker", kind: "defect", cost: -2, max: 1, excludes: [],
-    info: () => "Each move on the world map has a 1 in 10 chance of drifting a span off course.",
+    info: () => "Each world-map move has a 1 in 10 chance of drifting a span off.",
     needs: "a drift on world-map moves (overworld/travel.js)",
   },
   beatDeaf: {
