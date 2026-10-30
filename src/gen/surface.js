@@ -29,7 +29,8 @@
 // dressing (gen/biomes: ponds, ramps up the cliffs, 3D-only plateaus, rocks, lamps, props, and what the
 // biome adds of its own); the landmark's plan, its builder (gen/biomes/landmarks.js, while it has no plan)
 // or the site; the dungeon entrance (a STAIRS block, zone.entrance) and, when a dungeon lies below,
-// sinkholes inside zone.dungeonRect; last, once the zone validates, the wildlife, on ground the anchor reaches.
+// sinkholes inside zone.dungeonRect; last, once the zone validates, the wildlife, on ground the anchor reaches, and a
+// landmark's people on its plan's letters (world/sites.js PLAN_PEOPLE: story/landmark-people.js).
 //
 // zone.gen (what generation knew, not saved) adds for 2b: planned (columns whose faces of 2 or more are
 // meant: ramps, plateaus, posts), jump (a plateau's top: ground only 3D reaches), plateaus, ramps and caches
@@ -39,7 +40,7 @@ import { KIND } from "../blocks.js";
 import { makeRng, seedFor, distance } from "../rng.js";
 import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../pathing.js";
 import { SIDES, FLATTEN_SKIRT } from "../world/worldmodel.js";
-import { SITE_BUILDERS, sinkholeSpots } from "../world/sites.js";
+import { SITE_BUILDERS, PLAN_PEOPLE, sinkholeSpots } from "../world/sites.js";
 import { zoneSeed } from "../world/run.js";
 import { stampVault } from "./vaults.js";
 import { worldFns, heightAt, treeAt, SURFACE_RULES, forgetWorldFns } from "./terrain.js";
@@ -118,7 +119,9 @@ function* zoneSteps(run, wx, wy) {
   // validateSurface measured; creatures change no block, so the verdict holds). None in a settlement's span.
   const { dress, mapReach } = zone.gen;
   if (dress.biome.spawns?.length && !dress.settled) populate(dress, mapReach);
-  delete zone.gen.dress; delete zone.gen.mapReach;
+  // Then a landmark's people on its plan's letters (world/sites.js PLAN_PEOPLE: no draw from any stream, uids of their own).
+  if (zone.gen.people) for (const place of PLAN_PEOPLE) place(zone, zone.gen.people);
+  delete zone.gen.dress; delete zone.gen.mapReach; delete zone.gen.people;
   return zone;
 }
 
@@ -432,7 +435,8 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
   // (The wildlife comes once the zone validates, zoneSteps: it needs the map's reach, which validation measures.)
   zone.gen = { ports: base.ports.map((p) => ({ ...p, tiles: Array.from({ length: p.width }, (_, k) => portTile(p, k)) })),
                keyPoints, scenery, cliff: base.cliff, worldWater: base.water, plan, planAt, hub, entranceGated, local,
-               planned: ctx.planned, jump: ctx.jump, footprint: reserved, ...ctx.made, dress: ctx };
+               planned: ctx.planned, jump: ctx.jump, footprint: reserved, ...ctx.made, dress: ctx,
+               people: L && planDef && planAt ? { landmark: L, plan: planDef, at: planAt } : null };
   return zone;
 }
 

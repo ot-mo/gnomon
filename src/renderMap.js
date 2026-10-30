@@ -527,7 +527,7 @@ registerDescriber("tile", (game, tile, { zone, i, kind }) => {
 registerDescriber("people", (game, tile, { zone }) => talkersIn(zone)
   .filter((n) => n.tx === tile.x && n.ty === tile.y && !ghostOffMap(game, n))
   .map((n) => {
-    const title = typeOf(n).title;
+    const title = n.title ?? typeOf(n).title;   // (a landmark person: its role, story/landmark-people.js)
     return `${n.name}${title ? ", " + title : ""}, is here.${n.vis.flat ? " (A flat being: in 3D you'd only see a shadow.)" : ""} Walk into them to talk.`;
   }), { order: 20 });
 

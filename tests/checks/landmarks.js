@@ -31,6 +31,13 @@
 //    §15.3 keys' in GIMMICK_KEYS), cradles and bottom; its holy place a faction; and what its own plan promises (below,
 //    PROMISES). The 3D walk (reach3d): steps up of one block, drops, and jumps across up to 2 open tiles walking or 4
 //    sprinting at the same height or lower, orthogonally; ghost planks underfoot or not.
+// 6. Who stands where (the integrator, C5 #3 with C1b #18; story/landmark-people.js), on every span of section 3: one
+//    person on each cell of each of its plan's people letters, with a kind for every `who`, its uid, the letter's name,
+//    named, standing where you would in that column (the Tall Table's on the top), talking under its words
+//    (dialogueIdOf, registered), flat for Folio's people and Ess and Tee and ghostly for Brann, thol and the ghost
+//    traders and nobody else; Pell and Castor only in zone.landmarkPeople. Then on one seed: Pell's round (Hollowmere
+//    days 1-2, Benchmark 3-4, Molar 5-6, and again from day 7), Castor at Molar once beat 1 is done and not after he
+//    is killed (the "kill" event), and a save's record of a person keeping its name, title, words and landmark.
 import { buildRun } from "../../src/world/run.js";
 import { TEST_WORLD } from "../../src/content/world/test-world.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
@@ -53,6 +60,12 @@ import { TOP as TABLE_TOP } from "../../src/content/world/plans/tallTable.js";
 import { RINGS, FOLDMOTHER_LAYOUT } from "../../src/content/world/plans/foldmother.js";
 import { PRESSYARD_HOUSES } from "../../src/content/world/plans/pressyard.js";
 import { TOLL_GATE } from "../../src/content/world/plans/molar.js";
+import { peopleOn, kindOf, PRESENCE, syncPeople } from "../../src/story/landmark-people.js";   // the integrator, C5 #3
+import { dialogueIdOf } from "../../src/content/people-words.js";
+import { dialogueIds } from "../../src/talk.js";
+import { dayNumber } from "../../src/clock.js";
+import { emit } from "../../src/events.js";
+import { trimCreature, rebuildCreature } from "../../src/save/codec.js";
 
 const pct = (sorted, q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))];
 const holesOf = (z) => {
@@ -128,6 +141,7 @@ export function checkLandmarks({ seeds = [1, 7, 42, 1234, 31337], tiles = 500 } 
 
   // The real world's landmarks.
   let realZones = 0, realRetried = 0;
+  const people = { placed: 0, top: 0, flat: 0, ghosts: 0, later: 0 };
   for (const seed of seeds) {
     const run = buildRun(seed, REAL_WORLD), world = run.world;
     for (const L of world.landmarks.values())
@@ -141,8 +155,11 @@ export function checkLandmarks({ seeds = [1, 7, 42, 1234, 31337], tiles = 500 } 
         if (L.dungeon && wx === L.wx && wy === L.wy && !L.dungeon.legacy)
           expect(z.entrance && z.get(z.entrance.x, z.entrance.y, FLOOR_Z - 1) === B.STAIRS && z.gen.keyPoints.some((k) => k.x === z.entrance.x && k.y === z.entrance.y),
                  `${at}: no way down into ${L.dungeon.id}`);
+        peopleOfSpan(z, L, world.plans[L.spanPlans?.[`${wx},${wy}`] || L.plan], at, expect, people);
       }
   }
+  stats.people = `${people.placed} placed (${people.top} on the Tall Table's top, ${people.flat} flat, ${people.ghosts} ghosts), ` +
+    `${people.later} come and go, on ${seeds.length} seeds; ${checkPresence(seeds[0], expect)}`;
 
   // C1a: Hollowmere on its plan (section 4 of the header), on every seed.
   stats.hollowmere = checkHollowmere(seeds, expect);
@@ -234,7 +251,7 @@ function checkHollowmere(seeds, expect) {
     const want = ["r", "g", "s"].reduce((n, ch) => n + cells(ch).length, 0);
     expect(z.props.length === want, `${at}: ${z.props.length} props, the plan has ${want}`);
     props += z.props.length;
-    expect(z.creatures.every((c) => c.type === "maren"), `${at}: wildlife or someone else in the start village (${z.creatures.map((c) => c.type)})`);
+    expect(z.creatures.every((c) => c.type === "maren" || c.landmark === "hollowmere"), `${at}: wildlife or someone else in the start village (${z.creatures.map((c) => c.type)})`);
     // (the road is laid over the plan's open ground, which the plan keeps: it reaches the temple's porch, the H cells,
     // whatever the plan calls its hub)
     const [hx, hy] = tcell("H");
@@ -274,6 +291,69 @@ function groundOf(zone, x, y, rows = null) {
   let z = 0;
   while (z < zone.h && zone.get(x, y, z) && !GROUND_SKIP.has(zone.get(x, y, z))) z++;
   return GROUND_SKIP.has(zone.get(x, y, z)) ? null : z;
+}
+
+// --- Who stands where (section 6 of the header) ------------------------------------------------------------------------
+// What C5 #3 says of the view: Folio's people and Ess and Tee only on the map; Brann, thol and the ghost trader only with
+// your torch out.
+const FLAT_PEOPLE = new Set([...Object.values(REAL_WORLD.landmarks.find((l) => l.id === "folio").letters).map((l) => l.who), "essAndTee"]);
+const GHOST_PEOPLE = new Set(["brann", "thol", "ghostTrader"]);
+function peopleOfSpan(z, L, plan, at, expect, tally) {
+  if (!plan || !z.gen?.planAt) return;
+  const later = new Map((z.landmarkPeople || []).map((s) => [s.uid, s])), ids = new Set(dialogueIds());
+  for (const p of peopleOn(L, plan, z.gen.planAt)) {
+    const kind = kindOf(p.who, p.letter), i = p.x + p.y * z.w, here = z.creatures.filter((c) => c.tx === p.x && c.ty === p.y);
+    expect(kind, `${at}: ${p.who} (letter ${p.ch}) has no kind`);
+    if (PRESENCE[p.who]) {
+      tally.later++;
+      expect(!here.length && later.get(p.uid)?.z === z.stand[i] && later.get(p.uid)?.kind === kind, `${at}: ${p.who} should come and go (zone.landmarkPeople), not stand there`);
+      continue;
+    }
+    const c = here[0];
+    expect(here.length === 1 && c.uid === p.uid, `${at}: ${here.length} on ${p.who}'s cell (${p.x}, ${p.y}) (${here.map((h) => h.uid)})`);
+    if (!c) continue;
+    tally.placed++;
+    if (L.id === "tallTable") { tally.top++; expect(c.z === FLOOR_Z + TABLE_TOP, `${at}: ${p.who} stands at ${c.z}, not on the top (${FLOOR_Z + TABLE_TOP})`); }
+    expect(c.type === kind && c.name === p.letter.name && c.named && c.landmark === L.id && c.who === p.who && c.z === z.stand[i] && z.stand[i] >= FLOOR_Z,
+           `${at}: ${p.who} is ${c.type} "${c.name}" at ${c.z} (stand ${z.stand[i]})`);
+    expect(c.talk?.dialogue === dialogueIdOf(p.who) && ids.has(c.talk.dialogue), `${at}: ${p.who} talks under ${c.talk?.dialogue}`);
+    expect(c.vis.flat === FLAT_PEOPLE.has(p.who) && c.vis.ghostly === GHOST_PEOPLE.has(p.who), `${at}: ${p.who}'s view: flat ${c.vis.flat}, ghostly ${c.vis.ghostly}`);
+    if (c.vis.flat) tally.flat++;
+    if (c.vis.ghostly) tally.ghosts++;
+  }
+}
+// Pell's round, Castor's checkpoint, a killed person, and a person through a save (one seed).
+function checkPresence(seed, expect) {
+  const run = buildRun(seed, REAL_WORLD), W = run.world, zones = {};
+  for (const id of ["hollowmere", "benchmark", "molar"]) { const L = W.landmarks.get(id); zones[id] = generateSurface(run, L.wx, L.wy); }
+  const game = { time: 0, state: {} }, has = (id, who) => zones[id].creatures.some((c) => c.who === who);
+  const startOf = (d) => { let t = 0; while (dayNumber({ time: t }) < d) t += 30; return t; };
+  const where = [];
+  for (let d = 1; d <= 7; d++) {
+    game.time = startOf(d);
+    for (const z of Object.values(zones)) syncPeople(game, z);
+    const here = Object.keys(zones).filter((id) => has(id, "pell"));
+    where.push(here.join("+") || "none");
+    const want = d === 1 || d === 2 || d === 7 ? "hollowmere" : d <= 4 ? "benchmark" : "molar";
+    expect(here.length === 1 && here[0] === want, `Pell on day ${d}: at ${here.join(", ") || "none"}, not ${want}`);
+  }
+  expect(!has("molar", "castor"), "Castor at Molar before beat 2");
+  game.state.campaign = { done: { beat1: 100 } };
+  syncPeople(game, zones.molar);
+  const castor = zones.molar.creatures.find((c) => c.who === "castor");
+  expect(castor?.type === "assizer" && castor.talk?.dialogue === "castor" && castor.title, `Castor not at Molar once beat 1 is done (${castor?.type})`);
+  if (castor) {
+    emit(game, "kill", { c: castor, uid: castor.uid });
+    zones.molar.creatures = zones.molar.creatures.filter((c) => c !== castor);
+    syncPeople(game, zones.molar);
+    expect(!has("molar", "castor") && game.state.landmarkPeople?.dead?.[castor.uid], "Castor came back after he was killed");
+  }
+  // Through a save: the codec's record of a placed person keeps what it is.
+  const kept = zones.benchmark.creatures.find((c) => c.who === "benchmarkSignaller");
+  const back = kept && rebuildCreature(JSON.parse(JSON.stringify(trimCreature(kept))), zones.benchmark);
+  expect(back && ["name", "title", "landmark", "who", "type"].every((f) => back[f] === kept[f]) && back.named && back.talk.dialogue === kept.talk.dialogue,
+         `a saved person comes back as ${JSON.stringify(back && { name: back.name, title: back.title, landmark: back.landmark, who: back.who, dialogue: back.talk?.dialogue })}`);
+  return `Pell's round by day 1-7: ${where.join(", ")}; Castor at Molar from beat 2, not after he is killed; a person through a save`;
 }
 
 // --- C1b: the other 15 landmarks (section 5 of the header) -----------------------------------------------------------

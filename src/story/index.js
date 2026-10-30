@@ -22,6 +22,7 @@ import "../content/creatures/villagers.js";
 import { registerSiteBuilder } from "../world/sites.js";
 import { buildVillage } from "./village-site.js";
 import "./villagequests.js";
+import "./landmark-people.js";   // who stands on the landmark plans' letters (C5 #3)
 export { generateHistory } from "./history.js";
 export { generateVillage } from "./villages.js";
 export { startQuest } from "./quests.js";

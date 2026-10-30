@@ -172,7 +172,7 @@ export function lookLine(game, payload) {
   if (!payload) return "You haven't seen that place.";
   const p = game.player, c = payload.creature;
   if (c && canTalk(c)) {
-    const title = typeOf(c).title;
+    const title = c.title ?? typeOf(c).title;   // (a landmark person: its role, story/landmark-people.js)
     return `${c.name}${title ? `, ${title}` : ""}.${isFlat(c) ? " A flat being." : ""}`;
   }
   if (c) {

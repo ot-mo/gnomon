@@ -13,6 +13,7 @@
 //   legendOf(run, uid) → LegendDef | null
 //   SITE_BUILDERS[kind](ctx, site)        how a site is stamped into its surface zone (WS7: village; here: ruin,
 //   registerSiteBuilder(kind, fn)         lair, historic, station, dungeon); a second builder for a kind throws
+//   PLAN_PEOPLE, registerPlanPeople(fn)   who stands on a landmark plan's people letters (story/landmark-people.js)
 //
 // Site = { id, kind, at: { wx, wy }, name, tier, landmarkId?, checkpoint?, historyRef?, legend?, toppled?,
 //          surface: { builder, rect: { x, y, w, d } | null, params }, dungeon?: DungeonSpec }
@@ -58,6 +59,11 @@ export function registerSiteBuilder(kind, fn) {
   if (SITE_BUILDERS[kind]) throw new Error(`registerSiteBuilder: "${kind}" already has a builder`);
   SITE_BUILDERS[kind] = fn;
 }
+
+// Who stands on a landmark plan's people letters (story/landmark-people.js, the integrator's, C5 #3): gen/surface.js calls
+// each placer once the span's zone validates, after its wildlife, with { landmark, plan, at } (the plan stamped, its corner).
+export const PLAN_PEOPLE = [];
+export function registerPlanPeople(fn) { PLAN_PEOPLE.push(fn); }
 
 export const SITE_KINDS = ["village", "ruin", "lair", "historic", "station"];
 // The kinds placed by a region's chance, in this order (P0's three first, so their draws are P0's).
