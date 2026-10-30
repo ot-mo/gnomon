@@ -273,7 +273,7 @@ export function checkContent(m) {
       const n = d.floors.length;
       need(Array.isArray(d.named) && d.named.length === n && d.named.every(str), `${at}: ${d.named?.length} floor names for ${n} floors`);
       need(!d.floorGimmicks || d.floorGimmicks.length === n, `${at}: ${d.floorGimmicks?.length} floors of gimmicks for ${n} floors`);
-      need([...(d.gimmicks || []), ...(d.floorGimmicks || []).flat()].every((g) => DG.GIMMICKS[g]), `${at}: a gimmick that isn't one of GIMMICKS`);
+      need([...(d.gimmicks || []), ...(d.floorGimmicks || []).flat(), ...(d.cast || [])].every((g) => DG.GIMMICKS[g]), `${at}: a gimmick that isn't one of GIMMICKS`);
       need(DG.DUNGEON_THEMES[d.theme], `${at}: theme ${d.theme}`);
       need((d.cradle || []).every((z) => Number.isInteger(z) && z >= 1 && z <= n), `${at}: a cradle off its floors`);
       need((d.vaultPool || []).every((v) => V.vaultById(Array.isArray(v) ? v[0] : v)), `${at}: a vault it can't draw`);

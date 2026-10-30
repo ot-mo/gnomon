@@ -494,7 +494,8 @@ function checkC1b(seeds, expect) {
           expect(p.bottom?.kind === want.bottom.kind && (want.bottom.kind !== "guardian" || f.creatures.some((c) => c.guardian === want.bottom.id)), `${at}: its bottom ${JSON.stringify(p.bottom)}`);
         }
       }
-      expect(used.size === union.size && [...used].every((g) => union.has(g)), `${at}: its floors play ${[...used]}, its keys (${keys}) map onto ${[...union]}`);
+      const cast = new Set(want.cast || []);   // (gimmicks that place its inhabitants, beyond its keys: Kettle Mesa's first flatlings)
+      expect([...union].every((g) => used.has(g)) && [...used].every((g) => union.has(g) || cast.has(g)), `${at}: its floors play ${[...used]}, its keys (${keys}) map onto ${[...union]}${cast.size ? `, its cast ${[...cast]}` : ""}`);
     }
   }
   // Holy places (C2 #5): each names a faction.

@@ -141,56 +141,73 @@ export const LANDMARK_INDEX = [
 
 // The landmark dungeons (C1b; bible §5, §15.3): what world/sites.js landmarkDungeon reads beside the floors, by dungeon
 // id. gimmicks (every floor) or floorGimmicks (floor by floor) are gen/dungeon.js GIMMICKS ids, the bible's gimmick key
-// mapped onto what the generator builds (docs/c1.md "C1b": the map); theme a DUNGEON_THEMES id; named the floors'
-// names; cradle the floors with a Truing Cradle; vaultPool the puzzle rooms its floors draw; bottom what its last floor
-// holds that the code builds today (the Metronome's Escapement stands in the Colossus's hall, the pattern the bible
-// builds it on). `planned` is what the bible gives the dungeon that the code doesn't build yet (integration requests):
-// its true bottom (a legend, a relic, a boss), a guardian's hall on a floor that isn't the last, each floor's headroom,
-// the murals' words, a day and a night layout, the tide, the floors up, floors opened by a beat.
+// mapped onto what the generator builds (GIMMICK_KEYS, below), and `cast` those that place its inhabitants (§5's lists)
+// beyond its keys; theme a DUNGEON_THEMES id; named the floors' names; cradle the floors with a Truing Cradle; vaultPool
+// the puzzle rooms its floors draw; bottom what its last floor holds that the code builds today (the Metronome's
+// Escapement stands in the Colossus's hall, the pattern the bible builds it on). `planned` is what the bible gives the
+// dungeon that the code doesn't build yet (integration requests): its true bottom (a legend, a relic, a boss), a hall on
+// a floor that isn't the last (`vaults`: { floor: vault id | { hall, guardian } }), its own inhabitants (`creatures`:
+// [kind, weight] rows by C3's ids, in place of its region's), each floor's headroom, the murals' words, a day and a night
+// layout, the tide, the floors up, floors opened by a beat, a second way out, a clue.
 const LANDMARK_DUNGEONS = {
-  kettleMesa: { theme: "horn", floorGimmicks: [["collapsed"], ["collapsed", "spikeworks"], ["flooded"]],
+  kettleMesa: { theme: "horn", floorGimmicks: [["collapsed", "flatland"], ["collapsed", "spikeworks"], ["flooded"]], cast: ["flatland"],   // (the first flatlings)
     named: ["Kettle Mesa, the Rim", "Kettle Mesa, the Ledges", "Kettle Mesa, the Kettle's Bottom"],
     planned: { bottom: { kind: "legend", id: "grubMother", name: "the Grub Mother", species: "brineGrub", template: "plain" },
-               daylight: [1], vaults: { 2: "flatLie" }, culvert: { from: 3, to: "hollowmere" } } },
+               creatures: [["brineGrub", 4], ["saltrat", 3], ["rustbackScav", 2], ["flatling", 2]],
+               daylight: [1], vaults: { 2: "flatLie" }, culvert: { from: 3, to: "hollowmere" },
+               clue: { floor: 3, what: "a fresh sapper tunnel with an Assize plumb-seal in it (beat 1's clue)" } } },
   datum: { theme: "deepwright", floorGimmicks: [["murals"], ["murals", "allDeep"], ["murals", "allDeep"], ["murals", "allDeep"]],
     named: ["the Datum, the Gauge Room", "the Datum, the Plate Hall", "the Datum, the Long Level", "the Datum, the Stone"],
     planned: { bottom: { kind: "reading", id: "datumStone", name: "the Datum stone", plinth: 2 }, opensAtBeat: { 3: 2, 4: 2 },
                murals: [{ text: "THIS SILL IS 3 BLOCKS UP.", map: "A brass plate set in the floor, numbered 3." }] } },
   rootCanals: { theme: "deepwright", gimmicks: ["lightless", "flooded", "haunted"],
-    named: ["the Root Canals, the Upper Cut", "the Root Canals, the Smugglers' Run"], planned: { darkMapping: true, watch: "chandlerWatch" } },
+    named: ["the Root Canals, the Upper Cut", "the Root Canals, the Smugglers' Run"],
+    planned: { darkMapping: true, creatures: [["chandlerGuard", 3], ["lampHound", 3], ["shade", 1]],
+               exit: { floor: 2, to: "molar", at: "the canals' far mouth (molar.js X), east of the checkpoint" } } },
   press: { theme: "gears", floorGimmicks: [["flatland"], ["flatland"], ["flatland", "spikeworks", "oneBeat"], ["flatland", "spikeworks", "oneBeat"], ["spikeworks", "oneBeat"]],
     named: ["the Press, the Feed Floor", "the Press, the Pressing Rooms", "the Press, the Beat Floor", "the Press, the Low Floor", "the Press-hall"],
-    planned: { bottom: { kind: "boss", id: "pressMaster", name: "Press-Master Sevrin Marr-Orrum", with: "the Press, its three pistons on gantries 3-5 up" },
-               headroom: [6, 5, 4, 3, null], pressedRooms: true } },
+    planned: { bottom: { kind: "boss", id: "pressMaster", name: "Press-Master Sevrin Marr-Orrum", with: "the Press, its three pistons on gantries 3 to 5 blocks up" },
+               creatures: [["pressHound", 3], ["mosaicGolem", 2], ["erratum", 1], ["assizer", 1]],
+               headroom: [6, 5, 4, 3, null], pressedRooms: true, captive: { floor: 3, who: "toviHallen" } } },
   unlitChoir: { theme: "shade", gimmicks: ["lightless", "haunted", "braziers"],
     named: ["the Unlit Choir, the Narthex", "the Unlit Choir, the Nave", "the Unlit Choir, the Quire", "the Unlit Choir, the Warden's Crypt",
             "the Unlit Choir, the Undercroft", "the Unlit Choir, Noon's Floor"],
-    planned: { bottom: { kind: "boss", id: "noon", name: "Noon", flat: true, darkOnly: true }, vaults: { 4: "warden" }, darkMapping: true } },
+    planned: { bottom: { kind: "boss", id: "noon", name: "Noon", flat: true, darkOnly: true },
+               vaults: { 4: { hall: "warden", guardian: "gloamWarden" } },   // the Gloom Warden's hall, C3's Gloam Warden in it
+               creatures: [["lamplessChanter", 3], ["shade", 3], ["wraith", 2], ["longshadow", 1]], darkMapping: true, runeDoors: true } },
   metronome: { theme: "gears", gimmicks: ["spikeworks", "oneBeat"], cradle: [1],
     named: ["the Metronome, the Casting Floor", "the Metronome, the Gear Floor", "the Metronome, the Rack Floor", "the Metronome, the Spring Floor",
             "the Metronome, the Bob Floor", "the Metronome, the Escapement"],
     bottom: { kind: "guardian", id: "colossus" },
-    planned: { bottom: { kind: "boss", id: "escapement", name: "the Escapement", pattern: "colossus" }, offBeatDoors: true } },
+    planned: { bottom: { kind: "boss", id: "escapement", name: "the Escapement", pattern: "colossus" },
+               creatures: [["draughtsman", 3], ["beatSpider", 3], ["lensSentry", 2]], offBeatDoors: true } },
   drownedLantern: { theme: "glass", gimmicks: ["flooded"],
     named: ["the Drowned Lantern, the Tide Door", "the Drowned Lantern, the Oil Store", "the Drowned Lantern, the Wet Stair",
             "the Drowned Lantern, the Sunken Gallery", "the Drowned Lantern, the Noonglass Dais"],
     planned: { bottom: { kind: "relic", id: "noonglass", name: "the Noonglass", dryOnlyAtNoon: true },
-               legend: { floor: 5, id: "drownedBellwether", name: "the Drowned Bellwether" }, tide: { dry: [11, 13], rise: 1, every: 2, max: 4 } } },
-  square: { theme: "deepwright", floorGimmicks: [["murals"], ["flatland", "murals"], ["flatland", "murals"]], cradle: [1],
+               legend: { floor: 5, id: "drownedBellwether", name: "the Drowned Bellwether" }, tide: { dry: [11, 13], rise: 1, every: 2, max: 4 },
+               creatures: [["glassCrab", 3], ["mirrorEel", 2], ["slagSalamander", 2]] } },
+  square: { theme: "deepwright", gimmicks: ["murals"], cradle: [1],
     named: ["the Square, the Hall Below", "the Square, the Cells", "the Square, the Deep Cells"],
-    planned: { up: ["the Square, the Rule Floor", "the Square, the Hierarch's Floor"], identicalRooms: true, ruleBanners: true, freeFittings: true } },
+    planned: { up: ["the Square, the Rule Floor", "the Square, the Hierarch's Floor"], identicalRooms: true, ruleBanners: true, freeFittings: true,
+               theme: "rule",   // one material: every room the same in 3D
+               prisoners: { floors: [2, 3], who: "pressed prisoners: talked to and freed on the map, by turning their press-wheels in 3D" },
+               creatures: [["plumbknight", 3], ["assizer", 2]] } },
   dialWorks: { theme: "gears",
     floorGimmicks: Array.from({ length: 8 }, (_, k) => (k % 2 === 0 ? ["allDeep", "spikeworks", "oneBeat"] : ["flatland", "spikeworks", "oneBeat"])),
     named: ["the Dial-works, the Great Wheel", "the Dial-works, the Train", "the Dial-works, the Fusee", "the Dial-works, the Mainspring",
             "the Dial-works, the Escape Wheel", "the Dial-works, the Pallets", "the Dial-works, the Hand's Root", "the Noon Socket"],
-    planned: { bottom: { kind: "boss", id: "vesper", name: "Vesper" }, sweepingHand: { period: 40 }, door: { hours: [11, 13] } } },
+    planned: { bottom: { kind: "boss", id: "vesper", name: "Vesper" }, sweepingHand: { period: 40 },
+               door: { hours: [11, 13], or: ["the Plumb Key", "the Cube turned on the threshold (10 max HP, for good)", "Hierarch Strade as an ally"] },
+               creatures: { odd: [["latticeTroll", 2], ["askewAngle", 3], ["fold", 3]], even: [["smoother", 3], ["burnisher", 3], ["planarQueen", 1]] } } },
   underPage: { theme: "salt", gimmicks: ["murals"], vaultPool: ["mosaicHall"],   // (the Speaking Door is floor 2's alone: planned.vaults)
     named: ["the Under-Page, the First Leaf", "the Under-Page, the Speaking Door", "the Under-Page, the Founding"],
     planned: { bottom: { kind: "relic", id: "pressedFounding", name: "the Pressed's founding relic", with: "a Second-Hour stele with all three accounts; a reading that names Vesper" },
-               vaults: { 2: "speakingDoor" } } },
+               vaults: { 2: "speakingDoor" }, creatures: [["tileMimic", 2], ["flatling", 2], ["pressedPilgrim", 1]] } },
   rootfold: { theme: "horn", gimmicks: ["allDeep"],
     named: ["the Rootfold, the Upper Roots", "the Rootfold, the Fold", "the Rootfold, the Heartroot"],
-    planned: { layouts: { day: [6, 18], night: [18, 6] }, foldLanding: 1 } },
+    planned: { layouts: { day: [6, 18], night: [18, 6] }, foldLanding: 1,
+               creatures: [["pleatSpider", 3], ["creasebeetle", 3], ["sporeling", 2], ["hangvine", 1]] } },
 };
 for (const l of LANDMARK_INDEX) if (l.dungeon && LANDMARK_DUNGEONS[l.dungeon.id]) Object.assign(l.dungeon, LANDMARK_DUNGEONS[l.dungeon.id]);
 // §15.3's gimmick keys, each mapped onto what builds it (C1b; check-landmarks holds every landmark dungeon's gimmicks to
@@ -209,10 +226,10 @@ export const GIMMICK_KEYS = {
   mystery: { gimmicks: [], code: "Who Lit the Hush? (C5, beat 6)" },
   pressing: { gimmicks: ["flatland", "spikeworks", "oneBeat"], code: "pressed rooms unpressed by turning on their centre; plates that press you flat for 10 s" },
   loweringCeiling: { gimmicks: [], code: "headroom 6, 5, 4 and 3 blocks, then the tall Press-hall" },
-  theDark: { gimmicks: ["lightless", "haunted", "braziers"] },
+  theDark: { gimmicks: ["lightless", "haunted", "braziers"], code: "the doors rune doors; the Unlit seen only with your torch out" },
   oneBeat: { gimmicks: ["spikeworks", "oneBeat"], code: "doors on the off-beat; machines acting on the beat" },
   tideOfHours: { gimmicks: ["flooded"], code: "dry 11:00-13:00, the water up a block every 2 hours to 4; the waterline on the map" },
-  identicalRooms: { gimmicks: ["murals", "flatland"], code: "a lattice of identical rooms; patrols' straight traces on the map; the floors up" },
+  identicalRooms: { gimmicks: ["murals"], code: "a lattice of identical rooms of one material; patrols' straight traces on the map; pressed prisoners talked to and freed on the map by turning their press-wheels in 3D; the floors up" },
   ruleBanners: { gimmicks: [], code: "banners that make a 12-tile Trued zone" },
   sweepingHand: { gimmicks: ["allDeep", "spikeworks", "oneBeat", "flatland"], code: "the inner hand's shadow, a turn every 40 s, pressing flat what it covers" },
   answerInFloor: { gimmicks: ["murals"], vaults: ["mosaicHall", "speakingDoor"] },
