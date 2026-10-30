@@ -180,7 +180,9 @@ export function checkContent(m) {
       need(a.info === undefined || (str(a.info) && sentences(a.info) <= 1), `${at}: info`);
       if (a.wornRep === "hour") need(Number.isInteger(a.hourRep) && a.hourRep > 0, `${at}: an Hour mask's hourRep`);
       else if (a.wornRep !== undefined) repOk(at, a.wornRep);
-      if (a.wornRep !== undefined) need(str(a.needs), `${at}: a worn reputation with no needs (the hook is a request)`);
+      // B1 (approved 2026-10-30): the worn reputation hook is built (social/reputation.js syncWornRep; check-social holds
+      // every wornRep piece on and off), so no piece may still wait for it
+      if (a.wornRep !== undefined) need(!/worn reputation/.test(a.needs || ""), `${at}: still waits for the worn reputation hook (B1 built it: social/reputation.js syncWornRep)`);
     }
     for (const id of Fg.FORGED.armour) need(I.ARMOURS[id], `forged armour ${id}: no such armour`);
     for (const id of Object.keys(Fg.VALUE)) need(I.WEAPONS[id] || I.ARMOURS[id] || m.c4.missiles.MISSILES[id], `value ${id}: no such weapon, armour or missile weapon`);
