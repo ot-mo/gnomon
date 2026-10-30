@@ -957,6 +957,10 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json, captu
   if (!pick(maren, "About the Assize plumb-seal...", "Give the seal to Mira.") || C.choices?.beat1?.seal !== "survey" || rep("survey") - s0 !== 100)
     fail(`beat 1's choice at Maren: ${json(C.choices?.beat1)}, Survey +${rep("survey") - s0}`);
   if (T.talkTo(game, maren).options.some((o) => /^About the Assize/.test(o.label))) fail("beat 1's choice still offered once made");
+  if (p.inv.some((it) => it.id === "assizeSeal")) fail("the seal is still in your pack after you gave it to Mira");
+  // A quest item you carry already (picked up where it lies: B2 puts the seal in Kettle Mesa's tunnel) isn't given twice.
+  { const one = BT.campaignItem("plumbKey"), n0 = p.inv.filter((it) => it.id === "plumbKey").length; BT.giveCampaignItems(game, [["plumbKey", 1]]);
+    if (!one || p.inv.filter((it) => it.id === "plumbKey").length !== n0) fail("a second Plumb Key was given"); }
   if (!pick(qv, "About the Datum reading...", "Sell it to the Horary. (The Seventh-Chimers will learn your name.)") || rep("horary") - h0 !== 150 || !C.ambushes?.includes("seventhChimers"))
     fail(`beat 2's choice at Quint-Vey: ${json(C.choices?.beat2)}, Horary +${rep("horary") - h0}, ambushes ${json(C.ambushes)}`);
   // (Benchmark's leech shares only "the" with beat 4's giver, Kay of the Long Line: not enough.)

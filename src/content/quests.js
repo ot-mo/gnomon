@@ -202,8 +202,8 @@ export const QUESTS = {
         reward: { text: "The Assize plumb-seal, and Maren's blessing: +5 max HP.", items: [["assizeSeal", 1]], maxHp: 5 },
         done: { event: "zone:enter", landmark: "kettleMesa", z: 3 },
         choices: [{ id: "seal", label: "the Assize plumb-seal", options: [
-          { id: "survey", text: "Give the seal to Mira.", rep: { survey: 100 } },
-          { id: "chandlers", text: "Sell it to Pell's Chandler buyer.", rep: { chandlers: 100, survey: -50 }, glim: 120 }] }] },
+          { id: "survey", text: "Give the seal to Mira.", rep: { survey: 100 }, takes: [["assizeSeal", 1]] },
+          { id: "chandlers", text: "Sell it to Pell's Chandler buyer.", rep: { chandlers: 100, survey: -50 }, glim: 120, takes: [["assizeSeal", 1]] }] }] },
       { id: "beat2", n: 2, title: "The Datum", landmark: "benchmark", band: [3, 6], after: ["beat1"],
         giver: "Surveyor-General Quint-Vey", goal: "Surveyor-General Quint needs a true reading from the Datum stone to measure the noon Hand.",
         offer: "Interesting. Don't move, you're in my line. The noon Hand is long, and I need to know how long. The Datum stone under the pillar is the last true level. Read it standing at its height.",

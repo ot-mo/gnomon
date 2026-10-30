@@ -12,7 +12,8 @@
 //   payGlim(game, n)   into your purse, the rest on the ground at your feet as cash
 //   choicesOpen(game) → [{ beat, choice }]   a done beat's choices not made yet, but those `byRoute` (recorded as the route
 //                    happens: C5 #7, #8)
-//   choose(game, beatId, choiceId, optionId) → option | null   pays it (rep, glim, items, reading) and records it:
+//   choose(game, beatId, choiceId, optionId) → option | null   pays it (rep, glim, items, reading), takes what it gives
+//                    away (`takes`: beat 1's seal) and records it:
 //                    campaign.choices[beat][choice], campaign.alliance (beat 10), campaign.ambushes (beat 2's Seventh-
 //                    Chimers: the world map's encounter table reads it once their band exists, a request)
 //   isGiver(c, beat) → bool   the talker the beat's `giver` names: every word of it in the talker's name ("Surveyor-
@@ -59,6 +60,7 @@ export function giveCampaignItems(game, items) {
   for (const [id, n = 1] of items || []) {
     const it = campaignItem(id);
     if (!it || !p) { C.owed = [...(C.owed || []), [id, n]]; continue; }
+    if (it.kind === "quest" && p.inv.some((x) => x.kind === "quest" && x.id === id)) continue;   // (one already carried: picked up where it lies)
     if (it.kind === "tonic") addToInventory(p, { ...it, count: n });
     else for (let k = 0; k < n; k++) addToInventory(p, { ...it });
     game.log?.(`You receive ${n > 1 ? `${n} × ` : ""}${itemName(game, it)}.`, [200, 220, 255]);
@@ -120,11 +122,21 @@ export function choicesOpen(game) {
   return out;
 }
 
+// What an option takes from your pack (beat 1's seal, given to Mira or sold): n of the item with that id, if you have them.
+function takeItems(game, id, n) {
+  const p = game.player;
+  for (let k = 0; k < n && p; k++) {
+    const at = p.inv.findIndex((x) => x.id === id || x.effect === id);
+    if (at < 0) return;
+    if ((p.inv[at].count || 1) > 1) p.inv[at].count--; else p.inv.splice(at, 1);
+  }
+}
 export function choose(game, beatId, choiceId, optionId) {
   const beat = beatOf(beatId), choice = beat?.choices?.find((c) => c.id === choiceId), o = choice?.options.find((x) => x.id === optionId);
   const C = campaignOf(game);
   if (!o || C.done[beatId] === undefined || C.choices?.[beatId]?.[choiceId] !== undefined) return null;
   ((C.choices ||= {})[beatId] ||= {})[choiceId] = optionId;
+  for (const [id, n = 1] of o.takes || []) takeItems(game, id, n);
   payRep(game, o.rep);
   payGlim(game, o.glim);
   giveCampaignItems(game, o.items);
