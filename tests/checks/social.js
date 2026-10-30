@@ -48,6 +48,8 @@
 //  15. shrines    the component on a statue; donations (the Vigil's cap, the Lampless only in the dark)
 //  16. trade      the screen by keys: from talk, a buy, Tab, Esc back to the talker's first words
 //  17. JSON       the Kindling's, the Snuffer's and the donations' state
+//  18. B3         the backlog's requests (B3): the rite variants and specials, holy places, the Hour cults, the commons,
+//                 the liquids, the Smoothers, the banks, the legends' opinions, the powers, the surgeon's and tinker's packs
 export const BIBLE_START = {   // bible §15.4 "Start (Bent / Plumb)"
   hollowmere: [100, 100], noonVigil: [50, 50], survey: [0, 0], assize: [-700, -100], horary: [0, 0], pressed: [-50, -50],
   lampless: [-100, -100], drovers: [0, 0], chandlers: [-50, -50], rustbacks: [-450, -450], flatfolk: [0, 0], unlit: [0, 0],
@@ -1123,6 +1125,9 @@ export async function run(env) {
     game.view = "map";
     if (!ritual.riteReady(game, ghost, "tracing")) fail("the Unlit take the Tracing");
     game.view = "3d"; p().torch = false;
+    // B3 (C2 #3): the Unlit's Snuffing is the Pouring, which wants a vial of anything to pour.
+    if (!/poured/.test(ritual.riteReady(game, ghost, "snuffing") || "")) fail("the Pouring without a vial to pour");
+    items.addToInventory(p(), { kind: "vial", effect: "brine" });
     if (ritual.riteReady(game, ghost, "snuffing")) fail(`the Unlit refuse the Snuffing in the dark: ${ritual.riteReady(game, ghost, "snuffing")}`);
     p().torch = true;
 
@@ -1443,6 +1448,9 @@ export async function run(env) {
     items.useItem(game, p(), p().inv[0]);
     if (p().hp !== 7 || !p().inv.some((i) => i.kind === "vial" && i.effect === "")) fail(`fresh water: hp ${p().hp}, ${JSON.stringify(p().inv)}`);
     liquids.drinkLiquid(game, p(), "ink");
+    // B3 (C2 #9): bible §13.7, 5 s of confusion first, then Flat.
+    if (p().status?.flat || !p().status?.confused) fail("ink: not confused first, or Flat at once");
+    { const t0 = game.time; game.time += 6; events.emit(game, "clock:tick", { t0, t1: game.time }); }
     if (!p().status?.flat) fail("ink didn't make you Flat");
     for (const f of Object.values(F.FACTIONS)) {
       if (f.hidden || f.group) continue;
@@ -1466,7 +1474,7 @@ export async function run(env) {
   // eyes) it does what the data says. The money's words and reference numbers are §3.1's.
   {
     const L = (await m("content/liquids.js")).LIQUIDS, { CURRENCY: CUR } = await m("content/currency.js"), ST = await m("status.js");
-    const WANTED = ["glowing", "nausea", "confused"];   // statuses §13.7 needs that status.js hasn't (integration request)
+    const WANTED = [];   // statuses §13.7 needs that the game hasn't (B3, C2 #9: glowing, nausea and confused are social/liquids.js's)
     const KNOWN = ["heal", "hurt", "status", "save", "burns", "douse", "clean", "ward", "stain", "draws", "shortcut", "dark", "seek", "reroll",
       "shutdown", "transform", "seePlane", "rep", "again"];
     let effects = 0;
@@ -1494,12 +1502,12 @@ export async function run(env) {
       ["clearGlim", "touch", "burns", "burns", 12], ["turnwater", "drink", "shutdown", "days", 1], ["turnwater", "touch", "transform", "transform", "sameTier"],
       ["blood", "touch", "stain", "stain", { sight: 2, t: 30 }], ["blood", "touch", "draws", "draws", "saltbeasts"],
     ];
-    // A vial's words say what drinking does today: a liquid whose drink waits on a status or effect the game hasn't
-    // got keeps the bible's words in `full`, and its shown words don't name what isn't there.
+    // A vial's words say what drinking does: since B3 (C2 #9) every effect lands, so no liquid keeps a `full` of words
+    // waiting, and every drink status is one the game has.
     for (const [id, d] of Object.entries(L)) {
       if (d.sameAs) continue;
-      const waits = (d.effects.drink || []).some((e) => WANTED.includes(e.status) || e.reroll || e.seePlane || e.after);
-      if (waits && (!d.full?.drink || /glow for|nausea|confus|re-roll|see the Plane|blind/.test(d.drink))) fail(`liquid ${id}: "${d.drink}" promises what drinking doesn't do yet`);
+      if (d.full) fail(`liquid ${id}: still keeps words waiting in full (${JSON.stringify(d.full).slice(0, 60)})`);
+      for (const e of d.effects.drink || []) if (e.status && !ST.STATUS_DEFS[e.status]) fail(`liquid ${id}: drink status ${e.status} isn't one`);
     }
     for (const [id, part, key, field, want] of bible) {
       const got = eff(id, part, key)?.[field];
@@ -1589,6 +1597,535 @@ export async function run(env) {
     if (!game.talk.node.options.some((o) => /what you have/.test(o.label))) fail("back from trade, the talk didn't start over");
     keys.dispatchKey(game, "Escape");
     stats.tradeScreen = `opened from talk on theirs; a buy by Enter (${rows0[cheap].price} glim); Tab to yours; Esc back to the talker's first words`;
+  }
+
+  // ===== B3 (peoples and villages): the backlog's code requests ===========================================================
+  // --- 18. B3 -------------------------------------------------------------------------------------------------------------
+  // C2 #3 the rite variants (each need refused and met), the specials as menu rows, the Askew's re-angling, the dish row,
+  // the Unlit's double price and buys.subjects; C2 #5 holy places and trespass; C2 #6 the Hour cults and the Hourbound;
+  // C2 #8 the commons lamp, the oven, the shrine; C2 #9 the liquids' drink and touch; C2 #11 the Smoothers; C2 #13 the
+  // money's words and the banks; WS10 #6 a legend's opinions and a Herdmother's herd; the powers (Hour script, Gossip,
+  // Triangulator, Oil fire, Brew, Chime); WS6b's surgeon's and tinker's packs.
+  {
+    const ritual = await m("social/ritual.js"), places = await m("social/places.js"), holy = await m("social/holy.js");
+    const cults = await m("social/cults.js"), commons = await m("social/commons.js"), sm = await m("social/smoothers.js");
+    const bank = await m("social/bank.js"), stocks = await m("social/stocks.js"), POW = (await m("content/powers.js")).POWERS;
+    const CF = await m("content/factions.js"), V = (await m("content/villages.js")).VILLAGES, CUR = (await m("content/currency.js")).CURRENCY;
+    const status = await m("status.js"), clock = await m("clock.js"), { FLOOR_Z } = world, keyset = await m("keyset.js");
+    const RUN = await m("world/run.js"), { REAL_WORLD } = await m("content/world/worldmap.js"), { compileWorld } = await m("world/worldmodel.js");
+    const secrets = await m("story/secrets.js"), journal = await m("story/journal.js"), murals = await m("story/murals.js");
+    const tick = (s) => { const t0 = game.time; game.time += s; events.emit(game, "clock:tick", { t0, t1: game.time }); };
+    const setup = () => {
+      fresh(1234, { genotype: "bent" });
+      p().funds = 200; p().inv = []; p().torch = true; setEgo(16); p().perks = {};
+      game.view = "3d"; game.state.rep ||= {};
+    };
+    const face = (c) => { p().yaw = Math.atan2(c.y - p().y, c.x - p().x); };
+    const out = {};
+
+    // C2 #3: the variants' needs, each refused where it isn't met and met where it is.
+    setup();
+    const horary = named("mira", "villager", "horary", { near: [1, 0], name: "Tick" }); face(horary);
+    game.zone.steles = [{ x: Math.floor(p().x) + 2, y: Math.floor(p().y), hour: 12 }];
+    game.time = (12 - 6 - 3) * 60;   // 09:00: three hours from the stele's
+    if (!/dial-stele/.test(ritual.riteReady(game, horary, "lighting") || "")) fail("the Horary's Lighting away from the stele's hour");
+    game.time = (12 - 6) * 60 + 30;   // 12:30
+    if (ritual.riteReady(game, horary, "lighting")) fail(`the Horary's Lighting within the hour: ${ritual.riteReady(game, horary, "lighting")}`);
+    const r1 = ritual.performRite(game, horary, "lighting");
+    if (!r1.ok || !r1.text.includes(CF.FACTIONS.horary.riteVariant.words[0])) fail(`the Lighting at the hour's words: ${r1.text?.slice(0, 80)}`);
+    delete game.zone.steles;
+    setup();
+    const kite = named("mira", "villager", "kites", { near: [1, 0], name: "Kree" }); face(kite);
+    if (!/blocks up/.test(ritual.riteReady(game, kite, "lighting") || "")) fail("the Ascent on the ground");
+    p().z = kite.z = FLOOR_Z + 8;
+    if (ritual.riteReady(game, kite, "lighting")?.match(/blocks up/)) fail("the Ascent 8 up still refused for height");
+    setup();
+    const plan = named("mira", "villager", "plan", { near: [1, 0], name: "Grid Two" }); face(plan);
+    p().funds = 4;
+    if (!/reservoir/.test(ritual.riteReady(game, plan, "lighting") || "")) fail("the Oiling with 4 glim");
+    p().funds = 20;
+    const r2 = ritual.performRite(game, plan, "lighting");
+    if (!r2.ok || p().funds !== 15) fail(`the Oiling: ${r2.ok}, funds 20 → ${p().funds} (5 poured)`);
+    game.view = "map";
+    const plan2 = named("mira", "villager", "plan", { near: [0, 1], name: "Grid Three" });
+    if (!/map 90%/.test(ritual.riteReady(game, plan2, "tracing") || "")) fail("the Oiling's Tracing on an unmapped floor");
+    game.zone.seen.fill(1);
+    if (ritual.riteReady(game, plan2, "tracing")) fail(`the Oiling's Tracing on a mapped floor: ${ritual.riteReady(game, plan2, "tracing")}`);
+    setup();
+    const rust = named("mira", "villager", "rustbacks", { near: [1, 0], name: "Grak" }); face(rust); game.state.rep.rustbacks = 0;
+    if (!/Iron first/.test(ritual.riteReady(game, rust, "lighting") || "")) fail("the Rustbacks' Lighting without iron");
+    p().inv = [{ kind: "weapon", id: "longsword", made: "iron", ench: 0, known: true }];
+    const r3 = ritual.performRite(game, rust, "lighting");
+    if (!r3.ok || p().inv.some((it) => it.made === "iron")) fail(`the iron gift: ${r3.ok}, pack ${JSON.stringify(p().inv)}`);
+    setup();
+    const tree = named("mira", "villager", "pleatwood", { near: [1, 0], name: "Old Bark" }); face(tree);
+    game.time = (14 - 6) * 60;
+    if (!/dusk/.test(ritual.riteReady(game, tree, "lighting") || "")) fail("the Pleatwood's Lighting at 14:00");
+    game.time = (18 - 6) * 60 + 10;
+    if (ritual.riteReady(game, tree, "lighting")) fail(`the Pleatwood's Lighting at dusk: ${ritual.riteReady(game, tree, "lighting")}`);
+    // The Mirroring: the Lighting is half, the bond comes on the Tracing after it.
+    setup();
+    const err = named("mira", "villager", "errata", { near: [1, 0], name: "Akli" }); face(err); game.state.rep.errata = 0;
+    if (!/first/.test(ritual.riteReady(game, err, "tracing") || "") && (game.view = "map") && !/first/.test(ritual.riteReady(game, err, "tracing") || "")) fail("the Mirroring's Tracing before its Lighting");
+    game.view = "3d"; face(err);
+    p().inv = [{ kind: "vial", effect: "turnwater", count: 1 }];   // (their sacrament: poured at the bond, not at the first half)
+    const h1 = ritual.performRite(game, err, "lighting");
+    if (!h1.ok || !h1.half || ritual.kin(game, err)) fail(`the Mirroring's Lighting: ${JSON.stringify(h1).slice(0, 90)}`);
+    if (!p().inv.some((it) => it.effect === "turnwater")) fail("the Mirroring's first half poured the sacrament");
+    game.view = "map";
+    const h2 = ritual.performRite(game, err, "tracing");
+    if (!h2.ok || !ritual.kin(game, err)) fail(`the Mirroring's Tracing after it: ${h2.text?.slice(0, 90)}`);
+    if (p().inv.some((it) => it.effect === "turnwater") || !(h2.changes.errata >= 20)) fail(`the Mirroring's bond: the sacrament not poured, or no +20 (${JSON.stringify(h2.changes)})`);
+    // The Moths and the Saltbeasts kindle only through their legend.
+    setup();
+    const moth = named("mira", "villager", "moths", { near: [1, 0], name: "Flutter" });
+    if (!/only through/.test(ritual.canKindle(game, moth) || "")) fail("a common Lantern Moth can be kindled");
+    out.variants = "the hour, the Ascent, the Oiling (5 glim; the floor plan), iron, dusk, the Mirroring in two halves, legends only";
+
+    // C2 #3: the specials, the dish, the double price, buys.subjects, the Askew.
+    setup();
+    p().genotype = "plumb";
+    const lamp = named("mira", "villager", "lampless", { near: [1, 0], name: "Ishel" });
+    game.state.rep.lampless = 300;
+    game.state.kindling = { kin: { [ritual.kinKey(game, lamp)]: { faction: "lampless", name: "Ishel", rite: "snuffing", at: 0, net: 0 } }, followers: [] };
+    const snuffOn = !!(await m("content/mutations.js")).MUTATIONS.snuff;   // (the Snuff waits on its code in MUTATIONS_WAITING: not offered until then)
+    const snuffRow = ritual.ritualRows(game, lamp).find((r) => r.id === "special:snuff");
+    if (!snuffOn ? snuffRow : !snuffRow || !/Bent/.test(snuffRow.why || "")) fail(`the Snuff for a Plumb: ${JSON.stringify(snuffRow)?.slice(0, 80)}`);
+    p().genotype = "bent";
+    const snuff = ritual.ritualRows(game, lamp).find((r) => r.id === "special:snuff");
+    if (snuffOn) {
+      if (!snuff || snuff.n !== -200 || snuff.why) fail(`the Snuff row: ${JSON.stringify(snuff)?.slice(0, 80)}`);
+      else { ritual.ritualRow(game, lamp, snuff); if (!p().mutations?.snuff || game.state.rep.lampless !== 100) fail(`the Snuff bought: ${JSON.stringify(p().mutations)}, rep ${game.state.rep.lampless}`); }
+      if (ritual.ritualRows(game, lamp).some((r) => r.id === "special:snuff")) fail("the Snuff offered twice");
+    } else if (snuff) fail("the Snuff offered while it waits on its code");
+    const pressed = named("mira", "villager", "pressed", { near: [0, 1], name: "Vee" });
+    game.state.rep.pressed = 300;
+    game.state.kindling.kin[ritual.kinKey(game, pressed)] = { faction: "pressed", name: "Vee", rite: "tracing", at: 0, net: 0 };
+    const press = ritual.ritualRows(game, pressed).find((r) => r.id === "special:pressing");
+    if (!press || press.n !== -100) fail("the Pressing rite isn't a −100 row");
+    else ritual.ritualRow(game, pressed, press);
+    if (!status.hasStatus(p(), "pressing") || Math.abs(status.statusLeft(p(), "pressing") - 1440) > 1) fail("the Pressing isn't a world day's gift");
+    const abil = await m("abilities.js");
+    if (!abil.abilitiesOf(p()).some((a) => a.id === "pressing")) fail("the Pressing gives no ability");
+    else {
+      abil.activate(game, p(), "pressing", {});
+      if (!status.hasStatus(p(), "flat")) fail("the Pressing didn't press you flat");
+      status.removeStatus(game, p(), "flat");
+      if (abil.activate(game, p(), "pressing", {})) fail("the Pressing twice on one floor");
+    }
+    if (ritual.ritualRows(game, pressed).some((r) => r.id === "special:pressing")) fail("the Pressing offered again while its day lasts");
+    if (!p().hotbar?.includes("pressing")) fail("the Pressing isn't on a hotbar key");
+    status.catchUpStatuses(game, p(), 1441);   // (statuses run on the frames and skips, not on the clock's tick)
+    if (p().hotbar?.includes("pressing") || !ritual.ritualRows(game, pressed).some((r) => r.id === "special:pressing")) fail("the Pressing's day over: its key kept, or not offered again");
+    const pressed2 = named("mira", "villager", "pressed", { near: [-1, 1], name: "Arr" });
+    game.state.kindling.kin[ritual.kinKey(game, pressed2)] = { faction: "pressed", name: "Arr", rite: "tracing", at: 0, net: 0 };
+    game.state.kindling.specials.limbTest = 0;   // (a special once a run, whichever kin: the bookkeeping is the run's, not the creature's)
+    if (game.state.kindling.kin[ritual.kinKey(game, pressed)].specials) fail("a special's mark kept on the creature, not the run");
+    const moot = named("mira", "villager", "sporeMoot", { near: [-1, 0], name: "Hears-Slowly" });
+    game.state.kindling.kin[ritual.kinKey(game, moot)] = { faction: "sporeMoot", name: "Hears-Slowly", rite: "snuffing", at: 0, net: 0 };
+    if (ritual.ritualRows(game, moot).some((r) => r.id === "special:limb") !== !!items.ARMOURS.fungalLimb) fail("the fungal limb offered without C4's item, or not with it");
+    // The Unlit pay twice for a Deep Inscription; the Vigil buys only Noon's accounts.
+    const unlit = named("mira", "villager", "unlit", { near: [0, -1], name: "wen" });
+    game.state.kindling.kin[ritual.kinKey(game, unlit)] = { faction: "unlit", name: "wen", rite: "snuffing", at: 0, net: 0 };
+    const hist = [...secrets.secretsOf(game.run).values()].filter((d) => d.kind === "history" && !d.ref.noon);
+    const deep = hist.find((d) => d.reading === "deep"), dark = hist.find((d) => d.reading === "dark"), noon = [...secrets.secretsOf(game.run).values()].find((d) => d.ref?.noon && d.reading === "deep");
+    for (const d of [deep, dark, noon]) secrets.learnSecret(game, d.id, "check", { quiet: true });
+    const rows = ritual.ritualRows(game, unlit);
+    const nDeep = rows.find((r) => r.id === `give:${deep.id}`)?.n, nDark = rows.find((r) => r.id === `give:${dark.id}`)?.n;
+    if (nDeep !== 70 || nDark !== 35) fail(`the Unlit: a deep reading ${nDeep} (want 70), a dark one ${nDark} (want 35)`);
+    const vigil = named("mira", "villager", "noonVigil", { near: [-1, -1], name: "Clara" });
+    game.state.kindling.kin[ritual.kinKey(game, vigil)] = { faction: "noonVigil", name: "Clara", rite: "lighting", at: 0, net: 0 };
+    const vrows = ritual.ritualRows(game, vigil).map((r) => r.id);
+    if (!vrows.includes(`give:${noon.id}`) || vrows.includes(`give:${deep.id}`)) fail(`the Vigil buys ${vrows.filter((r) => r.startsWith("give:")).join(", ")}: Noon's only`);
+    // The Askew re-angle at Grey.
+    const askew = named("mira", "villager", "askew", { near: [1, 1], name: "Ivo" });
+    const before = Object.keys(p().mutations || {}).length;
+    if (ritual.reangleOffer(game, askew)) fail("the Askew re-angle you at Cold");
+    game.state.rep.askew = 0;
+    const offer = ritual.reangleOffer(game, askew);
+    const opt = talk.talkTo(game, askew).options.find((o) => o.label === "Re-angle me.");
+    if (!offer || !opt) fail("the Askew offer no re-angling at Grey");
+    else {
+      opt.go();
+      if (Object.keys(p().mutations).length !== before + 1 || game.state.rep.askew !== offer.rep || offer.rep >= 0) fail(`re-angled: ${JSON.stringify(p().mutations)}, Askew ${game.state.rep.askew} (want ${offer.rep})`);
+    }
+    // The dish row: a village leader's kin teaches its dish (−40).
+    out.menu = `the Snuff (−200, Bent only), the Pressing (−100, a day, flat once a floor), the limb only with C4's item; the Unlit ${nDeep} for a deep reading; the Vigil Noon's only; re-angled for ${offer?.rep}`;
+
+    // C2 #8 (with #3's dish): a village's commons lamp, its oven, its shrine; the Gossip power.
+    {
+      const W = (await m("content/world/test-world.js")).TEST_WORLD, run = RUN.buildRun(1, W);
+      const site = [...run.sites.values()].find((s) => s.kind === "village" && !run.villages.get(s.id).abandoned
+        && V.styles[run.villages.get(s.id).layout.style].lamp !== "dark");
+      setup();
+      game.run = run;
+      const v = run.villages.get(site.id);
+      const lighter = named("mira", "villager", { [v.factionId]: 1 }, { near: [1, 0], name: "Lumel" });
+      Object.assign(lighter, { village: site.id, villageRole: "lamplighter" });
+      (await m("story/village-site.js")).ensureVillageFaction(game, v);
+      p().funds = 0;
+      const take = () => talk.talkTo(game, lighter).options.find((o) => /commons lamp|more from the lamp/.test(o.label));
+      take()?.go();
+      if (p().funds !== V.commons.take.free) fail(`the commons lamp's free thimble: ${p().funds}`);
+      const rep0 = F.repOf(game, v.factionId);
+      take()?.go();
+      if (p().funds !== 10 || F.repOf(game, v.factionId) !== rep0 + V.commons.take.rep) fail(`a second thimble: ${p().funds} glim, rep ${rep0} → ${F.repOf(game, v.factionId)}`);
+      for (let k = 0; k < 6; k++) take()?.go();
+      if (p().funds !== 5 + 5 * commons.COMMONS.extraTakes) fail(`the lamp ran dry at ${p().funds} glim (want ${5 + 5 * commons.COMMONS.extraTakes})`);
+      tick(24 * 60);
+      const f1 = p().funds; take()?.go();
+      if (p().funds !== f1 + 5) fail("the next day's thimble");
+      // The oven: a learned dish, a day of its bonus.
+      const leader = named("mira", "villager", { [v.factionId]: 1 }, { near: [0, 1], name: "Reeve" });
+      Object.assign(leader, { village: site.id, villageRole: "leader" });
+      const dish = v.culture.dish, D = V.dishBook[dish];
+      game.state.kindling = { kin: { [ritual.kinKey(game, leader)]: { faction: v.factionId, name: "Reeve", rite: "lighting", at: 0, net: 0 } }, followers: [] };
+      game.state.rep[v.factionId] = 300;
+      const dr = ritual.ritualRows(game, leader).find((r) => r.id === "dish");
+      if (!dr || dr.n !== -40) fail(`the dish row: ${JSON.stringify(dr)?.slice(0, 80)}`);
+      else ritual.ritualRow(game, leader, dr);
+      const cook = talk.talkTo(game, leader).options.find((o) => o.label.includes(dish));
+      if (!cook) fail(`no cooking of ${dish} at the oven`);
+      else cook.go();
+      const [bk, bv] = Object.entries(D.bonus)[0];
+      if (!status.hasStatus(p(), "fed") || Math.abs(stats6.bonus(p(), bk) - bv) > 1e-9 && stats6.bonus(p(), bk) < bv) fail(`fed by ${dish}: ${bk} ${stats6.bonus(p(), bk)} (want ${bv})`);
+      if (commons.cookDish(game, site.id, dish).ok) fail("the oven twice in a day");
+      for (const [d, B2] of Object.entries(V.dishBook)) for (const k of Object.keys(B2.bonus)) if (!stats6.BONUS_KEYS.includes(k)) fail(`the dish ${d}'s bonus ${k} isn't a bonus key`);
+      // Brew: a vial and three quarters of the tonic's worth, a tonic, once a day; no trader pays more for it (review 4).
+      p().perks = {}; keyset.addKey(p().perks, "brew");
+      const cost = commons.brewCost("ironbark");
+      p().funds = cost + 10; p().inv = [{ kind: "vial", effect: "sap", count: 1 }];
+      const brew = commons.brewTonic(game, site.id, p().inv[0]);
+      if (!brew.ok || p().funds !== 10 || !p().inv.some((it) => it.kind === "tonic" && it.effect === "ironbark")) fail(`Brew: ${brew.line} ${JSON.stringify(p().inv)}`);
+      setEgo(24); game.state.rep[v.factionId] = 700;
+      for (const t of Object.values(commons.BREWS)) {
+        const best = merchants.priceOf(game, { kind: "tonic", effect: t, count: 1 }, leader, "sell");
+        if (best > commons.brewCost(t)) fail(`a brewed ${t} sells for ${best} at EGO 24 and Bright, more than its ${commons.brewCost(t)} to brew`);
+      }
+      setEgo(16);
+      // Built, not offered yet (the coordinator, 2026-10-30: the pool waits on the user's decision): each holds B3's marker.
+      const PM = await m("content/powers.js");
+      for (const k of ["brew", "hourScript", "gossip", "triangulator", "oilFire", "chime"]) if (POW[k].needs !== PM.BUILT_B3) fail(`${k}: needs ${POW[k].needs}, want B3's marker`);
+      if (leveling.offerPowers(game, p(), { level: 5 }).some((k) => POW[k].needs === PM.BUILT_B3)) fail("a power B3 built is offered before the pool is balanced");
+      // The shrine: the right view, once a day; the wrong view's words.
+      const zone = game.zone, kind = v.culture.shrine, S2 = V.shrines[kind];
+      zone.village = { siteId: site.id, shrine: { x: 5, y: 5, z: FLOOR_Z, view: S2.view, kind } };
+      game.view = S2.view === "map" ? "3d" : "map";
+      const wrong = commons.prayAtShrine(game, zone);
+      if (wrong?.ok || wrong?.line !== S2.wrong) fail(`a prayer in the wrong view: ${JSON.stringify(wrong)}`);
+      game.view = S2.view === "map" ? "map" : "3d"; p().torch = S2.view !== "dark";
+      if (S2.view === "dark") { game.zone.hasSky = false; }
+      p().hp = 1;
+      const right = commons.prayAtShrine(game, zone), again = commons.prayAtShrine(game, zone);
+      if (!right?.ok || !right.line.startsWith(S2.reward.text) || again?.ok) fail(`a prayer at the ${kind} in its view: ${JSON.stringify(right)}, again ${JSON.stringify(again)}`);
+      if (S2.reward.heal && p().hp <= 1) fail(`the ${kind}'s heal didn't heal`);
+      out.shrine = { kind, wrong: !!wrong && !wrong.ok, right: right?.line };
+      out.commons = `${V.commons.take.free} free, ${commons.COMMONS.extraTakes} more for ${V.commons.take.rep} each, then the wick; ${dish}: ${bk} +${bv} for a day; Brew sap → ironbark for 10 glim`;
+    }
+
+    // C2 #9: drinking as the data, touch in a puddle, a vial poured by dropping it.
+    setup();
+    p().hp = 10;
+    liquids.drinkLiquid(game, p(), "glim");
+    if (!status.hasStatus(p(), "glowing") || Math.abs(status.statusLeft(p(), "glowing") - 10) > 0.01) fail("glim: no 10 s glow");
+    liquids.drinkLiquid(game, p(), "brine");
+    if (!status.hasStatus(p(), "nausea")) fail("brine: no nausea");
+    const hp0 = p().hp; liquids.drinkLiquid(game, p(), "freshWater");
+    if (p().hp !== hp0) fail("nauseous, you drank anyway");
+    status.removeStatus(game, p(), "nausea");
+    liquids.drinkLiquid(game, p(), "umbra");
+    p().torch = true; tick(61);   // (your own torch is bright light: light.js inDark)
+    if (!status.hasStatus(p(), "blinded")) fail("umbra: no blindness in bright light after 60 s");
+    setup(); liquids.drinkLiquid(game, p(), "sunwine"); liquids.drinkLiquid(game, p(), "sunwine");
+    if (!status.hasStatus(p(), "confused")) fail("two sunwines: not confused");
+    setup(); p().mutations = { kindle: 1 }; p().creases = 0;
+    liquids.drinkLiquid(game, p(), "turnwater");
+    if (p().mutations.kindle || Object.keys(p().mutations).length !== 1) fail(`turnwater on the Bent: ${JSON.stringify(p().mutations)}`);
+    setup(); liquids.drinkLiquid(game, p(), "clearGlim");
+    if (!status.hasStatus(p(), "seePlane") || Math.abs(status.statusLeft(p(), "seePlane") - 1800) > 1) fail("clear glim: no 30 min of the Plane");
+    const witness = named("mira", "villager", "lampless", { near: [1, 0], name: "Thol" });
+    const lr = F.repOf(game, "lampless");
+    liquids.drinkLiquid(game, p(), "clearGlim");
+    if (F.repOf(game, "lampless") !== lr - 100) fail(`clear glim before a Lampless: ${lr} → ${F.repOf(game, "lampless")}`);
+    creatures.removeCreature(game.zone, witness);
+    // Poured: a dropped vial makes a puddle (a prop, drawn in both views) and the touch lands.
+    setup();
+    p().inv = [{ kind: "vial", effect: "sap", count: 1 }];
+    game.invSel = 0;
+    (await m("inventory.js")).inventoryKey(game, "KeyX");
+    const pud = (game.zone.props || []).find((pr) => pr.liquid === "sap");
+    if (!pud || !(await m("content/biomes.js")).PROPS[pud.kind] || !p().inv.some((it) => it.kind === "vial" && it.effect === "")) fail(`a dropped vial of sap: ${JSON.stringify(pud)}, ${JSON.stringify(p().inv)}`);
+    if (!status.hasStatus(p(), "pinned")) fail("the poured sap didn't stick you");
+    tick(liquids.PUDDLE.seconds + 1);
+    if ((game.zone.props || []).some((pr) => pr.liquid)) fail("the puddle never dried");
+    // Oil fire: a glim puddle lit by L within 4 tiles, its torch lit; whatever stands in it burns.
+    setup();
+    keyset.addKey(p().perks, "oilFire");
+    const tx = Math.floor(p().x) + 2, ty = Math.floor(p().y);
+    liquids.pourLiquid(game, p(), "glim", tx, ty);
+    const burner = creatures.spawnCreature("goblin", tx, ty, p().z, { rng: R, level: 3 }); creatures.addCreature(game.zone, burner);
+    events.emit(game, "inspect", { zone: game.zone, x: tx, y: ty, z: p().z, open: true });
+    tick(0.1);
+    if (!status.hasStatus(burner, "burning")) fail("Oil fire: the goblin in the lit glim doesn't burn");
+    out.liquids = "glow, nausea (and no drinking), umbra's late blindness in light, sunwine twice, turnwater re-rolls, the Plane 30 min, the Lampless −100 seen; a dropped vial a puddle that sticks and dries; Oil fire";
+
+    // C2 #5: holy places, from the landmarks and the zone; a neutral member hostile there below Warm; trespass.
+    {
+      const world = compileWorld(REAL_WORLD), g2 = { run: { world }, zone: { wx: 5, wy: 16, z: 0, key: "5,16,0" } };
+      if (places.holyAt(g2, 10, 10)?.faction !== "noonVigil") fail(`Hollowmere's holy place: ${JSON.stringify(places.holyAt(g2, 10, 10))}`);
+      const L = world.landmarks.get("molar"), a0 = (await m("content/world/landmarks.js")).PLANS.molar.areas[0];
+      const g3 = { run: { world }, zone: { wx: L.wx, wy: L.wy, z: 0, key: "m" } };
+      if (places.holyAt(g3, L.rect.x + a0.rect[0], L.rect.y + a0.rect[1])?.faction !== "assize" || places.holyAt(g3, L.rect.x, L.rect.y)) fail("Molar's checkpoint area");
+      const hn = world.landmarks.get("halfnight");
+      if (places.holyAt({ run: { world }, zone: { wx: 26, wy: 11, z: 0, key: "h" } }, 3, 3)?.faction !== "lampless") fail("Halfnight's Hush span");
+      const st = places.stelesNear(g3, L.rect.x + 36, L.rect.y + 25, 3);
+      if (st[0]?.hour !== 12) fail(`Molar's dial-stele: ${JSON.stringify(st)}`);
+    }
+    setup();
+    game.zone.holy = "lampless";
+    const singer = named("mira", "villager", "lampless", { near: [3, 0], name: "Sesh" }); singer.maxHp = singer.hp = 12;   // (one that can fight: a talker that can't keeps away instead)
+    game.state.rep.lampless = 0;
+    if (F.attitude(game, singer, p()) !== "hostile") fail(`a Grey Lampless in their holy place: ${F.attitude(game, singer, p())}`);
+    game.state.rep.lampless = 300;
+    p().torch = true; tick(0.1);
+    if (!game.state.trespass?.lampless?.warned || F.attitude(game, singer, p()) === "hostile") fail("at Warm, a lit torch: asked once, not turned");
+    tick(holy.GRACE + 0.1);
+    if (F.attitude(game, singer, p()) !== "hostile") fail("at Warm, the torch still lit after the warning: not turned");
+    p().genotype = "plumb"; game.state.rep.lampless = 700; game.state.trespass = {};
+    tick(0.1); tick(holy.GRACE + 1);
+    if (F.attitude(game, singer, p()) === "hostile") fail("a Plumb with the dark-pass turned on");
+    delete game.zone.holy;
+    setup(); game.zone.holy = "horary";
+    const ringer = named("mira", "villager", "horary", { near: [3, 0], name: "Bell" }); ringer.maxHp = ringer.hp = 12;
+    game.state.rep.horary = 300;
+    tick(0.1); p().torch = false; tick(0.1);
+    if (!game.state.trespass?.horary?.warned || F.attitude(game, ringer, p()) === "hostile") fail("your torch out in the Hour-house: not warned first, or turned at once");
+    tick(holy.GRACE + 0.1);
+    if (F.attitude(game, ringer, p()) !== "hostile") fail("your torch out in the Hour-house past the warning: the Horary didn't turn");
+    // The Assize: a Bent below Bright in the Square, told once, turned 10 s later; a Plumb never.
+    events.emit(game, "zone:leave", { zone: game.zone });
+    game.zone.holy = "assize";
+    const rule = named("mira", "villager", "assize", { near: [3, 1], name: "Castor" }); rule.maxHp = rule.hp = 12;
+    game.state.rep.assize = 300; tick(0.1);
+    if (!game.state.trespass?.assize?.warned || F.attitude(game, rule, p()) === "hostile") fail("a Bent at Warm in the Square: not warned first");
+    tick(holy.GRACE + 0.1);
+    if (F.attitude(game, rule, p()) !== "hostile") fail("a Bent at Warm in the Square past the warning: not turned");
+    events.emit(game, "zone:leave", { zone: game.zone }); p().genotype = "plumb"; tick(0.1); tick(holy.GRACE + 0.1);
+    if (game.state.trespass?.assize?.warned) fail("a Plumb warned in the Square");
+    p().genotype = "bent";
+    // The Plan: a bomb gone off in its place, a warning; another, −50 and they turn. The Pressed: a bomb, they turn.
+    events.emit(game, "zone:leave", { zone: game.zone });
+    game.zone.holy = "plan";
+    const unit = named("mira", "villager", "plan", { near: [3, -1], name: "Grid Five" }); unit.maxHp = unit.hp = 12;
+    game.state.rep.plan = 300;
+    const bomb = () => { const b = { x: p().x + 2, y: p().y, z: p().z, fuse: 1 }; (game.zone.bombs ||= []).push(b); tick(0.1); game.zone.bombs = game.zone.bombs.filter((o) => o !== b); tick(0.1); };
+    bomb();
+    if (!game.state.trespass?.plan?.warned || F.repOf(game, "plan") !== 300) fail(`a bomb in the Plan's place: warned ${!!game.state.trespass?.plan?.warned}, rep ${F.repOf(game, "plan")}`);
+    bomb();
+    if (F.repOf(game, "plan") !== 250 || F.attitude(game, unit, p()) !== "hostile") fail(`a second bomb in the Plan's place: rep ${F.repOf(game, "plan")}, ${F.attitude(game, unit, p())}`);
+    events.emit(game, "zone:leave", { zone: game.zone });
+    game.zone.holy = "pressed";
+    const pilgrim = named("mira", "villager", "pressed", { near: [-3, 1], name: "Vee" }); pilgrim.maxHp = pilgrim.hp = 12;
+    game.state.rep.pressed = 300; tick(0.1); bomb();
+    if (F.attitude(game, pilgrim, p()) !== "hostile") fail("a bomb on the Pressed's mosaics: they didn't turn");
+    events.emit(game, "zone:leave", { zone: game.zone });
+    if (game.state.trespass?.horary) fail("a trespass outlived the zone");
+    delete game.zone.holy;
+    out.holy = "the landmarks' (Hollowmere, Molar's area, Halfnight's span, Molar's stele at 12), Grey hostile, the Lampless' warning and turn, the dark-pass, the Horary's torch";
+
+    // C2 #6: the cults in the run, registered on an Hour site, the pass, the Hourbound.
+    {
+      const run = RUN.buildRun(3, REAL_WORLD), R0 = run.history.rulers[0];
+      const cid = `cult:${R0.short}`, def = run.factions.get(cid);
+      if (!def || def.rulerId !== R0.id || def.name !== R0.cult.name || def.startRep.bent !== -500 || def.pilgrimFloor !== false
+        || !def.likes.some(([f]) => f === "horary") || def.hates.length !== R0.hated.length) fail(`the cult of ${R0.name}: ${JSON.stringify(def)?.slice(0, 160)}`);
+      if (run.history.rulers.some((r) => !run.factions.has(`cult:${r.short}`))) fail("an Hour without its cult");
+      const site = [...run.sites.values()].find((s) => s.historyRef?.rulerId === R0.id);
+      setup();
+      game.run = run; game.state.rep = {};
+      const zone = game.zone, savedSite = zone.siteId;
+      zone.siteId = site.id;
+      const thug = creatures.spawnCreature("goblin", Math.floor(p().x) + 3, Math.floor(p().y), p().z, { rng: R, level: 3 }); creatures.addCreature(zone, thug);
+      const raider = mob("rustbacks", null, { x: Math.floor(p().x) + 4, y: Math.floor(p().y) + 1 }); creatures.addCreature(zone, raider);   // (one with a faction of its own joins too: review 3)
+      zone.bottomLoot = { relic: null };
+      zone.set(Math.floor(p().x) + 6, Math.floor(p().y), FLOOR_Z - 1, (await m("blocks.js")).B.ALTAR);
+      events.emit(game, "zone:enter", { zone, how: "walk" });
+      if (!F.FACTIONS[cid] || F.FACTIONS.horary.relations[cid] !== 1 || thug.faction?.[cid] !== 1) fail(`entering ${R0.name}'s site: registered ${!!F.FACTIONS[cid]}, the Horary ${F.FACTIONS.horary?.relations?.[cid]}, the goblin ${JSON.stringify(thug.faction)}`);
+      const lead = zone.creatures.find((c) => c.hourbound);
+      if (!lead || lead.faction?.[cid] !== 1 || !lead.named || lead.level !== (zone.level || 1) + 3) fail(`no Hourbound in the reliquary: ${JSON.stringify(lead && { f: lead.faction, l: lead.level })}`);
+      if (F.attitude(game, thug, p()) !== "hostile") fail("a cultist at −500 isn't out for you");
+      game.state.journal = { ...(game.state.journal || {}), cultPass: { [R0.id]: 0 } };
+      if (F.attitude(game, thug, p()) !== "neutral") fail("with the cult pass, a cultist in its site isn't neutral");
+      if (raider.faction?.[cid] !== 1 || raider.faction?.rustbacks !== 0.5 || F.attitude(game, raider, p()) !== "neutral") fail(`a Rustback on the cult's floor: ${JSON.stringify(raider.faction)}, ${F.attitude(game, raider, p())} with the pass`);
+      events.emit(game, "zone:enter", { zone, how: "walk" });
+      if (zone.creatures.filter((c) => c.hourbound).length !== 1) fail("a second Hourbound");
+      // Its armour: in 3D in good light, the event's Deep Inscription learned.
+      if (lead) {
+        game.view = "3d"; p().torch = true;
+        events.emit(game, "inspect", { zone, x: lead.tx, y: lead.ty, z: lead.z, open: true });
+        if (!journal.knows(game, `hist:${lead.hourbound.eventId}:deep`)) fail("the Hourbound's armour read in 3D in light taught nothing");
+      }
+      zone.siteId = savedSite; delete zone.bottomLoot;
+      game.run = null;
+      out.cults = `${run.history.rulers.length} cults on seed 3 (−500, the Horary liking them), registered on a site, its creatures members, the pass neutral, one Hourbound`;
+    }
+
+    // WS10 #6: a legend's opinions (attitude, the Kindling) and a Herdmother's herd.
+    setup();
+    const goblinType = "goblin";
+    const legend = creatures.spawnCreature(goblinType, Math.floor(p().x) + 1, Math.floor(p().y), p().z, { rng: R, level: 5, uid: "legend:test" });
+    legend.flags = { legend: "legend:test" }; legend.named = true; legend.name = "Zhad";
+    legend.opinions = [["drovers", "loves", "they leave salt licks"], ["rustbacks", "hates", "they ride it"]];
+    creatures.addCreature(game.zone, legend);
+    const drover = mob("drovers", "neutral", { x: 5, y: 5 }), rustback = mob("rustbacks", "neutral", { x: 6, y: 5 });
+    if (F.attitude(game, legend, drover) !== "friendly" || F.attitude(game, legend, rustback) !== "hostile") fail(`a legend toward what it loves and hates: ${F.attitude(game, legend, drover)}, ${F.attitude(game, legend, rustback)}`);
+    if (F.attitude(game, legend, p()) !== "hostile") fail("a legend at your Grey");
+    game.state.rep.drovers = 300;
+    if (F.attitude(game, legend, p()) !== "neutral") fail("a legend that loves the Drovers, you Warm with them");
+    const ops = ritual.opinionsOf(game, legend).map(([f, o]) => `${f}:${o}`).join();
+    if (ops !== "drovers:loves,rustbacks:hates") fail(`the legend's opinions for the Kindling: ${ops}`);
+    // A Herdmother: the Saltbeasts', docile, kindled by her Lighting through L; her herd friendly after.
+    setup();
+    const vaults = await m("gen/vaults.js");
+    const hdef = { uid: "legend:herd", template: "herdmother", species: "goblin", name: "Old", epithet: "Mother", level: 6, mutations: [], opinions: [{ faction: "drovers", feeling: "hates", reason: "they herd her" }], hook: null, hall: "herd" };
+    const oldLegends = game.run.legends;
+    const hm = vaults.spawnLegend(game.zone, hdef, Math.floor(p().x) + 1, Math.floor(p().y), p().z, R);
+    hm.z = p().z;
+    const herd = creatures.spawnCreature("goblin", Math.floor(p().x) + 3, Math.floor(p().y), p().z, { rng: R, level: 3 }); herd.herdOf = "legend:herd"; herd.faction = { saltbeasts: 1 }; creatures.addCreature(game.zone, herd);
+    game.run.legends = new Map([["legend:herd", hdef]]);
+    if (hm.faction?.saltbeasts !== 1 || hm.talk) fail(`the Herdmother: ${JSON.stringify({ f: hm.faction, talk: !!hm.talk })}`);
+    // A legend that lost its c.opinions (a save from before them): the bond reads its def's.
+    { const keep = hm.opinions; delete hm.opinions;
+      if (ritual.opinionsOf(game, hm).map(([f, o]) => `${f}:${o}`).join() !== "drovers:hates") fail(`a legend's opinions from its def: ${JSON.stringify(ritual.opinionsOf(game, hm))}`);
+      hm.opinions = keep; }
+    if (F.attitude(game, herd, p()) !== "hostile") fail("her herd before the Kindling");
+    face(hm);
+    events.emit(game, "inspect", { zone: game.zone, x: hm.tx, y: hm.ty, z: hm.z, open: true });
+    if (!ritual.kin(game, hm)) fail(`no Herdmother's Lighting by L: ${ritual.canKindle(game, hm) ?? ritual.riteReady(game, hm, "lighting")}`);
+    if (F.attitude(game, herd, p()) !== "friendly" || F.attitude(game, hm, p()) !== "friendly") fail("the herd isn't friendly after her Kindling");
+    game.run.legends = oldLegends;
+    out.legends = "loves/hates to creatures, neutral to a friend of what it loves, its opinions in the bond; the Herdmother kindled by L, her herd friendly";
+
+    // C2 #11: the Smoothers come, flat, out for you, at your tier.
+    setup();
+    p().level = 8;
+    const pack = sm.sendSmoothers(game, { zone: game.zone, size: 3, burnisher: true, great: true });
+    if (pack.length !== 5 || !pack.every((c) => creatures.isFlat(c)) || pack.some((c) => F.attitude(game, c, p()) !== "hostile" || F.membershipsOf(c).length)) fail(`the pack: ${pack.map((c) => c.type).join()}`);
+    if (pack.filter((c) => c.type === "smoother" && !c.named).some((c) => c.level !== 8) || pack.find((c) => c.type === "burnisher")?.level !== 11) fail(`the pack's levels: ${pack.map((c) => c.level).join()}`);
+    const before2 = game.zone.creatures.length;
+    events.emit(game, "smoothers", { zone: game.zone, size: 1, burnisher: false, great: false });
+    if (game.zone.creatures.length !== before2 + 1) fail("the \"smoothers\" event brought nobody");
+    out.smoothers = "3 smoothers at your tier, a burnisher one up, the Great Smoother; flat, factionless, hostile";
+
+    // C2 #13: the overflow's words, the banks (at F, H, D; noBank elsewhere), their 5%.
+    setup();
+    game.zone.wx = 20; game.zone.wy = 9;
+    game.run = { world: compileWorld(REAL_WORLD) };
+    if (bank.bankHere(game) !== "F") fail(`Molar's bank: ${bank.bankHere(game)}`);
+    p().funds = 100;
+    const dep = bank.deposit(game, 100);
+    if (!dep.ok || p().funds !== 0 || game.state.bank !== 95 || !dep.line.includes(CUR.lines.deposit)) fail(`a deposit of 100: ${JSON.stringify(dep)} bank ${game.state.bank}`);
+    const wd = bank.withdraw(game, 50);
+    if (!wd.ok || p().funds !== 50 || game.state.bank !== 45 || !wd.line.includes(CUR.lines.withdraw)) fail(`a withdrawal of 50: ${JSON.stringify(wd)}`);
+    const chand = named("mira", "villager", "chandlers", { near: [1, 0], name: "Saffre" });
+    game.zone.wx = 21;
+    const nb = talk.talkTo(game, chand).options.find((o) => /bank here/.test(o.label));
+    if (!nb || nb.go().text !== CUR.lines.noBank) fail("a Chandler away from the Houses doesn't say noBank");
+    game.state.rep.chandlers = -700;   // (at Dark: one goodbye, no bank: review 7)
+    if (talk.talkTo(game, chand).options.some((o) => /bank/i.test(o.label))) fail("a Chandler at Dark offers the bank");
+    game.state.rep.chandlers = 0;
+    game.zone.wx = 0; game.zone.wy = 0; game.run = null;
+    // A sale the flask can't hold: refused with the money's words.
+    const trader = named("mira", "merchant", "drovers", { near: [0, 1], name: "Sebbu" });
+    p().funds = currency.purseCap(p()); p().inv = [{ kind: "weapon", id: "longsword", made: "iron", ench: 0, known: true, count: 1 }];
+    const sale = merchants.tradeRows(game, trader, "yours")[0], said = sale && merchants.tradeRow(game, trader, "yours", sale);
+    if (!said || said.ok || !said.line.includes(CUR.lines.overflow)) fail(`a sale into a full flask: ${JSON.stringify(said)?.slice(0, 120)}`);
+    // The torch on an empty purse (torch.js, the coordinator's exception for C2 #13): the money's words the first time in
+    // a run, the short line after; the mark is in game.state, so a save keeps it and a reload doesn't say them again.
+    {
+      const T = await m("torch.js"), lines = [], log0 = game.log;
+      setup(); p().funds = 0; p().torch = true; delete game.state.purseDryTold;
+      game.log = (t, c) => { lines.push(t); return log0.call(game, t, c); };
+      const dark = { hasSky: false }, per = T.glimSeconds();
+      T.burnTorch(game, p(), 0, per + 1, dark);
+      p().funds = 5; T.burnTorch(game, p(), per + 1, per + 2, dark);
+      p().funds = 0; T.burnTorch(game, p(), per + 2, 3 * per, dark);
+      const kept = JSON.parse(JSON.stringify(game.state)).purseDryTold;
+      game.log = log0;
+      const dry = lines.filter((t) => /purse is dry/i.test(t));
+      if (dry[0] !== CUR.lines.empty || dry.length !== 2 || dry[1] === CUR.lines.empty || kept !== true)
+        fail(`the torch on an empty purse: ${JSON.stringify(dry)}, kept ${kept}`);
+    }
+    out.money = "the overflow's words; Molar F: 100 in, 95 held; 50 out; noBank elsewhere; the torch's first empty-purse line the money's";
+
+    // WS6b: the tinker's and the surgeon's packs.
+    setup();
+    const ot = creatures.spawnCreature("ottilie", 3, 3, 0, { level: 6 }); creatures.addCreature(game.zone, ot);
+    const dc = creatures.spawnCreature("detailC", 4, 4, 0, { level: 12 }); creatures.addCreature(game.zone, dc);
+    const so = merchants.restock(game, ot), sd = merchants.restock(game, dc);
+    if (!so.some((s) => s.item.kind === "cell") || !so.some((s) => s.item.kind === "artifact") || !so.some((s) => s.item.kind === "potion")) fail(`Ottilie's pack: ${so.map((s) => s.item.kind).join()}`);
+    const imps = sd.filter((s) => s.item.kind === "implant");
+    const IMP = (await m("content/items/implants.js")).IMPLANTS, SURG = (await m("content/creatures/people.js")).STOCKS.surgeon;
+    if (imps.length < 2 || sd.some((s) => s.item.kind === "potion") || imps.some((s) => s.price < 400 || IMP[s.item.id].grade > stocks.gradeCap(SURG.implants.grade, 12)))
+      fail(`Detail C's pack: ${sd.map((s) => `${s.item.kind}:${s.item.id}@${s.price}`).join()}`);
+    out.stocks = `Ottilie ${so.length} rows (cells, an artifact, the general pack); Detail C ${imps.length} implants at ${imps.map((s) => s.price).join("/")} glim and cells`;
+
+    // The lore powers: Hour script reads one more account; Triangulator twice the XP; Gossip a rumour on arrival.
+    setup();
+    keyset.addKey(p().perks, "hourScript");
+    const e0 = [...secrets.secretsOf(game.run).values()].find((d) => d.kind === "history" && !d.ref.noon && d.reading === "flat");
+    game.zone.murals = [{ x: 4, y: 4, z: FLOOR_Z - 1, view: "map", text: secrets.secretText(game.run, e0), secret: e0.id }];
+    game.view = "map";
+    const learned = murals.readMural(game, { zone: game.zone, x: 4, y: 4, open: true });
+    if (learned.length !== 2 || !learned[1].startsWith(e0.id.slice(0, e0.id.lastIndexOf(":")))) fail(`Hour script: ${learned.join()}`);
+    delete game.zone.murals;
+    // Triangulator: twice the XP for the same event's three accounts.
+    let triXp = null;
+    events.on("triangulate", (g, ev) => { triXp = ev.xp; });
+    const tri = async (perk) => {
+      setup();
+      if (perk) keyset.addKey(p().perks, "triangulator");
+      triXp = null;
+      const base = e0.id.slice(0, e0.id.lastIndexOf(":"));
+      for (const r of ["flat", "deep", "dark"]) secrets.learnSecret(game, `${base}:${r}`, "check", { quiet: true });
+      return triXp;
+    };
+    const plain = await tri(false), doubled = await tri(true);
+    if (!(plain > 0) || Math.abs(doubled - 2 * plain) > 1) fail(`Triangulator: ${plain} XP plain, ${doubled} with it`);
+    // Gossip: a rumour unasked, the first time you come to a village.
+    setup();
+    keyset.addKey(p().perks, "gossip");
+    const vsite = [...game.run.sites.values()].find((s) => s.kind === "village"), keep = game.zone.siteId;
+    const known = () => Object.keys(game.state.journal?.secrets || {}).filter((id) => id.startsWith("gossip:")).length;
+    const g0 = known();
+    game.zone.siteId = vsite.id;
+    events.emit(game, "zone:enter", { zone: game.zone, how: "walk" });
+    if (known() !== g0 + 1) fail(`Gossip: ${known() - g0} rumours on arriving`);
+    events.emit(game, "zone:enter", { zone: game.zone, how: "walk" });
+    if (known() !== g0 + 1) fail("Gossip told twice in one village");
+    game.zone.siteId = keep;
+    // The Chime (review 5): a neutral creature recruited by EGO against WIL, one at a time, a sermon a day; kept through a save.
+    {
+      setup(); setEgo(30); keyset.addKey(p().perks, "chime");
+      const abil = await m("abilities.js"), codec = await m("save/codec.js");
+      if (!abil.abilitiesOf(p()).some((a) => a.id === "chime")) fail("the Chime gives no ability");
+      const a1 = mob("drovers", "neutral", { x: Math.floor(p().x) + 2, y: Math.floor(p().y) }), a2 = mob("drovers", "neutral", { x: Math.floor(p().x) + 3, y: Math.floor(p().y) });
+      for (const c of [a1, a2]) { delete c.attrs; creatures.addCreature(game.zone, c); }
+      abil.activate(game, p(), "chime", { creature: a1 });
+      const back = codec.rebuildCreature(JSON.parse(JSON.stringify(codec.trimCreature(a1))), game.zone);
+      if (a1.brain?.leader !== "player" || !back.chimed || back.chimedAt !== a1.chimedAt) fail(`the Chime: ${JSON.stringify({ l: a1.brain?.leader, saved: { c: back.chimed, at: back.chimedAt } })}`);
+      status.clearCooldown(p(), "chime");
+      if (abil.activate(game, p(), "chime", { creature: a1 })) fail("a second sermon to the same one the same day");
+      status.clearCooldown(p(), "chime");
+      abil.activate(game, p(), "chime", { creature: a2 });
+      if (a2.brain?.leader !== "player" || a1.brain?.leader === "player") fail("the Chime keeps two followers at once");
+      const hostile = mob(null, null, { x: Math.floor(p().x) + 1, y: Math.floor(p().y) + 1 }); creatures.addCreature(game.zone, hostile);
+      status.clearCooldown(p(), "chime");
+      if (abil.activate(game, p(), "chime", { creature: hostile })) fail("the Chime recruited a monster out for you");
+      setEgo(16);
+    }
+    out.lore = `Hour script one more account; Triangulator ${doubled} XP for ${plain}; Gossip one rumour a village`;
+    stats.b3 = out;
   }
 
   // --- 17. JSON ----------------------------------------------------------------------------------------------------------

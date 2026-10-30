@@ -21,9 +21,10 @@ import { placeSites, placeLegends } from "./sites.js";
 import { generateHistory } from "../story/history.js";
 import { makeVillages, villageFaction } from "../story/villages.js";
 import { makeSecrets } from "../story/secrets.js";
+import { cultFaction } from "../social/cultdef.js";
 
 export const RUN_VERSION = 1;   // the shape of a saved run
-export const GEN_VERSION = 7;   // bumps whenever buildRun would make a different run from the same seed (2: WS10's sites and legends; 3: WS7's generated history and secrets; 4: WS7b's villages, their secrets and factions; 5: C1a's villages by quota and C2's names, peoples and relic powers; 6: C3's creatures, and the real world's legends and bands by region; 7: C5 #9, the real world's village quests drawing from their region's pools)
+export const GEN_VERSION = 8;   // bumps whenever buildRun would make a different run from the same seed (2: WS10's sites and legends; 3: WS7's generated history and secrets; 4: WS7b's villages, their secrets and factions; 5: C1a's villages by quota and C2's names, peoples and relic powers; 6: C3's creatures, and the real world's legends and bands by region; 7: C5 #9, the real world's village quests drawing from their region's pools; 8: B3's cults, one a ruler, in the run's factions, and every village surface's heights by style)
 export const RUN_STATS = { builds: 0 };
 const MAPS = ["sites", "sitesAt", "villages", "factions", "relations", "legends", "secrets"];
 
@@ -39,6 +40,9 @@ export const RUN_STEPS = [
   { id: "factions", run: (run) => {
     run.factions = new Map();
     for (const v of run.villages.values()) run.factions.set(v.factionId, villageFaction(v));
+    // The Hour cults, one for each ruler of the run's history (B3, C2 #6; social/cults.js registers each on entering
+    // one of its Hour's sites). No draws: the same rulers make the same cults.
+    for (const R of run.history?.rulers || []) if (R.short) { const def = cultFaction(R); run.factions.set(def.id, def); }
     run.relations = new Map();
   } },
   { id: "legends", run: (run) => { run.legends = placeLegends(run); } },   // WS10: every lair's owner, by uid

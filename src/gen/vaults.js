@@ -563,7 +563,9 @@ registerLegend("herd", (c) => {
   floorCol(c);
   const def = bottomOf(c).legend;
   if (!def || !c.rng.chance(0.5)) return;
-  addCreature(c.zone, spawnCreature(def.species, c.x, c.y, c.z0, { rng: c.cosmetic, state: "idle", level: Math.max(1, def.level - 3) }));
+  const h = spawnCreature(def.species, c.x, c.y, c.z0, { rng: c.cosmetic, state: "idle", level: Math.max(1, def.level - 3) });
+  h.herdOf = def.uid;   // (kindled with their Herdmother, the herd is friendly: social/legends.js; B3, WS10 #6)
+  addCreature(c.zone, h);
 });
 registerLegend("bottomLoot", (c) => {
   floorCol(c);
@@ -602,6 +604,13 @@ export function spawnLegend(zone, def, x, y, z, rng) {
   c.named = true;
   c.flags = { ...(c.flags || {}), legend: def.uid };
   if (def.hook) c.brain = { ...(c.brain || {}), hook: `legend:${def.hook}` };
+  // Its opinions, for attitude and the Kindling (B3, WS10 #6; social/legends.js). A Herdmother is the Saltbeasts' and docile,
+  // so she can be kindled with (the Saltbeasts' Herdmother's Lighting: L on her, social/legends.js).
+  c.opinions = (def.opinions || []).map((o) => [o.faction, o.feeling, o.reason]);
+  if (def.template === "herdmother") {
+    c.faction = { saltbeasts: 1 };
+    c.brain = { ...(c.brain || {}), temperament: "docile" };
+  }
   legendLooks(c, def);
   return addCreature(zone, c);
 }
