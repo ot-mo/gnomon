@@ -843,8 +843,10 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
   const sillMural = (dz.murals || []).find((m) => m.view === "3d" && /SILL IS (\d)/.test(m.text));
   const plateMurals = (dz.murals || []).filter((m) => m.view === "map" && /plate set in the floor, numbered/.test(m.text)).length;
   const onPlate = (n) => { const q = tl.plates.find((o) => o.n === n); Object.assign(P, { x: q.x + 0.5, y: q.y + 0.5, z: FLOOR_Z }); tick("map"); };
-  const shut0 = shut(); onPlate(tl.answer === 1 ? 2 : 1); const wrong = shut(); onPlate(tl.answer);
-  G2.trueLevel = { vault: dz.vault.name, plates: tl.plates.length, plateMurals, sill: sillMural && Number(/SILL IS (\d)/.exec(sillMural.text)[1]) === tl.answer, shut0, wrongShut: wrong, open: !shut() };
+  const clouds0 = dz.clouds.length, shut0 = shut(); onPlate(tl.answer === 1 ? 2 : 1); const wrong = shut(), gas = dz.clouds.length > clouds0;
+  onPlate(tl.answer); const dead = shut();   // straight on to the right one: the plates are dead
+  game.time += GM.TRUE_LEVEL.dead + 1; Object.assign(P, { x: tl.plates[0].x + 0.5, y: tl.plates[0].y - 1.5 }); tick("map"); onPlate(tl.answer);   // off the plates, then the right one
+  G2.trueLevel = { vault: dz.vault.name, plates: tl.plates.length, plateMurals, sill: sillMural && Number(/SILL IS (\d)/.exec(sillMural.text)[1]) === tl.answer, shut0, wrongShut: wrong, gas, dead, open: !shut() };
   // The Drowned Lantern's tide: dry at noon, deep at 16:00 (the datum's floor), and it rises with the clock while you're there.
   const lvl = (f) => { const t = f.tide.base?.[0]; return t ? f.get(t[0] % f.w, Math.floor(t[0] / f.w), FLOOR_Z - 1) : null; };
   const dry = lvl(enter("drownedLantern", 1, 12)), deep = lvl(enter("drownedLantern", 2, 16));
@@ -887,7 +889,7 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
   stats.gimmicks2 = G2;
   expect(JSON.stringify(G2.headroom) === "[6,5,4,3]" && G2.pressed.flatBefore >= 1 && G2.pressed.gold && G2.pressed.deepAfter && G2.pressed.done
     && G2.pressPlate?.flat && G2.pressPlate.unhurt && !G2.pressPlate.plates1
-    && G2.trueLevel.vault === "The True Level" && G2.trueLevel.plates === 4 && G2.trueLevel.plateMurals === 4 && G2.trueLevel.sill && G2.trueLevel.shut0 && G2.trueLevel.wrongShut && G2.trueLevel.open
+    && G2.trueLevel.vault === "The True Level" && G2.trueLevel.plates === 4 && G2.trueLevel.plateMurals === 4 && G2.trueLevel.sill && G2.trueLevel.shut0 && G2.trueLevel.wrongShut && G2.trueLevel.gas && G2.trueLevel.dead && G2.trueLevel.open
     && G2.tide.noon && G2.tide.at16 && G2.tide.levels === "01234440" && G2.tide.byClock && G2.sweep.cells > 20 && G2.sweep.moved && G2.sweep.flat
     && G2.darkMapping.trail === 3 && G2.darkMapping.other && G2.fold.day === G2.fold.planks && G2.fold.planks > 100 && G2.fold.night === 0 && G2.fold.dropped && G2.fold.dawn === G2.fold.planks && G2.layouts.day === "day" && G2.layouts.night === "night" && G2.layouts.differ && G2.layouts.nightThings > 0 && G2.layouts.againThings === 0 && G2.layouts.load === "day",
     `in a game: the gimmicks ${JSON.stringify(G2)}`);

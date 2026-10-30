@@ -25,6 +25,8 @@ import { addStatus, hasStatus } from "./status.js";
 import * as S from "./screen.js";
 import { changeZone } from "./zones.js";
 
+export const TRUE_LEVEL = { dead: 30 };   // seconds the plates are dead after a wrong one
+
 // --- The tide -----------------------------------------------------------------------------------------------------
 export function tideLevel(zone, hour) {
   const t = zone?.tide;
@@ -92,8 +94,15 @@ registerUpdate("landmarkGimmicks", (game) => {
   }
   const tl = zone.trueLevel;
   if (tl && !tl.solved && !hasStatus(p, "flying")) {
-    const plate = tl.plates.find((q) => q.x === tx && q.y === ty);
-    if (plate && plate.n === tl.answer && Math.abs(p.z - FLOOR_Z) < 0.4) {
+    const plate = tl.plates.find((q) => q.x === tx && q.y === ty), on = plate && Math.abs(p.z - FLOOR_Z) < 0.4;
+    const stepped = on && tl.onPlate !== plate.n;   // (each step onto a plate counts once)
+    tl.onPlate = on ? plate.n : null;
+    if (stepped && plate.n !== tl.answer && (game.time || 0) >= (tl.deadUntil ?? -Infinity)) {   // a wrong plate: gas, and the plates go dead (no walking the row)
+      tl.deadUntil = (game.time || 0) + TRUE_LEVEL.dead;
+      zone.clouds.push({ x: plate.x + 0.5, y: plate.y + 0.5, z: FLOOR_Z + 1, r: 3, time: 8, kind: "poison" });
+      game.log(`The plate numbered ${plate.n} clicks, and gas hisses from the floor. The plates go dead under your feet.`, [150, 210, 80]);
+    }
+    if (on && plate.n === tl.answer && (game.time || 0) >= (tl.deadUntil ?? -Infinity)) {
       tl.solved = true;
       for (const [x, y, z] of tl.gate) zone.set(x, y, z, B.AIR);
       zone.refresh();
