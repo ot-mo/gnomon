@@ -1322,7 +1322,7 @@ export function checkGear(m) {
       ironbark: (p) => St.bonus(p, "av") === 2 && St.bonus(p, "str") === 2, foldSap: (p) => has(p, "flat"), clearwit: (p) => St.bonus(p, "examine") === 5 && St.bonus(p, "int") === 2,
     };
     const od = {
-      balm: (p) => has(p, "tonic:sick"), hasp: (p) => has(p, "hasted") && has(p, "tonic:crash"), gloam: (p) => has(p, "darkened") && m.player.torchRange(p) < 6,
+      balm: (p) => has(p, "tonic:sick"), hasp: (p) => has(p, "hasted") && has(p, "tonic:crash"), gloam: (p) => has(p, "blinded") && (p.torch = true) && m.player.torchRange(p) <= 1,   // (B1, C4 #10: blind in any light)
       ironbark: (p) => has(p, "tonic:heavy"), foldSap: (p) => m.status.statusLeft(p, "flat") === 60, clearwit: () => !game.zone.seen.some(Boolean),
     };
     if (JSON.stringify(Object.keys(TN.TONICS)) !== JSON.stringify(Object.keys(expect))) fail(`tonics ${Object.keys(TN.TONICS).join(", ")}, want bible §13.8's six`);
@@ -1436,7 +1436,7 @@ export function checkGear(m) {
       const od = (id, check) => { const q = fresh(); game.zone.seen.fill(1); game.zone.holeSeen.fill(1); TN.injectTonic(game, q, "ironbark", seq(0.9)); TN.injectTonic(game, q, id, seq(0)); return check(q); };
       const ods = {
         balm: od("balm", (q) => m.status.statusLeft(q, "tonic:sick") === 30 && m.status.statusFlag(q, "noRegen")),
-        gloam: od("gloam", (q) => m.status.statusLeft(q, "darkened") === 20),
+        gloam: od("gloam", (q) => m.status.statusLeft(q, "blinded") === 20),   // (B1, C4 #10: blind in any light, player.js torchRange)
         ironbark: od("ironbark", (q) => m.status.statusLeft(q, "tonic:heavy") === 20 && m.status.statusSpeed(q) === 0.5),
         hasp: od("hasp", (q) => m.status.statusLeft(q, "hasted") === 15 && m.status.statusLeft(q, "tonic:crash") === 15),
         foldSap: od("foldSap", (q) => m.status.statusLeft(q, "flat") === 60),
@@ -1648,6 +1648,48 @@ export function checkB1Gear(m) {
     stats.lootWorld = `real dungeon floors ${JSON.stringify(R)}, test ${JSON.stringify(T)}; surface rewards ${JSON.stringify(sr)}; elite drops ${JSON.stringify(drops)}; a shelf of ${shelf.length}`;
   });
 
+  // 2. Light (WS5 #19, WS6b #3, C4 #10): the lantern-mote lights 6 tiles torch or no and counts you lit (light.js inDark);
+  //    the Snuffer's mark takes a tile off a lit torch; gloam's 6 tiles with the torch out (3 for the Bent); blinded leaves
+  //    a tile in any light, the dark sight with the torch out.
+  section("light", () => {
+    startRun(13, m.testWorld.TEST_WORLD);
+    const s0 = game.run.world.start;
+    game.debug.enterZone(`${s0.wx},${s0.wy},3`, "down");   // (a dungeon floor of the legacy stack: dark)
+    const p = game.player, P = m.player, L = m.light, S = m.status;
+    p.status = {}; p.mutations = {}; p.torch = false; p.snufferMark = false; m.stats.invalidateStats(p);
+    const dark0 = P.torchRange(p), darkHere = L.inDark(game, game.zone, p.x, p.y, p.z);
+    S.addStatus(game, p, "running:lanternMote", { t: 100 });
+    const mote = P.torchRange(p), motePow = P.torchPower(p), moteDark = L.inDark(game, game.zone, p.x, p.y, p.z);
+    p.torch = true;
+    const moteLit = P.torchRange(p);
+    S.removeStatus(game, p, "running:lanternMote"); p.torch = false;
+    if (!darkHere || dark0 > 0 || mote !== P.MOTE_RANGE || motePow < P.MOTE_POWER || moteDark || moteLit < P.MOTE_RANGE)
+      fail(`the lantern-mote: torch out ${dark0} → ${mote} tiles (power ${motePow}), in the dark ${darkHere} → ${moteDark}; lit ${moteLit}`);
+    p.torch = true;
+    const lit = P.torchRange(p);
+    p.snufferMark = true;
+    const marked = P.torchRange(p);
+    p.snufferMark = false;
+    if (Math.abs(lit - marked - 1) > 1e-9) fail(`the Snuffer's mark: a lit torch ${lit} → ${marked}, want a tile less`);
+    p.torch = false;
+    p.genotype = "plumb"; m.tonics.injectTonic(game, p, "gloam", () => 0.99);
+    const gloam = P.torchRange(p);
+    S.removeStatus(game, p, "tonic:gloam"); S.removeStatus(game, p, "tonic");
+    p.genotype = "bent"; m.tonics.injectTonic(game, p, "gloam", () => 0.99);
+    const gloamBent = P.torchRange(p);
+    S.removeStatus(game, p, "tonic:gloam"); S.removeStatus(game, p, "tonic");
+    if (gloam !== 6 || gloamBent !== 3) fail(`gloam with the torch out: ${gloam} tiles (want 6), a Bent's ${gloamBent} (want 3: half)`);
+    S.addStatus(game, p, "nightEyes", { t: 100 });   // (a little dark sight, so the dark's range isn't 0)
+    const sight = P.torchRange(p);
+    S.addStatus(game, p, "blinded", { t: 20 });
+    const blindDark = P.torchRange(p);
+    p.torch = true;
+    const blindLit = P.torchRange(p);
+    S.removeStatus(game, p, "blinded"); S.removeStatus(game, p, "nightEyes");
+    if (blindLit > 1 || !(sight > 0) || blindDark !== sight) fail(`blinded: ${blindLit} tiles with the torch lit (want 1 at most), ${blindDark} with it out (want the dark sight's ${sight})`);
+    stats.light = `the lantern-mote ${mote} tiles torch out (lit counted); a lit torch ${lit} → ${marked} with the Snuffer's mark; gloam ${gloam} (a Bent's ${gloamBent}); blinded ${blindLit} lit`;
+  });
+
   return { name: "items: B1's gear", ok: problems.length === 0, problems, stats };
 }
 
@@ -1675,7 +1717,7 @@ export async function run(env) {
   m.missileTable = (await env.src("content/items/missiles.js")).MISSILES;
   // B1's (checkB1Gear).
   await Promise.all([load("worldmap", "content/world/worldmap.js"), load("testWorld", "content/world/test-world.js"), load("zones", "zones.js"),
-    load("common", "gen/biomes/common.js"), load("monsters", "monsters.js")]);
+    load("common", "gen/biomes/common.js"), load("monsters", "monsters.js"), load("light", "light.js")]);
   if (env.args?.only === "b1") return [checkB1Gear(m)];   // (node tools/check-items.mjs --only b1)
   return [checkItems(m), checkGear(m), checkB1Gear(m)];
 }

@@ -169,7 +169,7 @@ export function naturalLight(game, zone, x, y, z) {
 }
 
 export function inDark(game, zone, x, y, z) {
-  if (game.player.torch) return false;
+  if (game.player.torch || game.player.status?.["running:lanternMote"]) return false;   // (the lantern-mote is light too: B1, WS5 #19)
   return zoneIsLightless(zone) || naturalLight(game, zone, x, y, z) < RULES.dark.threshold;
 }
 

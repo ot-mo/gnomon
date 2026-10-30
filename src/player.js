@@ -5,7 +5,7 @@ import { bonus, invalidateStats, clampHp, makeAttrs, speedMul, canSwim } from ".
 import { makeBody, wielded, worn } from "./body.js";
 import { RULES } from "./rules.js";
 import { CURRENCY } from "./currency.js";
-import { hasStatus, statusFlag, statusSpeed } from "./status.js";
+import { hasStatus, statusFlag, statusSpeed, STATUS_DEFS } from "./status.js";
 import { torchGutters } from "./torch.js";
 import { hashFloat } from "./rng.js";
 import { MUTATIONS } from "./content/mutations.js";
@@ -85,21 +85,35 @@ export { av as armourValue } from "./stats.js";
 // mutation that sees in the dark (content/mutations.js darkRange: Night Eyes). With an empty
 // purse it gutters (torch.js): a flicker RULES.torch.gutterRange tiles across, its strength jumping
 // about with time t (render3d passes game time).
+// B1: a switched-on lantern-mote (status "running:lanternMote", WS5 #19; bible "a light of radius 6 that follows
+// you") lights MOTE_RANGE tiles at least, torch or no (light.js inDark counts you lit); the Snuffer's mark (an oath
+// broken: p.snufferMark, social/ritual.js; WS6b #3) takes a tile off a lit torch for the rest of the run; a status's
+// darkRange (gloam's 6 tiles, C4 #10) reaches as a mutation's does with the torch out; blinded (gloam's overdose,
+// umbra's after-effect) leaves you a tile in any light.
+export const MOTE_RANGE = 6, MOTE_POWER = 2.2;
+const moteOn = (p) => hasStatus(p, "running:lanternMote");
 export function torchRange(p) {
-  if (!p.torch) return Math.max(Math.min(4, bonus(p, "darkSight") * 1.5), darkRange(p));
-  if (torchGutters(p)) return RULES.torch.gutterRange;
-  return 6 * (1 + bonus(p, "torch")) * (hasStatus(p, "darkened") ? 0.4 : 1);
+  let r;
+  if (!p.torch) r = Math.max(Math.min(4, bonus(p, "darkSight") * 1.5), darkRange(p));
+  else if (torchGutters(p)) r = RULES.torch.gutterRange;
+  else r = Math.max(1, 6 * (1 + bonus(p, "torch")) * (hasStatus(p, "darkened") ? 0.4 : 1) - (p.snufferMark ? 1 : 0));
+  if (moteOn(p)) r = Math.max(r, MOTE_RANGE);
+  if ((p.torch || moteOn(p)) && hasStatus(p, "blinded")) r = Math.min(r, 1);
+  return r;
 }
 export function torchPower(p, t = 0) {
-  if (!p.torch) return Math.min(0.9, bonus(p, "darkSight") * 0.3);
-  if (torchGutters(p)) return RULES.torch.gutterPower * (0.6 + 0.4 * hashFloat(Math.floor(t * 9)));
-  return 2.2 * (1 + bonus(p, "torch") * 1.2) * (hasStatus(p, "darkened") ? 0.3 : 1);
+  let w;
+  if (!p.torch) w = Math.min(0.9, bonus(p, "darkSight") * 0.3);
+  else if (torchGutters(p)) w = RULES.torch.gutterPower * (0.6 + 0.4 * hashFloat(Math.floor(t * 9)));
+  else w = 2.2 * (1 + bonus(p, "torch") * 1.2) * (hasStatus(p, "darkened") ? 0.3 : 1);
+  return moteOn(p) ? Math.max(w, MOTE_POWER) : w;
 }
 export { speedMul };
 export const jumpBonus = (p) => bonus(p, "jump");
 function darkRange(p) {
   let r = 0;
   for (const id in p.mutations || {}) { const f = MUTATIONS[id]?.darkRange; if (f) r = Math.max(r, f(p.mutations[id])); }
+  for (const id in p.status || {}) { const f = STATUS_DEFS[id]?.darkRange; if (f) r = Math.max(r, f(p.status[id])); }   // (gloam: B1)
   return r;
 }
 export const hasFeatherFall = (p) => bonus(p, "featherFall") > 0;

@@ -34,7 +34,7 @@ export const ARTIFACTS = {
   echoBell: { name: "echo-bell", vague: "a cold brass bell", class: "a mapper", complexity: 2, charge: 100, value: 220,
     info: "Rung once, it draws every surface within 10 tiles onto your map, lit or not." },
   lanternMote: { name: "lantern-mote", vague: "a warm disc", class: "a lamp", complexity: 2, charge: 10, per: "minute", bonus: { torch: 0.4 }, value: 260,
-    info: "Switched on, a mote of light follows you: your torch reaches further, and your hands stay free." },
+    info: "Switched on, a mote of light follows you: 6 tiles of light, torch or no, and your torch reaches further." },   // (player.js torchRange, light.js inDark: B1)
   glimgun: { name: "glimgun", vague: "an oily brass tube", class: "a weapon", complexity: 2, charge: 0, target: "creature", value: 240,
     info: "Spits a bolt of burning glim at what you aim at: 2d6 fire. Each shot costs a glim from your purse.",
     needs: "C4: its shot lights the target's area, a trespass in the Lampless' holy places (bible §13.2: light.js, C2's holy places)" },
@@ -55,8 +55,7 @@ export const ARTIFACTS = {
     bonus: { jump: 2 }, value: 360, info: "Strapped on and wound, they add 2 blocks to your jump, and you climb 2 on the map.",
     needs: "25 charge a jump rather than 100 a minute (player.js, turns.js: a jump's hook)" },
   mirrorShield: { name: "mirror shield", vague: "a dish that shows you yourself", class: "a ward", complexity: 3, charge: 300, per: "minute",
-    bonus: { ward: 3 }, value: 380, info: "Raised, it turns arrows and bolts aside: they do 3 less.",
-    needs: "the bible's 50% of missiles reflected (missiles.js), for the ward meanwhile" },
+    bonus: { ward: 3 }, value: 380, info: "Raised, it turns half the arrows and bolts aside; the rest do 3 less." },   // (combat.js turnedAside: B1)
 };
 
 // Bible §13.4's others: data for the code that will do each (docs/c4.md, integration requests). Same shape as ARTIFACTS.

@@ -1221,7 +1221,7 @@ export async function run(env) {
     const droverBuys = F.FACTIONS.drovers.buys;
     delete F.FACTIONS.drovers.buys;
     const k = named("mira", "merchant", "drovers", { near: [1, 0], name: "Dov", level: 5 });
-    k.teaches = ["swimmer", "tough", "repair"];   // (repair waits on its needs: never offered)
+    k.teaches = ["swimmer", "tough", "mod"];   // (mod waits on its needs: never offered; repair did until B1 built it)
     ritual.performRite(game, k, "tracing");
     // The run's own secrets, learned as a player would (WS7's journal since the WS7a merge: its entries say only when
     // and how you learned each; kind, reading and text are the run's): deep readings of three events, a dark one of a
@@ -1235,7 +1235,7 @@ export async function run(env) {
     const ids = rows().map((r) => r.id);
     for (const w of [`give:${A.id}`, `give:${G.id}`, "power:swimmer", "power:tough", "recruit", "best"]) if (!ids.includes(w)) fail(`the flame-kin menu lacks ${w}: ${ids.join(", ")}`);
     if (ids.includes(`give:${Bd.id}`)) fail("the Drovers (deep) want a dark reading");
-    if (ids.includes("power:repair")) fail("the flame-kin menu teaches Repair, a power still waiting on its needs");
+    if (ids.includes("power:mod")) fail("the flame-kin menu teaches Mod, a power still waiting on its needs");
     const label = rows().find((r) => r.id === `give:${A.id}`)?.label || "";
     if (!label.includes(SEC.secretText(game.run, A))) fail(`a reading's row doesn't tell its account: "${label}"`);
     const rep0 = F.repOf(game, "drovers");
@@ -1329,10 +1329,13 @@ export async function run(env) {
     events.emit(game, "kill", { c: victim, src: p() });
     if (F.repOf(game, "survey") !== before - 120 || F.repOf(game, "moths") !== -600) fail(`oathbreaking: the Survey ${before} → ${F.repOf(game, "survey")}, the Moths ${F.repOf(game, "moths")}`);
     if (!merchants.snuffed(game) || ritual.canKindle(game, stranger) === null) fail("the Snuffer can still kindle");
+    // (B1, WS6b #3: the mark on the torch, a tile shorter for the rest of the run)
+    if (!p().snufferMark) fail("oathbreaking: the Snuffer's mark isn't on you (player.snufferMark)");
     const sTalk = talk.talkTo(game, stranger).options.find((o) => /kindle/i.test(o.label))?.go();
     if (!/Snuffer/.test(sTalk?.text || "")) fail(`asking to kindle as the Snuffer: ${sTalk?.text}`);
     game.time += 7 * 24 * 60 * RULES.clock.secondsPerMinute + 1;
     if (merchants.snuffed(game)) fail("the Snuffer's mark lasts past 7 world days");
+    if (!p().snufferMark) fail("the Snuffer's mark on the torch went with the 7 days (it is for the run)");
     setup();
     const v2 = named("mira", "villager", "clatter", { near: [1, 0], name: "Hob" });
     ritual.performRite(game, v2, "tracing");
