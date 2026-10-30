@@ -19,7 +19,8 @@ import { registerTalkOptions, node, bye } from "../talk.js";
 import { on } from "../events.js";
 import { registerStatus, addStatus } from "../status.js";
 import { receive, pay, funds, formatPrice } from "../currency.js";
-import { addRep, FACTIONS } from "../factions.js";
+import { addRep, FACTIONS, attitude } from "../factions.js";
+import { standingOf } from "./builders.js";
 import { maxHp } from "../stats.js";
 import { hasKey } from "../keyset.js";
 import { dayNumber } from "../clock.js";
@@ -44,6 +45,8 @@ function cstate(game, site) {
   return all[site];
 }
 const villageHere = (game, c) => (c?.village && game.run ? villageOf(game.run, c.village) : null);
+// Someone at Dark, or out for you, says one goodbye and offers nothing (social/builders.js).
+const refuses = (game, c) => standingOf(game, c).band === "hated" || attitude(game, c, game.player) === "hostile";
 const styleOf = (v) => VILLAGES.styles[v.layout?.style] || VILLAGES.styles.turf;
 
 registerStatus("fed", { name: "fed", color: [230, 200, 140], kind: "good", t: DAY_S, stack: "refresh",
@@ -68,7 +71,7 @@ export function takeFromLamp(game, siteId) {
 }
 registerTalkOptions("commonsLamp", (game, c) => {
   const v = villageHere(game, c);
-  if (!v || v.abandoned || c.villageRole !== "lamplighter" || !game.state) return null;
+  if (!v || v.abandoned || c.villageRole !== "lamplighter" || !game.state || refuses(game, c)) return null;
   const dark = styleOf(v).lamp === "dark", st = cstate(game, c.village);
   const label = dark ? "What is the commons dark for?" : st.taken === 0 ? "May I take a thimble from the commons lamp?" : "May I take a little more from the lamp?";
   return [{ label, go: () => {
@@ -102,7 +105,7 @@ export function brewTonic(game, siteId, vial) {
 }
 registerTalkOptions("oven", (game, c) => {
   const v = villageHere(game, c);
-  if (!v || v.abandoned || c.villageRole !== "leader" || !game.state) return null;
+  if (!v || v.abandoned || c.villageRole !== "leader" || !game.state || refuses(game, c)) return null;
   const p = game.player, opts = [];
   for (const dish of Object.keys(game.state.dishes || {})) opts.push({ label: `May I cook ${dish} at your oven?`, go: () => {
     const out = cookDish(game, c.village, dish);

@@ -7,7 +7,8 @@
 //   bankHere(game) → landmark letter | null       one of CURRENCY.banks where you stand
 //   deposit(game, n) → { ok, line }  withdraw(game, n) → { ok, line }
 import { registerTalkOptions, node, bye } from "../talk.js";
-import { FACTIONS, membershipsOf } from "../factions.js";
+import { FACTIONS, membershipsOf, attitude } from "../factions.js";
+import { standingOf } from "./builders.js";
 import { CURRENCY } from "../content/currency.js";
 import { LANDMARK_INDEX } from "../content/world/worldmap.js";
 import { pay, receive, funds, formatPrice } from "../currency.js";
@@ -43,6 +44,7 @@ registerTalkOptions("bank", (game, c) => {
   if (!game.state || !FACTIONS.chandlers) return null;
   const here = bankHere(game);
   if (!chandler(c) && !(here && isMerchant(c))) return null;
+  if (standingOf(game, c).band === "hated" || attitude(game, c, game.player) === "hostile") return null;   // (at Dark: one goodbye)
   if (!here) return [{ label: "Do the Houses bank here?", go: () => node(CURRENCY.lines.noBank, [bye()]) }];
   const step = (label, fn) => ({ label, go: () => { const out = fn(); game.log(out.line, out.ok ? [255, 220, 120] : [200, 190, 170]); return bankNode(); } });
   const bankNode = () => node(`The House holds ${formatPrice(balance(game))} of yours. Your flask holds ${formatPrice(funds(game.player))}.`, [
