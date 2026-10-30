@@ -174,6 +174,10 @@ export function sfx(name, opts = {}) {
     case "click":
       tone(ac, t, { f0: 1400, dur: 0.03, vol: 0.06 });
       break;
+    case "scratch":   // a nib on paper, far off: Folio's writing (bible §5 G)
+      for (let k = 0, n = 2 + Math.floor(Math.random() * 3); k < n; k++)
+        noise(ac, t + k * 0.07, { dur: 0.05, vol: 0.12 * v, pan, type: "bandpass", f0: 3800 * jitter(0.2), f1: 5200 * jitter(0.2), q: 3, attack: 0.01 });
+      break;
   }
 }
 

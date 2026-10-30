@@ -50,6 +50,11 @@
 //      prop three tiles ahead at noon changes the 3D frame, and only locally.
 //  15. The held weapon by the hour (WS3 #7, at the WS9 merge): under open sky with your torch out it is lit less at
 //      midnight than at noon (the sky's light × daylight; it shone at night); underground the same at both hours.
+//  16. The regions' skies and the landmarks seen from afar (B2: C1a #5, C1b #14, #25): on a glare span (the Salt Waste) the
+//      view stops at 6 tiles in the noon window, bleached (a wall beyond it unseen at noon, seen at 10:00); under the canopy
+//      the light dims and the haze is green; the Tall Table's and Foldmother's silhouettes on the horizon from two spans off
+//      by day, facing them (not facing away, behind a wall, at night, in their own span or beyond their visibleFrom); Folio's shadows
+//      sliding in 3D (none on the map) and its scratching every 0.4-1.3 s in 3D there only.
 import { checkGolden } from "./golden.js";
 
 export async function checkRender(m) {
@@ -730,6 +735,85 @@ export async function checkRender(m) {
            Math.abs(gn.ownSpan.lowest - gn.ownSpan.footRow) <= 1 && gn.ownSpan.besideBelow === 0 &&
            !gn.testWorld && !gn.underground, `the Gnomon on the horizon: ${JSON.stringify(gn)} (the Shade's span ${shadeKey})`);
     stats.gnomon = gn;
+  }
+
+  // --- 16. The regions' skies, landmarks on the horizon, Folio (B2: C1a #5, C1b #14, #25) -------------------------
+  {
+    fresh(4242, worldmap.REAL_WORLD);
+    const Wd = game.run.world, find = (ok) => { for (let y = 0; y < Wd.h; y++) for (let x = 0; x < Wd.w; x++) { const t = Wd.tileAt(x, y); if (t && t.travel === "yes" && !t.landmark && ok(t, x, y)) return `${x},${y},0`; } return null; };
+    const sky = (t) => Wd.regions[t.region]?.sky;
+    const glareKey = find((t) => sky(t) === "glare"), canopyKey = find((t) => sky(t) === "canopy"), clearKey = find((t) => sky(t) === "clear");
+    const out = {};
+    // A frame facing east from the zone's middle at hour h, with a wall 2 blocks high `ahead` tiles in front of you (none: 0).
+    const look = (key, h, ahead = 0) => {
+      fresh(4242, worldmap.REAL_WORLD);
+      game.debug.enterZone(key, "start");
+      const z = game.zone, s = standNear(z, z.w >> 1, z.d >> 1);
+      if (ahead) { for (let k = -3; k <= 3; k++) for (let zz = s.z; zz < s.z + 2; zz++) z.set(s.x + ahead, s.y + k, zz, B.STONE); z.refresh(); }   // (2 high: its noon shadow stays at its foot)
+      game.time = T(h);
+      Object.assign(p(), { x: s.x + 0.5, y: s.y + 0.5, z: s.z, vz: 0, yaw: 0, pitch: 0, torch: false });
+      return { hash: frame3d(), look: render3d.lookState() };
+    };
+    // The glare (C1a #5): from 11:00 to 13:00 on a glare span the view stops at SKY_LOOKS.glare.dist tiles, bleached; a wall
+    // beyond it doesn't change the frame at noon and does at 10:00; one inside it does at noon.
+    const G = render3d.SKY_LOOKS.glare.dist;
+    const noon = look(glareKey, 12), ten = look(glareKey, 10), far12 = look(glareKey, 12, G + 3), far10 = look(glareKey, 10, G + 3), near12 = look(glareKey, 12, G - 3);
+    out.glare = { key: glareKey, noon: noon.look.glare && noon.look.maxDist === G, ten: !ten.look.glare && ten.look.maxDist > G, farHidden: far12.hash === noon.hash,
+      farAt10: far10.hash !== ten.hash, nearShown: near12.hash !== noon.hash, bleached: noon.look.fog.every((c) => c > 200) };
+    // The canopy: dimmer under the Pleat's leaves than an open sky at the same hour, its haze green.
+    const can = look(canopyKey, 12).look, clr = look(clearKey, 12).look;
+    out.canopy = { key: canopyKey, light: +(can.daylight / clr.daylight).toFixed(2), fog: can.fog.map(Math.round), sky: can.sky, clear: clr.sky };
+    expect(Object.values(out.glare).every((v) => v === true || typeof v === "string") && out.canopy.light < 0.8 && can.fog[1] > can.fog[0] && can.fog[1] > can.fog[2] && !clr.glare && clr.maxDist > G,
+      `the regions' skies: ${JSON.stringify(out)}`);
+    // Landmarks on the horizon (C1b #14): from two spans off, by day, facing it: its silhouette over the sky; facing away,
+    // at night, from its own span and from beyond its visibleFrom, none.
+    const far = (id, key, h, { away = false, wall = false } = {}) => {
+      fresh(4242, worldmap.REAL_WORLD);
+      game.debug.enterZone(key, "start");
+      const z = game.zone, L = game.run.world.landmarks.get(id), plan = game.run.world.plans[L.plan];
+      let s = null;   // the highest ground at least 8 tiles in from the edges (the wall below stays in the zone)
+      for (let i = 0; i < z.w * z.d; i++) { const x = i % z.w, y = Math.floor(i / z.w); if (x >= 8 && y >= 8 && x < z.w - 8 && y < z.d - 8 && z.stand[i] >= 0 && (!s || z.stand[i] > s.z)) s = { x, y, z: z.stand[i] }; }
+      const gx = (L.wx - z.wx) * z.w + L.anchor[0] + plan.rows[0].length / 2, gy = (L.wy - z.wy) * z.d + L.anchor[1] + plan.rows.length / 2;
+      const yaw = Math.atan2(gy - s.y - 0.5, gx - s.x - 0.5) + (away ? Math.PI : 0);
+      if (wall) {   // a tall wall 3 tiles ahead, across the whole view
+        const cx = Math.round(s.x + 0.5 + Math.cos(yaw) * 3), cy = Math.round(s.y + 0.5 + Math.sin(yaw) * 3);
+        for (let k = -6; k <= 6; k++) for (let zz = 0; zz < z.h; zz++) z.set(cx - Math.round(Math.sin(yaw) * k), cy + Math.round(Math.cos(yaw) * k), zz, B.STONE);
+        z.refresh();
+      }
+      game.time = T(h);
+      Object.assign(p(), { x: s.x + 0.5, y: s.y + 0.5, z: s.z, vz: 0, yaw, pitch: 0.1, torch: false });
+      frame3d();
+      return render3d.farDrawn().includes(id);
+    };
+    const near2 = (id) => { const L = Wd.landmarks.get(id); for (const [dx, dy] of [[2, 0], [-2, 0], [0, 2], [0, -2], [2, 2], [-2, -2], [2, -2], [-2, 2]]) { const t = Wd.tileAt(L.wx + dx, L.wy + dy); if (t && t.travel === "yes" && !t.landmark) return `${L.wx + dx},${L.wy + dy},0`; } return null; };
+    out.billboards = {};
+    for (const id of Object.keys(render3d.FAR_BILLBOARDS)) {
+      const L = Wd.landmarks.get(id), key = near2(id), farKey = find((t, x, y) => Math.max(Math.abs(x - L.wx), Math.abs(y - L.wy)) === L.visibleFrom + 2);
+      out.billboards[id] = { key, day: far(id, key, 12), away: far(id, key, 12, { away: true }), night: far(id, key, 23), own: far(id, `${L.wx},${L.wy},0`, 12), beyond: farKey && far(id, farKey, 12),
+        behindWall: far(id, key, 12, { wall: true }) };
+      const b = out.billboards[id];
+      expect(b.day && !b.away && !b.night && !b.own && !b.beyond && !b.behindWall, `${id} on the horizon: ${JSON.stringify(b)}`);
+    }
+    // Folio's shadows (C1b #25): in 3D on its span many slide over the paving, a frame two seconds on differs; none on the
+    // map; and its scratching comes every 0.4-1.3 s in 3D there, never on the map or elsewhere.
+    fresh(4242, worldmap.REAL_WORLD);
+    const folio = Wd.landmarks.get("folio");
+    game.debug.enterZone(`${folio.wx},${folio.wy},0`, "start");
+    const fz = game.zone, pa = fz.gen.planAt, fs = standNear(fz, pa.x + (pa.w >> 1), pa.y + (pa.d >> 1));
+    game.time = T(12);
+    Object.assign(p(), { x: fs.x + 0.5, y: fs.y + 0.5, z: fs.z, vz: 0, yaw: 0, pitch: -0.5, torch: true });
+    const h1 = frame3d(), n1 = render3d.folioShadowsDrawn();
+    game.time += 2;
+    const h2 = frame3d();
+    const count = render3d.FOLIO_SHADOWS.count;
+    render3d.FOLIO_SHADOWS.count = 0; const h0 = frame3d(); render3d.FOLIO_SHADOWS.count = count;
+    game.view = "map"; render3d.render3d(game); const nMap = render3d.folioShadowsDrawn();
+    const scratches = (view, key) => { if (key !== game.zone.key) game.debug.enterZone(key, "start"); game.view = view; let n = 0; const t0 = game.time; for (let k = 0; k < 400; k++) { game.time = t0 + k * 0.05; if (music.folioScratchDue(game)) n++; } return n; };
+    out.folio = { shadows: n1, slide: h1 !== h2, drawn: h1 !== h0, onMap: nMap, scratch3d: scratches("3d", fz.key), scratchMap: scratches("map", fz.key), scratchElsewhere: scratches("3d", clearKey) };
+    expect(n1 >= 20 && out.folio.slide && out.folio.drawn && nMap === 0 && out.folio.scratch3d >= 20 / 1.3 - 1 && out.folio.scratch3d <= 20 / 0.4 && !out.folio.scratchMap && !out.folio.scratchElsewhere,
+      `Folio in 3D: ${JSON.stringify(out.folio)}`);
+    game.view = "3d";
+    stats.skies = out;
   }
 
   // --- 12. A dormant zone frees its arrays (only with --expose-gc: tools/check-perf.mjs runs this check so) ----------

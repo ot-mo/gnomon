@@ -23,7 +23,7 @@ import { castRay, hit, setGhostVisible, rayInfo } from "./raycast.js";
 import { sampleGrid, inDark, zoneIsLightless, daylight, syncLight, sunState, sunlitGrid } from "./light.js";
 import { sunDir, skyColors, fogFor, spanOf, daylightAt, minutes, clockLabel, phase, gnomonOf, handAngle, inNoonWindow } from "./clock.js";
 import { material, albedo, setMaterialTime, setDarkSight, DARK_SIGHT_BLOCKS } from "./materials.js";
-import { noise2, hash } from "./rng.js";
+import { noise2, hash, hashInt } from "./rng.js";
 import { creatureSprite, canTalk, talkersIn, isFlat } from "./creatures.js";
 import { guardianSprites } from "./guardians.js";
 import { spikeSprites } from "./traps.js";
@@ -106,6 +106,7 @@ let sunOn = false, sunX = 0, sunY = 0, sunZ = 1, sunR = 0, sunG = 0, sunB = 0;  
 let zen = [50, 95, 190], hor = [170, 200, 240];                                // the sky's gradient
 let discX = 0, discY = 0, discZ = 1, discVis = 0, discR = 255, discG = 250, discB = 215;
 let cloudR = 245, cloudG = 245, cloudB = 250, starK = 0, horizon = null, horizonSides = null;
+let skyKind = null, glareOn = false;   // the region's sky (C1a's REGIONS[r].sky), and the noon glare this frame
 
 // The zone's arrays and sizes, read once a frame: the per-pixel code below never reads the zone object
 // (each zone has its own shape, and code tuned to one zone's would be thrown out in the first frame of the next).
@@ -125,9 +126,17 @@ function frameNeighbours(game, zone) {
 }
 
 // This frame's sky, for tests: { daylight, starK, discVis, sunOn }.
-export const lookState = () => ({ daylight: skyR, starK, discVis, sunOn });
+export const lookState = () => ({ daylight: skyR, starK, discVis, sunOn, sky: skyKind, glare: glareOn, maxDist, fog: [fogR, fogG, fogB], fogD });
+
+// The region's sky (bible §4.9; C1a's REGIONS[r].sky; B2, C1a #5), outdoors only, the map untouched:
+//   glare   the Salt Waste, the Glass Sea, its shore and causeway: from 11:00 to 13:00 the 3D view drops to `dist` tiles
+//           and its colours bleach into a white haze (the Gnomon, the compass, still shows)
+//   canopy  the Pleat: a green dimness, the sky's light × `dim` and the haze toward `tint`
+// The others ("haze", "clear", "crystal", "ashen": the Shade's dark is its terrain's) keep the clock's looks.
+export const SKY_LOOKS = { glare: { dist: 6, density: 0.5, bleach: [246, 244, 232], light: 1.15 }, canopy: { dim: 0.72, tint: [70, 112, 62], mix: 0.5 } };
 function frameLook(game, zone) {
   outdoor = !!zone.hasSky;
+  skyKind = null; glareOn = false;
   if (!outdoor) {
     maxDist = MAX_DIST; sunOn = false; horizon = null;
     skyR = SKY_COLOR[0]; skyG = SKY_COLOR[1]; skyB = SKY_COLOR[2];
@@ -142,6 +151,17 @@ function frameLook(game, zone) {
   const fog = fogFor(game, zone);
   [fogR, fogG, fogB] = fog.color; fogD = fog.density;
   ({ zenith: zen, horizon: hor } = skyColors(game, zone));
+  skyKind = spanOf(game, zone)?.region?.sky ?? null;
+  if (skyKind === "glare" && inNoonWindow(game)) {
+    const G = SKY_LOOKS.glare;
+    glareOn = true; maxDist = G.dist; fogD = G.density; [fogR, fogG, fogB] = G.bleach;
+    zen = [...G.bleach]; hor = [...G.bleach];
+    skyR *= G.light; skyG *= G.light; skyB *= G.light;
+  } else if (skyKind === "canopy") {
+    const C = SKY_LOOKS.canopy;
+    skyR *= C.dim; skyG *= C.dim; skyB *= C.dim;
+    fogR += (C.tint[0] - fogR) * C.mix; fogG += (C.tint[1] - fogG) * C.mix; fogB += (C.tint[2] - fogB) * C.mix;
+  }
   // The faces' sun is the one the zone was baked for, so lit faces and shadows agree.
   const real = sunDir(game), baked = sunState(zone).sun || real;
   [sunX, sunY, sunZ] = baked;
@@ -448,6 +468,50 @@ function drawGnomon(game, zone) {
   }
 }
 
+// --- Landmarks on the horizon (bible §5 E, §5 P; B2, C1b #14) ---------------------------------------------------
+// Foldmother's crown and the Tall Table, seen from afar as the Gnomon is: a sky-layer silhouette, never voxels, drawn only
+// on cells that show the sky or the horizon plane (nothing nearer in front of it), from the spans within its visibleFrom
+// (not its own: there it stands in voxels), by day (lost in the dark at night, as the Gnomon is). A table is a sheer block
+// `height` blocks up and `half` tiles either side of its middle; a crown a dome of leaves on a trunk. farDrawn() → the ids
+// drawn in the last 3D frame.
+export const FAR_BILLBOARDS = {
+  tallTable: { height: 12, half: 11, shape: "table", ch: "#", color: [128, 92, 66] },
+  foldmother: { height: 24, half: 10, shape: "crown", ch: "&", color: [72, 108, 62] },
+};
+let farShown = [];
+export const farDrawn = () => farShown.slice();
+function drawFarLandmarks(game, zone) {
+  farShown = [];
+  const W = outdoor && game.run?.world;
+  if (!W || daylightAt(minutes(game)) < GNOMON.nightBelow) return;
+  for (const [id, b] of Object.entries(FAR_BILLBOARDS)) {
+    const L = W.landmarks?.get(id), plan = L && W.plans?.[L.plan];
+    if (!plan) continue;
+    const span = Math.max(Math.abs(L.wx - zone.wx), Math.abs(L.wy - zone.wy));
+    if (span === 0 || span > (L.visibleFrom ?? 3)) continue;
+    const gx = (L.wx - zone.wx) * zone.w + (L.anchor?.[0] ?? 0) + plan.rows[0].length / 2, gy = (L.wy - zone.wy) * zone.d + (L.anchor?.[1] ?? 0) + plan.rows.length / 2;
+    const vx = gx - cam.ex, vy = gy - cam.ey;
+    const zc = vx * cam.fX + vy * cam.fY + (FLOOR_Z - cam.ez) * cam.fZ;
+    if (zc < 2) continue;
+    const toScreen = (z) => (1 - (vx * cam.uX + vy * cam.uY + (z - cam.ez) * cam.uZ) / zc / cam.halfH) * 0.5 * S.rows;
+    const sx = ((vx * cam.rX + vy * cam.rY) / zc / cam.halfW + 1) * 0.5 * S.cols, foot = toScreen(FLOOR_Z), top = toScreen(FLOOR_Z + b.height);
+    const half = (b.half / zc / cam.halfW) * 0.5 * S.cols, dist = Math.hypot(vx, vy);
+    const k = 0.25 + 0.5 * (1 - Math.exp(-dist / 150));   // hazed by distance, never lost in it (it's a landmark)
+    const col = [b.color[0] + (fogR - b.color[0]) * k, b.color[1] + (fogG - b.color[1]) * k, b.color[2] + (fogB - b.color[2]) * k];
+    let shown = false;
+    for (let y = Math.max(0, Math.floor(top)); y <= Math.min(S.rows - 1, Math.floor(foot)); y++) {
+      const f = foot === top ? 1 : (y + 0.5 - top) / (foot - top);   // 0 at the top, 1 at the foot
+      const w = b.shape === "table" ? half : f < 0.65 ? half * Math.sqrt(Math.max(0, 1 - ((0.65 - f) / 0.65) ** 2)) : half * 0.18;
+      for (let x = Math.max(0, Math.floor(sx - w + 0.5)); x <= Math.min(S.cols - 1, Math.floor(sx + w - 0.5)); x++) {
+        if (depth[y * S.cols + x] !== Infinity) continue;
+        S.put(x, y, b.ch, col[0], col[1], col[2]);
+        shown = true;
+      }
+    }
+    if (shown) farShown.push(id);
+  }
+}
+
 // --- Dynamic resolution (§6.7) ----------------------------------------------------------------------
 const dyn = { on: typeof document !== "undefined", half: false, avg: 0, since: 0 };
 export function setDynamicResolution(on) { dyn.on = !!on; if (!on) dyn.half = false; }
@@ -467,6 +531,33 @@ let darkPerHit = false;
 
 // Flat beings near you this frame: where they stand (x, y, z), their shadows drawn onto the floor in shadeHit.
 let shadowAt = new Float64Array(24), shadowCount = 0;
+function addShadow(x, y, z) {
+  if (shadowAt.length < (shadowCount + 1) * 3) { const more = new Float64Array(shadowAt.length * 2); more.set(shadowAt); shadowAt = more; }
+  shadowAt[shadowCount * 3] = x; shadowAt[shadowCount * 3 + 1] = y; shadowAt[shadowCount * 3 + 2] = z; shadowCount++;
+}
+// Folio in 3D (bible §5 G; B2, C1b #25): several hundred shadows slide over its paving with nobody casting them, the town's
+// Flatfolk going about their streets (the map shows the town). FOLIO_SHADOWS.count of them over its plan, each along a row or
+// a column at its own pace, wrapping round the plan; those within `near` tiles of you are drawn (a flat being's shadow).
+export const FOLIO_SHADOWS = { count: 300, speed: [0.4, 1.1], near: 16 };
+let folioShown = 0;
+export const folioShadowsDrawn = () => folioShown;
+function folioShadows(game, zone, player) {
+  folioShown = 0;
+  const pa = zone.landmarkId === "folio" && zone.z === 0 && zone.gen?.planAt;
+  if (!pa || game.view === "map") return;
+  const F = FOLIO_SHADOWS, t = game.time || 0;
+  for (let k = 0; k < F.count; k++) {
+    const h = hashInt(k, 7151), along = h & 1, sp = (F.speed[0] + ((h >>> 1) % 1000) / 1000 * (F.speed[1] - F.speed[0])) * ((h >>> 11) & 1 ? 1 : -1);
+    const ax = (h >>> 12) % pa.w, ay = (h >>> 20) % pa.d, run = along ? pa.w : pa.d;
+    const s = (((along ? ax : ay) + t * sp) % run + run) % run;
+    const x = pa.x + (along ? s : ax) + 0.5, y = pa.y + (along ? ay : s) + 0.5;
+    if (Math.abs(x - player.x) > F.near || Math.abs(y - player.y) > F.near) continue;
+    const st = zone.stand[Math.floor(x) + Math.floor(y) * zone.w];
+    if (st < 0) continue;
+    addShadow(x, y, st);
+    folioShown++;
+  }
+}
 // Every creature but the people, in the zone's order: attitude decides who fights, not who is seen (a follower, a wary
 // or neutral beast are there too). Under the parent's attitudes these are exactly the ones hostile to you.
 const beastsIn = (zone, player) => zone.creatures.filter((c) => c !== player && !canTalk(c));
@@ -477,10 +568,8 @@ export function render3d(game) {
   setCamera(player, game.fov, game.cam);
   shadowCount = 0;
   for (const c of [...beastsIn(zone, player), ...talkersIn(zone)])
-    if (isFlat(c) && Math.hypot(c.x - player.x, c.y - player.y) < 20) {
-      if (shadowAt.length < (shadowCount + 1) * 3) { const more = new Float64Array(shadowAt.length * 2); more.set(shadowAt); shadowAt = more; }
-      shadowAt[shadowCount * 3] = c.x; shadowAt[shadowCount * 3 + 1] = c.y; shadowAt[shadowCount * 3 + 2] = c.z; shadowCount++;
-    }
+    if (isFlat(c) && Math.hypot(c.x - player.x, c.y - player.y) < 20) addShadow(c.x, c.y, c.z);
+  folioShadows(game, zone, player);
   torchOn = !!player.torch;
   setMaterialTime(game.time);   // water ripples move
   if (depth.length !== S.cols * S.rows) depth = new Float32Array(S.cols * S.rows);
@@ -502,6 +591,7 @@ export function render3d(game) {
 
   setGhostVisible(false);          // everything else (sight lines, aiming…) sees straight through them
   drawGnomon(game, zone);
+  drawFarLandmarks(game, zone);
   drawSprites(game);
   drawDamageNumbers(game);
   // A bomb going off close by: a flash of light.

@@ -28,6 +28,8 @@
 import { onAudioReady, audioOut, savedSwitch, saveSwitch, impulse } from "./audio.js";
 import { MOODS as MOOD_TABLE } from "./content/moods.js";
 import { spanOf, isNight } from "./clock.js";
+import { hashInt } from "./rng.js";
+import { sfx } from "./sfx.js";
 
 const MOODS = {
   temple:  { bpm: 66,  root: 62, scale: [0, 2, 4, 6, 7, 9, 11], chords: [0, 4, 5, 3], pad: "triangle", pluck: "sine",     notes: 0.45, bass: "none",     drums: 0, cutoff: 2600 },
@@ -84,9 +86,27 @@ export function toggleMusic() {
   return !st.muted;
 }
 
+// Folio's scratching (bible §5 G: "a scratching like a great deal of distant writing"; B2, C1b #25): in 3D on its span,
+// a scratch every SCRATCH_EVERY seconds or so, from somewhere in the town round you. → whether one is due now (and sets the
+// next); the sound itself is sfx("scratch"), placed.
+export const SCRATCH_EVERY = [0.4, 1.3];
+export function folioScratchDue(game) {
+  const z = game.zone;
+  if (z?.landmarkId !== "folio" || z.z !== 0 || game.view === "map") { st.scratchAt = null; return false; }
+  const t = game.time || 0;
+  if (st.scratchAt === null || st.scratchAt === undefined) st.scratchAt = t + SCRATCH_EVERY[0];
+  if (t < st.scratchAt) return false;
+  st.scratchAt = t + SCRATCH_EVERY[0] + (hashInt(Math.floor(t * 10), 991) % 1000) / 1000 * (SCRATCH_EVERY[1] - SCRATCH_EVERY[0]);
+  return true;
+}
+
 // Once a frame: what should be playing, how tense, how flat.
 export function updateMusic(game) {
   const f = game.zone, p = game.player;
+  if (folioScratchDue(game)) {
+    const a = (hashInt(Math.floor((game.time || 0) * 10), 313) % 628) / 100, r = 6 + (hashInt(Math.floor((game.time || 0) * 10), 77) % 10);
+    sfx("scratch", { at: { x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r }, vol: 0.8 });
+  }
   let chasing = 0, bossAwake = false;
   for (const m of f?.creatures || []) {
     if (m.state !== "chase" || Math.hypot(m.x - p.x, m.y - p.y) > 14) continue;
