@@ -39,6 +39,12 @@
 //    traders and nobody else; Pell and Castor only in zone.landmarkPeople. Then on one seed: Pell's round (Hollowmere
 //    days 1-2, Benchmark 3-4, Molar 5-6, and again from day 7), Castor at Molar once beat 1 is done and not after he
 //    is killed (the "kill" event), and a save's record of a person keeping its name, title, words and landmark.
+// 7. Who stands in the landmark dungeons (the integrator, C5 #12; story/dungeon-people.js, on B2's places), on one seed,
+//    each floor made twice the same: the Hierarch on the Square's top floor up (an assizer in her name, under her words,
+//    on floor); Lio in the Square's floor-2 first cell and a pressed prisoner in every other cell of floors 2 and 3, flat
+//    until the wheel turns ("prisoner:freed"); Tovi Hallen on the Press's captive spot, flat; the Assize plumb-seal at
+//    the end of Kettle Mesa's floor-3 tunnel; the Grub Mother and the Gloam Warden named by their `who` (their barks);
+//    Benchmark's signaller and Map Room's surveyor with B2's services (signalRoom, mapRoom), the signaller by a talk option.
 import { buildRun } from "../../src/world/run.js";
 import { TEST_WORLD } from "../../src/content/world/test-world.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
@@ -67,7 +73,8 @@ import { dialogueIdOf, PEOPLE_WORDS } from "../../src/content/people-words.js";
 import { isMerchant, ensureStock } from "../../src/social/merchants.js";
 import { canKindle } from "../../src/social/ritual.js";
 import { theOf, TheOf } from "../../src/creatures.js";
-import { dialogueIds } from "../../src/talk.js";
+import { dialogueIds, talkTo } from "../../src/talk.js";
+import { barkOf } from "../../src/story/barks.js";
 import { dayNumber } from "../../src/clock.js";
 import { emit } from "../../src/events.js";
 import { trimCreature, rebuildCreature } from "../../src/save/codec.js";
@@ -174,6 +181,7 @@ export function checkLandmarks({ seeds = [1, 7, 42, 1234, 31337], tiles = 500 } 
   }
   stats.people = `${people.placed} placed (${people.top} on the Tall Table's top, ${people.flat} flat, ${people.ghosts} ghosts, ${people.merchants} merchants, ${people.unnamed} without a name of their own, ${people.titled} titled), ` +
     `${people.later} come and go, on ${seeds.length} seeds; ${checkPresence(seeds[0], expect)}`;
+  stats.dungeonPeople = dungeonPeople(seeds[0], expect);
 
   // C1a: Hollowmere on its plan (section 4 of the header), on every seed.
   stats.hollowmere = checkHollowmere(seeds, expect);
@@ -376,6 +384,49 @@ function peopleOfSpan(z, L, plan, at, expect, tally) {
     if (c.vis.ghostly) tally.ghosts++;
   }
 }
+// Section 7: the landmark dungeons' people (one seed).
+function dungeonPeople(seed, expect) {
+  const run = buildRun(seed, REAL_WORLD), W = run.world, ids = new Set(dialogueIds()), out = [];
+  const floor = (id, z) => { const L = W.landmarks.get(id), key = `${L.wx},${L.wy},${z}`, g = { run };
+    const a = ZONE_GENERATORS.dungeon(g, { wx: L.wx, wy: L.wy, z, key }), b = ZONE_GENERATORS.dungeon(g, { wx: L.wx, wy: L.wy, z, key });
+    const sig = (f) => f.creatures.filter((c) => c.landmark || c.who).map((c) => `${c.uid}:${c.type}:${c.tx},${c.ty}`).join() + "|" + f.items.filter((it) => it.id === "assizeSeal").map((it) => `${it.x},${it.y}`).join();
+    expect(sig(a) === sig(b), `${id} floor ${z}: made twice, its people differ`);
+    return a; };
+  const talks = (c, who) => c?.talk?.dialogue === dialogueIdOf(who) && ids.has(c.talk.dialogue);
+  const top = floor("square", -2), strade = top.creatures.find((c) => c.who === "strade");
+  expect(strade?.type === "assizer" && strade.name === "Hierarch Aurel Strade-Orrum" && talks(strade, "strade") && strade.title && top.stand[strade.tx + strade.ty * top.w] === FLOOR_Z,
+         `the Hierarch on the Square's top floor: ${strade?.type} "${strade?.name}"`);
+  if (strade) out.push("the Hierarch up top");
+  let cells = 0;
+  for (const z of [2, 3]) {
+    const f = floor("square", z);
+    expect((f.prisoners || []).length > 0, `the Square's floor ${z} has no cells`);
+    (f.prisoners || []).forEach((q, k) => {
+      const c = f.creatures.find((m) => m.tx === q.x && m.ty === q.y && m.landmark);
+      const lio = z === 2 && k === 0;
+      expect(c && c.vis.flat && (lio ? c.type === "lio" && talks(c, "lio") : c.who === "pressedPilgrim" && c.name === "a pressed prisoner"), `the Square's floor ${z} cell ${k}: ${c?.type} ${c?.name} flat ${c?.vis?.flat}`);
+      cells++;
+      if (c && k === 0) { emit({ state: {} }, "prisoner:freed", { zone: f, prisoner: q, k }); expect(!c.vis.flat, `the Square's floor ${z} cell ${k}: still flat once its wheel turned`); }
+    });
+  }
+  out.push(`${cells} cells (Lio in the first)`);
+  const press = floor("pressyard", 3), tovi = press.creatures.find((c) => c.who === "toviHallen");
+  expect(press.captive && tovi && tovi.tx === press.captive.x && tovi.ty === press.captive.y && tovi.vis.flat && talks(tovi, "toviHallen"), `Tovi Hallen on the Press's floor 3: ${tovi?.tx},${tovi?.ty} flat ${tovi?.vis?.flat}`);
+  const mesa = floor("kettleMesa", 3), seal = mesa.items.find((it) => it.kind === "quest" && it.id === "assizeSeal");
+  expect(mesa.clue && seal && Math.floor(seal.x) === mesa.clue.x && Math.floor(seal.y) === mesa.clue.y, `the seal at Kettle Mesa's tunnel's end: ${seal && `${seal.x},${seal.y}`} (clue ${mesa.clue && `${mesa.clue.x},${mesa.clue.y}`})`);
+  expect(mesa.creatures.some((c) => c.who === "grubMother" && barkOf(c) === PEOPLE_WORDS.grubMother.bark), "the Grub Mother has no who (no bark)");
+  expect(floor("unlitChoir", 4).creatures.some((c) => c.who === "gloamWarden"), "the Gloam Warden has no who");
+  // Benchmark's services (B2's): on the surface, by its people.
+  const B = W.landmarks.get("benchmark"), bz = generateSurface(run, B.wx, B.wy);
+  const sig = bz.creatures.find((c) => c.who === "benchmarkSignaller"), map = bz.creatures.find((c) => c.who === "mapRoomSurveyor");
+  expect(sig?.merchant?.services?.join() === "signalRoom" && sig.merchant.stock === "none" && map?.merchant?.services?.join() === "mapRoom" && map.merchant.stock === "general",
+         `Benchmark's services: the signaller ${JSON.stringify(sig?.merchant)}, the Map Room ${JSON.stringify(map?.merchant)}`);
+  const board = sig && talkTo({ state: {}, quests: [], run }, sig).options.find((o) => o.label === "What does the board show?");
+  expect(board && board.go()?.trade === "services", "the signaller offers no way to the Signal Room's board");
+  out.push("Tovi pressed at the Press, the seal at the tunnel's end, the bottoms' who, Benchmark's two services");
+  return out.join("; ");
+}
+
 // Pell's round, Castor's checkpoint, a killed person, and a person through a save (one seed).
 function checkPresence(seed, expect) {
   const run = buildRun(seed, REAL_WORLD), W = run.world, zones = {};

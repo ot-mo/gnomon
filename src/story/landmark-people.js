@@ -34,12 +34,13 @@ import { PEOPLE } from "../content/creatures/people.js";
 import { dayNumber } from "../clock.js";
 import { RULES } from "../rules.js";
 import { registerTalkOptions, node, bye } from "../talk.js";
+import { registerStock } from "../social/merchants.js";
 import { on } from "../events.js";
 import { registerCreatureField } from "../save/codec.js";
 
 // Who has no type of their own and no culture type: Ess and Tee are the parent's Ess (Tee at her side, in her words);
-// Castor is an assizer of the Assize.
-const KINDS = { essAndTee: "ess", castor: "assizer" };
+// Castor and Hierarch Strade (story/dungeon-people.js) are assizers of the Assize.
+const KINDS = { essAndTee: "ess", castor: "assizer", strade: "assizer" };
 // A title where the role's first clause names what someone sells or where they stand, not who they are.
 const TITLES = {
   essAndTee: "envoys of Folio", benchmarkLeech: "the station's healer", benchmarkBanker: "of the Chandler bank", benchmarkDrover: "of the Drovers' caravan stop",
@@ -50,6 +51,13 @@ const TITLES = {
   wisse: "Abbess of the Lampless", ghostTrader: "of the ghost market", gateAssizer: "keeper of the Square's gate", bramwyn: "keeper of the Pressing rite",
   inkSeller: "of Saltpage", pressedLibrarian: "keeper of the Pressed's library", sporeHerbalist: "of the Spore Moot",
 };
+
+// A person's services (B2's, overworld/renderWorld.js): the Signal Room's board (the Hand on your world map), the Map
+// Room's readings; one who isn't a merchant by its words (the signaller) offers them by a talk option, and sells nothing.
+export const SERVICES = { benchmarkSignaller: ["signalRoom"], mapRoomSurveyor: ["mapRoom"] };
+registerStock("none", () => []);
+registerTalkOptions("services", (game, c) => (SERVICES[c?.who] && PEOPLE_WORDS[c.who]?.role !== "merchant"
+  ? [{ label: "What does the board show?", go: () => ({ trade: "services" }) }] : null));
 
 export const PRESENCE = {
   pell: { round: [6, { hollowmere: [1, 2], benchmark: [3, 4], molar: [5, 6] }] },
@@ -101,6 +109,7 @@ function spec(zone, landmark, p) {
            name: p.letter.name, title: own ? null : titleOf(p.who, p.letter.role) };
 }
 
+export function spawnLandmarkPerson(sp) { return spawnPerson(sp); }   // (story/dungeon-people.js: the dungeons' people)
 function spawnPerson(sp) {
   const c = spawnCreature(sp.kind, sp.x, sp.y, sp.z, { uid: sp.uid, name: sp.name, level: sp.level,
     talk: { dialogue: dialogueIdOf(sp.who), state: {} } });
@@ -112,6 +121,7 @@ function spawnPerson(sp) {
   // Detail C's); Pell too, who would otherwise wait for the Keeper's Stair's pack (social/merchants.js legacyPeddler).
   // The landmarks' own stocks and services (banks, readings, rooms) are WS6b's, the backlog's B3.
   if (PEOPLE_WORDS[sp.who]?.role === "merchant" && !CREATURE_TYPES[sp.kind].merchant?.stock) c.merchant = { stock: "general" };
+  if (SERVICES[sp.who]) c.merchant = { stock: c.merchant?.stock ?? "none", services: SERVICES[sp.who] };
   return c;
 }
 

@@ -91,7 +91,7 @@ export const PEOPLE = {
   surveyor: {
     name: "a surveyor", title: "of the Survey", glyph: "@", color: [118, 168, 214], hp: 18, factions: ["survey"], fight: FLEES,
     ...d20(12, 14, 14, 18, 14, 14), talk: { dialogue: "villager" },
-    people: ["quintVey", "saaraTovi", "benchmarkLeech", "benchmarkSignaller", "mapRoomSurveyor"],
+    people: ["quintVey", "saaraTovi", "benchmarkLeech", "benchmarkSignaller", "mapRoomSurveyor", "toviHallen"],
     ...look(CLOAK, [90, 70, 55], [70, 100, 140], [200, 190, 140]),
   },
   chandler: {

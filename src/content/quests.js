@@ -199,7 +199,7 @@ export const QUESTS = {
         routes: ["Go down Kettle Mesa to floor 3 and look for a fresh tunnel.", "Put your torch out in the crypt and ask Brann what he heard. Bomb the undercroft wall where he points.",
           "On the map, ask Ess and Tee. They read the tunnel as a line of disturbed floor, and walk you along it."],
         learn: "A sapper tunnel, cut straight as a ruler, runs under the Steps towards the temple. In the spoil lies a brass seal: a plumb-line in a square. The Assize's.",
-        reward: { text: "The Assize plumb-seal, and Maren's blessing: +5 max HP.", items: [["assizeSeal", 1]], maxHp: 5 },
+        reward: { text: "The Assize plumb-seal, and Maren's blessing: +5 max HP.", maxHp: 5 },   // (the seal lies at the tunnel's end: story/dungeon-people.js)
         done: { event: "zone:enter", landmark: "kettleMesa", z: 3 },
         choices: [{ id: "seal", label: "the Assize plumb-seal", options: [
           { id: "survey", text: "Give the seal to Mira.", rep: { survey: 100 }, takes: [["assizeSeal", 1]] },
@@ -313,8 +313,8 @@ export const QUESTS = {
         done: { event: "zone:enter", landmark: "square", z: 3 },
         choices: [{ id: "hierarch", label: "the Hierarch", options: [
           { id: "kill", text: "Kill her.", rep: { assize: -400, bentVillages: 200 } },
-          { id: "spare", text: "Spare her and turn her. The patrols stop.", rep: { assize: 300 } },
-          { id: "join", text: "Join her: the Assize alliance.", rep: { assize: 600, survey: -300, hollowmere: -300 }, alliance: "assize" }] }] },
+          { id: "spare", text: "Spare her and turn her. The patrols stop.", rep: { assize: 300 }, ally: "strade" },
+          { id: "join", text: "Join her: the Assize alliance.", rep: { assize: 600, survey: -300, hollowmere: -300 }, alliance: "assize", ally: "strade" }] }] },
       { id: "beat11", n: 11, title: "The Dial-works", landmark: "gnomon", band: [23, 30], after: ["beat10"],
         giver: null, goal: "Walk the Last Mile, open the door at noon, go down the Dial-works and face Vesper in the Noon Socket.",
         offer: "From the Last Milestone it is about five spans of Lattice to the needle's foot. The door opens between 11:00 and 13:00.",

@@ -1016,8 +1016,9 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json, captu
   const J = await env.src("story/journal.js"), PLAY = await env.src("screens/play.js"), ST = await env.src("status.js");
   const F = await env.src("factions.js"), base = (f) => F.repOf({ state: { rep: {} }, player: p }, f);   // (a faction's start, where rep0 has none)
   const C = game.state.campaign, has = (pred) => p.inv.some(pred), rep = (f) => F.repOf(game, f) - (f in rep0 ? rep0[f] : base(f));
-  if (!has((it) => it.kind === "quest" && it.id === "assizeSeal" && it.name === "Assize plumb-seal") || !has((it) => it.kind === "quest" && it.id === "plumbKey"))
-    fail("beats 1 and 10: the Assize plumb-seal or the Plumb Key isn't in your pack");
+  // (beat 1's seal is found at Kettle Mesa's tunnel's end, C5 #12, not paid: picked up here as it would be there)
+  if (has((it) => it.id === "assizeSeal") || !has((it) => it.kind === "quest" && it.id === "plumbKey")) fail("beat 1 paid the seal (it is found), or beat 10 didn't pay the Plumb Key");
+  p.inv.push({ ...BT.campaignItem("assizeSeal") });
   if (!has((it) => it.kind === "artifact" && it.id === "plumbBob" && it.known)) fail("beat 2: no known plumb-bob");
   if ((p.maxHpGain || 0) - gain0 !== 5) fail(`beat 1: max HP +${(p.maxHpGain || 0) - gain0}, not +5`);
   {
@@ -1089,6 +1090,13 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json, captu
     fail(`beat 2's choice at Quint-Vey: ${json(C.choices?.beat2)}, Horary +${rep("horary") - h0}, ambushes ${json(C.ambushes)}`);
   // (Benchmark's leech shares only "the" with beat 4's giver, Kay of the Long Line: not enough.)
   if (T.talkTo(game, talker("the leech", "benchmarkLeech")).options.some((o) => /^About /.test(o.label))) fail("the leech is offered a choice that isn't hers");
+  // Beat 10: Strade spared (or joined) is your ally, whom the Gnomon's door knows (game.state.stradeAlly: B2's interact.js).
+  {
+    const ally0 = game.state.stradeAlly;
+    delete game.state.stradeAlly;
+    if (!BT.choose(game, "beat10", "hierarch", "spare") || game.state.stradeAlly !== true) fail(`beat 10 spared: stradeAlly ${game.state.stradeAlly}`);
+    delete C.choices.beat10.hierarch; game.state.stradeAlly = ally0;
+  }
   // A beat with no giver (5, 7) asks on its own: the beat as the speaker, its choice and nothing else to leave by.
   // Both beats without a giver wait, in order (verification finding on 37da06f: one overwrote the other).
   const own = BT.ownChoices(game).map((o) => `${o.beat.id}.${o.choice.id}`).join();
@@ -1149,7 +1157,7 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json, captu
     const t0 = game.time, seals = () => p.inv.filter((it) => it.id === "assizeSeal").length, n0 = seals(), g0 = p.maxHpGain;
     game.time = 0; delete C.paid.beat1;
     BT.payBeat(game, B[0]); BT.payBeat(game, B[0]);
-    if (seals() - n0 !== 1 || p.maxHpGain - g0 !== 5) fail(`beat 1 paid at time 0, then again: ${seals() - n0} seals, max HP +${p.maxHpGain - g0}`);
+    if (seals() !== n0 || p.maxHpGain - g0 !== 5) fail(`beat 1 paid at time 0, then again: ${seals() - n0} seals, max HP +${p.maxHpGain - g0}`);
     game.time = t0;
   }
   // Glim that doesn't fit your purse goes on the ground at your feet (verification finding on 37da06f: it was lost).

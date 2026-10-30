@@ -19,7 +19,7 @@ import { generateSurface, surfaceSteps, buildApronBand } from "../gen/surface.js
 import { generateDungeonLevel } from "../gen/dungeon.js";
 import { legacyZone } from "./legacy.js";
 import { zoneSeed } from "./run.js";
-import { siteWithDungeon, dungeonParams } from "./sites.js";
+import { siteWithDungeon, dungeonParams, DUNGEON_PEOPLE } from "./sites.js";
 import { hashInt } from "../rng.js";
 import { hourOf } from "../clock.js";
 import { on } from "../events.js";
@@ -50,6 +50,8 @@ function dungeonZone(game, { wx, wy, z }) {
   if (z < 0) zone.hasAbove = !!zone.upStairs;   // a floor up: its stair up leads to z − 1 (B2, C1b #8)
   const holy = site.landmarkId ? run.world.landmarks.get(site.landmarkId)?.holyFloors?.[z] : null;
   if (holy) zone.holy = holy;   // a landmark dungeon's holy floor (the Unlit Choir's, the Square's…: B2, C1b #3)
+  // Who stands in it (C5 #12: story/dungeon-people.js; no draw from any stream, uids of their own).
+  if (site.landmarkId) for (const placeIn of DUNGEON_PEOPLE) placeIn(zone, { site, z, landmark: run.world.landmarks.get(site.landmarkId) });
   return zone;
 }
 

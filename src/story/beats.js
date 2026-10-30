@@ -15,7 +15,8 @@
 //                    happens: C5 #7, #8)
 //   choose(game, beatId, choiceId, optionId) → option | null   pays it (rep, glim, items, reading), takes what it gives
 //                    away (`takes`: beat 1's seal) and records it:
-//                    campaign.choices[beat][choice], campaign.alliance (beat 10), campaign.ambushes (beat 2's Seventh-
+//                    campaign.choices[beat][choice], campaign.alliance (beat 10), state.<ally>Ally (beat 10's Strade,
+//                    spared or joined: the Gnomon's door opens to her), campaign.ambushes (beat 2's Seventh-
 //                    Chimers: the world map's encounter table reads it once their band exists, a request)
 //   isGiver(c, beat) → bool   the talker the beat's `giver` names: every word of it in the talker's name ("Surveyor-
 //                    General Quint-Vey" is Surveyor-General Teodor Quint-Vey)
@@ -151,6 +152,7 @@ export function choose(game, beatId, choiceId, optionId) {
   giveCampaignItems(game, o.items);
   if (o.reading) learnSecret(game, o.reading, "quest");
   if (o.alliance) C.alliance = o.alliance;
+  if (o.ally) game.state[`${o.ally}Ally`] = true;   // (game.state.stradeAlly: interact.js's Gnomon door knows her, B2)
   if (o.ambush && !(C.ambushes ||= []).includes(o.ambush)) C.ambushes.push(o.ambush);
   emit(game, "campaign:choice", { beat: beatId, choice: choiceId, option: optionId });
   return o;

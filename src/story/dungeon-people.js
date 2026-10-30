@@ -1,0 +1,86 @@
+// The landmark dungeons' people and things (the integrator, C5 #12 with C1b #18, #20, #24; on B2's places: docs/b2.md
+// "Requests" 3): who and what stands where a landmark dungeon's floor is made (world/sites.js registerDungeonPeople,
+// called by world/zonegen.js), from content/world/landmarks.js `below` ({ who, floor | up }), with uids of their own and
+// no draw from any stream, so a save keeps them and nothing else generated moves.
+//
+//   the Hierarch (strade, `up: 2`) on the Square's top floor up: an assizer in her name, talking under her words, in
+//     the room farthest from the floor's stair (beat 10's giver: her choice and offer, story/beats.js)
+//   the Square's prisoners (zone.prisoners, B2's cells on floors 2 and 3): Lio in floor 2's first cell, a pressed
+//     prisoner in each other; flat, talked to on the map, until their press-wheel turns (B2's "prisoner:freed")
+//   Tovi Hallen on the Press's floor 3 (zone.captive): a Survey engineer, pressed flat (unpressed by the unpress lens,
+//     once C4's lens is made)
+//   the Assize plumb-seal at the end of Kettle Mesa's floor-3 sapper tunnel (zone.clue): beat 1's find (its reward no
+//     longer gives it, so it can't come twice)
+//   the bottoms' `who` (their barks, story/barks.js): a `below` entry's creature found by its kind or name (the Grub
+//     Mother, a legend of the brine-grubs; the Gloam Warden; the Speaking Door, the parent's door)
+//   PRESSED   who lies flat until freed: Lio, Tovi Hallen, the prisoners (vis.flat, kept by a save)
+import { CREATURE_TYPES, addCreature } from "../creatures.js";
+import { FLOOR_Z } from "../world.js";
+import { registerDungeonPeople } from "../world/sites.js";
+import { spawnLandmarkPerson, kindOf } from "./landmark-people.js";
+import { campaignItem } from "./beats.js";
+import { makeItem } from "../items.js";
+import { on } from "../events.js";
+
+export const PRESSED = new Set(["lio", "toviHallen", "pressedPilgrim"]);
+const PRISONER = { who: "pressedPilgrim", kind: "pressedPilgrim", name: "a pressed prisoner", role: "a prisoner of the Assize" };
+
+const standZ = (zone, x, y) => { const s = zone.stand?.[x + y * zone.w]; return s >= 0 ? s : FLOOR_Z; };
+
+function place(zone, L, entry, x, y, uid) {
+  const kind = kindOf(entry.who, entry);
+  if (!kind || zone.creatures.some((c) => c.uid === uid)) return null;
+  const c = spawnLandmarkPerson({ uid, who: entry.who, kind, landmark: L.id, x, y, z: standZ(zone, x, y), level: zone.level,
+    name: entry.name, title: entry.title !== undefined ? entry.title : kind === entry.who ? null : entry.role?.split(/[:;(,]/)[0].trim() });
+  if (PRESSED.has(entry.who)) c.vis.flat = true;
+  return addCreature(zone, c);
+}
+
+// The room farthest from where you come in (the floor's stair down to it, else its spawn): its middle, or the floor
+// nearest it.
+function farthestRoom(zone) {
+  const from = zone.stairs || zone.spawn || { x: zone.w / 2, y: zone.d / 2 };
+  const rooms = (zone.rooms || []).filter((r) => r.cx !== undefined);
+  rooms.sort((a, b) => Math.hypot(b.cx - from.x, b.cy - from.y) - Math.hypot(a.cx - from.x, a.cy - from.y));
+  for (const r of rooms)
+    for (let d = 0; d < 4; d++)
+      for (let y = r.cy - d; y <= r.cy + d; y++)
+        for (let x = r.cx - d; x <= r.cx + d; x++)
+          if (zone.stand?.[x + y * zone.w] === FLOOR_Z && !zone.creatures.some((c) => c.tx === x && c.ty === y)) return [x, y];
+  return null;
+}
+
+export function placeDungeonPeople(zone, { site, z, landmark: L }) {
+  if (!L || !zone) return;
+  const here = (L.below || []).filter((b) => (b.up ? -b.up === z : b.floor === z));
+  for (const entry of here) {
+    if (entry.who === "strade") {
+      const at = farthestRoom(zone);
+      if (at) place(zone, L, { ...entry, title: "the Assize's head" }, at[0], at[1], `landmark:${L.id}:${z}:strade`);
+    } else if (entry.who === "toviHallen" && zone.captive) {
+      place(zone, L, { ...entry, title: "a Survey engineer, the Reeve's son" }, zone.captive.x, zone.captive.y, `landmark:${L.id}:${z}:toviHallen`);
+    }
+    // a bottom or an inhabitant the floor already holds: its `who`, for its bark
+    for (const c of zone.creatures) if (!c.who && !c.talk && ((entry.kind && c.type === entry.kind) || c.name === entry.name)) c.who = entry.who;
+    for (const c of zone.creatures) if (!c.who && c.type === "door" && entry.who === "speakingDoor") c.who = entry.who;
+  }
+  // The Square's cells: Lio in floor 2's first, a pressed prisoner in every other.
+  const lio = here.find((b) => b.who === "lio");
+  (zone.prisoners || []).forEach((q, k) => {
+    const entry = k === 0 && lio ? { ...lio, title: null } : { ...PRISONER, title: PRISONER.role };
+    const c = place(zone, L, entry, q.x, q.y, `landmark:${L.id}:${z}:prisoner:${k}`);
+    if (c && q.freed) c.vis.flat = false;
+  });
+  // Beat 1's find: the seal at the tunnel's end.
+  if (zone.clue && L.id === "kettleMesa" && !zone.items.some((it) => it.id === "assizeSeal")) {
+    const it = campaignItem("assizeSeal");
+    if (it) zone.items.push(makeItem(it, zone.clue.x + 0.5, zone.clue.y + 0.5, standZ(zone, zone.clue.x, zone.clue.y)));
+  }
+}
+registerDungeonPeople(placeDungeonPeople);
+
+// A press-wheel turned (B2's "prisoner:freed"): the one in that cell stands up, no longer flat.
+on("prisoner:freed", (game, { zone, prisoner }) => {
+  if (!zone || !prisoner) return;
+  for (const c of zone.creatures) if (c.landmark && c.tx === prisoner.x && c.ty === prisoner.y && PRESSED.has(c.who)) c.vis.flat = false;
+});
