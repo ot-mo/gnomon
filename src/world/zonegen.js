@@ -4,7 +4,7 @@
 //   surface  "wx,wy,0": gen/surface.js generateSurface(game.run, wx, wy), for every span you can be in
 //            (a span whose edges are shut, the sea, has no zone); ZONE_STAGED.surface is the same in
 //            stages (surfaceSteps), for 3D prefetch
-//   dungeon  "wx,wy,z", z ≥ 1: the dungeon under the span's site. The legacy stack (the test world's
+//   dungeon  "wx,wy,z", z ≥ 1: the dungeon under the span's site; z ≤ −1, its floors up (the Square's two, dungeon.up). The legacy stack (the test world's
 //            temple, DECISIONS.md) is world/legacy.js legacyZone; any other site's level z is
 //            generateDungeonLevel(zoneSeed(run, wx, wy, z), dungeonParams(run, site, z)).
 //
@@ -39,11 +39,12 @@ function dungeonZone(game, { wx, wy, z }) {
   const run = game.run;
   if (!run) return null;
   const site = siteWithDungeon(run, wx, wy);
-  if (!site || z < 1 || z > site.dungeon.levels) return null;
+  if (!site || z === 0 || z > site.dungeon.levels || -z > (site.dungeon.up?.length || 0)) return null;
   if (site.dungeon.legacy) return legacyZone(game, { wx, wy, z }, site);
   const zone = generateDungeonLevel(zoneSeed(run, wx, wy, z), dungeonParams(run, site, z));
   zone.siteId = site.id;
   zone.landmarkId = site.landmarkId || null;
+  if (z < 0) zone.hasAbove = !!zone.upStairs;   // a floor up: its stair up leads to z − 1 (B2, C1b #8)
   return zone;
 }
 

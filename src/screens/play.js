@@ -84,10 +84,17 @@ export function checkFloorEvents(game) {
   }
   if (!p.onGround) return false;
   const under = zone.get(Math.floor(p.x), Math.floor(p.y), Math.round(p.z) - 1);
-  const below = under === B.STAIRS ? zoneBelow(game, zone) : null, above = under === B.STAIRS_UP ? zoneAbove(game, zone) : null;
+  const below = under === B.STAIRS ? zoneBelow(game, zone) : null, above = under === B.STAIRS_UP ? upFrom(game, zone) : null;
   if (below) { changeFloor(game, below, "down", "You descend the stairs..."); return true; }
   if (above) { changeFloor(game, above, "up", "You climb the stairs back up..."); return true; }
   return false;
+}
+
+// The zone a stair up leads to: the level above (zoneAbove), or, from a zone with floors over it (zone.hasAbove: the
+// Square's surface and its first floor up), the floor up at z − 1 (B2, C1b #8). The way back is the floor's stairs
+// down (zoneBelow: z + 1).
+export function upFrom(game, zone) {
+  return zoneAbove(game, zone) || (zone.hasAbove ? { wx: zone.wx, wy: zone.wy, z: zone.z - 1, key: `${zone.wx},${zone.wy},${zone.z - 1}` } : null);
 }
 
 export function fallThrough(game) {

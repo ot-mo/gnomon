@@ -428,7 +428,7 @@ export function buildVault(v, rng) {
 //   p.final + p.bottom   the bottom's hall (bottomHall): a guardian's, a boss's, a legend's lair, the reliquary
 //   otherwise            a pick from p.vaultPool (ids, or [id, weight]; default every puzzle vault),
 //                        keeping vaults whose `levels` range holds p.level, and on a last level only vaults
-//                        without chasms (`holes`: there's nowhere to fall to). Equal weights draw exactly as
+//                        without chasms (`holes`: there's nowhere to fall to; nor on a floor up, p.noHoles). Equal weights draw exactly as
 //                        rng.pick does, so the legacy stack's random vaults don't move (its last level is a hall).
 export function pickVault(rng, p = {}) {
   let v = p.forcedVault ? vaultById(p.forcedVault) : null;
@@ -437,7 +437,7 @@ export function pickVault(rng, p = {}) {
     const level = p.level ?? 1;
     const pool = (p.vaultPool || VAULTS.map((o) => o.id))
       .map((e) => (Array.isArray(e) ? { v: vaultById(e[0]), w: e[1] } : { v: vaultById(e), w: 1 }))
-      .filter(({ v: o }) => o && (!o.levels || (level >= o.levels[0] && level <= o.levels[1])) && !(p.final && o.holes));
+      .filter(({ v: o }) => o && (!o.levels || (level >= o.levels[0] && level <= o.levels[1])) && !((p.final || p.noHoles) && o.holes));
     if (!pool.length) throw new Error(`no vault fits level ${level}`);
     if (pool.every((e) => e.w === pool[0].w)) v = pool[Math.floor(rng() * pool.length)].v;
     else {
@@ -521,6 +521,8 @@ registerLegend("guardian", (c) => {
   addCreature(c.zone, spawnCreature(c.vault.guardian, c.x, c.y, c.z0, { rng: c.cosmetic, state: "idle", level: c.zone.level }));
 });
 registerLegend("stairs", (c) => { floorCol(c); at(c, -1, B.STAIRS); c.zone.stairs = { x: c.x, y: c.y }; });
+// Stairs up (a plan maps its own letter to it: the Square's gatehall, under its floors up; B2, C1b #8).
+registerLegend("stairsUp", (c) => { floorCol(c); at(c, -1, B.STAIRS_UP); c.zone.upStairs = { x: c.x, y: c.y }; });
 registerLegend("entrance", (c) => {
   wallCol(c);
   at(c, -1, c.vault.floorBlock); at(c, 0, B.AIR); at(c, 1, B.AIR);

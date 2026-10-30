@@ -28,7 +28,8 @@
 //    make them), the same twice (section 3), every open seam on the world function wherever the plan leaves the ground
 //    as it was, every person's place a key point (reachable on the map) but the Tall Table's top, which a 3D walk
 //    reaches; its dungeon's floors at the bible's levels with their names, gimmicks (each landmark's the union of its
-//    §15.3 keys' in GIMMICK_KEYS), cradles and bottom; its holy place a faction; and what its own plan promises (below,
+//    §15.3 keys' in GIMMICK_KEYS), cradles and bottom, and its floors up (the Square's two, levels 22 and 23: z = −1 and −2,
+//    reached by the surface's stair up; B2, C1b #8); its holy place a faction; and what its own plan promises (below,
 //    PROMISES). The 3D walk (reach3d): steps up of one block, drops, and jumps across up to 2 open tiles walking or 4
 //    sprinting at the same height or lower, orthogonally; ghost planks underfoot or not.
 import { buildRun } from "../../src/world/run.js";
@@ -53,6 +54,9 @@ import { TOP as TABLE_TOP } from "../../src/content/world/plans/tallTable.js";
 import { RINGS, FOLDMOTHER_LAYOUT } from "../../src/content/world/plans/foldmother.js";
 import { PRESSYARD_HOUSES } from "../../src/content/world/plans/pressyard.js";
 import { TOLL_GATE } from "../../src/content/world/plans/molar.js";
+import { upFrom } from "../../src/screens/play.js";   // B2
+import { ZONE_GENERATORS } from "../../src/zones.js";
+import "../../src/world/zonegen.js";
 
 const pct = (sorted, q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))];
 const holesOf = (z) => {
@@ -437,7 +441,7 @@ function ward({ z, pa, plan, cell }) {
 
 function checkC1b(seeds, expect) {
   const ids = LANDMARK_INDEX.map((l) => l.id).filter((id) => id !== "hollowmere");
-  const tally = { zones: 0, seams: 0, seamTiles: 0, keys: 0, floors: 0, promises: 0, climbs: 0 };
+  const tally = { zones: 0, seams: 0, seamTiles: 0, keys: 0, floors: 0, promises: 0, climbs: 0, up: 0 };
   for (const seed of seeds) {
     const runs = { real: buildRun(seed, REAL_WORLD) }, cache = new Map();
     const surface = (run, wx, wy) => { const k = `${run === runs.real ? "r" : "w"}${wx},${wy}`; if (!cache.has(k)) cache.set(k, generateSurface(run, wx, wy)); return cache.get(k); };
@@ -505,6 +509,26 @@ function checkC1b(seeds, expect) {
           expect(p.bottom?.kind === want.bottom.kind && (want.bottom.kind !== "guardian" || f.creatures.some((c) => c.guardian === want.bottom.id)), `${at}: its bottom ${JSON.stringify(p.bottom)}`);
         }
       }
+      // Its floors up (the Square's: bible §5 M, levels 22 and 23; B2, C1b #8): the surface's stair up a key point with the
+      // zone above it; each floor at its level with its name, valid, its stair up leading on (the top one has none) and its
+      // stairs down back; the zone generator makes exactly those floors.
+      if (want.up) {
+        const up = REAL_WORLD.landmarks.find((l) => l.dungeon?.id === want.id).dungeon.planned?.up || [];
+        expect(z.upStairs && z.get(z.upStairs.x, z.upStairs.y, FLOOR_Z - 1) === B.STAIRS_UP && z.hasAbove && z.gen.keyPoints.some((k) => k.x === z.upStairs.x && k.y === z.upStairs.y),
+          `${at}: its stair up (${JSON.stringify(z.upStairs)}, hasAbove ${z.hasAbove}) isn't a reachable STAIRS_UP`);
+        expect(JSON.stringify(upFrom({}, z)) === JSON.stringify({ wx: L.wx, wy: L.wy, z: -1, key: `${L.wx},${L.wy},-1` }), `${at}: its stair up leads to ${JSON.stringify(upFrom({}, z))}`);
+        for (let k = 1; k <= want.up.length; k++) {
+          const lz = -k, p = dungeonParams(t.run, site, lz), f = ZONE_GENERATORS.dungeon({ run: t.run }, { wx: L.wx, wy: L.wy, z: lz, key: `${L.wx},${L.wy},${lz}` });
+          tally.floors++; tally.up++;
+          expect(p.level === want.up[k - 1] && p.name === up[k - 1] && f && f.level === p.level, `${at} floor ${k} up: level ${p.level} (${want.up[k - 1]}), name "${p.name}"`);
+          if (!f) continue;
+          for (const pr of validateDungeonLevel(f, p)) expect(false, `${at} floor ${k} up: ${pr}`);
+          const top = k === want.up.length, next = upFrom({}, f);
+          expect(f.stairs && f.hasBelow && (top ? !f.upStairs && !next : f.upStairs && next?.z === lz - 1), `${at} floor ${k} up: stairs down ${!!f.stairs}, up ${!!f.upStairs} → ${JSON.stringify(next)}`);
+          expect(!f.blocks.some((b, i) => i < f.w * f.d && !b), `${at} floor ${k} up: a hole (a fall would land out of line on the surface)`);
+        }
+        expect(!ZONE_GENERATORS.dungeon({ run: t.run }, { wx: L.wx, wy: L.wy, z: -want.up.length - 1, key: "x" }), `${at}: a floor up above the last`);
+      } else expect(!z.hasAbove && !upFrom({}, z), `${at}: a stair up with no floors up`);
       const cast = new Set(want.cast || []);   // (gimmicks that place its inhabitants, beyond its keys: Kettle Mesa's first flatlings)
       expect([...union].every((g) => used.has(g)) && [...used].every((g) => union.has(g) || cast.has(g)), `${at}: its floors play ${[...used]}, its keys (${keys}) map onto ${[...union]}${cast.size ? `, its cast ${[...cast]}` : ""}`);
     }
@@ -515,7 +539,7 @@ function checkC1b(seeds, expect) {
   for (const [where, f] of holy) expect(FACTIONS[f], `${where}: holy to ${f}, which is no faction`);
   return {
     c1b: `${ids.length} landmarks and Halfnight's 2 other wards on ${seeds.length} seeds: ${tally.zones} zones on their plans; ${tally.seams} seams (${tally.seamTiles} tiles) on the world function; ` +
-      `${tally.keys} people's places reachable; ${tally.promises} promises held, ${tally.climbs} climbs walked in 3D; ${tally.floors} dungeon floors at the bible's levels with their names, gimmicks and cradles`,
+      `${tally.keys} people's places reachable; ${tally.promises} promises held, ${tally.climbs} climbs walked in 3D; ${tally.floors} dungeon floors at the bible's levels with their names, gimmicks and cradles (${tally.up} of them floors up)`,
     holy: holy.map(([w, f]) => `${w}: ${f}`).join(", "),
   };
 }

@@ -380,6 +380,8 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
     else stubSite(sctx, site);
   }
   if (zone.stairs) { zone.entrance = { ...zone.stairs }; if (!entranceGated) keyPoints.push({ ...zone.stairs }); }
+  // A landmark with floors up (the Square's: dungeon.up) has a stair up in its plan: the zone above is z = −1 (B2, C1b #8).
+  if (zone.upStairs && site?.dungeon?.up?.length) zone.hasAbove = true;
   // Plan walls and roofs are scenery: nobody walks on them, and the map draws them as walls
   // (zone.planWalls: also a wall lower than a dungeon room's, which computeKinds alone would call floor), as it
   // draws the dressing's posts, outcrops and spires (ctx.walls).

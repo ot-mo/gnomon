@@ -16,9 +16,10 @@
 //
 // Site = { id, kind, at: { wx, wy }, name, tier, landmarkId?, checkpoint?, historyRef?, legend?, toppled?,
 //          surface: { builder, rect: { x, y, w, d } | null, params }, dungeon?: DungeonSpec }
-// DungeonSpec = { levels, theme, baseLevel, levelStep, gimmicks, floorGimmicks?, floorLevels?, up?, legacy?,
+// DungeonSpec = { levels, theme, baseLevel, levelStep, gimmicks, floorGimmicks?, floorLevels?, up?, namedUp?, legacy?,
 //                 optional?, named?, vaultPool?, cradle?: [z], murals?: [{ text, map }],
 //                 bottom: { kind: "guardian" | "legend" | "relic" | "boss" | "none", id, uid?, hall?, trueMarks? } }
+//   up: the levels of its floors up (z = −1, −2…; the Square's), namedUp their names.
 //   Floor z's level is floorLevels[z − 1] when the floors are listed (the landmarks, bible §15.3), else
 //   round(baseLevel + z × levelStep); baseLevel is the surface level, so a generic site's floor k is the
 //   surface level + k (DECISIONS.md). The legacy stack has baseLevel 0: its levels are the parent's depths.
@@ -97,7 +98,7 @@ function landmarkDungeon(L) {
   };
   if (d.id) spec.id = d.id;
   if (d.floors) spec.floorLevels = [...d.floors];
-  if (d.up) spec.up = [...d.up];
+  if (d.up) { spec.up = [...d.up]; if (d.planned?.up) spec.namedUp = [...d.planned.up]; }   // floors up: z = −1, −2… (B2, C1b #8)
   if (d.legacy) spec.legacy = true;
   if (d.optional) spec.optional = true;
   if (d.named) spec.named = [...d.named];
@@ -161,6 +162,7 @@ export function sinkholeSpots(run, site) {
 // last level its bottom: a guardian's hall, a boss's throne, a legend's lair, an Hour site's reliquary ("none":
 // an ordinary level).
 export function dungeonParams(run, site, z) {
+  if (z < 0) return upParams(run, site, z);
   const spec = site.dungeon, level = dungeonLevelOf(spec, z), final = z >= spec.levels;
   const tile = run.world.tileAt(site.at.wx, site.at.wy);
   let bottom = null;
@@ -181,6 +183,23 @@ export function dungeonParams(run, site, z) {
     cradle: !!spec.cradle?.includes(z), murals: spec.murals ? spec.murals.map((m) => ({ ...m })) : null,
     name: spec.named?.[z - 1] || `${site.name}, level ${z}`,
     landings: z === 1 ? sinkholeSpots(run, site).map(([x, y]) => [x, y]) : null,
+  };
+}
+
+// A floor up (z = −1, −2…; the Square's Rule Floor and Hierarch's Floor, levels 22 and 23: bible §5 M, §15.3; B2, C1b
+// #8): its level from spec.up, its name from spec.namedUp. The stair up from the surface (gen/surface.js: zone.hasAbove)
+// comes out by its stairs down, which lead back to z + 1; the top one has no stairs up. No holes and no vault with chasms
+// (a fall from the first floor up would land on the surface out of line with it), and no sinkholes over it.
+function upParams(run, site, z) {
+  const spec = site.dungeon, k = -z, level = spec.up[k - 1], top = k >= spec.up.length;
+  const tile = run.world.tileAt(site.at.wx, site.at.wy);
+  return {
+    key: `${site.at.wx},${site.at.wy},${z}`, wx: site.at.wx, wy: site.at.wy, z, level, tier: tierOfLevel(level),
+    index: z, count: spec.up.length, final: false, up: true, theme: spec.theme || "legacy", hasUp: !top, forcedVault: null,
+    vaultPool: (vaultPoolFor(spec, level) || null), noHoles: true, gimmicks: [...(spec.gimmicks || [])], bottom: null, encounters: [],
+    creatureTable: ownTable(spec, z, level) || run.world.regions?.[tile?.region]?.creatures || null, holesIn: { x0: 0, y0: 0, x1: -1, y1: -1 },
+    cradle: false, murals: spec.murals ? spec.murals.map((m) => ({ ...m })) : null,
+    name: spec.namedUp?.[k - 1] || `${site.name}, floor ${k} up`, landings: null,
   };
 }
 
