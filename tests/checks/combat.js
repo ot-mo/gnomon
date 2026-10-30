@@ -36,7 +36,10 @@
 //                        Shift), AI ability use, the outdoor activity radius, the d20 log format
 //   checkArena(ctx)      two factions, 100 runs: every run ends, the same seeds give the same runs, a mirror
 //                        match is even, the stronger side wins
-//   ttkTables(ctx)       time to kill by level band (d20 with the attribute set), with sanity bounds
+//   ttkTables(ctx)       time to kill by level band (d20 with the attribute set), with sanity bounds; and (C3) the same
+//                        fighter against the real world's creatures of each band (realBand: its regions' rows, by how
+//                        many of its spans each region has at that tier; the kinds out for a Bent stranger), the
+//                        balance reference for the real world's levels, held to the same bounds
 //   ctx = { game, startRun, inputHandlers, keys, seedRandom, restoreRandom }
 //
 // game/startRun: the real game (game.js). srcFiles: [{ file, text }] of every src/ module.
@@ -69,6 +72,9 @@ import { requestTarget, cursorTarget, lineOfFire, targetText } from "../../src/s
 import { mapView } from "../../src/renderMap.js";
 import { MISSILES } from "../../src/content/items/missiles.js";
 import { EYE, attackTime } from "../../src/player.js";
+import { compileWorld } from "../../src/world/worldmodel.js";
+import { REAL_WORLD } from "../../src/content/world/worldmap.js";
+import { attitude } from "../../src/factions.js";
 
 const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/.*$/gm, "$1");
 
@@ -1558,6 +1564,29 @@ export function checkArena(ctx, { runs = 100 } = {}) {
 const POWER_ORDER = ["quick", "keenEye", "mighty", "quick", "keenEye", "mighty", "ironSkin", "ironSkin", "tough", "tough", "tough", "executioner", "regen", "regen", "longReach"];
 const BANDS = [1, 2, 3, 4, 5, 6, 7, 8].map((tier) => ({ tier, level: 3 * tier - 1 }));
 const GEAR = { 1: ["mace", "leather"], 2: ["longsword", "chain"], 3: ["waraxe", "scale"], 4: ["greatsword", "plate"] };
+// The real world's creatures of a tier band (C3): each region's rows (content/world/regions.js) at the band's level,
+// weighted by its spans of that tier (so a creature's share is the chance that what you meet on a span of the tier is
+// it), registered kinds only, people left out, and only those out for a Bent stranger (the docile and the neutral fight
+// nobody who leaves them be). → { [type]: share of 2000 }, the shape of the sampled counts.
+export function realBand(game, tier, level) {
+  const W = compileWorld(REAL_WORLD), counts = {}, spans = {};
+  for (const t of W.tiles) if (t.tier === tier) spans[t.region] = (spans[t.region] || 0) + 1;
+  const total = Object.values(spans).reduce((a, n) => a + n, 0);
+  for (const [region, n] of Object.entries(spans)) {
+    const rows = (REAL_WORLD.regions[region]?.creatures || []).filter(([type, w, lo, hi]) => {
+      const T = CREATURE_TYPES[type];
+      if (!T || T.talks || !(w > 0) || level < lo || level > hi) return false;
+      return attitude(game, spawnCreature(type, 1, 1, FLOOR_Z, { rng: () => 0.5, level }), game.player) === "hostile";
+    });
+    const sum = rows.reduce((a, r) => a + r[1], 0);
+    for (const [type, w] of rows) counts[type] = (counts[type] || 0) + 2000 * (n / total) * (w / sum);
+  }
+  // Back to 2000 in all: a region of the tier with no kind out for a stranger at the level shares nothing out, and
+  // its spans' share goes to the others (not to nobody, which would pull the band's averages down).
+  const all = Object.values(counts).reduce((a, n) => a + n, 0);
+  if (all > 0) for (const type of Object.keys(counts)) counts[type] *= 2000 / all;
+  return counts;
+}
 export function ttkTables(ctx, { blows = 1500 } = {}) {
   const { game, seedRandom, restoreRandom } = ctx;
   const problems = [], stats = {};
@@ -1569,7 +1598,7 @@ export function ttkTables(ctx, { blows = 1500 } = {}) {
   Object.assign(p, { x: 4.5, y: 5.5, z: FLOOR_Z });
   const saved = { attrs: { ...p.attrs }, level: p.level, body: p.body, perks: p.perks, perkRank: p.perkRank, maxHpGain: p.maxHpGain, mutations: p.mutations };
   const table = {};
-  const sets = [["d20", "attributes"], ["legacy", "legacy"], ["d20", "attributes", "powers"], ["d20", "attributes", "mutations"]];
+  const sets = [["d20", "attributes"], ["legacy", "legacy"], ["d20", "attributes", "powers"], ["d20", "attributes", "mutations"], ["d20", "attributes", "real"]];
   seedRandom?.(97);   // (the legacy set draws Math.random)
   try {
     for (const [combat, statsSet, build] of sets) {
@@ -1579,7 +1608,7 @@ export function ttkTables(ctx, { blows = 1500 } = {}) {
         const k = Math.floor(level / 4);
         p.level = level; p.perks = {}; p.perkRank = {}; p.maxHpGain = 0; p.mutations = {};
         p.attrs = { ...saved.attrs, str: 18 + Math.ceil(k / 2), agi: 17 + Math.floor(k / 2), tou: 16 };
-        if (build) {
+        if (build && build !== "real") {
           for (const id of POWER_ORDER.slice(0, level - 1 - Math.floor(level / 5))) { p.perks[id] = true; p.perkRank[id] = (p.perkRank[id] || 0) + 1; }
           p.attrs.str += 2 * (p.perkRank.mighty || 0);
           p.maxHpGain = 8 * (p.perkRank.tough || 0);
@@ -1592,8 +1621,10 @@ export function ttkTables(ctx, { blows = 1500 } = {}) {
         invalidateStats(p);
         const hpMax = maxHp(p), swing = attackTime(p);
         // Which creatures this level brings, and how often.
-        const pick = makeRng(level * 31 + 7), counts = {};
-        for (let n = 0; n < 2000; n++) { const id = pickCreatureType(pick, level); counts[id] = (counts[id] || 0) + 1; }
+        const pick = makeRng(level * 31 + 7);
+        let counts = {};
+        if (build === "real") counts = realBand(game, tier, level);
+        else for (let n = 0; n < 2000; n++) { const id = pickCreatureType(pick, level); counts[id] = (counts[id] || 0) + 1; }
         game.combatRng = makeRng(level * 97 + (combat === "d20" ? 1 : 2));
         const per = [];
         for (const [type, n] of Object.entries(counts)) {
@@ -1638,6 +1669,14 @@ export function ttkTables(ctx, { blows = 1500 } = {}) {
       expect(r.itKills >= 1.5 * r.youKill && r.costPct <= 75, `d20 tier ${r.tier}: it kills you in ${r.itKills} s, you it in ${r.youKill} s, a kill costs ${r.costPct}% (want it 1.5× slower and at most 75%)`);
       if (r.tier <= 4) expect(r.costPct <= 1.5 * L.costPct + 3 && r.youKill <= 1.5 * L.youKill + 0.5, `d20 tier ${r.tier}: a kill costs ${r.costPct}% in ${r.youKill} s against the legacy set's ${L.costPct}% in ${L.youKill} s (want within 1.5×)`);
     });
+    // The real world's creatures (C3): the same bounds as the parent's tables under d20, band by band.
+    table.real.forEach((r, k) => {
+      const L = table.legacy[k];
+      expect(r.types >= 3, `real tier ${r.tier} (level ${r.level}): ${r.types} kinds out for you, want 3 or more`);
+      expect(r.youKill >= 0.5 && r.youKill <= 12, `real tier ${r.tier} (level ${r.level}): you kill a creature of your level in ${r.youKill} s on average (want 0.5-12)`);
+      expect(r.itKills >= 1.5 * r.youKill && r.costPct <= 75, `real tier ${r.tier}: it kills you in ${r.itKills} s, you it in ${r.youKill} s, a kill costs ${r.costPct}% (want it 1.5× slower and at most 75%)`);
+      if (r.tier <= 4) expect(r.costPct <= 1.5 * L.costPct + 3 && r.youKill <= 1.5 * L.youKill + 0.5, `real tier ${r.tier}: a kill costs ${r.costPct}% in ${r.youKill} s against the legacy set's ${L.costPct}% in ${L.youKill} s (want within 1.5×)`);
+    });
     // The builds only help: never slower to kill, never dearer (within the rolls' noise).
     for (const b of ["powers", "mutations"]) table[b].forEach((r, k) => {
       const base = table.d20[k];
@@ -1648,6 +1687,7 @@ export function ttkTables(ctx, { blows = 1500 } = {}) {
     stats.mutations = table.mutations.map(line);
     stats.d20 = table.d20.map((r) => `tier ${r.tier} L${r.level} (${r.weapon}, HP ${r.hp}, DV ${r.dv}, AV ${r.av}): you kill in ${r.youKill} s, it kills you in ${r.itKills} s, a kill costs ${r.costPct}% (worst ${r.worst}; ${r.types} kinds)`);
     stats.legacy = table.legacy.map((r) => `tier ${r.tier} L${r.level}: you kill in ${r.youKill} s, it kills you in ${r.itKills} s, a kill costs ${r.costPct}%`);
+    stats.real = table.real.map((r) => `tier ${r.tier} L${r.level} (${r.weapon}, HP ${r.hp}, DV ${r.dv}, AV ${r.av}): you kill in ${r.youKill} s, it kills you in ${r.itKills} s, a kill costs ${r.costPct}% (worst ${r.worst}; ${r.types} kinds)`);
     stats.table = table;
   } finally {
     Object.assign(p, saved);
