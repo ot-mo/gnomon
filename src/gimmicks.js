@@ -124,10 +124,10 @@ function unpress(game, zone) {
 // --- Foldmother's fold ----------------------------------------------------------------------------------------------
 export const FOLD = { dawn: 6, dusk: 18 };
 export const foldOpenAt = (hour) => hour >= FOLD.dawn && hour < FOLD.dusk;
-export function setFold(game, zone, open) {
+export function setFold(game, zone, open, { arriving = false } = {}) {
   const F = zone?.fold;
   if (!F || F.open === open) return;
-  const p = game?.zone === zone ? game.player : null;
+  const p = game?.zone === zone && !arriving ? game.player : null;   // (arriving: you aren't placed yet, so you're on no branch)
   const out = p && F.planks.some(([x, y, z]) => x === Math.floor(p.x) && y === Math.floor(p.y) && Math.abs(p.z - (z + 1)) < 0.6);
   for (const [x, y, z] of F.planks) zone.set(x, y, z, open ? B.PLANK : B.AIR);
   F.open = open;
@@ -138,9 +138,9 @@ export function setFold(game, zone, open) {
       "Dusk. She closes like a hand, and you are folded in with the branch, down through her roots, and set down unhurt.");
   }
 }
-const followFold = (game, zone) => { if (zone?.fold) setFold(game, zone, foldOpenAt(hourOf(game))); };
+const followFold = (game, zone, arriving = false) => { if (zone?.fold) setFold(game, zone, foldOpenAt(hourOf(game)), { arriving }); };
 
-on("zone:prepare", (game, { zone }) => { followTide(game, zone); followFold(game, zone); });
+on("zone:prepare", (game, { zone }) => { followTide(game, zone); followFold(game, zone, true); });
 on("clock:hour", (game) => { followTide(game, game.zone); followFold(game, game.zone); });
 
 // --- The map: where the hand will be next, and your track in the dark ----------------------------------------------------

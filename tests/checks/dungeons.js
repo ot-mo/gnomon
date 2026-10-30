@@ -890,7 +890,13 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
     game.time += 2; catchUp(game);
     const dropped = game.zone.key === `${fz.wx},${fz.wy},1` && P.hp === hp, night = planks();
     game.debug.enterZone(fz.key); game.clockSeen = game.time; game.time += 12 * 60; catchUp(game);
-    G2.fold = { planks: F.planks.length, day, night, dropped, dawn: planks() };
+    const dawn = planks();
+    // Arriving at night from a spot that happens to lie over a branch: you arrive on Foldmother's span, not dropped below.
+    game.time = (12 - 6) * 60 + 24 * 60 * 4; game.debug.enterZone(fz.key); const keep = planks();
+    game.debug.enterZone(`${fz.wx},${fz.wy},1`); Object.assign(P, { x: pk[0] + 0.5, y: pk[1] + 0.5, z: pk[2] + 1 });
+    game.time = (21 - 6) * 60 + 24 * 60 * 4; game.debug.enterZone(fz.key, "up");
+    const arrived = game.zone.key === fz.key;
+    G2.fold = { planks: F.planks.length, day, night, dropped, dawn, keep, arrived };
   }
   }
   stats.gimmicks2 = G2;
@@ -898,7 +904,7 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
     && G2.pressPlate?.flat && G2.pressPlate.unhurt && !G2.pressPlate.plates1
     && G2.trueLevel.vault === "The True Level" && G2.trueLevel.plates === 4 && G2.trueLevel.plateMurals === 4 && G2.trueLevel.sill && G2.trueLevel.shut0 && G2.trueLevel.wrongShut && G2.trueLevel.gas && G2.trueLevel.dead && G2.trueLevel.open
     && G2.tide.noon && G2.tide.at16 && G2.tide.levels === "01234440" && G2.tide.byClock && G2.sweep.cells > 20 && G2.sweep.moved && G2.sweep.flat && !G2.sweep.bossFlat && G2.sweep.plainFlat
-    && G2.darkMapping.trail === 3 && G2.darkMapping.other && G2.fold.day === G2.fold.planks && G2.fold.planks > 100 && G2.fold.night === 0 && G2.fold.dropped && G2.fold.dawn === G2.fold.planks && G2.layouts.day === "day" && G2.layouts.night === "night" && G2.layouts.differ && G2.layouts.nightThings > 0 && G2.layouts.againThings === 0 && G2.layouts.load === "day",
+    && G2.darkMapping.trail === 3 && G2.darkMapping.other && G2.fold.day === G2.fold.planks && G2.fold.planks > 100 && G2.fold.night === 0 && G2.fold.dropped && G2.fold.dawn === G2.fold.planks && G2.fold.arrived && G2.layouts.day === "day" && G2.layouts.night === "night" && G2.layouts.differ && G2.layouts.nightThings > 0 && G2.layouts.againThings === 0 && G2.layouts.load === "day",
     `in a game: the gimmicks ${JSON.stringify(G2)}`);
   return { name: "landmark bottoms", ok: problems.length === 0, problems, stats };
 }
