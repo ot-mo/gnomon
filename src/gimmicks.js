@@ -106,7 +106,7 @@ function unpress(game, zone) {
   pr.done = true;
   for (const m of zone.creatures)
     if (m.pressed && m.x >= pr.x0 && m.x < pr.x1 + 1 && m.y >= pr.y0 && m.y < pr.y1 + 1) { m.vis = { ...(m.vis || {}), flat: false }; m.pressed = false; m.state = "chase"; }
-  game.log("You turn on the gold tile, and the room unpresses: what was drawn on the floor stands up into the world.", [255, 220, 140]);
+  game.log("You turn on the bright centre tile, and the room unpresses: what was drawn on the floor stands up into the world.", [255, 220, 140]);
 }
 
 // --- Foldmother's fold ----------------------------------------------------------------------------------------------
@@ -133,7 +133,7 @@ on("clock:hour", (game) => { followTide(game, game.zone); followFold(game, game.
 
 // --- The map: where the hand will be next, and your track in the dark ----------------------------------------------------
 export const SWEEP_AHEAD = 4;   // seconds: the hand's shadow this far ahead, drawn dim over the floor
-// (renderMap.js registers it as the map overlay "landmarkGimmicks", and so loads this module.)
+// (renderMap.js draws it first in its "items" overlay, and so loads this module: P0's check-hud holds the overlays' list.)
 export function drawGimmicks(game, { zone, onScreen, toScreen }) {
   if (zone.darkMapping) for (const i of zone.trail || []) {
     const x = i % zone.w, y = Math.floor(i / zone.w);
