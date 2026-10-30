@@ -31,6 +31,7 @@ import { B, FLOOR_Z } from "../world.js";
 import { tierOfLevel, levelOfTier } from "../world/worldmodel.js";
 import * as sites from "../world/sites.js";
 import { ENCOUNTERS } from "../content/encounters.js";
+import { pickRow } from "../content/creatures/levels.js";
 import { roll, spanKey, tileOf, OW } from "./state.js";
 import { reveal, pin, findSite } from "./discovery.js";
 
@@ -66,16 +67,19 @@ export function legendsFor(game, tile) {
   return out;
 }
 
-function bandOf(game, tile) {
+export function bandOf(game, tile) {   // (exported for checks)
   const B_ = E().band, R = E().regions[tile.region] || {}, level = tile.level ?? levelOfTier(tile.tier);
   const lo = Math.round(B_.size[0] + B_.perTier[0] * (tile.tier - 1)), hi = Math.round(B_.size[1] + B_.perTier[1] * (tile.tier - 1));
   const n = lo + Math.floor(roll(game) * (hi - lo + 1));
   const table = R.creatures?.filter((t) => CREATURE_TYPES[t]) || null;
   const rand = () => roll(game);
-  const lead = pickCreatureType(rand, level, table?.length ? table : null);
+  // A real-world region's own rows (C3's ENCOUNTERS.regions[r].rows: [type, weight, lo, hi]), one draw a member as before,
+  // else the parent's pick (integrator, C3 #3: the rows were never read, so every real-world band was goblins and rats).
+  const draw = () => (R.rows?.length && pickRow(rand, R.rows, level)) || pickCreatureType(rand, level, table?.length ? table : null);
+  const lead = draw();
   const types = [lead], elite = [rollElite(rand, level) || null];
   for (let k = 1; k < n; k++) {
-    types.push(roll(game) < B_.same ? lead : pickCreatureType(rand, level, table?.length ? table : null));
+    types.push(roll(game) < B_.same ? lead : draw());
     elite.push(rollElite(rand, level) || null);
   }
   return { kind: "band", types, elite, level };

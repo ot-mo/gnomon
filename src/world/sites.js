@@ -188,20 +188,29 @@ function legendName(rng) {
 }
 // The lair's owner: a species of its level, one template, 0-2 mutations, 1-3 opinions with their reasons.
 // Its level is the lair's bottom level + 3 (bible §12.13's base rule).
-export function makeLegend(rng, site, bottomLevel) {
-  const base = LEGENDS.base, level = bottomLevel + base.levels;
+// region: the lair's span's region. One with an entry in LEGENDS.regions (the real world's, C3) gives the species by
+// weight, a Herdmother's herd, and the factions its opinions are about, each feeling drawn first and its reason from
+// LEGENDS.reasons[faction][feeling] (integrator, C3 #4); elsewhere (the test world) the draws are as they were.
+export function makeLegend(rng, site, bottomLevel, region = null) {
+  const base = LEGENDS.base, level = bottomLevel + base.levels, R = region ? LEGENDS.regions?.[region] : null;
   const ids = Object.keys(LEGENDS.templates);
-  let template = rng.pick(ids), species = pickCreatureType(rng, level);
+  const byWeight = (rows) => { const live = rows.filter(([t]) => CREATURE_TYPES[t]); if (!live.length) return null;
+    let k = rng() * live.reduce((a, [, w]) => a + w, 0); for (const [t, w] of live) if ((k -= w) < 0) return t; return live[live.length - 1][0]; };
+  let template = rng.pick(ids), species = (R && byWeight(R.species || [])) || pickCreatureType(rng, level);
   const tpl = () => LEGENDS.templates[template];
   if (tpl().species) {
-    const fits = tpl().species.filter((s) => CREATURE_TYPES[s]);
+    const fits = (R ? R.herds || [] : tpl().species).filter((s) => CREATURE_TYPES[s]);
     if (fits.length) species = rng.pick(fits);
     else template = "plain";
   }
   const muts = Object.keys(LEGENDS.mutations);
   const mutations = rng.shuffle(muts.slice()).slice(0, rng.int(base.mutations[0], base.mutations[1]));
-  const factions = rng.shuffle(Object.keys(LEGENDS.factions).slice()).slice(0, rng.int(base.opinions[0], base.opinions[1]));
-  const opinions = factions.map((f) => ({ faction: f, feeling: rng.chance(0.5) ? "loves" : "hates", reason: rng.pick(LEGENDS.factions[f]) }));
+  const pool = R ? (R.factions || []).filter((f) => LEGENDS.reasons?.[f]) : Object.keys(LEGENDS.factions);
+  const factions = rng.shuffle(pool.slice()).slice(0, rng.int(base.opinions[0], base.opinions[1]));
+  const opinions = factions.map((f) => {
+    const feeling = rng.chance(0.5) ? "loves" : "hates";
+    return { faction: f, feeling, reason: rng.pick(R ? LEGENDS.reasons[f][feeling] : LEGENDS.factions[f]) };
+  });
   return { uid: `legend:${site.id}`, template, species, name: legendName(rng), epithet: rng.pick(tpl().epithets), level,
            mutations, opinions, hook: tpl().hook || null, hall: tpl().hall, siteId: site.id };
 }
@@ -355,7 +364,7 @@ function furnish(run, site) {
   if (site.kind === "lair" && d) {
     const k = DUNGEONS.kinds.lair;
     d.theme = k.theme;
-    site.legend = makeLegend(srng, site, dungeonLevelOf(d, d.levels));
+    site.legend = makeLegend(srng, site, dungeonLevelOf(d, d.levels), run.world.tileAt(site.at.wx, site.at.wy)?.region);
     d.bottom = { kind: "legend", id: site.legend.template, uid: site.legend.uid, hall: site.legend.hall };
     d.floorGimmicks = rollGimmicks(srng, k.gimmicks, d.levels);
   } else if (site.kind === "ruin" && d) {

@@ -52,7 +52,7 @@ import { ENCOUNTERS } from "../../src/content/encounters.js";
 import { enterWorldMap, worldStep, fastTravel, leaveWorldMap, travelPath, answer } from "../../src/overworld/travel.js";
 import { rest } from "../../src/overworld/rest.js";
 import { reveal, isKnown, pin, pinsAt, knownSites, discoveryXp, sight } from "../../src/overworld/discovery.js";
-import { encounterChance, rollEncounter, placeEncounter, legendsFor, hiddenSiteRoll } from "../../src/overworld/encounters.js";
+import { encounterChance, rollEncounter, placeEncounter, legendsFor, hiddenSiteRoll, bandOf } from "../../src/overworld/encounters.js";
 import { atlas, canStep, edgeBetween, spanKey, OW } from "../../src/overworld/state.js";
 import { isLost, lostChance } from "../../src/overworld/lost.js";
 import { worldView, spanLines } from "../../src/overworld/renderWorld.js";
@@ -504,6 +504,20 @@ function encounterTables(G, problems) {
       if (o.some((x) => re.test(x))) caught++; else problems.push(`encounter tables: the mutant "${what}" isn't caught`);
     }
     if (tableProblems(game).out.length !== out.length) problems.push("encounter tables: the rows aren't as they were after the mutants");
+    // A real-world band draws from its region's rows (integrator, C3 #3): 30 bands on a span of every region with rows,
+    // every member a kind of the rows at the span's level.
+    {
+      const g = fresh(G, 24, REAL_WORLD), W = g.run.world, off = [];
+      let bands = 0;
+      for (const [r, E] of Object.entries(ENCOUNTERS.regions)) {
+        const t = W.tiles.find((u) => u.region === r && u.encounterRate > 0 && rowsAt(E.rows || [], u.level).length);
+        if (!t) continue;
+        const ok = new Set(rowsAt(E.rows, t.level).map(([type]) => type));
+        for (let k = 0; k < 30; k++, bands++) for (const type of bandOf(g, t).types) if (!ok.has(type)) { off.push(`${r}: ${type}`); break; }
+      }
+      if (!bands || off.length) problems.push(`real-world bands not from their region's rows: ${off.slice(0, 4).join("; ") || "no band drawn"}`);
+      stats.bandsByRegion = `${bands} bands, every member from its region's rows`;
+    }
     Object.assign(stats, { regions, rows: Object.values(ENCOUNTERS.regions).reduce((a, r) => a + (r.rows?.length || 0), 0), downsAt8: got, mutants: `${caught} of ${mutants.length}` });
   } finally { p.genotype = saved.genotype; game.state.rep = saved.rep; }
   return stats;

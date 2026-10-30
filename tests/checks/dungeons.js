@@ -670,6 +670,26 @@ function legendDataProblems(game) {
     p.genotype = "bent"; game.state.rep = {};
     const run = () => legendData(game, L, C.CREATURE_TYPES, F.FACTIONS, F.attitude, C.spawnCreature);
     problems.push(...run());
+    // The real world's lairs draw by region (integrator, C3 #4): on 5 seeds, every lair's owner of its region's species
+    // (a Herdmother's of its herds), every opinion about one of its factions, with a reason for that feeling.
+    {
+      const off = [];
+      let lairs = 0;
+      for (const seed of [1, 7, 42, 1234, 31337]) {
+        const r = buildRun(seed, compileWorld(REAL_WORLD));
+        for (const s of r.sites.values()) {
+          if (!s.legend || s.kind !== "lair") continue;
+          const reg = r.world.tileAt(s.at.wx, s.at.wy).region, e = L.regions[reg], g = s.legend;
+          if (!e) continue;
+          lairs++;
+          const kinds = g.template === "herdmother" ? e.herds : e.species.map(([t]) => t);
+          if (!kinds.includes(g.species)) off.push(`${s.id} (${reg}): ${g.template} ${g.species}`);
+          for (const o of g.opinions) if (!e.factions.includes(o.faction) || !L.reasons[o.faction]?.[o.feeling]?.includes(o.reason)) off.push(`${s.id}: ${o.faction} ${o.feeling} "${o.reason}"`);
+        }
+      }
+      if (!lairs || off.length) problems.push(`real-world legends not by region: ${off.slice(0, 4).join("; ") || "no lair"}`);
+      stats.byRegion = `${lairs} real-world lairs on 5 seeds, each owner and opinion from its region`;
+    }
     const mutants = [
       ["a docile owner", () => { const s = L.regions.waste.species; s.push(["longback", 1]); return () => s.pop(); }, /waste's longback isn't out for a stranger/],
       ["a faction without reasons", () => { const old = L.reasons.drovers; delete L.reasons.drovers; return () => { L.reasons.drovers = old; }; }, /reasons for drovers|faction drovers unknown or without reasons/],
