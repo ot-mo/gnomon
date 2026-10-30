@@ -1068,6 +1068,13 @@ its §8.4 files and two P0 checks).
 
 ## Open items carried forward
 
+- **More powers offered, and check-combat's typical build** (the coordinating session, relaying the user, 2026-10-30): every
+  power that goes live widens the 3 offers a level, so ttkTables' typical build gets fewer of the stat powers it prefers and
+  its tier-8 cost a kill rises (B1's 8 class powers live: 43.4%; B3's 6 alone: 44.6%; the bound is 22-41%). **The user:
+  "Measure, then decide."** B1 counts the live powers' worth in the TTK model and measures with and without B3's six; any
+  rule change (4 offers a level, say) goes to the user first; no bound is widened and the draw isn't frozen. Meanwhile B3
+  builds its six powers with their `needs` kept, so they aren't offered; `docs/b3.md` asks the integrator to drop those
+  `needs` once the user has decided. For the merges of `p4b-b1` and `p4b-b3`: check-combat's bound must hold at each.
 - **Balance phase: the user's decisions** (2026-10-30, given to the coordinating session in chat, the user's choices
   verbatim from its options): **1. Fight cost: "Like the parent."** Creature scaling and gear are tuned so a typical
   build (powers as offered, normal gear, C4's included) loses about 25-38% of its health per same-level kill at tiers
