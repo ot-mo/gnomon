@@ -1223,10 +1223,11 @@ export function checkGear(m) {
     const tierOf = (level) => Math.min(8, Math.ceil((level + 1) / 3));
     let launchers = 0;
     const HEAVY = { greatsword: 4, maul: 4, glaive: 4, waraxe: 3, longsword: 3 };
-    // The armour that does something now (written out, not read from gear.js useful): armour, or a bonus the stat bus reads.
+    // The armour that does something now (written out, not read from gear.js useful): armour, a bonus the stat bus reads, or
+    // since B1 a special that is built (a worn reputation).
     const LOOT_ARMOUR = ["leather", "chain", "scale", "plate", "copperCap", "ironHelm", "goggles", "cloak", "bracers", "gauntlets", "boots",
       "helm", "plumbHelm", "lampCrownHat", "monocle", "glassScale", "pleatedCoat", "reedCloak", "featherCloak", "mapCase", "kiteGlider", "examiningKit",
-      "stiltSandals", "stiltBoots"];
+      "stiltSandals", "stiltBoots", "featheredHood", "assizeWrit"];   // (B1: the hood and the writ, their worn reputation built)
     const drawnArmour = new Set();
     const tally = {};
     for (let level = 1; level <= 30; level++) {

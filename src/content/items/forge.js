@@ -108,7 +108,8 @@ export const GEAR_WEAPONS = {
 //   veil     a hood or veil: Lightsick's sun doesn't reach you under it (bible §13.5; progression/mutations.js reads
 //            it once docs/c4.md's request is in)
 //   wornRep  reputation while worn (bible §3.5 "Wearables"): { faction: n }, or "hour" for an Hour mask (+hourRep with
-//            that Hour's favoured factions, −hourRep with its hated ones); the hook is docs/c4.md's request
+//            that Hour's favoured factions, −hourRep with its hated ones: the mask's `hour`, a ruler id); social/reputation.js
+//            syncWornRep applies it (B1)
 //   needs    the rest of the bible's line, for the code (docs/c4.md)
 // A piece that does nothing yet (only `needs`) stays out of the real world's loot until it does (items/gear.js useful).
 export const GEAR_ARMOURS = {
@@ -117,7 +118,7 @@ export const GEAR_ARMOURS = {
   plumbHelm:     { name: "plumb-helm", armour: 3, str: 13, tier: 6, metal: true, slot: "head" },
   lampCrownHat:  { name: "lamp crown", armour: 0, str: 0, tier: 4, metal: true, slot: "head", bonus: { torch: 1 / 3 }, info: "your torch reaches 2 tiles further" },
   featheredHood: { name: "feathered hood", armour: 0, str: 0, tier: 2, metal: false, slot: "head", veil: true, wornRep: { kites: 250 },
-                   needs: "Kites +250 while worn (the worn reputation hook)" },
+                   info: "the Kites +250 while you wear it" },
   // Face
   monocle:       { name: "examiner's monocle", armour: 0, str: 0, tier: 3, metal: true, slot: "face", bonus: { examine: 3 } },
   saltVeil:      { name: "salt veil", armour: 0, str: 0, tier: 2, metal: false, slot: "face", veil: true, glare: true,
@@ -125,7 +126,7 @@ export const GEAR_ARMOURS = {
   sporeVeil:     { name: "spore veil", armour: 0, str: 0, tier: 3, metal: false, slot: "face", veil: true, spores: true,
                    needs: "immune to spores (C3's spore creatures and clouds)" },
   hourMask:      { name: "Hour mask", armour: 0, str: 0, tier: 4, metal: false, slot: "face", wornRep: "hour", hourRep: 200,
-                   needs: "+200 with that Hour's favoured factions, -200 with its hated ones while worn (the worn reputation hook; an item's `hour`)" },
+                   info: "+200 with its Hour's favoured factions, -200 with its hated ones while you wear it" },
   // Body
   glassScale:    { name: "glass-scale", armour: 3, str: 14, tier: 5, metal: false, slot: "body", bonus: { ward: 1 }, info: "missiles do 1 less",
                    needs: "reflects 15% of missiles (missiles.js)" },
@@ -133,7 +134,7 @@ export const GEAR_ARMOURS = {
   // Back
   reedCloak:     { name: "reed cloak", armour: 0, str: 0, tier: 1, metal: false, slot: "back", bonus: { stealth: 0.1 } },
   featherCloak:  { name: "feather cloak", armour: 0, str: 0, tier: 3, metal: false, slot: "back", bonus: { stealth: 0.05 }, wornRep: { kites: 250 },
-                   needs: "Kites +250 while worn (the worn reputation hook)" },
+                   info: "the Kites +250 while you wear it" },
   // (navigation is taken off a chance: overworld/lost.js; a compass-ring is 0.05, bible §15.6's "-5 points")
   mapCase:       { name: "map case", armour: 0, str: 0, tier: 1, metal: false, slot: "back", bonus: { navigation: 0.03 }, info: "you get lost less on the world map" },
   kiteGlider:    { name: "kite-glider", armour: 0, str: 0, tier: 4, metal: false, slot: "back", bonus: { featherFall: 1 }, info: "falls never hurt you",
@@ -160,7 +161,7 @@ export const GEAR_ARMOURS = {
                    needs: "no slipping, no knockback (WS8's knockback, glim's slip)" },
   // Neck (a document pinned where an amulet hangs)
   assizeWrit:    { name: "Assize writ", armour: 0, str: 0, tier: 2, metal: false, slot: "neck", wornRep: { assize: 100, bentVillages: -100 },
-                   needs: "Assize +100, the Bent villages -100 while worn (the worn reputation hook)" },
+                   info: "the Assize +100 and the Bent villages -100 while you wear it" },
 };
 
 // What a piece is worth in glim before its material (bible §3.1; × MATERIALS[made].value for forged gear). The

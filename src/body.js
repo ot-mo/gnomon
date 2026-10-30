@@ -17,6 +17,8 @@
 //   carried(e) → item[]                      worn, the belt, then the pack: everything you have
 //   swapBelt(game, e) → { ok, time, reason } R: the weapon in hand and the one on the belt change places
 //   addPart(e, part), removePart(e, partId) → item[]   extra limbs from mutations (WS4); what it held comes off
+// Events: "gear" { e } after equip, unequip and removePart changed what e wears (B1: social/reputation.js
+// syncWornRep follows it for worn reputation). Not sent without a game (character creation).
 //
 // A two-handed weapon (WEAPONS[id].hands === 2) takes every holding part: the primary one holds it
 // and the others hold the primary's part id (a string), so no item sits in two places in a save.
@@ -29,6 +31,7 @@
 import { ITEM_KINDS } from "./items.js";
 import { attr, invalidateStats, clampHp } from "./stats.js";
 import { RULES } from "./rules.js";
+import { emit } from "./events.js";
 
 export const BODY_PLANS = {};
 export function registerBodyPlan(id, parts) {
@@ -153,6 +156,7 @@ export function equip(game, e, it, partId = defaultPart(e, it)) {
   for (const id of ids.slice(1)) e.body.equip[id] = ids[0];
   invalidateStats(e);   // STR, max HP and armour follow your gear (stats.js)
   clampHp(e);
+  if (game) emit(game, "gear", { e });
   return { ok: true, removed, time: RULES.body.equipTime };
 }
 function clearItem(e, it) {
@@ -169,6 +173,7 @@ export function unequip(game, e, partId) {
   clearItem(e, it);
   invalidateStats(e);
   clampHp(e);
+  if (game) emit(game, "gear", { e });
   return { ok: true, item: it };
 }
 

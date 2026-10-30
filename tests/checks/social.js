@@ -1597,5 +1597,74 @@ export async function run(env) {
     for (const k of ["kindling", "snuffer", "donations", "merchants"]) if (JSON.stringify(st[k]) !== JSON.stringify(game.state[k])) fail(`state.${k} isn't plain JSON`);
   }
 
+  // --- 18. Worn reputation (B1: C4 #2 with C2 #12; bible §3.5 "Wearables") -----------------------------------------------
+  // On and off through body.js equip/unequip and the pack's E (inventory.js): the feathered hood and the feather cloak
+  // Kites +250 each (they add up), the Assize writ Assize +100 and the Bent villages −100, an Hour mask ±200 with its
+  // Hour's favoured and hated factions; a clamp at +1000 taken back exactly; a kit's writ counted at the run's start.
+  {
+    const Bd = await m("body.js"), inv = await m("inventory.js"), GR = await m("content/items/gear.js"), CG = await m("progression/chargen.js");
+    fresh(1234);
+    const P = p(), r = (f) => F.repOf(game, f), it = (id) => GR.makeGear("armour", id);
+    const k0 = r("kites"), a0 = r("assize"), v0 = r("bentVillages");
+    const hood = it("featheredHood"), cloak = it("featherCloak"), writ = it("assizeWrit");
+    Bd.equip(game, P, hood, "head");
+    if (r("kites") - k0 !== 250) fail(`worn rep: the feathered hood on, Kites ${r("kites") - k0}, want +250`);
+    Bd.equip(game, P, cloak, Bd.defaultPart(P, cloak));
+    if (r("kites") - k0 !== 500) fail(`worn rep: hood and cloak on, Kites ${r("kites") - k0}, want +500`);
+    Bd.unequip(game, P, "head");
+    if (r("kites") - k0 !== 250) fail(`worn rep: the hood off, Kites ${r("kites") - k0}, want +250 (the cloak's)`);
+    Bd.unequip(game, P, Bd.defaultPart(P, cloak));
+    if (r("kites") !== k0 || Object.keys(game.state.wornRep || {}).length) fail(`worn rep: both off, Kites ${r("kites")} (was ${k0}), applied ${JSON.stringify(game.state.wornRep)}`);
+    // The pack's E (inventory.js equip and unequipPart), the writ on the neck.
+    P.inv.push(writ);
+    inv.equip(game, writ, P.inv.indexOf(writ));
+    const part = Object.keys(P.body.equip).find((id) => P.body.equip[id] === writ);
+    if (!part || r("assize") - a0 !== 100 || r("bentVillages") - v0 !== -100) fail(`worn rep: the writ by E (on ${part}): Assize ${r("assize") - a0}, Bent villages ${r("bentVillages") - v0}, want +100 and −100`);
+    if (part) inv.unequipPart(game, part);
+    if (r("assize") !== a0 || r("bentVillages") !== v0) fail(`worn rep: the writ off by E: Assize ${r("assize")} (was ${a0}), Bent villages ${r("bentVillages")} (was ${v0})`);
+    // A clamp: Kites at 900, the hood moves only 100, and taking it off takes back only that.
+    F.addRep(game, "kites", 900 - r("kites"));
+    Bd.equip(game, P, hood, "head");
+    const top = r("kites");
+    Bd.unequip(game, P, "head");
+    if (top !== F.REP_MAX || r("kites") !== 900) fail(`worn rep: from 900 the hood gave ${top}, off ${r("kites")} (want ${F.REP_MAX}, then 900)`);
+    // An Hour mask: its Hour's favoured +200, hated −200.
+    const H = game.run.history?.rulers?.find((h) => h.favoured?.length && h.hated?.length);
+    if (!H) fail("worn rep: the run's history has no Hour with favoured and hated factions");
+    else {
+      const mask = it("hourMask"); mask.hour = H.id;
+      const fav = H.favoured.filter((f) => F.FACTIONS[f]), hat = H.hated.filter((f) => F.FACTIONS[f] && !fav.includes(f));
+      const before = Object.fromEntries([...fav, ...hat].map((f) => [f, r(f)]));
+      Bd.equip(game, P, mask, Bd.defaultPart(P, mask));
+      const moved = Object.fromEntries([...fav, ...hat].map((f) => [f, r(f) - before[f]]));
+      if (fav.some((f) => moved[f] !== Math.min(200, F.REP_MAX - before[f])) || hat.some((f) => moved[f] !== Math.max(-200, F.REP_MIN - before[f])))
+        fail(`worn rep: ${H.name}'s mask moved ${JSON.stringify(moved)} (favoured ${fav.join(", ")}, hated ${hat.join(", ")})`);
+      Bd.unequip(game, P, Bd.defaultPart(P, mask));
+      if ([...fav, ...hat].some((f) => r(f) !== before[f])) fail("worn rep: the mask off didn't put its factions back");
+      stats.wornRepHour = `${H.name}'s mask: ${JSON.stringify(moved)}`;
+    }
+    // A kit's piece: the Aspirant of the Rule carries the writ in the pack (no rep until worn); a kit that wears one
+    // (the Aspirant's, with the writ on the neck for this test) counts from the run's start (chargen.js beginRun).
+    const BG = (await m("content/backgrounds.js")).BACKGROUNDS, bg = "aspirantOfTheRule", kit = BG[bg].kit;
+    const choices = { genotype: "plumb", background: bg, attrs: CG.suggestSpread("plumb", bg), name: "Test", mode: "oneWick" };
+    CG.beginRun(game, choices, { seed: 77 });
+    const packed = game.player.inv.find((x) => x.id === "assizeWrit"), a1 = r("assize");
+    if (!packed || Object.keys(game.state.wornRep || {}).length) fail(`worn rep: the Aspirant's writ in the pack: ${!!packed}, applied ${JSON.stringify(game.state.wornRep)}`);
+    else { inv.equip(game, packed, game.player.inv.indexOf(packed)); if (r("assize") - a1 !== 100) fail(`worn rep: the Aspirant's writ put on moved Assize ${r("assize") - a1}`); }
+    const savedKit = { equip: kit.equip, pack: kit.pack };
+    try {
+      kit.equip = { ...kit.equip, neck: it("assizeWrit") }; kit.pack = [];
+      CG.beginRun(game, choices, { seed: 77 });
+      if (game.player.body.equip.neck?.id !== "assizeWrit" || game.state.wornRep?.assize !== 100 || game.state.wornRep?.bentVillages !== -100)
+        fail(`worn rep: a kit's worn writ at the start: on the neck ${game.player.body.equip.neck?.id}, applied ${JSON.stringify(game.state.wornRep)}`);
+      else {
+        const a2 = r("assize");
+        Bd.unequip(game, game.player, "neck");
+        if (a2 - r("assize") !== 100) fail(`worn rep: a kit's worn writ off moved Assize ${r("assize") - a2}`);
+      }
+    } finally { kit.equip = savedKit.equip; kit.pack = savedKit.pack; }
+    stats.wornRep = `hood +250, cloak +250 (both +500), writ +100/−100 by E, a clamp at ${F.REP_MAX} taken back exactly; the Aspirant's packed writ nothing until worn, a kit's worn writ from the run's start`;
+  }
+
   return { name: "social", ok: !problems.length, problems, stats };
 }

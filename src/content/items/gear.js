@@ -39,7 +39,8 @@ export function useful(kind, id) {
   if (kind === "weapon") return !!WEAPONS[id];
   if (kind === "missile") return id in LAUNCHER_TIER;
   const a = ARMOURS[id];
-  return !!a && (a.armour > 0 || Object.keys(a.bonus || {}).length > 0);
+  // (B1: a reputation table while worn counts; an Hour mask's waits for whoever lays one with its Hour)
+  return !!a && (a.armour > 0 || Object.keys(a.bonus || {}).length > 0 || (!!a.wornRep && typeof a.wornRep === "object"));
 }
 
 // The real world's gear by the tier it first turns up at: the light classes from the start, the heavy ones later (as
