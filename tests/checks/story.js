@@ -540,7 +540,7 @@ async function villages7b(env, { fail, stats, test, real, json, startRun, game }
           if (!BLOCKS[z.get(m.x, m.y, FLOOR_Z - 1)]?.mosaic) fail(`${tag}: a map mural off its mosaic`);
           for (const dx of [-2, -1, 0, 1, 2]) if (!murals.muralsAt(z, m.x + dx, m.y).includes(m)) fail(`${tag}: the tablet's tile ${dx} doesn't read its mural`);
         } else if (m.view === "3d") { lintels++; if (z.get(m.x, m.y, m.z) !== B.MURAL) fail(`${tag}: a lintel without its carved panel`); }
-        else { runes++; if (z.get(m.x, m.y, FLOOR_Z - 1) !== B.RUNE) fail(`${tag}: a doorstep rune without its rune`); }
+        else { runes++; if (z.get(m.x, m.y, m.z - 1) !== B.RUNE) fail(`${tag}: a doorstep rune without its rune`); }   // (B3, C2 #7: under the floor of its building, raised or sunk)
       }
       const wantK = v.abandoned ? { map: 1, "3d": 1, dark: 1 } : { map: v.history.length, "3d": v.history.length, dark: v.layout.rune ? 1 : 0 };
       if (json(kinds) !== json(wantK)) fail(`${tag}: murals ${json(kinds)}, want ${json(wantK)}`);

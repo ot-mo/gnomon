@@ -49,6 +49,58 @@ export const VILLAGE_REWARD = { xp: (level) => (leveling.xpReward ? leveling.xpR
 
 const block = (key) => B[key] ?? B.STONE;
 
+// The heights (bible §9.4; VILLAGES.styles[s].heights and its flags; B3, C2 #7), in blocks above the green's datum,
+// each within DECISIONS "Heights" (the highest floor 8 up, its roof 12): which building stands how high, and on what.
+//   stilts n       every house n up (the reed villages)            sunk n     every house n down (the turf longhouses)
+//   ledges [a, b]  three levels 3 blocks apart: the hall and the south row on the green, the NW house 3 up, the NE 6 up,
+//                  each cut into the rock (a terrace under it), with steps down to the green: the map shows one layer
+//   canopy [a, b]  pods on posts: the NW 6 up, the NE 8 up, the ground open under them (the map shows the ground)
+//   cliff [a, b]   caves up a cliff: the NE 4 up, the NW (the market: the trader's) 8 up, the market at the top
+//   storeys        the hall a second storey (a floor of 4 more), reached by a stair inside it
+//   mapOnly        the page-town: past the hall and the next house, every building is ink on the floor (mosaic), walls
+//                  and roof only on the map
+//   windows: false, runeDoors   the Shade's cells: no window lamps, a rune over each door
+//   cistern        the salt domes: a cistern of fresh water on the green
+// What isn't stamped (docs/b3.md): the boardwalks over brine, the barrow's crypt, the canopy's bridges that fold at dusk,
+// the Stacks' lift shaft, the glass huts' see-through walls (the renderer's).
+export function liftOf(S, slot) {
+  const H = S.heights || {};
+  if (H.stilts) return { h: H.stilts, under: "posts" };
+  if (H.sunk) return { h: -H.sunk };
+  if (H.ledges) return { h: { nw: 3, ne: 6 }[slot] ?? 0, under: "terrace" };
+  if (H.canopy) return { h: { nw: H.canopy[0], ne: Math.min(8, H.canopy[1]) }[slot] ?? 0, under: "posts" };
+  if (H.cliff) return { h: { nw: Math.min(8, H.cliff[1]), ne: H.cliff[0] }[slot] ?? 0, under: "terrace" };
+  return { h: 0 };
+}
+// Move a stamped building's columns h blocks up (the ground stays; under it a terrace of the wall block, or posts at the
+// corners) or down (dug into the ground).
+function lift(zone, b, h, under, fill) {
+  if (!h) return;
+  const top = zone.h - 1;
+  for (let y = b.y0; y < b.y0 + b.d; y++) for (let x = b.x0; x < b.x0 + b.w; x++) {
+    if (h > 0) {
+      for (let z = top - h; z >= FLOOR_Z - 1; z--) zone.set(x, y, z + h, zone.get(x, y, z));
+      const corner = (x === b.x0 || x === b.x0 + b.w - 1) && (y === b.y0 || y === b.y0 + b.d - 1);
+      for (let z = FLOOR_Z; z < FLOOR_Z - 1 + h; z++) zone.set(x, y, z, under === "terrace" || corner ? fill : B.AIR);
+    } else {
+      for (let z = FLOOR_Z - 1; z <= top; z++) zone.set(x, y, z + h, zone.get(x, y, z));
+      for (let z = top + h + 1; z <= top; z++) zone.set(x, y, z, B.AIR);
+    }
+  }
+}
+// Steps from a raised door down to the green: the doorstep one below the door, then one lower each tile towards the
+// green's middle, along the row outside the door.
+function stairs(zone, b, h, fill, mid) {
+  if (!(h > 1)) return [];
+  const out = [], row = b.door.y + (b.slot === "sw" || b.slot === "se" ? -1 : 1), dir = b.door.x < mid ? 1 : -1;
+  for (let k = 1; k < h; k++) {
+    const x = b.door.x + dir * (k - 1);
+    for (let z = FLOOR_Z; z < FLOOR_Z + h - k; z++) zone.set(x, row, z, fill);
+    out.push([x, row]);
+  }
+  return out;
+}
+
 export function buildVillage(ctx, site) {
   const { run, zone, rect } = ctx;
   const v = villageOf(run, site.id);
@@ -72,7 +124,7 @@ export function buildVillage(ctx, site) {
   const order = ["hall", "nw", "ne", "sw", "se"];
   const plans = v.layout.buildings.map((id, k) => ({ id, slot: k === 0 ? "hall" : order[k] }));
   const built = [];
-  for (const { id, slot } of plans) {
+  for (const [k, { id, slot }] of plans.entries()) {
     let rows = VILLAGES.plans[id].slice();
     const south = slot === "sw" || slot === "se";
     if (south) rows = rows.slice().reverse();   // the door faces the green
@@ -81,11 +133,13 @@ export function buildVillage(ctx, site) {
       const edge = y === 0 || y === rows.length - 1 || x === 0 || x === r.length - 1;
       return ch === "#" && edge && rng.chance(0.2) && !/[M]/.test(rows[y]) ? "." : ch;
     }).join(""));
+    if (S.windows === false) rows = rows.map((r) => r.replace(/l/g, "#"));   // (the Shade's cells: no windows)
     const w = rows[0].length, [sx, sy] = SLOTS[slot], lx = sx < 0 ? W - w : sx, ly = sy;
     const [x0, y0] = at(lx, ly);
     stampVault(zone, { id: `village:${id}`, name: `${v.name} ${id}`, height: WALL_H, wall, floorBlock: floor, plan: rows, links: [],
                        legend: { M: "door" } }, x0, y0, rng, { roof: v.abandoned ? "none" : "slab", wallHeight: WALL_H, cosmetic: rng });
-    const b = { id, slot, x0, y0, w, d: rows.length, door: null, step: null, inside: [] };
+    const L = v.abandoned ? { h: 0 } : liftOf(S, slot);
+    const b = { id, slot, x0, y0, w, d: rows.length, door: null, step: null, inside: [], h: L.h, stairs: [] };
     rows.forEach((r, py) => [...r].forEach((ch, px) => {
       const x = x0 + px, y = y0 + py;
       mark(x, y);
@@ -100,6 +154,13 @@ export function buildVillage(ctx, site) {
     }));
     // Nobody stands right inside the door or on the doorstep.
     b.inside = b.inside.filter(([x, y]) => Math.abs(x - b.door.x) + Math.abs(y - b.door.y) > 1);
+    // Its height (C2 #7): lifted or sunk, and steps down to the green.
+    lift(zone, b, b.h, L.under, wall);
+    b.stairs = stairs(zone, b, b.h, wall, rect.x + W / 2);
+    for (const [x, y] of b.stairs) mark(x, y);
+    if (!v.abandoned && slot === "hall" && S.heights?.storeys) secondStorey(zone, b, rows, wall, floor, roof, rng);
+    if (!v.abandoned && S.mapOnly && k >= 2) paintOnly(zone, b, rows, walls);
+    if (!v.abandoned && S.runeDoors) zone.set(b.door.x, b.door.y, FLOOR_Z + 2 + b.h, B.RUNE);
     built.push(b);
   }
   const hall = built[0], second = built[1];
@@ -107,8 +168,8 @@ export function buildVillage(ctx, site) {
   // 3. The art. A lintel is a carved panel in the wall over the door; a tablet a row of five mosaic tiles.
   const hist = v.history.map((id) => eventById(run, id)).filter(Boolean);
   const lintel = (b, e) => {
-    zone.set(b.door.x, b.door.y, FLOOR_Z + 2, B.MURAL);
-    murals.push({ x: b.door.x, y: b.door.y, z: FLOOR_Z + 2, view: "3d", text: e.text.inscription, secret: `hist:${e.id}:deep` });
+    zone.set(b.door.x, b.door.y, FLOOR_Z + 2 + b.h, B.MURAL);
+    murals.push({ x: b.door.x, y: b.door.y, z: FLOOR_Z + 2 + b.h, view: "3d", text: e.text.inscription, secret: `hist:${e.id}:deep` });
   };
   const tablet = ([tx, ty], e, k) => {
     const [x, y] = at(tx, ty);
@@ -117,8 +178,8 @@ export function buildVillage(ctx, site) {
     murals.push({ x, y, z: FLOOR_Z - 1, view: "map", text: e.text.gospel, secret: `hist:${e.id}:flat` });
   };
   const rune = (b, e) => {
-    zone.set(b.step.x, b.step.y, FLOOR_Z - 1, B.RUNE);
-    murals.push({ x: b.step.x, y: b.step.y, z: FLOOR_Z, view: "dark", text: e.text.hostile, secret: `hist:${e.id}:dark` });
+    zone.set(b.step.x, b.step.y, FLOOR_Z - 1 + b.h, B.RUNE);
+    murals.push({ x: b.step.x, y: b.step.y, z: FLOOR_Z + b.h, view: "dark", text: e.text.hostile, secret: `hist:${e.id}:dark` });
   };
   if (v.abandoned) {
     // What Happened Here: one event, in all three views.
@@ -152,6 +213,12 @@ export function buildVillage(ctx, site) {
     shrineZ = FLOOR_Z + 1; walls[sx + sy * zone.w] = 1;
   }
   mark(sx, sy);
+  // The salt domes' cistern (C2 #7): fresh water, three by three, west of the lamp.
+  const cistern = [];
+  if (!v.abandoned && S.cistern) for (let cy = 6; cy <= 8; cy++) for (let cx = 6; cx <= 8; cx++) {
+    const [x, y] = at(cx, cy);
+    zone.set(x, y, FLOOR_Z - 1, B.WATER_SHALLOW); mark(x, y); cistern.push([x, y]);
+  }
   let perch = null;
   if (v.layout.perch) {
     const [px, py] = at(...PERCH);
@@ -163,7 +230,7 @@ export function buildVillage(ctx, site) {
 
   zone.murals = [...(zone.murals || []), ...murals];
   zone.village = { siteId: site.id, shrine: { x: sx, y: sy, z: shrineZ, view, kind }, lamp: { x: lx, y: ly, dark },
-                   perch, buildings: built.map((b) => ({ id: b.id, x0: b.x0, y0: b.y0, w: b.w, d: b.d, door: b.door, step: b.step })) };
+                   perch, buildings: built.map((b) => ({ id: b.id, x0: b.x0, y0: b.y0, w: b.w, d: b.d, door: b.door, step: b.step, h: b.h })) };
 
   // 5. The cast: the leader in the hall, the trader and the leech in the next two buildings, the tinker in the
   //    workshop if there is one; everyone else on the green.
@@ -175,7 +242,9 @@ export function buildVillage(ctx, site) {
   if (perch) for (let i = -1; i <= 5; i++) for (const dy of [-1, 0, 1]) blocked.add(key(perch.x - 4 + i, perch.y + dy));
   for (const b of built) {
     for (const dy of [-1, 1]) blocked.add(key(b.door.x, b.door.y + dy));   // doorsteps, in and out
+    for (const [x, y] of b.stairs) blocked.add(key(x, y));
   }
+  for (const [x, y] of cistern) blocked.add(key(x, y));
   for (const [tx, ty] of TABLETS) for (let i = -2; i <= 2; i++) blocked.add(key(...at(tx + i, ty)));
   const green = [];
   for (let gy = 5; gy <= 10; gy++) for (let gx = 0; gx < W; gx++) { const [x, y] = at(gx, gy); if (!blocked.has(key(x, y))) green.push([x, y]); }
@@ -184,15 +253,15 @@ export function buildVillage(ctx, site) {
   const spot = (role) => {
     const b = home[role];
     const pool = b ? b.inside.filter(([x, y]) => !taken.has(key(x, y))) : [];
-    const pick = pool.length ? pool[rng.int(0, pool.length - 1)] : green.find(([x, y]) => !taken.has(key(x, y)));
-    if (pick) taken.add(key(...pick));
+    const pick = pool.length ? [...pool[rng.int(0, pool.length - 1)], b.h] : green.find(([x, y]) => !taken.has(key(x, y)));
+    if (pick) taken.add(key(pick[0], pick[1]));
     return pick;
   };
   const P = VILLAGES.peoples[v.people];
   for (const r of v.roles) {
     const p = spot(r.role);
     if (!p) continue;
-    const c = spawnCreature(r.creatureType, p[0], p[1], FLOOR_Z, { uid: r.uid, name: r.name, level: v.level,
+    const c = spawnCreature(r.creatureType, p[0], p[1], FLOOR_Z + (p[2] || 0), { uid: r.uid, name: r.name, level: v.level,
       talk: { dialogue: r.dialogue, state: {} } });
     c.village = site.id;
     c.villageRole = r.role;
@@ -206,6 +275,33 @@ export function buildVillage(ctx, site) {
     }
     addCreature(zone, c);
   }
+}
+
+// The Stacks' hall (C2 #7, storeys): a second storey of the same plan 4 up, walled and roofed, its door walled up, and
+// three steps inside along the hall's back wall, the slab over the top two opened.
+function secondStorey(zone, b, rows, wall, floor, roof, rng) {
+  const up = rows.map((r) => r.replace(/M/g, "#").replace(/r/g, "."));
+  // (stampVault writes whole columns: the storey below is kept and put back under the new floor)
+  const below = [];
+  for (let y = b.y0; y < b.y0 + b.d; y++) for (let x = b.x0; x < b.x0 + b.w; x++) for (let z = 0; z < FLOOR_Z + WALL_H; z++) below.push([x, y, z, zone.get(x, y, z)]);
+  stampVault(zone, { id: "village:storey", name: "the upper storey", height: WALL_H, wall, floorBlock: floor, plan: up, links: [], legend: {} },
+    b.x0, b.y0, rng, { roof: "slab", wallHeight: WALL_H, cosmetic: rng, baseZ: FLOOR_Z + WALL_H + 1 });
+  for (const [x, y, z, bl] of below) zone.set(x, y, z, bl);
+  for (let y = b.y0; y < b.y0 + b.d; y++) for (let x = b.x0; x < b.x0 + b.w; x++) zone.set(x, y, FLOOR_Z + 2 * WALL_H + 1, roof);
+  const y = b.y0 + 1;
+  for (let k = 1; k <= 3; k++) for (let z = FLOOR_Z; z < FLOOR_Z + k; z++) zone.set(b.x0 + k, y, z, floor);
+  for (const k of [2, 3]) zone.set(b.x0 + k, y, FLOOR_Z + WALL_H, B.AIR);
+  b.inside = b.inside.filter(([x, yy]) => !(yy === y && x >= b.x0 + 1 && x <= b.x0 + 3));
+  b.storeys = 2;
+}
+// The page-town (C2 #7, mapOnly): a building drawn on the Plane, ink lines on the floor where its walls would be.
+function paintOnly(zone, b, rows, walls) {
+  rows.forEach((r, py) => [...r].forEach((ch, px) => {
+    const x = b.x0 + px, y = b.y0 + py;
+    for (let z = FLOOR_Z; z <= FLOOR_Z + WALL_H; z++) zone.set(x, y, z, B.AIR);
+    if (ch === "#" || ch === "l" || ch === "M") { zone.set(x, y, FLOOR_Z - 1, B.MOSAIC_BLUE); walls[x + y * zone.w] = 0; }
+  }));
+  b.painted = true;
 }
 
 // The village's skill (bible §9.2: one power from one tree, taught through the Kindling): the first power of that
