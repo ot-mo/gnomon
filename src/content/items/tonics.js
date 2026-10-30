@@ -23,6 +23,7 @@ import { addStatus, removeStatus, hasStatus, statusOf, registerStatus } from "..
 import { maxHp, mod } from "../../stats.js";
 import { GENOTYPES } from "../genotypes.js";
 import { RULES } from "../../rules.js";
+import { hasKey } from "../../keyset.js";
 
 const secs = (s) => Math.max(0, Math.ceil(s.t));
 const T = (id, label, def) => registerStatus(`tonic:${id}`, { color: [150, 220, 200], kind: "good", stack: "refresh", hud: (s) => `${label} ${secs(s)}s`, ...def });
@@ -65,9 +66,10 @@ const say = (game, p, text, color = [150, 220, 200]) => { if (game && p === game
 
 export const TONICS = {
   balm: {
-    name: "balm", value: 25, t: 3, status: "tonic:balm", odT: 30, info: (k) => `Heals ${12 * k} over 3 s. Overdone: no rest or balm mends you for 30 s.`,
-    needs: "the overdose's nausea, and no healing from potions either (a nauseous status: C2's brine may share it; effects.js)",
-    use: (game, p, k) => { addStatus(game, p, "tonic:balm", { t: 3, mag: k }); say(game, p, `Warmth spreads up your arm. (+${12 * k} HP over 3 s)`, [230, 90, 110]); },
+    name: "balm", value: 25, t: 3, status: "tonic:balm", odT: 30, info: (k) => `Heals ${12 * k} over 3 s (half again with Alchemist). Overdone: no rest, balm or potion mends you for 30 s.`,
+    needs: "the overdose's nausea (a nauseous status: C2's brine may share it)",
+    // (B1: Alchemist's "healing heals 18", bible §10.8, for a balm too; effects.js's potion of healing reads tonic:sick)
+    use: (game, p, k) => { const a = hasKey(p.perks, "alchemist") ? 1.5 : 1; addStatus(game, p, "tonic:balm", { t: 3, mag: k * a }); say(game, p, `Warmth spreads up your arm. (+${12 * k * a} HP over 3 s)`, [230, 90, 110]); },
     overdose: (game, p) => { addStatus(game, p, "tonic:sick", { t: 30 }); say(game, p, "The balm curdles. Neither rest nor balm will mend you for a while.", [170, 200, 110]); },
   },
   hasp: {

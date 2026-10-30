@@ -188,7 +188,7 @@ export function useArtifact(game, p, it) {
   }
   if (def.per) return toggle(game, p, it);
   if (needs(it) && !loadCell(game, p, it)) { game.log(`The ${def.name} needs ${needs(it)} charge (${chargeText(game, it.cell)}), and you have no cell that full.`, [255, 150, 120]); return 0; }
-  if (it.id === "glimgun" && funds(p) < 1) { game.log("The glimgun needs a glim from your purse for each shot.", [255, 150, 120]); return 0; }
+  if (it.id === "glimgun" && funds(p) < 1 && !freeShot(p, it)) { game.log("The glimgun needs a glim from your purse for each shot.", [255, 150, 120]); return 0; }
   if (def.target) return { aim: it };
   return fireArtifact(game, p, it, null);
 }
@@ -203,6 +203,8 @@ function toggle(game, p, it) {
 }
 
 const AIM_RANGE = { foldKnife: 4, glimgun: 10, lancet: 8 };
+// Glimgunner (B1, C4 #9): a glim for every two shots (the first of each pair pays; it.shots counts them).
+const freeShot = (p, it) => hasKey(p.perks, "glimgunner") && (it.shots || 0) % 2 === 1;
 export function aimArtifact(game, p, it) {
   requestTarget(game, { range: AIM_RANGE[it.id] || 10, target: ARTIFACTS[it.id].target }, (target) => {
     // No target (cancelled, or on the map nothing in sight to aim at): nothing happens, nothing is paid.
@@ -285,7 +287,8 @@ const EFFECTS = {
     return true;
   },
   glimgun(game, p, it, target) {
-    if (!pay(game, p, 1)) return false;
+    if (!freeShot(p, it) && !pay(game, p, 1)) return false;
+    it.shots = (it.shots || 0) + 1;
     const c = target?.creature;
     if (!c || !touchable(game, c) || ghostHidden(game, c)) { game.log("The glimgun spits a bolt of burning glim into the dark.", [255, 160, 70]); return true; }
     const vs = elementVs(c, "fire"), dmg = Math.max(1, Math.round(d6(2) * (vs === "resist" ? 0.5 : vs === "weak" ? 1.5 : 1)));

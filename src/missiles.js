@@ -30,6 +30,8 @@ import { addStatus, registerStatus, statusFlag, cooldownLeft, startCooldown } fr
 import { bind } from "./keys.js";
 import { registerHudSegment } from "./hud.js";
 import { theOf, TheOf } from "./creatures.js";
+import { hasKey } from "./keyset.js";
+export const PIN_MORE = 1;   // the Pin power: a bolt's pin lasts a second longer (bible §10.8 "bolts pin for 2 s", the bolt-bow's own)
 
 registerStatus("pinned", { name: "pinned", color: [215, 205, 160], t: 2, stack: "max", flags: { noMove: true },
   hud: (s) => `PINNED ${Math.ceil(s.t)}s`, ended: "You pull yourself free." });
@@ -51,7 +53,8 @@ export function missileSpec(p, launcher) {
     element: null, noun: m.noun,
     onHit: hit ? (game, tgt) => {
       if (combatRng(game)() >= hit.chance) return;
-      addStatus(game, tgt, hit.status, { t: hit.t, stack: "max" });
+      const more = hit.status === "pinned" && hasKey(p.perks, "pin") ? PIN_MORE : 0;   // (the Pin power: B1)
+      addStatus(game, tgt, hit.status, { t: hit.t + more, stack: "max" });
       game.log(hit.status === "pinned" ? `The bolt pins ${theOf(tgt)} where it stands!` : `${TheOf(tgt)} reels, dazed.`, [215, 205, 160]);
     } : null,
   };

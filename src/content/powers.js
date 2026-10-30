@@ -67,8 +67,8 @@ export const POWERS = {
   brace:        { tree: "polearm",   name: "Brace",         info: "Chargers stop on your point.", needs: "chargers stopping on your point (ai.js charges, combat.js)" },
   // (check-content holds every bonus key to stats.js BONUS_KEYS, so `bonus: () => ({ missileAcc: 2 })` comes with the key)
   steadyHand:   { tree: "missile",   name: "Steady hand",   info: "+2 to hit with slings and bolt-bows.", bonus: () => ({ missileAcc: 2 }) },
-  pin:          { tree: "missile",   name: "Pin",           info: "Your bolts pin what they hit for 2 s.", needs: "a pin beyond the bolt-bow's own 2 s (missiles.js onHit; the balance pass: say +1 s, or slings' stones too)" },
-  glimgunner:   { tree: "missile",   name: "Glimgunner",    info: "The glimgun costs 1 glim for every 2 shots.", needs: "a glim every second shot (bodymods/artifacts.js EFFECTS.glimgun; the Lamplighter's kit holds one)" },
+  pin:          { tree: "missile",   name: "Pin",           info: "Your bolts pin what they hit a second longer (3 s)." },   // (missiles.js PIN_MORE: B1)
+  glimgunner:   { tree: "missile",   name: "Glimgunner",    info: "The glimgun costs 1 glim for every 2 shots." },   // (bodymods/artifacts.js: B1)
   returnDisc:   { tree: "throwing",  name: "Return",        info: "Thrown discs come back to your hand.", needs: "discs, a thrown kind that bounces to a second target (throwing.js; the item is C4's once it is)" },
   roll:         { tree: "tumbling",  name: "Roll",          info: "A dodge-roll in 3D.", needs: "a dodge-roll in 3D (player.js)" },
   darkBackstab: { tree: "shadowcraft", name: "Dark backstab", info: "Double damage against an unaware target while your torch is out, with any weapon." },

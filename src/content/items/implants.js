@@ -51,7 +51,7 @@ export const IMPLANTS = {
     info: "Spinning weights in the wrists. Thrown things fly flat and hit for 2 more." },
   jugglerArm: { name: "juggler's arm", parts: ["arm"], grade: 5, effect: "jugglerArm",   // (throwing.js volley: B1)
     info: "A second set of tendons. You throw up to four knives at once." },
-  balmPump: { name: "balm pump", parts: ["back"], grade: 3, effect: "balmPump", needs: "a balm tonic from the pack injected below 40% health (content/items/tonics.js injectTonic; on the HP change)",
+  balmPump: { name: "balm pump", parts: ["back"], grade: 3, effect: "balmPump",   // (bodymods/implants.js: B1)
     info: "Holds four tonics along the spine and injects a balm when you fall below 40% health." },
   foldingRack: { name: "folding rack", parts: ["back"], grade: 4, addsPart: { id: "back_2", type: "back" },
     info: "A frame that folds out of the shoulders: room for a second thing on your back." },

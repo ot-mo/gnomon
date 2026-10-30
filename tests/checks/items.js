@@ -1737,6 +1737,60 @@ export function checkB1Gear(m) {
     stats.gripSoles = "a 2-block step on the map refused without them, taken with them";
   });
 
+  // 4. The tonics' and implants' rest (C4 #10, #14) and the missile powers (C4 #9): an overdone balm stops a potion of
+  //    healing too; Alchemist's balm heals 18 over 3 s; the balm pump injects a balm from the pack when a blow leaves you
+  //    under 40% (not above, not without the pump, not while a balm works); Glimgunner pays a glim every second shot;
+  //    Pin: a bolt's pin 3 s, 2 without.
+  section("tonics and implants", () => {
+    startRun(13, m.testWorld.TEST_WORLD);
+    const p = game.player, S = m.status, E = m.events, TN = m.tonics;
+    const reset = () => { p.status = {}; p.perks = {}; p.body.implants = Object.fromEntries(Object.keys(p.body.implants).map((k) => [k, null])); p.maxHpGain = 20; m.stats.invalidateStats(p); p.hp = 5; };   // (room to heal 18)
+    const settle = () => { for (let k = 0; k < 200; k++) S.tickStatuses(game, p, 1 / 60); };
+    reset(); m.effects.drinkPotion(game, "healing"); const potion = p.hp - 5;
+    reset(); S.addStatus(game, p, "tonic:sick", { t: 30 }); m.effects.drinkPotion(game, "healing"); const sick = p.hp - 5;
+    reset(); p.genotype = "plumb"; TN.injectTonic(game, p, "balm"); settle(); const balm = p.hp - 5;
+    reset(); p.perks = { alchemist: 1 }; TN.injectTonic(game, p, "balm"); settle(); const alch = p.hp - 5;
+    if (potion !== 12 || sick !== 0 || balm !== 12 || alch !== 18) fail(`healing: a potion ${potion}, overdone ${sick}; a balm ${balm}, with Alchemist ${alch} (want 12, 0, 12, 18)`);
+    // The balm pump.
+    const pump = (hpShare, fitted, working = false) => {
+      reset(); p.hp = Math.floor(m.stats.maxHp(p) * hpShare);
+      if (fitted) p.body.implants.back = { kind: "implant", id: "balmPump" };
+      if (working) S.addStatus(game, p, "tonic:balm", { t: 3, mag: 1 });
+      p.inv = p.inv.filter((s) => s.kind !== "tonic"); p.inv.push({ kind: "tonic", effect: "balm", count: 2 });
+      E.emit(game, "hurt", { tgt: p, src: null, dmg: 1 });
+      return p.inv.find((s) => s.kind === "tonic")?.count ?? 0;
+    };
+    const used = pump(0.3, true), above = pump(0.5, true), none = pump(0.3, false), busy = pump(0.3, true, true);
+    if (used !== 1 || above !== 2 || none !== 2 || busy !== 2) fail(`the balm pump: at 30% ${2 - used} used (want 1), at 50% ${2 - above}, without it ${2 - none}, a balm working ${2 - busy}`);
+    reset(); p.hp = Math.floor(m.stats.maxHp(p) * 0.3); p.body.implants.back = { kind: "implant", id: "balmPump" };
+    p.inv.push({ kind: "tonic", effect: "balm", count: 1 }); E.emit(game, "hurt", { tgt: p, src: null, dmg: 1 });
+    if (!S.hasStatus(p, "tonic:balm")) fail("the balm pump's balm doesn't work");
+    // Glimgunner.
+    const shots = (perk) => {
+      reset(); if (perk) p.perks = { glimgunner: 1 };
+      const gun = { kind: "artifact", id: "glimgun", known: true }; p.inv.push(gun);
+      m.currency.setPurse?.(p, "flask500"); p.funds = 10;
+      for (let k = 0; k < 4; k++) m.artifacts.fireArtifact(game, p, gun, null);
+      p.inv.splice(p.inv.indexOf(gun), 1);
+      return 10 - m.currency.funds(p);
+    };
+    const paid = shots(false), paidGunner = shots(true);
+    if (paid !== 4 || paidGunner !== 2) fail(`the glimgun: 4 shots paid ${paid} glim, with Glimgunner ${paidGunner} (want 4 and 2)`);
+    // Pin.
+    const pinFor = (perk) => {
+      reset(); if (perk) p.perks = { pin: 1 };
+      const c = { status: {}, x: 0, y: 0, z: 0, type: "goblin", name: "goblin" };
+      const spec = m.missiles.missileSpec(p, { kind: "missile", id: "boltBow", ench: 0 });
+      const rng = game.combatRng; game.combatRng = () => 0;
+      try { spec.onHit(game, c, {}); } finally { game.combatRng = rng; }
+      return c.status.pinned?.t;
+    };
+    const pin0 = pinFor(false), pin1 = pinFor(true);
+    if (pin0 !== 2 || pin1 !== 3) fail(`Pin: a bolt's pin ${pin0} s, with Pin ${pin1} s (want 2 and 3)`);
+    p.hp = m.stats.maxHp(p);
+    stats.tonics = `a potion ${potion}, overdone ${sick}; a balm ${balm}, Alchemist's ${alch}; the pump at 30% used 1, at 50% none; the glimgun 4 shots ${paid} glim, Glimgunner ${paidGunner}; pins ${pin0} s, ${pin1} s with Pin`;
+  });
+
   return { name: "items: B1's gear", ok: problems.length === 0, problems, stats };
 }
 
