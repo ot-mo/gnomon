@@ -419,7 +419,8 @@ const canLearn = () => secrets.STUB === undefined;
 // The specials' effects (B3, C2 #3). why(game, sp) → a reason it can't be had, false when its thing doesn't exist yet.
 const DAY_S = () => 24 * worldHour();
 registerStatus("pressing", { name: "the Pressing", color: [220, 220, 230], kind: "good", t: 1440,
-  hud: () => null, ended: "The Pressing's gift wears off. The floor is only a floor again." });
+  hud: () => null, ended: "The Pressing's gift wears off. The floor is only a floor again.",
+  onEnd: (game, e) => { if (e.hotbar) e.hotbar = e.hotbar.map((a) => (a === "pressing" ? null : a)); } });   // (its key freed: review 6)
 // The Pressing rite: for a world day you may turn flat for 3 s, once a floor (an ability of its own while it lasts).
 registerAbilitySource("rite", (e) => (hasStatus(e, "pressing") ? [{ id: "pressing", lvl: 1 }] : []));
 registerAbility("pressing", {
@@ -435,7 +436,7 @@ registerAbility("pressing", {
   },
 });
 const SPECIALS = {
-  pressing: { run: (game) => {
+  pressing: { again: (game) => !hasStatus(game.player, "pressing"), run: (game) => {
     addStatus(game, game.player, "pressing", { t: DAY_S() });
     const hb = (game.player.hotbar ||= []), k = [...Array(9).keys()].find((i) => !hb[i]);
     if (!hb.includes("pressing") && k !== undefined) hb[k] = "pressing";
@@ -511,12 +512,15 @@ export function ritualRows(game, c) {
     } });
   // The faction's specials (bible §3.3; content/factions.js specials without `via`), each once.
   for (const sp of FACTIONS[f].specials || []) {
-    if (sp.via || !SPECIALS[sp.id] || (k.specials || {})[sp.id]) continue;
+    // Once a run, whichever flame-kin of the faction gives it (a limb from every Moot kin would be a limb to sell: review 6);
+    // the Pressing again only once its day is over.
+    const had = kstate(game).specials?.[sp.id] !== undefined;
+    if (sp.via || !SPECIALS[sp.id] || (had && !SPECIALS[sp.id].again?.(game))) continue;
     const why = SPECIALS[sp.id].why?.(game, sp);
     if (why === false) continue;   // (its thing doesn't exist yet: not offered)
     const no = sp.genotype && p.genotype !== sp.genotype ? `Only for the ${sp.genotype === "bent" ? "Bent" : "Plumb"}.` : why;
     rows.push({ id: `special:${sp.id}`, label: `${cap(sp.name)}`, n: sp.rep, why: no || null, run: () => {
-      (k.specials ||= {})[sp.id] = game.time || 0;
+      (kstate(game).specials ||= {})[sp.id] = game.time || 0;
       for (const [id, n] of Object.entries(sp.after || {})) addRep(game, id, n, "body");
       return SPECIALS[sp.id].run(game, sp, c);
     } });

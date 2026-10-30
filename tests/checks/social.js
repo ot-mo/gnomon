@@ -1713,6 +1713,14 @@ export async function run(env) {
       status.removeStatus(game, p(), "flat");
       if (abil.activate(game, p(), "pressing", {})) fail("the Pressing twice on one floor");
     }
+    if (ritual.ritualRows(game, pressed).some((r) => r.id === "special:pressing")) fail("the Pressing offered again while its day lasts");
+    if (!p().hotbar?.includes("pressing")) fail("the Pressing isn't on a hotbar key");
+    status.catchUpStatuses(game, p(), 1441);   // (statuses run on the frames and skips, not on the clock's tick)
+    if (p().hotbar?.includes("pressing") || !ritual.ritualRows(game, pressed).some((r) => r.id === "special:pressing")) fail("the Pressing's day over: its key kept, or not offered again");
+    const pressed2 = named("mira", "villager", "pressed", { near: [-1, 1], name: "Arr" });
+    game.state.kindling.kin[ritual.kinKey(game, pressed2)] = { faction: "pressed", name: "Arr", rite: "tracing", at: 0, net: 0 };
+    game.state.kindling.specials.limbTest = 0;   // (a special once a run, whichever kin: the bookkeeping is the run's, not the creature's)
+    if (game.state.kindling.kin[ritual.kinKey(game, pressed)].specials) fail("a special's mark kept on the creature, not the run");
     const moot = named("mira", "villager", "sporeMoot", { near: [-1, 0], name: "Hears-Slowly" });
     game.state.kindling.kin[ritual.kinKey(game, moot)] = { faction: "sporeMoot", name: "Hears-Slowly", rite: "snuffing", at: 0, net: 0 };
     if (ritual.ritualRows(game, moot).some((r) => r.id === "special:limb") !== !!items.ARMOURS.fungalLimb) fail("the fungal limb offered without C4's item, or not with it");
