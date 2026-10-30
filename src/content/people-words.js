@@ -17,7 +17,7 @@
 // Every claim about the cosmos belongs to someone (bible §2.1 rule 4). The words count against §15.9's 4,000 for the
 // 16 landmarks' registers and their people, Hollowmere's included (tests/checks/story.js holds it).
 import { node, bye, talkTo, registerDialogue } from "../talk.js";
-import { buildDialogue } from "../social/builders.js";
+import { buildDialogue, standingOf } from "../social/builders.js";
 
 const PARENT_IDS = new Set(["maren", "pell", "corwin", "ess", "tee", "brann", "mira", "rook", "lio", "shrine", "door"]);
 export const dialogueIdOf = (who) => (PARENT_IDS.has(who) ? `${who}@real` : who);
@@ -207,14 +207,16 @@ export const PEOPLE_WORDS = {
     who: "A pilgrim of the Plane. I lie on every mosaic between Saltpage and the sea, and read it with my face." },
 };
 
-// A person's words, then their role's options (its shop, its faction): the role's greeting and "Who are you?" give way.
+// A person's words, then their role's options (its shop, its faction): the role's greeting and "Who are you?" give way,
+// except to someone curt with you (Cold, or wary), who keeps the role's curt greeting.
 function wordsDialogue(w) {
   const role = buildDialogue(w.role);
   return (game, c, opts = {}) => {
     const base = role(game, c, opts);
     if (base.options.length === 1 && base.options[0].label === "Leave.") return base;   // refused, as the role would
+    const st = standingOf(game, c), curt = st.band === "disliked" || st.attitude === "wary";
     const done = game.state?.campaign?.done || {};
-    const greet = Object.keys(w.after || {}).filter((b) => done[b] !== undefined).map((b) => w.after[b]).pop() || w.greet;
+    const greet = curt ? base.text : Object.keys(w.after || {}).filter((b) => done[b] !== undefined).map((b) => w.after[b]).pop() || w.greet;
     const back = { label: "Back.", go: () => talkTo(game, c) };
     const own = [...(w.who ? [{ label: "Who are you?", go: () => node(w.who, [back, bye()]) }] : []),
       ...(w.topics || []).map(([label, text]) => ({ label, go: () => node(text, [back, bye()]) }))];

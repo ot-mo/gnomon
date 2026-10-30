@@ -1102,6 +1102,11 @@ async function storyC5(env, { fail, stats, json, game }) {
       delete game.state.campaign;
     }
   }
+  game.state.rep = { hollowmere: -300 };   // Cold with Hollowmere: Reeve Hallen talks (wary, not refusing), curtly
+  const cold = meet("hallen"), coldRoot = talk.talkTo(game, cold);
+  if (builders.standingOf(game, cold).band !== "disliked" || coldRoot.options.length < 2 || coldRoot.text === PW.hallen.greet)
+    fail(`C5: a Cold person who still talks greets with its own words, not the role's curt ones ("${coldRoot.text}")`);
+  game.state.rep = {};
   if (meet("hallen").talk.dialogue !== "hallen" || talk.talkTo(game, placed.at(-1)).text !== PW.hallen.greet) fail("C5: Reeve Hallen by her own type");
   if (!talk.talkTo(game, meet("ottilie")).options.some((o) => o.label === "Show me what you have.")) fail("C5: Old Ottilie by her own type, without her shop");
   for (const id of ["maren", "pell", "mira", "brann", "corwin", "rook", "lio"]) if (dialogueIdOf(id) === id) fail(`C5: ${id}'s words would replace the parent's`);
