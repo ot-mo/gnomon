@@ -32,17 +32,18 @@
 //
 // p.mutations = { [id]: level } (§2.4), plain JSON. p.creases: the Bent's (content/genotypes.js).
 //
+// Turns of the world: "view:turn" { from, to } (screens/play.js toggleMap: Tab, or Esc on the map; the cube's first
+// turn and a forced flat map aren't yours, and send none; B1, WS4 #16). game.state.cast = { turns, wakes: { zoneKey:
+// [time] }, pack: { zone, at, size, burnisher, great } | null } is saved with the state.
 // Watched every frame in the views (events.js registerUpdate):
-//   - turns of the world: game.view changing between the map and 3D in the same zone while you aren't flat (Tab;
-//     the cube's first turn and a forced flat aren't yours). game.state.cast = { turns, wakes: { zoneKey: [time] },
-//     pack: { zone, at, size, burnisher, great } | null } is saved with the state.
+//   - the pack's coming (sendPack);
 //   - defects that come and go: Dark-fear "shaken" while your torch is out, Moth-kissed "mobbed" while it's lit,
 //     Lightsick "sunsick" (1 HP every 20 s you stand under an open sky by day, counted through map actions and skips);
 //     each status lasts until its cause goes (see "Defects that come and go" below).
 import { MUTATIONS, BIBLE_FACTIONS } from "../content/mutations.js";
 import { GENOTYPES } from "../content/genotypes.js";
 import { invalidateStats, mod, maxHp } from "../stats.js";
-import { emit, registerUpdate } from "../events.js";
+import { emit, on, registerUpdate } from "../events.js";
 import { registerStatus, addStatus, removeStatus, hasStatus, statusFlag } from "../status.js";
 import { addRep, FACTIONS } from "../factions.js";
 import { naturalLight } from "../light.js";
@@ -199,15 +200,10 @@ function sendPack(game) {
   if (pack.zone === game.zone.key) emit(game, "smoothers", { zone: game.zone, size: pack.size, burnisher: pack.burnisher, great: pack.great });
 }
 
-// A turn of the world is the view changing in the same zone while you aren't flat: Tab (or Esc on the map). The
-// cube's first turn (before game.story.cube) and being pressed flat onto the map aren't turns of yours.
-const lastView = new WeakMap();   // game → { view, zone, cube }
-registerUpdate("mutations:turns", (game) => {
-  const was = lastView.get(game), now = { view: game.view, zone: game.zone, cube: !!game.story?.cube };
-  lastView.set(game, now);
-  if (was && was.view !== now.view && was.zone === now.zone && was.cube && !statusFlag(game.player, "flat")) turnWorld(game);
-  sendPack(game);
-}, { modes: ["play"] });
+// A turn of the world is Tab (or Esc on the map): toggleMap's "view:turn". (Under the Hand, bible §10.3, a turn leaves
+// no wake: once the Hand exists, skip the roll here.)
+on("view:turn", (game) => { turnWorld(game); });
+registerUpdate("mutations:turns", (game) => { sendPack(game); }, { modes: ["play"] });
 
 // --- Defects that come and go ------------------------------------------------------------------------------------
 // Their statuses last (LASTING: finite, so a save holds them; JSON has no Infinity) and the watch below puts them on

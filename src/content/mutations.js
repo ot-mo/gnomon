@@ -34,7 +34,7 @@ export const MUTATIONS = {
   // --- Physical ------------------------------------------------------------------------------------------------
   shellback: {
     name: "Shellback", kind: "physical", cost: 4, max: 10, excludes: ["wings"],
-    info: (l) => `A shell across your back: +${2 + Math.floor(l / 3)} armour, while you wear no body armour over it.`,
+    info: (l) => `A shell across your back: +${2 + Math.floor(l / 3)} armour; no body armour goes over it.`,   // (body.js canEquip: B1, WS4 #19)
     // Clothes don't cover it; anything heavier on the body and the shell can't settle (equip calls invalidateStats).
     bonus: (l, e) => { const it = e.body?.equip?.body; return !it || it.id === "clothes" ? { av: 2 + Math.floor(l / 3) } : null; },
     rep: { clatter: 200 },

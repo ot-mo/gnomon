@@ -780,6 +780,17 @@ export async function checkProgression(m) {
       const avPlate = st.av(sh);
       if (avPlate !== m.items.ARMOURS.plate.armour) fail(`Shellback under plate: AV ${avPlate}, want the plate's ${m.items.ARMOURS.plate.armour} alone`);
       out.shellback = `AV ${avBare} bare, ${avPlate} in plate`;
+      // ... and refuses body armour (B1, WS4 #19): the pack's E says why; clothes go on; without it plate goes on.
+      sh.body.equip.body = null; st.invalidateStats(sh);
+      const plate = { kind: "armour", id: "plate", ench: 0, known: true }, clothes = { kind: "armour", id: "clothes", ench: 0, known: true };
+      const refused = m.body.canEquip(game, sh, plate, "body"), wore = m.body.canEquip(game, sh, clothes, "body"), helm = m.body.canEquip(game, sh, { kind: "armour", id: "ironHelm", ench: 0, known: true });
+      sh.inv.push(plate);
+      const logged0 = game.messages.length, byE = m.inventory.equip(game, plate, sh.inv.indexOf(plate), "body");
+      const line = game.messages.slice(logged0).map((x) => x.text).join(" ");
+      const plain = { ...sh, mutations: {}, body: m.body.makeBody("humanoid") };
+      if (refused.reason !== "shell" || !wore.ok || !helm.ok || byE || !/shell/.test(line) || sh.body.equip.body || !m.body.canEquip(game, plain, plate, "body").ok)
+        fail(`Shellback and body armour: plate ${JSON.stringify(refused)}, clothes ${wore.ok}, a helm ${helm.ok}; by E ${byE} ("${line}"); without the shell ${m.body.canEquip(game, plain, plate, "body").ok}`);
+      sh.inv.splice(sh.inv.indexOf(plate), 1);
       // Reputation (bible §10.4): begun with Wings and Flatwise, once each; Wings gained in play. Each moves rep from
       // where the run began: the start by genotype (factions.js baseRep, WS6a) and the background's change.
       const rep = (f) => m.factions.repOf(game, f);
@@ -1057,20 +1068,28 @@ export async function checkProgression(m) {
       for (const [cast, ego, want] of table) { const got = chance(cast, ego); if (Math.abs(got - want) > 1e-9) fail(`Cast ${cast}, EGO ${ego}: wake chance ${got}, want ${want}`); }
       if (JSON.stringify(PM.packFor(20)) !== '{"size":2,"burnisher":false,"great":false}' || JSON.stringify(PM.packFor(45)) !== '{"size":4,"burnisher":true,"great":true}' || PM.packFor(30).size !== 3)
         fail(`packs: ${JSON.stringify([PM.packFor(20), PM.packFor(30), PM.packFor(45)])}`);
-      // Turns of the world at Cast 60 (75%): watched in the views, the third wake warns and the pack comes 10 s later.
+      // Turns of the world at Cast 60 (75%): Tab (toggleMap's "view:turn", B1, WS4 #16), the third wake warns and the
+      // pack comes 10 s later. The view set by hand (no turn of yours) rolls nothing.
       chance(60, 16);
-      const sent = [];
-      const off = m.events.on("smoothers", (g, e) => sent.push(e));
+      const sent = [], turned = [];
+      const off = m.events.on("smoothers", (g, e) => sent.push(e)), offTurn = m.events.on("view:turn", (g, e) => turned.push(e));
       try {
         game.state.cast = null; game.view = "map"; game.mode = "map";
         step(1 / 60);
+        for (let k = 0; k < 6; k++) { game.view = game.view === "map" ? "3d" : "map"; game.mode = game.view === "map" ? "map" : "explore"; step(1 / 60); }
+        if (game.state.cast?.turns) fail(`the view set by hand counted as ${game.state.cast.turns} turns`);
+        game.view = "map"; game.mode = "map"; step(1 / 60);
         let turns = 0;
         for (; turns < 40 && !game.state.cast?.pack; turns++) {
-          game.view = game.view === "map" ? "3d" : "map"; game.mode = game.view === "map" ? "map" : "explore";
+          const was = game.view;
+          m.keys.dispatchKey(game, "Tab");
+          if (game.view === was) { fail(`Tab didn't turn the world (${game.mode})`); break; }
           step(1 / 60);
         }
+        if (turned.length !== turns || turned.some((e, k) => e.from === e.to || (k && e.from !== turned[k - 1].to))) fail(`"view:turn" for ${turns} turns: ${JSON.stringify(turned.slice(0, 4))}`);
+        if (game.state.cast?.turns !== turns) fail(`${turns} turns by Tab rolled ${game.state.cast?.turns} wakes`);
         if (!game.state.cast?.pack || !said(/smooths itself out towards you/)) fail(`40 turns at 75% left no pack (${JSON.stringify(game.state.cast)})`);
-        const pack = { ...game.state.cast.pack };
+        const pack = { ...(game.state.cast?.pack || { at: -Infinity }) };   // (none: failed above)
         game.view = "map"; game.mode = "map"; step(1 / 60);
         while (game.time + 0.5 < pack.at) { T.mapWait(game); step(1 / 60); }
         if (sent.length) fail(`the Smoothers came before 10 s (at ${game.time}, due ${pack.at})`);
@@ -1094,7 +1113,7 @@ export async function checkProgression(m) {
         STS.addStatus(game, p, "flat", { t: 3 });
         step(1 / 60);
         if (game.state.cast?.turns) fail(`a forced flat map counted as a turn (${game.state.cast.turns})`);
-      } finally { off(); }
+      } finally { off(); offTurn(); }
     }
 
     // 7.6 Defects that come and go.
@@ -1394,7 +1413,7 @@ export async function run(env) {
     levelup: await src("screens/levelup.js"), create: await src("screens/create.js"), keys: await src("keys.js"), screens: await src("screens.js"),
     codec: await src("save/codec.js"), rng: await src("rng.js"), items: await src("items.js"), playerMod: await src("player.js"), body: await src("body.js"),
     implants: await src("content/items/implants.js"), mutations: await src("content/mutations.js"),
-    pmut: await src("progression/mutations.js"), abilities: await src("abilities.js"), turns: await src("turns.js"),
+    pmut: await src("progression/mutations.js"), abilities: await src("abilities.js"), turns: await src("turns.js"), inventory: await src("inventory.js"),
     creatures: await src("creatures.js"), world: await src("world.js"), status: await src("status.js"), events: await src("events.js"),
     factions: await src("factions.js"), charsheet: await src("screens/charsheet.js"), light: await src("light.js"), time: await src("time.js"),
     content: { ...genotypes, ...backgrounds, ...powers },

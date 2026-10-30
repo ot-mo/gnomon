@@ -7,7 +7,8 @@
 //   defaultPart(e, item) → partId | null     where E in the inventory puts it: the primary hand for weapons, else the
 //                                            first part of its type (one ring at a time "as in the existing game",
 //                                            bible §13.3; the second finger takes one only when asked by part id)
-//   canEquip(game, e, item, partId) → { ok, reason, item?, need? }   reason: "part" | "slot" | "weak" | "cursed" | "broken"
+//   canEquip(game, e, item, partId) → { ok, reason, item?, need? }   reason: "part" | "slot" | "weak" | "cursed" | "broken" |
+//                                                                   "shell" (Shellback: no body armour)
 //   equip(game, e, item, partId) → { ok, removed: [], time, reason }   what it pushed off is the caller's to put away
 //   unequip(game, e, partId) → { ok, item, reason }                  cursed things stick (reason "cursed")
 //   worn(e) → item[]                          equipped items and implants, each once (bonus() sees implants too)
@@ -137,6 +138,8 @@ export function canEquip(game, e, it, partId = defaultPart(e, it)) {
   if (slotType(it) !== part.type) return { ok: false, reason: "slot" };
   if (held(e, partId) !== it && worn(e).includes(it)) return { ok: false, reason: "worn" };   // one item, one place (else its bonuses count twice)
   if (it.broken) return { ok: false, reason: "broken" };   // (a snapped bone weapon, B1: mended first, items.js mendItem)
+  // Shellback (bible §13.5 "no body armour"; B1, WS4 #19): the shell takes nothing heavier than clothes on the body.
+  if (e.mutations?.shellback && part.type === "body" && it.kind === "armour" && it.id !== "clothes") return { ok: false, reason: "shell" };
   const ids = partsTaken(e, it, partId);
   if (!ids) return { ok: false, reason: "slot" };   // two-handed, one hand
   const need = ITEM_KINDS[it.kind]?.req?.(it)?.str;

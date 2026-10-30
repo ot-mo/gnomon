@@ -195,6 +195,7 @@ export function equip(game, it, index, part = defaultPart(game.player, it)) {
     if (check.reason === "weak") game.log(`You're not strong enough for the ${itemName(game, it)} (needs ${check.need} STR, you have ${attr(p, "str")}).`, BAD);
     else if (check.reason === "cursed") game.log(`Your cursed ${itemName(game, check.item)} won't come off! A scroll of remove curse would help.`, CURSE);
     else if (check.reason === "broken") return mendItem(game, p, it) > 0;   // (B1: the Repair power mends it; else it says so)
+    else if (check.reason === "shell") game.log(`Your shell won't go under the ${itemName(game, it)}: nothing heavier than clothes on your back.`, BAD);
     else game.log(`You have nowhere to put the ${itemName(game, it)}.`, DIM);
     return false;
   }
