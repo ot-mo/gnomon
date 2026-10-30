@@ -17,7 +17,9 @@
 //     beat = { id, n, title, landmark, band: [lo, hi], goal, after: [beat id] (any one of them: beats 7 and 8 share
 //              "beat6"; beat 9 needs both), needsAll?, start?: matcher, done: matcher, lengthens?: true,
 //              giver, offer, routes: [text], learn, reward { text, items?, rep?, glim?, maxHp? }, choices? }
-//     choice = { id, label, options: [{ id, text, rep: { [factionId]: n }, glim?, items?, reading?, alliance? }] }
+//     choice = { id, label, byRoute?, options: [{ id, text, rep: { [factionId]: n }, glim?, items?, reading?, alliance? }] }
+//              byRoute: the option is what the route you took did (beat 6's accusation, beat 8's sabotage, redrawing or
+//              argument), recorded by the code as it happens, never offered as a menu
 //     matcher = { event, landmark?, z?, id?, uid? }: the bus event that moves it (story/campaign.js beatMatches)
 //   The landmark people's words are content/people-words.js (re-exported at the bottom, which also loads them).
 export const QUESTS = {
@@ -260,7 +262,7 @@ export const QUESTS = {
         learn: "In Halfnight the accusation becomes the truth. Whoever you name lit the Hush.",
         reward: { text: "The dark-pass, if you won it, and a city in the climate you chose." },
         done: { event: "zone:enter", landmark: "unlitChoir", z: 0 },
-        choices: [{ id: "accused", label: "the accused", options: [
+        choices: [{ id: "accused", label: "the accused", byRoute: true, options: [
           { id: "horary", text: "Accuse a Horary suspect.", rep: { horary: -150, lampless: 100 } },
           { id: "lampless", text: "Accuse a Lampless suspect.", rep: { lampless: -150, horary: 100 } },
           { id: "neither", text: "Accuse a Chandler or a moth-tender.", rep: {} }] }] },
@@ -284,7 +286,7 @@ export const QUESTS = {
         learn: "The hand is the Assize's: a Seventh Hour drawn to the Rule, to be set in the Gnomon and turned.",
         reward: { text: "The Hour Hand (if you redrew it), or an Assize without one." },
         done: { event: "zone:enter", landmark: "metronome", z: 6 },
-        choices: [{ id: "hand", label: "the hour hand", options: [
+        choices: [{ id: "hand", label: "the hour hand", byRoute: true, options: [
           { id: "sabotage", text: "Break the pendulum. The floors fall still.", rep: { plan: -400 } },
           { id: "revise", text: "Redraw the hand for yourself.", rep: { plan: 100 }, items: [["hourHand", 1]] },
           { id: "argue", text: "Argue the drawing out of true.", rep: { plan: 200 } }] }] },
