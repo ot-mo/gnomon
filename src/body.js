@@ -20,8 +20,9 @@
 //   addPart(e, part), removePart(e, partId) → item[]   extra limbs from mutations (WS4); what it held comes off
 //   fittedEffect(e, effect) → bool          an implant fitted in one of e's parts names that effect (IMPLANTS[id].effect;
 //                                            bodymods/implants.js implantEffect's question, for modules that load before it)
-// Events: "gear" { e } after equip, unequip and removePart changed what e wears (B1: social/reputation.js
-// syncWornRep follows it for worn reputation). Not sent without a game (character creation).
+// Events: "gear" { e } after equip and unequip changed what e wears (B1: social/reputation.js syncWornRep follows it for
+// worn reputation; it follows bodymods' "uninstall" too, as a part that comes off, removePart, has no game). Not sent
+// without a game (character creation).
 //
 // A two-handed weapon (WEAPONS[id].hands === 2) takes every holding part: the primary one holds it
 // and the others hold the primary's part id (a string), so no item sits in two places in a save.

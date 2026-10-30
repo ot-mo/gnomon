@@ -1666,6 +1666,21 @@ export async function run(env) {
         if (a2 - r("assize") !== 100) fail(`worn rep: a kit's worn writ off moved Assize ${r("assize") - a2}`);
       }
     } finally { kit.equip = savedKit.equip; kit.pack = savedKit.pack; }
+    // The folding rack's second back holds the cloak; the rack taken out (its part comes off) takes the cloak's rep back.
+    {
+      fresh(1234);
+      const IMP = await m("bodymods/implants.js"), P2 = p(), k0 = r("kites");
+      P2.genotype = "plumb"; P2.license = { grade: 10 };
+      const rack = { kind: "implant", id: "foldingRack" };
+      IMP.install(null, P2, rack, "back", { free: true });
+      const cl = it("featherCloak"), on = Bd.equip(game, P2, cl, "back_2");
+      const kOn = r("kites");
+      game.truing = { at: "cradle" };
+      const out = IMP.uninstall(game, P2, "back", { free: true });
+      game.truing = null;
+      if (!on.ok || kOn - k0 !== 250 || !out?.ok || r("kites") !== k0 || Object.keys(game.state.wornRep || {}).length)
+        fail(`worn rep and the folding rack: the cloak on back_2 ${on.ok} (+${kOn - k0}); the rack out ${out?.ok} (${out?.reason || ""}), Kites ${r("kites")} (was ${k0}), applied ${JSON.stringify(game.state.wornRep)}`);
+    }
     stats.wornRep = `hood +250, cloak +250 (both +500), writ +100/−100 by E, a clamp at ${F.REP_MAX} taken back exactly; the Aspirant's packed writ nothing until worn, a kit's worn writ from the run's start`;
   }
 

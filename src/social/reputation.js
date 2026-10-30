@@ -33,7 +33,8 @@
 //   syncWornRep(game, p = game.player) → { [factionId]: n }   applies the difference from what is applied now
 //                                         (game.state.wornRep { faction: n }, what addRep really moved, so a clamp is
 //                                         taken back exactly), with addRep(…, "worn"); "gear" { e } (body.js equip,
-//                                         unequip) and the run's start (progression/chargen.js beginRun)
+//                                         unequip), "uninstall" (a part that comes off with an implant) and the run's
+//                                         start (progression/chargen.js beginRun)
 import { on } from "../events.js";
 import { extendRules } from "../rules.js";
 import * as creatures from "../creatures.js";
@@ -140,6 +141,8 @@ export function syncWornRep(game, p = game?.player) {
   return moved;
 }
 on("gear", (game, { e }) => { if (e === game.player) syncWornRep(game, e); });
+// (an implant taken out may take a part with it, and what it held: the folding rack's second back; verification finding)
+on("uninstall", (game, { e }) => { if (e === game.player) syncWornRep(game, e); });
 
 on("install", (game, { e }) => {
   if (e !== game.player || !game.state) return;
