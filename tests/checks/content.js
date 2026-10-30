@@ -174,7 +174,9 @@ export function checkContent(m) {
       need(PARTS.has(a.slot), `${at}: slot ${a.slot}, not a part of the humanoid body`);
       need(Number.isInteger(a.tier) && a.tier >= 1 && a.tier <= 8, `${at}: tier ${a.tier}`);
       bonusOk(at, a.bonus);
-      need(a.armour > 0 || Object.keys(a.bonus || {}).length > 0 || str(a.needs), `${at}: does nothing and says nothing of what it needs`);
+      // B1 (the coordinator's approval, 2026-10-30): a built special has an info line instead of needs (check-items' B1
+      // section maps each such piece to a special it tests the behaviour of)
+      need(a.armour > 0 || Object.keys(a.bonus || {}).length > 0 || str(a.info) || str(a.needs), `${at}: does nothing and says nothing of what it needs`);
       need(a.info === undefined || (str(a.info) && sentences(a.info) <= 1), `${at}: info`);
       if (a.wornRep === "hour") need(Number.isInteger(a.hourRep) && a.hourRep > 0, `${at}: an Hour mask's hourRep`);
       else if (a.wornRep !== undefined) repOk(at, a.wornRep);
