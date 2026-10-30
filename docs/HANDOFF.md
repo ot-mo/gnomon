@@ -1021,7 +1021,7 @@ its §8.4 files and two P0 checks).
   discovery, quests and villages; fighting is for loot and survival. **3. Process: "Propose, I approve."** The
   integrator reruns WS8's TTK tables with C4's gear and proposes concrete numbers to hit those targets (creature level
   scaling, tier gear enchantment, XP, bare hands, the wildlife's d20 numbers), and **shows the user the tables before
-  changing any number**. When: the integrator fits it around C1b, C3 and C5.
+  changing any number**. When: the integrator fits it around C1b, C3 and C5. **The proposal is written** (`docs/balance/proposal-2026-10-30.md`, 2026-10-30): creature scaling under d20 +18% HP a level and damage +3 then +2 per 3 levels, two species fixes, an enchantment fix for armour-less pieces, slower fists, XP unchanged (an optional trim); a typical build then pays 9-18% at tiers 1-4 and 23.5-38.5% at tiers 5-8. **Waiting on the user's approval**; nothing is changed.
 - **Balance phase** (the user, 2026-10-27: "settle the tuning (creature scaling, kill XP) in the balance phase once
   C4's gear and WS1/WS7's XP are in"): with C4's gear and WS1's discovery XP in (WS7's quest, beat and village XP are in since `p2-ws7b`: `xpReward` 0.6,
   0.75 and 0.2 of a level), rerun
