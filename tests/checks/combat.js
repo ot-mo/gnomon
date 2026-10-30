@@ -36,10 +36,12 @@
 //                        Shift), AI ability use, the outdoor activity radius, the d20 log format
 //   checkArena(ctx)      two factions, 100 runs: every run ends, the same seeds give the same runs, a mirror
 //                        match is even, the stronger side wins
-//   ttkTables(ctx)       time to kill by level band (d20 with the attribute set), with sanity bounds; and (C3) the same
-//                        fighter against the real world's creatures of each band (realBand: its regions' rows, by how
-//                        many of its spans each region has at that tier; the kinds out for a Bent stranger), the
-//                        balance reference for the real world's levels, held to the same bounds
+//   ttkTables(ctx)       time to kill by level band (d20 with the attribute set); (C3) the same fighter against the
+//                        real world's creatures of each band (realBand: its regions' rows, by how many of its spans
+//                        each region has at that tier; the kinds out for a Bent stranger); and the typical build
+//                        (typicalBuilds: the fighter backgrounds, their powers as offered, their gear as found) against
+//                        the real world's, which the bounds hold since the balance decision of 2026-10-30 (the plain
+//                        columns are information)
 //   ctx = { game, startRun, inputHandlers, keys, seedRandom, restoreRandom }
 //
 // game/startRun: the real game (game.js). srcFiles: [{ file, text }] of every src/ module.
@@ -49,13 +51,17 @@ import { spawnCreature, addCreature, CREATURE_TYPES, pickCreatureType, touchable
 import { resolveAttack, rollToHit, hitChance, toHitMod, critNat, dvOf, weaponSpec, naturalSpec, playerMelee, bumpAttack, combatLine, thrownSpec } from "../../src/combat.js";
 import { guardianThink } from "../../src/guardians.js";
 import { pushPlayerOut, killMonster } from "../../src/monsters.js";
-import { killXp } from "../../src/leveling.js";
+import { killXp, offerPowers, takePerk } from "../../src/leveling.js";
+import { BACKGROUNDS } from "../../src/content/backgrounds.js";
+import { suggestSpread } from "../../src/progression/chargen.js";
+import { hasKey } from "../../src/keyset.js";
+import { randomGear } from "../../src/content/items/gear.js";
 import { mapStep, passTime, refreshView, startTravel, travelStep } from "../../src/turns.js";
 import { overrideRules, RULES } from "../../src/rules.js";
-import { invalidateStats, mod, maxHp, av as armourValue, bonusTable, bonus } from "../../src/stats.js";
+import { invalidateStats, mod, attr, maxHp, av as armourValue, bonusTable, bonus } from "../../src/stats.js";
 import { makeBody } from "../../src/body.js";
 import { makeRng, distance } from "../../src/rng.js";
-import { WEAPONS, ARMOURS, useItem } from "../../src/items.js";
+import { WEAPONS, ARMOURS, ITEM_KINDS, strNeeded, useItem } from "../../src/items.js";
 import { on } from "../../src/events.js";
 import { setDaylight } from "../../src/light.js";
 import { setMode } from "../../src/screens.js";
@@ -298,9 +304,10 @@ export function checkCombat({ game, startRun, srcFiles }) {
       expect(fistSpec.fists && fistMean < daggerMean, `bare hands mean ${fistMean.toFixed(3)} against the dagger's ${daggerMean.toFixed(3)} (want less)`);
       stats.damage = { yours: { plain: +plain.toFixed(3), crit: +crits.toFixed(3), want: wantPlain }, creatureSoak: counts.map((c) => +c.toFixed(3)),
                        fists: +fistMean.toFixed(3), dagger: +daggerMean.toFixed(3) };
-      // A creature's blow on you (goblin level 5: 2-4 + 1). First with no armour, then with AV 4.
+      // A creature's blow on you (goblin level 5: 2-4 + 5, d20's 3 + floor(4 / 1.5) since the balance decision of
+      // 2026-10-30). First with no armour, then with AV 4.
       const biter = mk("goblin", 5);
-      const wantBite = 3 + 1;
+      const wantBite = 3 + 5;
       const onYou = (n = N) => {
         const out = [];
         for (let k = 0; k < n; k++) {
@@ -327,7 +334,7 @@ export function checkCombat({ game, startRun, srcFiles }) {
       const ySoaks = bites.map((x) => x.soaked), yCounts = [0, 1, 2, 3, 4].map((v) => ySoaks.filter((s) => s === v).length / ySoaks.length);
       expect(av4 === 4 && yCounts.every((c) => Math.abs(c - 0.2) <= 0.02),
         `your AV ${av4} soaks ${yCounts.map((c) => c.toFixed(3))} of 0..4, want 0.2 each`);
-      expect(bites.every((x) => x.dmg >= 0 && x.dmg <= (x.crit ? RULES.d20.crit : 1) * 5), "a blow on you did more than its range (×crit) allows");
+      expect(bites.every((x) => x.dmg >= 0 && x.dmg <= (x.crit ? RULES.d20.crit : 1) * (4 + 5)), "a blow on you did more than its range (×crit) allows");
       delete p.bonuses; p.body = savedBody; invalidateStats(p);
       stats.damage.onYou = { plain: +bPlain.toFixed(3), crit: +bCrit.toFixed(3), want: wantBite, soak: yCounts.map((c) => +c.toFixed(3)) };
       game.effects.length = 0;
@@ -1549,8 +1556,8 @@ export function checkArena(ctx, { runs = 100 } = {}) {
 // The d20 set with the attribute stats (DECISIONS; the integrator's flip, §8.5), at each tier's surface level
 // (3 × tier − 1): a fighter (STR 18, AGI 17, TOU 16 at creation, +1 attribute every 4 levels into STR and AGI by
 // turns) with the tier's weapon and armour (the legacy tables: maxTierAt) at +floor(level / 6) and +floor(level / 8),
-// against the creatures that level brings (pickCreatureType's weights, level-scaled: +6% HP a level, +1 damage
-// per 4). For each: your seconds to kill it (blows × your swing), its seconds to kill you (blows × its cooldown),
+// against the creatures that level brings (pickCreatureType's weights, level-scaled as creatures.js does under d20:
+// +18% HP a level, damage +3 then +2 every 3 levels; the legacy set keeps +6% and +1 per 4). For each: your seconds to kill it (blows × your swing), its seconds to kill you (blows × its cooldown),
 // and the share of your health one kill costs (its damage per second × your time to kill). Means are weighted by
 // how often each creature turns up. Melee only (archers' arrows, venom, regeneration and elites left out).
 // The same table under the legacy sets (the parent game: every blow lands, STR 10) is the balance reference.
@@ -1587,7 +1594,100 @@ export function realBand(game, tier, level) {
   if (all > 0) for (const type of Object.keys(counts)) counts[type] *= 2000 / all;
   return counts;
 }
-export function ttkTables(ctx, { blows = 1500 } = {}) {
+// The typical build (the bounds' build since the balance decision of 2026-10-30, the user's: docs/balance/
+// proposal-2026-10-30.md §3.6). Each fighter background as character creation suggests it (chargen.js suggestSpread;
+// its genotype and trees), levels 2-23 with the powers offered on a seed (leveling.js offerPowers: the first combat
+// power offered by TYPICAL_PREF, else the first offered) taken through takePerk, and an attribute point every 4th level
+// into STR and AGI by turns. Its kit at each band is the best of what it has found by then: its background's kit and
+// content/items/gear.js randomGear at the bands' levels (a weapon and two pieces at tier 1, two and four at each tier
+// after; elements and properties left off), the weapon by the damage a blow its info line and your STR promise (a
+// missing STR point taken as 10% off: it costs 2 to hit), each slot by the armour it shows (pieces without armour
+// left out: worn for their own bonus, their enchantment is noise here). → [{ bg, seed, at: { [band level]: { snap,
+// kit } } }], 4 backgrounds × 20 seeds.
+const TYPICAL_BGS = ["aspirantOfTheRule", "forgehandOfOrrum", "droversChild", "reedcutter"];
+const TYPICAL_PREF = ["quick", "mighty", "keenEye", "tough", "ironSkin", "executioner", "regen", "crushing", "longReach",
+  "giantSlayer", "secondWind", "foldingStrike", "thickBlood"];
+const TYPICAL_SEEDS = Array.from({ length: 20 }, (_, k) => 1001 + k);
+const typicalSnap = (p) => ({ attrs: { ...p.attrs }, perks: structuredClone(p.perks), perkRank: { ...p.perkRank }, maxHpGain: p.maxHpGain });
+// Put a build on the player as it was at `level` (its body made fresh from the kit).
+function wearTypical(p, build, level) {
+  const { snap, kit } = build.at[level], bg = BACKGROUNDS[build.bg];
+  Object.assign(p, { background: build.bg, genotype: bg.genotype, trees: [...bg.trees], level, mutations: {}, attrs: { ...snap.attrs },
+                     perks: structuredClone(snap.perks), perkRank: { ...snap.perkRank }, maxHpGain: snap.maxHpGain });
+  p.body = makeBody("humanoid");
+  if (kit.weapon) p.body.equip.hand_r = { ...kit.weapon, known: true };
+  for (const [slot, it] of Object.entries(kit.armour)) p.body.equip[p.body.parts.find((q) => q.type === slot).id] = { ...it, known: true };
+  invalidateStats(p);
+}
+export function typicalBuilds(game) {
+  const p = game.player, out = [], last = BANDS[BANDS.length - 1].level;
+  for (const bgId of TYPICAL_BGS) for (const seed of TYPICAL_SEEDS) {
+    const bg = BACKGROUNDS[bgId], snaps = {}, keepSeed = game.seed;
+    Object.assign(p, { background: bgId, genotype: bg.genotype, trees: [...bg.trees], level: 1, perks: {}, perkRank: {}, maxHpGain: 0,
+                       mutations: {}, attrs: suggestSpread(bg.genotype, bgId) });
+    p.body = makeBody("humanoid");
+    invalidateStats(p);
+    game.seed = seed;
+    try {
+      for (let level = 2, point = 0; level <= last; level++) {
+        p.level = level;
+        invalidateStats(p);
+        const offers = offerPowers(game, p, { level });
+        const pick = TYPICAL_PREF.find((k) => offers.includes(k)) || offers[0];
+        if (pick) takePerk(game, pick);
+        if (level % RULES.progression.level.attrPointEvery === 0) p.attrs[point++ % 2 ? "agi" : "str"]++;
+        invalidateStats(p);
+        snaps[level] = typicalSnap(p);
+      }
+    } finally { game.seed = keepSeed; }
+    const build = { bg: bgId, seed, at: {} }, rand = makeRng(5000 + 7 * (seed - 1000) + bgId.length);
+    const seenW = [], seenA = [];
+    for (const it of Object.values(bg.kit?.equip || {})) {
+      if (it.kind === "weapon") seenW.push({ ...it }); else if (it.kind === "armour" && ARMOURS[it.id]) seenA.push({ ...it });
+    }
+    for (const { tier, level } of BANDS) {
+      const [kW, kA] = tier === 1 ? [1, 2] : [2, 4];
+      for (let w = 0, a = 0, guard = 0; (w < kW || a < kA) && guard < 1000; guard++) {
+        const it = randomGear(rand, level);
+        delete it.element; delete it.props;
+        if (it.kind === "weapon" && w < kW) { seenW.push(it); w++; } else if (it.kind === "armour" && a < kA) { seenA.push(it); a++; }
+      }
+      build.at[level] = { snap: snaps[level], kit: { weapon: null, armour: {} } };
+      wearTypical(p, build, level);
+      const str = attr(p, "str");
+      const blow = (it) => {
+        const w = WEAPONS[it.id], req = strNeeded(it);
+        return ((w.dmg[0] + w.dmg[1]) / 2 + (it.material || 0) + Math.floor((str - req) / 2)) * (1 - 0.1 * Math.min(6, 2 * Math.max(0, req - str)));
+      };
+      const shown = (it) => ITEM_KINDS.armour.av({ ...it, ench: 0 });
+      const kit = build.at[level].kit;
+      kit.weapon = seenW.reduce((b, it) => (!b || blow({ ...it, ench: 0 }) > blow({ ...b, ench: 0 }) ? it : b), null);
+      for (const it of seenA) {
+        const slot = ARMOURS[it.id].slot || "body";
+        if (ARMOURS[it.id].armour > 0 && (!kit.armour[slot] || shown(it) > shown(kit.armour[slot]))) kit.armour[slot] = it;
+      }
+    }
+    out.push(build);
+  }
+  return out;
+}
+// Expected blows to bring `hp` to 0 or below, from blows' damage as sampled (the renewal sum over their spread: no
+// fight left half done at the end of the samples); `low`, the blows sampled while it is below `lowBelow` (the
+// Executioner's, combat.js yourMultipliers: under a quarter of its health).
+function blowsToKill(dmgs, hp, low = null, lowBelow = 0) {
+  const spread = (ds) => { const P = []; for (const d of ds) P[d] = (P[d] || 0) + 1 / ds.length; return P; };
+  const P = spread(dmgs), PL = low ? spread(low) : P;
+  const E = new Float64Array(hp + 1);
+  for (let h = 1; h <= hp; h++) {
+    const Q = h < lowBelow ? PL : P, miss = Q[0] || 0;
+    if (miss >= 1) return Infinity;
+    let s = 1;
+    for (let k = 1; k < h && k < Q.length; k++) if (Q[k]) s += Q[k] * E[h - k];
+    E[h] = s / (1 - miss);
+  }
+  return E[hp];
+}
+export function ttkTables(ctx, { blows = 1500, typicalBlows = 40 } = {}) {
   const { game, seedRandom, restoreRandom } = ctx;
   const problems = [], stats = {};
   const expect = (ok, m) => { if (!ok) problems.push(m); return ok; };
@@ -1596,15 +1696,58 @@ export function ttkTables(ctx, { blows = 1500 } = {}) {
   const z = arena("ws8-ttk", { w: 16, d: 10 });
   enterZone(game, z, { how: "start" }); onMap(game);
   Object.assign(p, { x: 4.5, y: 5.5, z: FLOOR_Z });
-  const saved = { attrs: { ...p.attrs }, level: p.level, body: p.body, perks: p.perks, perkRank: p.perkRank, maxHpGain: p.maxHpGain, mutations: p.mutations };
+  const saved = { attrs: { ...p.attrs }, level: p.level, body: p.body, perks: p.perks, perkRank: p.perkRank, maxHpGain: p.maxHpGain, mutations: p.mutations,
+                  background: p.background, genotype: p.genotype, trees: p.trees };
   const table = {};
-  const sets = [["d20", "attributes"], ["legacy", "legacy"], ["d20", "attributes", "powers"], ["d20", "attributes", "mutations"], ["d20", "attributes", "real"]];
+  const sets = [["d20", "attributes"], ["legacy", "legacy"], ["d20", "attributes", "powers"], ["d20", "attributes", "mutations"], ["d20", "attributes", "real"],
+                ["d20", "attributes", "typical"]];
+  // The typical build's row at a band: each build against the real world's kinds of the band, typicalBlows a side
+  // (the blows to kill from their spread: blowsToKill), the means over the builds; the worst kind by its mean cost.
+  let builds = null;
+  const typicalRow = (tier, level) => {
+    builds ||= typicalBuilds(game);
+    const counts = realBand(game, tier, level), kinds = {}, rs = [];
+    game.combatRng = makeRng(level * 97 + 3);
+    for (const b of builds) {
+      wearTypical(p, b, level);
+      const hpMax = maxHp(p), swing = attackTime(p), regenHps = bonus(p, "regen") / 12, r = { you: 0, it: 0, cost: 0 };
+      const exec = hasKey(p.perks, "executioner");
+      for (const [type, n] of Object.entries(counts)) {
+        const T = CREATURE_TYPES[type], c = addCreature(z, spawnCreature(type, 5, 5, FLOOR_Z, { rng: () => 0.5, level, state: "chase" }));
+        const itsHp = c.maxHp, yours = [], theirs = [], low = exec ? [] : null;
+        c.hp = c.maxHp = 1e12; c.cd = Infinity;
+        for (let k = 0; k < typicalBlows; k++) {
+          yours.push(resolveAttack(game, p, c, weaponSpec(p), { view: "map" }).dmg);
+          if (low) { const h = c.hp; c.hp = 1e11; low.push(resolveAttack(game, p, c, weaponSpec(p), { view: "map" }).dmg); c.hp = h; }
+          p.hp = 1e9;
+          theirs.push(resolveAttack(game, c, p, naturalSpec(c)).dmg);
+        }
+        game.effects.length = 0; run.logged.length = 0;
+        z.creatures.splice(z.creatures.indexOf(c), 1);
+        const w = n / 2000, itsDps = theirs.reduce((a, d) => a + d, 0) / theirs.length / T.cooldown;
+        const yourTtk = blowsToKill(yours, itsHp, low, itsHp * 0.25) * swing, itsBlows = blowsToKill(theirs, hpMax);
+        const itsTtk = regenHps > 0 ? (itsDps > regenHps ? hpMax / (hpMax / (itsBlows * T.cooldown) - regenHps) : Infinity) : itsBlows * T.cooldown;
+        const cost = (Math.max(0, itsDps - regenHps) * yourTtk) / hpMax;
+        r.you += w * yourTtk; r.it += w * itsTtk; r.cost += w * cost;
+        (kinds[type] ||= { cost: 0 }).cost += cost / builds.length;
+      }
+      rs.push({ ...r, hp: hpMax, dv: dvOf(game, p), av: armourValue(p) });
+    }
+    const mean = (f) => rs.reduce((a, r) => a + f(r), 0) / rs.length;
+    const [worst, wc] = Object.entries(kinds).reduce((a, [type, v]) => (v.cost > a[1] ? [type, v.cost] : a), ["", -1]);
+    return { tier, level, hp: Math.round(mean((r) => r.hp)), dv: +mean((r) => r.dv).toFixed(1), av: +mean((r) => r.av).toFixed(1),
+             youKill: +mean((r) => r.you).toFixed(2), itKills: +mean((r) => r.it).toFixed(1), costPct: +(100 * mean((r) => r.cost)).toFixed(1),
+             worst: `${worst} ${(100 * wc).toFixed(0)}%`, types: Object.keys(kinds).length,
+             builds: `${(100 * Math.min(...rs.map((r) => r.cost))).toFixed(0)}-${(100 * Math.max(...rs.map((r) => r.cost))).toFixed(0)}%`,
+             minRatio: +Math.min(...rs.map((r) => r.it / r.you)).toFixed(1) };
+  };
   seedRandom?.(97);   // (the legacy set draws Math.random)
   try {
     for (const [combat, statsSet, build] of sets) {
       const undo = [overrideRules("combat", combat), overrideRules("stats", statsSet)];
       const rows = [];
       for (const { tier, level } of BANDS) {
+        if (build === "typical") { rows.push(typicalRow(tier, level)); continue; }
         const k = Math.floor(level / 4);
         p.level = level; p.perks = {}; p.perkRank = {}; p.maxHpGain = 0; p.mutations = {};
         p.attrs = { ...saved.attrs, str: 18 + Math.ceil(k / 2), agi: 17 + Math.floor(k / 2), tou: 16 };
@@ -1661,22 +1804,20 @@ export function ttkTables(ctx, { blows = 1500 } = {}) {
       while (undo.length) undo.pop()();
       table[build || combat] = rows;
     }
-    // Bounds that hold the formulas, not a verdict on the balance (that is the table itself): you win a fight
-    // with a creature of your level at every band; the first four tiers stay near the parent game's numbers.
-    table.legacy.forEach((L, k) => {
-      const r = table.d20[k];
-      expect(r.youKill >= 0.5 && r.youKill <= 12, `d20 tier ${r.tier} (level ${r.level}): you kill a creature of your level in ${r.youKill} s on average (want 0.5-12)`);
-      expect(r.itKills >= 1.5 * r.youKill && r.costPct <= 75, `d20 tier ${r.tier}: it kills you in ${r.itKills} s, you it in ${r.youKill} s, a kill costs ${r.costPct}% (want it 1.5× slower and at most 75%)`);
-      if (r.tier <= 4) expect(r.costPct <= 1.5 * L.costPct + 3 && r.youKill <= 1.5 * L.youKill + 0.5, `d20 tier ${r.tier}: a kill costs ${r.costPct}% in ${r.youKill} s against the legacy set's ${L.costPct}% in ${L.youKill} s (want within 1.5×)`);
-    });
-    // The real world's creatures (C3): the same bounds as the parent's tables under d20, band by band.
-    table.real.forEach((r, k) => {
+    // The bounds hold the typical build against the real world's creatures (the balance decision of 2026-10-30): you
+    // win a fight with a creature of your level at every band, in a sane time; the first four tiers stay near the
+    // parent game's numbers; tiers 5-8 cost 25-38% of your health a kill, ±3 (the parent's 25-35%). The plain fighter's
+    // columns (d20, real) are information: no powers and the parent's gear, it pays far more than a player does.
+    table.typical.forEach((r, k) => {
       const L = table.legacy[k];
-      expect(r.types >= 3, `real tier ${r.tier} (level ${r.level}): ${r.types} kinds out for you, want 3 or more`);
-      expect(r.youKill >= 0.5 && r.youKill <= 12, `real tier ${r.tier} (level ${r.level}): you kill a creature of your level in ${r.youKill} s on average (want 0.5-12)`);
-      expect(r.itKills >= 1.5 * r.youKill && r.costPct <= 75, `real tier ${r.tier}: it kills you in ${r.itKills} s, you it in ${r.youKill} s, a kill costs ${r.costPct}% (want it 1.5× slower and at most 75%)`);
-      if (r.tier <= 4) expect(r.costPct <= 1.5 * L.costPct + 3 && r.youKill <= 1.5 * L.youKill + 0.5, `real tier ${r.tier}: a kill costs ${r.costPct}% in ${r.youKill} s against the legacy set's ${L.costPct}% in ${L.youKill} s (want within 1.5×)`);
+      expect(r.types >= 3, `typical tier ${r.tier} (level ${r.level}): ${r.types} kinds out for you, want 3 or more`);
+      expect(r.youKill >= 0.5 && r.youKill <= 12, `typical tier ${r.tier} (level ${r.level}): you kill a creature of your level in ${r.youKill} s on average (want 0.5-12)`);
+      expect(r.itKills >= 1.5 * r.youKill, `typical tier ${r.tier}: it kills you in ${r.itKills} s, you it in ${r.youKill} s (want it 1.5× slower)`);
+      if (r.tier <= 4) expect(r.costPct <= 1.5 * L.costPct + 3 && r.youKill <= 1.5 * L.youKill + 0.5, `typical tier ${r.tier}: a kill costs ${r.costPct}% in ${r.youKill} s against the legacy set's ${L.costPct}% in ${L.youKill} s (want within 1.5× + 3)`);
+      else expect(r.costPct >= 22 && r.costPct <= 41, `typical tier ${r.tier}: a kill costs ${r.costPct}% (want 25-38% ±3)`);
     });
+    // The real world (C3): every band has kinds out for you.
+    for (const r of table.real) expect(r.types >= 3, `real tier ${r.tier} (level ${r.level}): ${r.types} kinds out for you, want 3 or more`);
     // The builds only help: never slower to kill, never dearer (within the rolls' noise).
     for (const b of ["powers", "mutations"]) table[b].forEach((r, k) => {
       const base = table.d20[k];
@@ -1688,6 +1829,7 @@ export function ttkTables(ctx, { blows = 1500 } = {}) {
     stats.d20 = table.d20.map((r) => `tier ${r.tier} L${r.level} (${r.weapon}, HP ${r.hp}, DV ${r.dv}, AV ${r.av}): you kill in ${r.youKill} s, it kills you in ${r.itKills} s, a kill costs ${r.costPct}% (worst ${r.worst}; ${r.types} kinds)`);
     stats.legacy = table.legacy.map((r) => `tier ${r.tier} L${r.level}: you kill in ${r.youKill} s, it kills you in ${r.itKills} s, a kill costs ${r.costPct}%`);
     stats.real = table.real.map((r) => `tier ${r.tier} L${r.level} (${r.weapon}, HP ${r.hp}, DV ${r.dv}, AV ${r.av}): you kill in ${r.youKill} s, it kills you in ${r.itKills} s, a kill costs ${r.costPct}% (worst ${r.worst}; ${r.types} kinds)`);
+    stats.typical = table.typical.map((r) => `tier ${r.tier} L${r.level} (HP ${r.hp}, DV ${r.dv}, AV ${r.av}): you kill in ${r.youKill} s, it kills you in ${r.itKills} s, a kill costs ${r.costPct}% (builds ${r.builds}, the closest fight ${r.minRatio}×; worst ${r.worst}; ${r.types} kinds)`);
     stats.table = table;
   } finally {
     Object.assign(p, saved);

@@ -38,6 +38,7 @@
 import { B, FLOOR_Z } from "./world.js";
 import { hasStatus, statusFlag } from "./status.js";
 import { bonus, contentLevel } from "./stats.js";
+import { RULES } from "./rules.js";
 import { nextEntityId, genUid } from "./ids.js";
 import { distance } from "./rng.js";
 import { lineOfSight } from "./raycast.js";
@@ -70,7 +71,9 @@ export const canTalk = (c) => !!c.talk;
 // `g`). It glows in 3D with the elite's own colour (creatureSprite).
 export const eliteColor = (t, e) => t.color.map((v, k) => Math.round((v + e.color[k]) / 2));
 
-// Tougher at higher levels: +6% health per level, and +1 damage every four levels.
+// Tougher at higher levels: under d20 RULES.d20's creatureHp a level and creatureDmg + 1 per creatureDmgEvery levels
+// (the balance phase: +18% and +3, then +2 every 3); under the legacy set the parent's +6% health per level and +1
+// damage every four levels. Bosses and guardians keep their health; mortal villagers the parent's +6%.
 // z is the ground it stands on.
 export function spawnCreature(type, tx, ty, z, opts = {}) {
   const t = types()[type];
@@ -93,14 +96,15 @@ export function spawnCreature(type, tx, ty, z, opts = {}) {
   const rand = opts.rng;
   if (typeof rand !== "function") throw new Error(`spawnCreature: ${type} needs opts.rng (a cosmetic stream, or Math.random at runtime)`);
   const elite = opts.elite ?? null, e = elite ? elites()[elite] : null;
-  const hp = Math.round(t.hp * (t.boss || t.guardian ? 1 : 1 + 0.06 * (level - 1)) * (e?.hp || 1));
+  const D = RULES.combat === "legacy" ? null : RULES.d20, big = t.boss || t.guardian;
+  const hp = Math.round(t.hp * (big ? 1 : 1 + (D ? D.creatureHp : 0.06) * (level - 1)) * (e?.hp || 1));
   const size = e?.size || 1;
   return {
     id: nextEntityId(), uid: opts.uid ?? null, type, elite, guardian: t.guardian || null,
     name: opts.name ?? (e ? `${e.adj} ${t.name}` : t.name), glyph: t.glyph, color: e ? eliteColor(t, e) : t.color,
     w: t.w * size, h: t.h * size,
     hp, maxHp: hp, level,
-    bonus: Math.floor((level - 1) / 4) + (e?.dmg || 0),
+    bonus: (D && !big ? D.creatureDmg + Math.floor((level - 1) / D.creatureDmgEvery) : Math.floor((level - 1) / 4)) + (e?.dmg || 0),
     speedMul: e?.speed || 1, cdMul: e?.cd || 1, armour: (e?.armour || 0) + (t.armour || 0), ward: !!e?.ward,
     venom: Math.max(t.venom || 0, e?.venom || 0), drain: !!(t.drain || e?.drain), burns: t.burns || 0,
     xp: Math.round(t.xp * (1 + 0.1 * (level - 1)) * (e ? 2.5 : 1)),   // what killing it is worth

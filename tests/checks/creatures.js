@@ -133,12 +133,18 @@ export function checkCreatures({ game, startRun, srcFiles }) {
   expect(ratDraws === 4 && rat.shot === 1.5 && rat.anim === 5 && rat.think === 0.125 && rat.pause === 1, `a monster's looks: ${ratDraws} draws, shot ${rat.shot} anim ${rat.anim} think ${rat.think} pause ${rat.pause}`);
   expect(pellDraws === 0 && pell.talk?.dialogue === "pell" && pell.talk.met === false && pell.level === 9 && pell.hp === undefined,
          "a talker draws nothing, talks, has a level and no health");
-  const t = CREATURE_TYPES.rat;
-  expect(rat.maxHp === Math.round(t.hp * (1 + 0.06 * 8)) && rat.bonus === 2 && rat.xp === Math.round(t.xp * 1.8) && rat.state === "wander",
+  // Under d20 a creature's level scales it as the balance decision of 2026-10-30 says (the user's, proposal §3.2):
+  // +18% HP a level, damage +3 then +2 every 3 levels (RULES.d20.creatureHp, creatureDmg, creatureDmgEvery).
+  const t = CREATURE_TYPES.rat, D = RULES.d20;
+  expect(D.creatureHp === 0.18 && D.creatureDmg === 3 && D.creatureDmgEvery === 1.5, `the creature scaling: ${D.creatureHp}, ${D.creatureDmg}, ${D.creatureDmgEvery}`);
+  // and its two fixes (proposal §3.2): the barrow troll and the planar queen were the dearest kills of their bands.
+  expect(CREATURE_TYPES.barrowTroll?.hp === 30 && CREATURE_TYPES.planarQueen?.hp === 28,
+         `barrow troll ${CREATURE_TYPES.barrowTroll?.hp} HP, planar queen ${CREATURE_TYPES.planarQueen?.hp} (want 30, 28)`);
+  expect(rat.maxHp === Math.round(t.hp * (1 + 0.18 * 8)) && rat.bonus === 3 + 5 && rat.xp === Math.round(t.xp * 1.8) && rat.state === "wander",
          `level 9 rat: hp ${rat.maxHp}, damage +${rat.bonus}, xp ${rat.xp}`);
   expect(pell.id === rat.id + 1 && entityCounter() === pell.id + 1, "monsters and people draw their ids from one counter");
   const elite = spawnCreature("rat", 1, 1, FLOOR_Z, { rng: () => 0.5, level: 5, elite: "hulking" });
-  expect(elite.name === "hulking rat" && elite.maxHp === Math.round(t.hp * 1.24 * 2), `a hulking rat: ${elite.name}, ${elite.maxHp} HP`);
+  expect(elite.name === "hulking rat" && elite.maxHp === Math.round(t.hp * (1 + 0.18 * 4) * 2), `a hulking rat: ${elite.name}, ${elite.maxHp} HP`);
   stats.spawn = { monsterDraws: ratDraws, talkerDraws: pellDraws };
 
   // --- 4 and 5: on a test zone ---------------------------------------------------------------------------

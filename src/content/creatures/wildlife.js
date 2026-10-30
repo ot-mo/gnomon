@@ -236,7 +236,7 @@ export const WILDLIFE = {
   },
   barrowTroll: {
     name: "barrow-troll", glyph: "T", color: [140, 150, 120], xp: 24, levels: [9, 16], weight: 1, factions: [],
-    hp: 40, speed: 2.0, damage: [6, 11], cooldown: 1.7, reach: 1.6, sight: 11, w: 1.3, h: 2.1, regen: 1, weak: ["fire"], resist: ["frost"], ...d20(24, 10, 26, 6, 14, 6),
+    hp: 30, speed: 2.0, damage: [6, 11], cooldown: 1.7, reach: 1.6, sight: 11, w: 1.3, h: 2.1, regen: 1, weak: ["fire"], resist: ["frost"], ...d20(24, 10, 26, 6, 14, 6),
     rule: { sleeps: "day" }, needs: "asleep in the Teeth's foothills by day (gen/biomes, clock.js)",
     ...reskin("troll", { t: [[130, 140, 112], 0] }),
   },
@@ -439,7 +439,7 @@ export const WILDLIFE = {
   },
   planarQueen: {   // (the Flat Queen's rule, as the Twice-pressed legend has it: guardians.js "legend:twicePressed")
     name: "planar queen", glyph: "Q", color: [180, 140, 255], xp: 40, levels: [18, 30], weight: 1, flat: true, factions: [], ai: "legend:twicePressed",
-    hp: 40, speed: 1.8, damage: [3, 7], cooldown: 1.3, reach: 1.3, sight: 14, w: 1.2, h: 2.2, ...d20(16, 16, 20, 16, 22, 20),
+    hp: 28, speed: 1.8, damage: [3, 7], cooldown: 1.3, reach: 1.3, sight: 14, w: 1.2, h: 2.2, ...d20(16, 16, 20, 16, 22, 20),
     ...reskin("flatqueen", { p: [[90, 70, 170], 0.4] }),
   },
   // --- Anywhere: the Cast hunters (§12.12) ---------------------------------------------------------------

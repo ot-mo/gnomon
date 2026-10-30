@@ -30,8 +30,12 @@ const CORE = {
   // floor(level / dvPerLevels) + the species' dv. aimed: a projectile that physically reached its target;
   // reqPenalty per missing STR point of the wielded weapon, at most reqPenaltyMax. fistReq: bare hands
   // count STR over this (not over 0), so a fist never outdoes a weapon (0C verification).
+  // Creatures (creatures.js spawnCreature, not bosses or guardians): health × (1 + creatureHp × (level − 1)), damage +
+  // creatureDmg + floor((level − 1) / creatureDmgEvery); the legacy set keeps the parent's +6% and +1 per 4. (The
+  // balance phase, approved by the user 2026-10-30: docs/balance/proposal-2026-10-30.md §3.1.)
   d20: { die: 20, crit: 2, critPerAgi: 0.02, minCritNat: 2, highGround: 1, highGroundZ: 1, aimed: 3,
-         creatureDv: 5, dvPerLevels: 4, hitPerLevels: 3, reqPenalty: 2, reqPenaltyMax: 6, fistReq: 10 },
+         creatureDv: 5, dvPerLevels: 4, hitPerLevels: 3, reqPenalty: 2, reqPenaltyMax: 6, fistReq: 10,
+         creatureHp: 0.18, creatureDmg: 3, creatureDmgEvery: 1.5 },
 
   // Attributes (bible §10.6): modifier = floor((score − center) / 2); everyone has `base` until WS4.
   attr: { list: ["str", "agi", "tou", "int", "wil", "ego"], base: 16, center: 16 },

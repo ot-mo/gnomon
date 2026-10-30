@@ -591,7 +591,7 @@ export async function checkLegends({ seed = 7 } = {}) {
   const first = look(game.zone.creatures.find((o) => o.uid === L7.uid));
   for (let k = 0; k < 3; k++) { go(top); go(deep); }
   const again = look(game.zone.creatures.find((o) => o.uid === L7.uid));
-  const base = Math.floor((L7.level - 1) / 4);
+  const base = 3 + Math.floor((L7.level - 1) / 1.5);   // d20's creature damage (the balance decision of 2026-10-30)
   if (!first || first.bonus !== base + 2 || first.venom !== 3 || first.armour < 2 || first.color !== "[235,90,235]") problems.push(`mutations on first entry: ${JSON.stringify(first)}`);
   if (JSON.stringify(again) !== JSON.stringify(first)) problems.push(`mutations after three re-entries: ${JSON.stringify(again)} (first ${JSON.stringify(first)})`);
   go(top);
