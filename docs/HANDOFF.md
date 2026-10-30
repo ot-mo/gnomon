@@ -5,12 +5,12 @@ Update this file as the last act of every session (see `CLAUDE.md`, "Handing off
 **Updated:** 2026-10-30, the integrator (local session), on `integration`. **Phases 1 and 2 are done; Phase 3 is under
 way.** all six content sessions are merged (`p3i-c1a`, `p3i-c4`, `p3i-c2`, `p3i-c3`, `p3i-c1b`, `p3i-c5`), and §8.5's last wiring merge is done
 (`p3i-wiring`): **new games start on GNOMON's real world at Hollowmere** (`?world=test` for the test world). `main` =
-`p3i-c5`. Nothing is running; the balance proposal waits on the user. From here on only the integrator edits this file and
+`p3i-balance` (the user's balance decisions of 2026-10-30 applied: creature scaling under d20, two species fixes, enchantment AV, fists; ttkTables' bounds on a typical build). Nothing is running; the light-weapon fix (`docs/balance/light-weapons-2026-10-30.md`) waits on the user. From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p3i-sinkholes` (C1a's request 9, on `p3i-props`) on `integration`; before it `p3i-props` (props named; C1a's, C4's and C2's base), `p2-realworld`, `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+- **Last tag:** `p3i-balance` (the balance decisions of 2026-10-30, on `p3i-c5`) on `integration`; before it the Phase 3 merges (`p3i-c5`, `p3i-c1b`, `p3i-c3`, `p3i-c2`, `p3i-c4`, `p3i-wiring`, `p3i-c1a`), `p3i-sinkholes` (C1a's request 9, on `p3i-props`), `p3i-props` (props named; C1a's, C4's and C2's base), `p2-realworld`, `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
   `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b`, `p1-ws10`, the flip, `p1-ws2a`, `p1-ws7a`,
   `p1-ws7b`, `p1-ws2b`, `p1-ws9` and `p1-ws1`, with their integration requests; `p2-ws3` … `p2-ws9` before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
@@ -44,7 +44,7 @@ Hollowmere, holding the cube (it has none to find yet); without the flag nothing
 the real world the default: then `main.js`'s `?world=real` branch and its cube hook go (`config.js` `WORLD` can stay
 or go with it; browser-2b part 3 and check-overworld's 7 URLs follow).
 
-**Next step:** the user's answer to the balance proposal (`docs/balance/proposal-2026-10-30.md`; nothing changes until they approve), then the integrator's backlog of the content sessions' code requests (the integration log's "Left" lists, C5 #3 first: placing the landmark people), then Phase 4. Before: **Next step:** C5 (quests, the campaign, the landmark people's words), the last content session, is started in `gnomon-wtc5` on `ws/c5` from `p3i-c1b` (the user, 2026-10-30: "Start C5"); the integrator merges its tag when it comes; the balance proposal (the user's decisions, 2026-10-30, under "Open items") fits around them. Before: **C1b and C3 were started** (the user, 2026-10-29: "start C1b (in the c1 worktree, merging p3i-c2 first)
+**Next step:** the user's answer to the light-weapon proposal (`docs/balance/light-weapons-2026-10-30.md`: STR over one bar of 10 for every blade, the STR term and the material × swing ÷ 0.7; nothing changes until they approve), then the integrator's backlog of the content sessions' code requests (the integration log's "Left" lists, C5 #3 first: placing the landmark people), then Phase 4. Before: **Next step:** the user's answer to the balance proposal (`docs/balance/proposal-2026-10-30.md`; nothing changes until they approve; answered and applied at `p3i-balance`), then the integrator's backlog of the content sessions' code requests (the integration log's "Left" lists, C5 #3 first: placing the landmark people), then Phase 4. Before: **Next step:** C5 (quests, the campaign, the landmark people's words), the last content session, is started in `gnomon-wtc5` on `ws/c5` from `p3i-c1b` (the user, 2026-10-30: "Start C5"); the integrator merges its tag when it comes; the balance proposal (the user's decisions, 2026-10-30, under "Open items") fits around them. Before: **C1b and C3 were started** (the user, 2026-10-29: "start C1b (in the c1 worktree, merging p3i-c2 first)
 and C3 (a new c3 worktree from p3i-c2)"); the integrator merges their tags as they come, then C5 starts on the user's
 word. Meanwhile:
 - **C1b and C3** (the Phase 3 plan's table), started: their worktrees from `p3i-c2` (`c1` again for C1b, on `ws/c1`; a new `c3` on
@@ -391,6 +391,30 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p3i-balance`** (2026-10-30): the user's balance decisions of 2026-10-30 (relayed by the coordinating session, and
+"Approve the core" to the integrator), from `docs/balance/proposal-2026-10-30.md`, applied on `p3i-c5`. **Under d20
+only** (the legacy set keeps the parent's +6% HP a level and +1 damage per 4, so golden holds): creatures +18% HP a
+level and damage +3 then +2 every 3 levels (`RULES.d20.creatureHp`, `creatureDmg`, `creatureDmgEvery`; bosses and
+guardians unscaled, mortal villagers keep +6%); the barrow troll HP 40→30 and the planar queen 40→28; enchantment adds
+to AV only on C4's pieces with armour (a +3 monocle is AV 0; the parent's pieces keep armour + enchantment, which the
+proposal's "all the parent's armour has armour" missed: clothes, the reed hat and the goggles have none, so the rule
+is held to `GEAR_ARMOURS`); fists swing in 0.5 s (was 0.3). Checks changed with them (§3.6): check-creatures' level-9
+rat (HP 10, +8) and hulking rat, check-sites' legend bonus (3 + floor((L − 1) / 1.5)), check-combat's goblin blow
+(2-4 + 5) and its range, check-stats' AV formula (the same rule), and **ttkTables' bounds moved to the typical build**:
+four fighter backgrounds × 20 seeds (chargen's suggested spread, the powers offered on the seed taken by a combat
+preference through takePerk, a point every 4th level into STR and AGI; the best of what they found by each band,
+randomGear's kit, the weapon by its damage a blow, each slot by its armour) against the real world's creatures, 40
+blows a side a kind, the blows to kill from their spread (a renewal sum; the Executioner counted). Held to: tiers 1-4
+within 1.5× the legacy set's cost + 3, tiers 5-8 at 25-38% ±3, its kill of you 1.5× slower, 0.5-12 s to kill, 3 kinds
+a band; the plain fighter's columns (d20, real) are information now. Its numbers (cost a kill, your seconds to kill, its kill of you): 9.4% 0.88 s 11.2 s, 10.1% 1.18 s 13.3 s, 10.7% 1.44 s 14.9 s, 18.2% 2.2 s 13.5 s, 23.9% 2.85 s 13.2 s, 27.9% 3.31 s 13.6 s, 30.9% 3.52 s 12.9 s, 39.4% 4.15 s 11.6 s at tiers 1-8 (the parent: 8.7 / 8.5 / 9.7 / 16.3 / 24.9 / 30.0 / 34.8 / 24.5%); builds spread from 4-17% at tier 1 to 13-76% at tier 8. The same builds at 400
+blows: 9.3 / 10.1 / 10.6 / 18.0 / 23.7 / 27.4 / 30.1 / 38.6%, the agent's exact model 9.3 / 10.0 / 10.2 / 17.8 / 23.5 /
+27.2 / 30.0 / 38.5% (40 blows reads about half a point high). Pinned: the scaling's three numbers, the troll and the
+queen, fists 0.5 s. Mutants (12, each killed): creatureHp 0.06 (check-creatures; ttk tier 5 at 14.7%), creatureDmg 1
+(check-creatures, check-sites, check-combat's goblin), the legacy bonus under d20, the old AV rule (check-stats), fists
+0.3, troll 40, queen 40, creatureDmgEvery 1 (ttk tier 8 at 58%). Golden 86/86, legacy fights 1,359 steps 0 differing,
+screen frames 34/34. run-all 37 of 38 under load (the world-map draw, 3.59 and 3.68 ms; alone 1.2-1.85 ms), check-perf alone passes; check-combat 33 s alone (was 22), 106 s in run-all (check-edges 138 s stays the longest). The real world's bot playthrough (seed 9: 367 keys, the shrine prayer done, down Kettle Mesa) passes with the harder creatures; browser-gate (seeds 1234 and 7), browser-2b, browser-ws8, browser-c4 and browser-0d1 pass (audio silenced, servers stopped). Not taken: the XP trim and the askew angle fix (the user). Next: the light-weapon fix
+(`light-weapons.md`, proposed to the user with its tables; nothing changed until they approve).
 
 **`p3i-c5`** (2026-10-30): `p3-c5` (a9749c8) merged into `integration`, cleanly: the campaign's intro, wake line,
 starter chain and 11 beats of *The Lengthening* as data, quest texts and pools, and the landmark people's words
@@ -1032,7 +1056,7 @@ its §8.4 files and two P0 checks).
   discovery, quests and villages; fighting is for loot and survival. **3. Process: "Propose, I approve."** The
   integrator reruns WS8's TTK tables with C4's gear and proposes concrete numbers to hit those targets (creature level
   scaling, tier gear enchantment, XP, bare hands, the wildlife's d20 numbers), and **shows the user the tables before
-  changing any number**. When: the integrator fits it around C1b, C3 and C5. **The proposal is written** (`docs/balance/proposal-2026-10-30.md`, 2026-10-30): creature scaling under d20 +18% HP a level and damage +3 then +2 per 3 levels, two species fixes, an enchantment fix for armour-less pieces, slower fists, XP unchanged (an optional trim); a typical build then pays 9-18% at tiers 1-4 and 23.5-38.5% at tiers 5-8. **Decided by the user** (2026-10-30, in the coordinating session's chat, their choices from its options): **1. the core scaling "Approve as proposed"** (§3.1, edits 1-4: under d20 only, +18% HP a level, damage +3 then +2 every 3 levels); **2. three small fixes approved** (barrow troll HP 40→30 and planar queen 40→28, §3.2 6-7; enchantment adds to AV only on pieces with armour, §3.3 9; fists 0.5 s, §3.4 11), with §3.6's check changes (ttkTables' bounds on the typical build; no fixture re-recorded); **3. not approved:** the XP trim (§3.5 12) and the askew angle fix (8): XP stays; **4. light weapons "Fix it":** scale the STR term and the material by swing time so damage per second evens out across weapon weights, **the exact numbers proposed first, with tables, for the user's approval**.
+  changing any number**. When: the integrator fits it around C1b, C3 and C5. **The proposal is written** (`docs/balance/proposal-2026-10-30.md`, 2026-10-30): creature scaling under d20 +18% HP a level and damage +3 then +2 per 3 levels, two species fixes, an enchantment fix for armour-less pieces, slower fists, XP unchanged (an optional trim); a typical build then pays 9-18% at tiers 1-4 and 23.5-38.5% at tiers 5-8. **Decided by the user** (2026-10-30, in the coordinating session's chat, their choices from its options): **1. the core scaling "Approve as proposed"** (§3.1, edits 1-4: under d20 only, +18% HP a level, damage +3 then +2 every 3 levels); **2. three small fixes approved** (barrow troll HP 40→30 and planar queen 40→28, §3.2 6-7; enchantment adds to AV only on pieces with armour, §3.3 9; fists 0.5 s, §3.4 11), with §3.6's check changes (ttkTables' bounds on the typical build; no fixture re-recorded); **3. not approved:** the XP trim (§3.5 12) and the askew angle fix (8): XP stays; **4. light weapons "Fix it":** scale the STR term and the material by swing time so damage per second evens out across weapon weights, **the exact numbers proposed first, with tables, for the user's approval**. **Applied** (1-3) at `p3i-balance` (the integration log). **Light weapons proposed** (`docs/balance/light-weapons-2026-10-30.md`, to the user 2026-10-30): the user's rule alone (×swing ÷ 0.5) leaves a dagger 1.4× faster to kill, so the agent adds one bar of 10 for STR on every blade (as fists have); damage per second across the 13 classes evens from ×2.7 to ×1.2-1.3, the typical build's tiers 5-8 stay at 23.8 / 27.1 / 30.2 / 37.7%, a dagger fighter pays 22-34% there instead of 11-17%; low-STR and AGI builds lose most. When approved, ttkTables' typical kit must pick its weapon by the new rule.
 - **Balance phase** (the user, 2026-10-27: "settle the tuning (creature scaling, kill XP) in the balance phase once
   C4's gear and WS1/WS7's XP are in"): with C4's gear and WS1's discovery XP in (WS7's quest, beat and village XP are in since `p2-ws7b`: `xpReward` 0.6,
   0.75 and 0.2 of a level), rerun
