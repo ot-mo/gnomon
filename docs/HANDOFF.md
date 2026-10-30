@@ -2,7 +2,7 @@
 
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
-**Updated:** 2026-10-29, the integrator (local session), on `integration`. **Phases 1 and 2 are done; Phase 3 is under
+**Updated:** 2026-10-30, the integrator (local session), on `integration`. **Phases 1 and 2 are done; Phase 3 is under
 way.** C1a, C4, C2 and C3 are merged (`p3i-c1a`, `p3i-c4`, `p3i-c2`, `p3i-c3`), and §8.5's last wiring merge is done
 (`p3i-wiring`): **new games start on GNOMON's real world at Hollowmere** (`?world=test` for the test world). `main` =
 `p3i-c3`. C1b is running (asked to finish and tag); C5 after it. From here on only the integrator edits this file and
