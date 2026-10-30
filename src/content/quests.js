@@ -174,7 +174,7 @@ export const QUESTS = {
         text: "Brann's skull lies on the Keeper's Stair's second floor. Maren unseals the first landing. Some planks there only show with your torch out.",
         done: "thank you\ntake the lantern\nsit by it with your torch out and you'll mend\ni did for a while",
         rewards: { items: [["lantern", 1]], reading: "the Hush Stair", opens: "the Keeper's Stair" } },
-      { id: "dialFloor", title: "The Dial Floor", giver: "Brother Tamsin", goal: "Read the Dial Floor's mosaic on the map, its relief in 3D and its rim in the dark.", teaches: "readings, the three accounts, world-map travel", reward: "the site's relic, a first true-mark or 2 creases",
+      { id: "dialFloor", title: "The Dial Floor", giver: "Brother Tamsin", goal: "Read the Dial Floor's mosaic on the map, its relief in 3D and its rim in the dark, then visit the Fifth-Hour site.", teaches: "readings, the three accounts, world-map travel", reward: "the site's relic, a first true-mark or 2 creases",
         offer: "The Dial Floor, north of the village, tells one story three ways. Read the floor from above, the pedestal by light and the rim in the dark. The Horary pays for the difference.",
         text: "Read the Dial Floor three ways: the mosaic on the map, the pedestal's relief in 3D, the rim's rune with your torch out. Then follow its arrow to the Fifth-Hour site.",
         done: "Three accounts, and they don't agree. Good. Agreement is how you know someone has been at the stone.",
