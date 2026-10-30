@@ -857,7 +857,14 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
   let spot = null; for (let y = 0; y < sw.d && !spot; y++) for (let x = 0; x < sw.w && !spot; x++) if (sw.stand[x + y * sw.w] === FLOOR_Z && GM.underSweep(sw, x, y, game.time)) spot = [x, y];
   st.removeStatus(game, P, "flat");
   if (spot) { Object.assign(P, { x: spot[0] + 0.5, y: spot[1] + 0.5, z: FLOOR_Z }); tick(); }
-  G2.sweep = { cells: cells(game.time), moved: [...Array(sw.w * sw.d).keys()].some((i) => GM.underSweep(sw, i % sw.w, Math.floor(i / sw.w), game.time) !== GM.underSweep(sw, i % sw.w, Math.floor(i / sw.w), game.time + sw.sweep.period / 4)), flat: !!spot && st.hasStatus(P, "flat") };
+  // (a boss in the hand's shadow isn't pressed: a stand-in for Vesper on her spot's kind, at the player's tile)
+  const { spawnCreature: spc, addCreature: adc } = await import("../../src/creatures.js");
+  const bossM = adc(sw, spc("goblin", spot?.[0] ?? 1, spot?.[1] ?? 1, FLOOR_Z, { rng: Math.random, state: "idle", level: 3 }));
+  sw.bossSpot = { id: "goblin" }; tick();
+  const bossFlat = st.hasStatus(bossM, "flat"); sw.bossSpot = null; tick();
+  const plainFlat = st.hasStatus(bossM, "flat");
+  sw.creatures = sw.creatures.filter((c) => c !== bossM);
+  G2.sweep = { bossFlat, plainFlat, cells: cells(game.time), moved: [...Array(sw.w * sw.d).keys()].some((i) => GM.underSweep(sw, i % sw.w, Math.floor(i / sw.w), game.time) !== GM.underSweep(sw, i % sw.w, Math.floor(i / sw.w), game.time + sw.sweep.period / 4)), flat: !!spot && st.hasStatus(P, "flat") };
   st.removeStatus(game, P, "flat");
   // Dark-mapping in the Root Canals: three steps leave three tiles of track (none outside a dark-mapped dungeon).
   const rc = enter("molar", 1), sx = Math.floor(rc.spawn.x), sy = Math.floor(rc.spawn.y);
@@ -890,7 +897,7 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
   expect(JSON.stringify(G2.headroom) === "[6,5,4,3]" && G2.pressed.flatBefore >= 1 && G2.pressed.gold && G2.pressed.deepAfter && G2.pressed.done
     && G2.pressPlate?.flat && G2.pressPlate.unhurt && !G2.pressPlate.plates1
     && G2.trueLevel.vault === "The True Level" && G2.trueLevel.plates === 4 && G2.trueLevel.plateMurals === 4 && G2.trueLevel.sill && G2.trueLevel.shut0 && G2.trueLevel.wrongShut && G2.trueLevel.gas && G2.trueLevel.dead && G2.trueLevel.open
-    && G2.tide.noon && G2.tide.at16 && G2.tide.levels === "01234440" && G2.tide.byClock && G2.sweep.cells > 20 && G2.sweep.moved && G2.sweep.flat
+    && G2.tide.noon && G2.tide.at16 && G2.tide.levels === "01234440" && G2.tide.byClock && G2.sweep.cells > 20 && G2.sweep.moved && G2.sweep.flat && !G2.sweep.bossFlat && G2.sweep.plainFlat
     && G2.darkMapping.trail === 3 && G2.darkMapping.other && G2.fold.day === G2.fold.planks && G2.fold.planks > 100 && G2.fold.night === 0 && G2.fold.dropped && G2.fold.dawn === G2.fold.planks && G2.layouts.day === "day" && G2.layouts.night === "night" && G2.layouts.differ && G2.layouts.nightThings > 0 && G2.layouts.againThings === 0 && G2.layouts.load === "day",
     `in a game: the gimmicks ${JSON.stringify(G2)}`);
   return { name: "landmark bottoms", ok: problems.length === 0, problems, stats };

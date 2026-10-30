@@ -24,6 +24,7 @@ import { hourOf } from "./clock.js";
 import { addStatus, hasStatus } from "./status.js";
 import * as S from "./screen.js";
 import { changeZone } from "./zones.js";
+import { CREATURE_TYPES } from "./creatures.js";
 
 export const TRUE_LEVEL = { dead: 30 };   // seconds the plates are dead after a wrong one
 
@@ -63,6 +64,8 @@ function turnOf(dx, dy) {   // 0..1 round the middle, by the "diamond angle" (no
   const p = dy >= 0 ? (dx >= 0 ? dy / s : 1 - dx / s) : (dx < 0 ? 2 - dy / s : 3 + dx / s);
   return p / 4;
 }
+// What the hand doesn't press: a guardian, a boss kind, a landmark's boss in its hall (Vesper in the Noon Socket), a legend.
+const sweepProof = (zone, m) => !!(m.guardian || CREATURE_TYPES[m.type]?.boss || m.flags?.legend || (zone.bossSpot && m.type === zone.bossSpot.id));
 export function underSweep(zone, x, y, t) {
   const S = zone.sweep;
   if (!S) return false;
@@ -79,7 +82,7 @@ registerUpdate("landmarkGimmicks", (game) => {
   const tx = Math.floor(p.x), ty = Math.floor(p.y);
   if (zone.sweep) {
     if (underSweep(zone, tx, ty, game.time)) addStatus(game, p, "flat", { t: 1, stack: "refresh" });
-    for (const m of zone.creatures) if (m.hp > 0 && underSweep(zone, Math.floor(m.x), Math.floor(m.y), game.time) && !m.guardian && !m.boss) addStatus(game, m, "flat", { t: 1, stack: "refresh" });
+    for (const m of zone.creatures) if (m.hp > 0 && !sweepProof(zone, m) && underSweep(zone, Math.floor(m.x), Math.floor(m.y), game.time)) addStatus(game, m, "flat", { t: 1, stack: "refresh" });
   }
   if (zone.darkMapping && tx >= 0 && ty >= 0 && tx < zone.w && ty < zone.d) {
     const i = tx + ty * zone.w;
