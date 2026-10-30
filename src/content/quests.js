@@ -143,7 +143,7 @@ export const QUESTS = {
   // The campaign (TECH_DESIGN §8.3 "WS7": intro pages, the start, the main beats as data; bible §10.5, §11).
   campaign: {
     intro: [
-      { title: "GNOMON", text: "Far to the north-east a needle stands over the world, taller than weather. Its shadow is the hour.\n\nFor three nights now the noon shadow has been longer than it should be, and something under the Temple of Angles in Hollowmere has been shaking the floor." },
+      { title: "GNOMON", text: "Far to the north-east a needle stands over the world, taller than weather. The Horary says its shadow is the hour.\n\nFor three nights now something under the Temple of Angles in Hollowmere has been shaking the floor." },
       { text: "You were born in Hollowmere, or came with a caravan, or came down from a Level with a letter for the Prioress. It doesn't matter tonight.\n\nOn the third night of the shaking the sanctum stair cracks open. Below it, on the altar, a cube is humming." },
       { title: "HOW TO PLAY", text: "You see the world two ways. Until you touch the Cube, you see only one of them.\n  The map: from above, step by step, the whole place at once, and the flat things.\n  3D: from inside, height and depth, light and darkness.\nTab turns between them, once you can.\n\nJ: journal (quests, places, histories, rumours, notes).   Walk into someone to talk." },
     ],
