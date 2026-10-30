@@ -122,9 +122,11 @@ try {
   await shot("1-map-hollowmere-cast");
 
   // The look on the map: L, then L again on the default target (the foe first: the saltrat) → examine.
+  // (On the map the examine screen shows a creature's Flat line, in 3D its Deep one: C3's request 2, applied at its merge.)
+  const flatOf = (type) => page.evaluate(async (t) => (await import("/src/content/creatures/bestiary.js")).creatureLines(t).flat, type);
   await key("KeyL"); await key("KeyL");
-  let ex = await examined("A white-crusted rat, light as a dry reed.");
-  expect((await mode()) === "examine" && ex.type === "saltrat" && ex.shown, `L L on the map examines the saltrat with its Deep line (${await mode()}, ${JSON.stringify(ex)})`);
+  let ex = await examined(await flatOf("saltrat"));
+  expect((await mode()) === "examine" && ex.type === "saltrat" && ex.shown, `L L on the map examines the saltrat with its Flat line (${await mode()}, ${JSON.stringify(ex)})`);
   expect(ex.lines.some((l) => l.includes("out for you")), "the saltrat is out for you");
   await shot("2-map-examine-saltrat");
   await key("Escape");
@@ -136,9 +138,9 @@ try {
     if (!onIt) await key("Tab");
   }
   await key("Enter");
-  ex = await examined("A crab the height of a child, claws held aside.");
+  ex = await examined(await flatOf("clatterer"));
   expect(onIt && (await mode()) === "examine" && ex.type === "clatterer" && ex.shown && ex.lines.some((l) => l.includes("minding its own business")),
-         `the look cursor's Tab reaches the clatterer, and examine shows its Deep line and its peace (${onIt}, ${await mode()}, ${JSON.stringify(ex)})`);
+         `the look cursor's Tab reaches the clatterer, and examine shows its Flat line and its peace (${onIt}, ${await mode()}, ${JSON.stringify(ex)})`);
   await shot("3-map-examine-clatterer");
   await key("Escape");
   if ((await mode()) !== "map") await key("Escape");

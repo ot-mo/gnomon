@@ -372,7 +372,9 @@ export function checkContent(m) {
   const spawnable = (world, region, level) => {
     const table = m.worlds.find((w) => w.id === world).def.regions?.[region]?.creatures;
     if (table) return table.filter(([type, weight, lo, hi]) => CREATURE_TYPES[type] && weight > 0 && level >= lo && level <= hi).map(([type]) => type);
-    const lv = m.contentLevel(level);
+    // (The legacy stack's floors are the parent's levels 1-20 whatever level the world lists them at: world/legacy.js
+    // legacyZone, WS10 #9; so its tables at 20 at most, now that contentLevel reaches 23: integrator, C3 #1.)
+    const lv = region === "the legacy stack" ? Math.min(level, 20) : m.contentLevel(level);
     return legacyTypes.filter((id) => { const t = CREATURE_TYPES[id]; return t.weight > 0 && lv >= t.depths[0] && lv <= t.depths[1]; });
   };
   const loot = (world, region, level) => {
