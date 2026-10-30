@@ -50,7 +50,7 @@ import { GIMMICKS } from "../../src/gen/dungeon.js";
 import { FACTIONS } from "../../src/content/factions.js";
 import { LANDMARK_INDEX, GIMMICK_KEYS } from "../../src/content/world/worldmap.js";   // C1b
 import { TOP as TABLE_TOP } from "../../src/content/world/plans/tallTable.js";
-import { RINGS } from "../../src/content/world/plans/foldmother.js";
+import { RINGS, FOLDMOTHER_LAYOUT } from "../../src/content/world/plans/foldmother.js";
 import { PRESSYARD_HOUSES } from "../../src/content/world/plans/pressyard.js";
 import { TOLL_GATE } from "../../src/content/world/plans/molar.js";
 
@@ -413,10 +413,17 @@ const PROMISES = {
   saltpage: ({ z, cell }) => [
     [["w", "r", "g", "u"].reduce((n, ch) => n + cell(ch).length, 0) === 27 * 27 && ["w", "r", "g", "u"].every((ch) => cell(ch).every(([x, y]) => BLOCKS[z.get(x, y, FLOOR_Z - 1)]?.mosaic)), "the Page isn't 27 × 27 of mosaic"],
     [cell("#").every(([x, y]) => z.get(x, y, FLOOR_Z + 3) === B.SALT && !z.get(x, y, FLOOR_Z + 5)), "the monastery isn't one storey of salt"]],
-  foldmother: ({ z, cell }) => {
-    const r = reach3d(z, { sprint: false }), P = cell("P");
+  foldmother: ({ z, cell, pa }) => {
+    const r = reach3d(z, { sprint: false }), P = cell("P"), L = FOLDMOTHER_LAYOUT, at = ([x, y]) => [pa.x + x, pa.y + y];
+    const on = (h) => ([x, y]) => z.get(x, y, FLOOR_Z + h - 1) === B.PLANK;
+    const used = new Set(L.flatMap((g) => [...g.platforms.flat(), ...g.bridges].map(([x, y]) => `${g.height},${x},${y}`)));
+    const gaps = L.flatMap((g) => P.filter(([x, y]) => !used.has(`${g.height},${x - pa.x},${y - pa.y}`)).map((c) => [g.height, c]));
     return [[cell("T").every(([x, y]) => solidUp(z, x, y, FLOOR_Z, FLOOR_Z + 12)), "the trunk"],
-      [P.every(([x, y]) => RINGS.every((h) => z.get(x, y, FLOOR_Z + h - 1) === B.PLANK)), "the platforms at 3, 6, 9 and 12"],
+      [L.reduce((n, g) => n + g.platforms.length, 0) === 30 && L.every((g) => g.platforms.flat().map(at).every(on(g.height))), "not 30 platforms (bible §5 P) on their rings"],
+      [L.every((g) => g.bridges.length === g.platforms.length && g.bridges.map(at).every(on(g.height))) && gaps.length > 0 && gaps.every(([h, [x, y]]) => !z.get(x, y, FLOOR_Z + h - 1)),
+        "a platform not joined to the next by its one bridge, or a gap planked"],
+      [L.slice(0, 3).every((g, i) => g.pods.length === g.platforms.length && g.pods.map(at).every(([x, y]) => z.get(x, y, FLOOR_Z + g.height) === B.THATCH && z.get(x, y, FLOOR_Z + RINGS[i + 1] - 2) === B.THATCH)),
+        "the houses in the pleats"],
       [RINGS.every((h) => P.some(([x, y]) => r.has(`${x},${y},${FLOOR_Z + h}`))), "a ring the root-steps don't reach in 3D (walking)"]];
   },
 };
