@@ -1176,8 +1176,9 @@ export function checkGear(m) {
           if (!r.ok) { fail(`${set}: ${mat} ${id} won't go in hand (${r.reason})`); continue; }
           const spec = m.combat.weaponSpec(e);
           if (spec.material !== dmg) fail(`${set}: ${mat} ${id}: the spec's material is ${spec.material}, want ${dmg}`);
-          const w = I.WEAPONS[id], line = I.itemInfo(game, it);
-          if (!line.startsWith(`${w.dmg[0] + dmg}-${w.dmg[1] + dmg} damage`) || !line.includes(F.MATERIALS[mat].info)) fail(`${set}: ${mat} ${id}'s line: "${line}"`);
+          // (the line shows the material as it adds a blow: × the swing ÷ RULES.d20.swingRef, the light-weapon fix of 2026-10-30)
+          const w = I.WEAPONS[id], line = I.itemInfo(game, it), shown = Math.round(dmg * w.swing / m.rules.RULES.d20.swingRef);
+          if (!line.startsWith(`${w.dmg[0] + shown}-${w.dmg[1] + shown} damage`) || !line.includes(F.MATERIALS[mat].info)) fail(`${set}: ${mat} ${id}'s line: "${line}"`);
           if ((St.bonus(e, "cutsFlat") > 0) !== (mat === "noonsilver") || line.includes("cuts flat") !== (mat === "noonsilver")) fail(`${set}: ${mat} ${id}: cutsFlat ${St.bonus(e, "cutsFlat")}, line "${line}"`);
           if (!Bd.unequip(game, e, "hand_r").ok || snap(e) !== before) fail(`${set}: ${mat} ${id} on and off changed the derived numbers`);
           pieces++;
