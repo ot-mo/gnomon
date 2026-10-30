@@ -294,7 +294,14 @@ export function creatureSprite(game, c) {
 
 // Which creature turns up at this level (rand: a 0–1 random function). table: the type ids to draw
 // from (default: every registered type with `depths`). Levels past the content's read as its deepest.
+// Above the parent's levels (its tables, by `depths`, end at 20: golden) a draw with no table comes from the real
+// world's level pool, which content/creatures/levels.js registers here, as its kinds import this file; one draw, and
+// the parent's pick when no kind of the pool holds the level (integrator, C3 #1).
+const LEGACY_TOP = 20;
+let levelPool = null;
+export function setLevelPool(pick) { levelPool = pick; }
 export function pickCreatureType(rand, level, table = null) {
+  if (!table && level > LEGACY_TOP && levelPool) { const t = levelPool(rand, level); if (t) return t; }
   const lv = contentLevel(level);
   const ids = table || Object.keys(types()).filter((id) => types()[id].depths);
   const weights = ids.map((type) => {

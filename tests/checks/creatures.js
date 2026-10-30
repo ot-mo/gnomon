@@ -38,7 +38,7 @@ import { mapStep } from "../../src/turns.js";
 import { interact } from "../../src/interact.js";
 import { updateCreatures } from "../../src/ai.js";
 import { CREATURE_TYPES, ELITES, spawnCreature, addCreature, creatureAt, creatureSprite, touchable, hostilesTo, talkersIn,
-         canTalk } from "../../src/creatures.js";
+         canTalk, pickCreatureType } from "../../src/creatures.js";
 import { entityCounter } from "../../src/ids.js";
 import { AI_HOOKS } from "../../src/ai.js";
 import { attitude } from "../../src/factions.js";
@@ -47,6 +47,8 @@ import { WILDLIFE } from "../../src/content/creatures/wildlife.js";
 import { PEOPLE } from "../../src/content/creatures/people.js";
 import { VILLAGERS } from "../../src/content/creatures/villagers.js";
 import { CREATURES_WAITING } from "../../src/content/creatures/waiting.js";
+import { makeRng } from "../../src/rng.js";
+import { RULES } from "../../src/rules.js";
 import { LEVEL_POOL, rowsAt } from "../../src/content/creatures/levels.js";
 import { REGIONS } from "../../src/content/world/regions.js";
 
@@ -209,6 +211,18 @@ export function checkCreatures({ game, startRun, srcFiles }) {
   } finally {
     game.onTalk = onTalk; game.log = log;
     zone.creatures.length = 0;
+  }
+  // Levels above the parent's 20 (integrator, C3 #1): the clamp is 23, and a draw with no table there is a kind of C3's
+  // level pool that holds the level, never the "goblin" the parent's tables fall through to; at 20 and below the
+  // parent's draws are as they were (golden's).
+  {
+    const rng = makeRng(23), off = [];
+    for (const L of [21, 22, 23]) {
+      const ok = new Set(rowsAt(LEVEL_POOL, L).map(([t]) => t));
+      for (let k = 0; k < 300; k++) { const t = pickCreatureType(rng, L); if (!ok.has(t)) { off.push(`level ${L}: ${t}`); break; } }
+    }
+    if (RULES.level.contentMax !== 23 || off.length) problems.push(`levels above 20: contentMax ${RULES.level.contentMax}; ${off.join("; ")}`);
+    stats.above20 = `levels 21-23: 900 draws from C3's pool, none the parent's goblin`;
   }
   // 6. C3's roster (below).
   const roster = checkRoster(game);

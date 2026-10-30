@@ -77,7 +77,7 @@ function currencyParts({ game, startRun, dialogue, npcs, creatures, srcFiles, ca
     if (one !== `1 ${CURRENCY.name}` || many !== `12 ${CURRENCY.plural}`) fail(`formatPrice: "${one}", "${many}"`);
     if (C.formatFunds({ funds: 7 }) !== `${CURRENCY.glyph}7`) fail(`formatFunds: ${C.formatFunds({ funds: 7 })}`);
     stats.format = [one, many, C.formatFunds({ funds: 7 })];
-    if (C.priceLevel(15) !== 1 + 15 / RULES.price.levelStep || C.priceLevel(30) !== C.priceLevel(20)) fail("priceLevel isn't 1 + contentLevel/15");
+    if (C.priceLevel(15) !== 1 + 15 / RULES.price.levelStep || C.priceLevel(30) !== C.priceLevel(RULES.level.contentMax)) fail("priceLevel isn't 1 + contentLevel/15");   // integrator (C3 #1): the clamp is the rule's (23 since C3)
   }
 
   // --- 2. A new player -----------------------------------------------------------------------------

@@ -69,7 +69,7 @@ const CORE = {
   dark: { threshold: 0.3 },
 
   // Levels (DECISIONS: surface zone level = 3 × tier − 1; legacy tables read min(level, 20) until C3).
-  level: { contentMax: 20, tierMax: 8 },
+  level: { contentMax: 23, tierMax: 8 },   // (23: the surface's top level, tier 8; was 20, the parent's last, until C3 gave levels above it: integrator, C3 #1)
 
   // The clock (DECISIONS §1, bible §4.6; clock.js): one world hour is 60 s of game time in both views (a
   // world minute per second). The run starts on day 1 at 06:00. Hours of the day: dawn 05-06, day 06-18,

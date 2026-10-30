@@ -108,7 +108,7 @@ export function checkStats({ game, startRun, inventory, mechanics, gate = null }
   if (RULES.stats !== "attributes") problems.push("overrideRules did not switch RULES.stats");
   undo();
   if (RULES.stats !== "attributes" || RULES.combat !== "d20") problems.push(`RULES.stats is ${RULES.stats}, RULES.combat ${RULES.combat} after undo: not the defaults since the flip (attributes, d20)`);
-  if (St.contentLevel(25) !== 20 || St.contentLevel(7) !== 7) problems.push(`contentLevel: 25 → ${St.contentLevel(25)}, 7 → ${St.contentLevel(7)}`);
+  if (St.contentLevel(25) !== RULES.level.contentMax || St.contentLevel(7) !== 7) problems.push(`contentLevel: 25 → ${St.contentLevel(25)}, 7 → ${St.contentLevel(7)}`);   // integrator (C3 #1): the clamp is the rule's (23 since C3, the Phase 3 plan), not the parent's 20
 
   // --- 2. Gear, statuses and perks in both formula sets -----------------------------------------
   // Statuses go through status.js (its registry feeds the "statuses" source): a test status with bonuses.

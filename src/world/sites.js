@@ -49,6 +49,7 @@ import { countGen } from "./genstats.js";
 import { stampVault } from "../gen/vaults.js";
 import { DUNGEON_W, DUNGEON_D } from "../gen/dungeon.js";
 import { pickCreatureType, CREATURE_TYPES } from "../creatures.js";
+import "../content/creatures/levels.js";   // (the level pool above 20, which it registers with creatures.js)
 import { DUNGEONS } from "../content/dungeons.js";
 import { LEGENDS } from "../content/creatures/legends.js";
 

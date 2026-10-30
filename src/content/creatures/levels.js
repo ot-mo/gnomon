@@ -13,7 +13,7 @@
 //                            kinds only (rand: a 0..1 function; one draw), as gen/dungeon.js pickFrom draws a region's
 //                            rows; null when no registered kind's row holds the level (the caller falls back)
 //   rowsAt(rows, level) → rows               the rows of registered kinds, weight above 0, that hold `level`
-import { CREATURE_TYPES } from "../../creatures.js";
+import { CREATURE_TYPES, setLevelPool } from "../../creatures.js";
 import { WILDLIFE } from "./wildlife.js";
 
 const roams = (t) => t.weight > 0 && t.levels && t.temperament !== "docile" && !(t.damage[1] <= 1);
@@ -27,3 +27,5 @@ export function pickRow(rand, rows, level) {
   for (const [type, w] of live) if ((pick -= w) < 0) return type;
   return live[live.length - 1][0];
 }
+// Above level 20 a draw with no table is this pool's (creatures.js pickCreatureType; integrator, C3 #1).
+setLevelPool((rand, level) => pickRow(rand, LEVEL_POOL, level));
