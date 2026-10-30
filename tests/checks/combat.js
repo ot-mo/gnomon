@@ -77,7 +77,7 @@ import { fire, fireAt, readyLauncher, missileSpec } from "../../src/missiles.js"
 import { requestTarget, cursorTarget, lineOfFire, targetText } from "../../src/screens/target.js";
 import { mapView } from "../../src/renderMap.js";
 import { MISSILES } from "../../src/content/items/missiles.js";
-import { EYE, attackTime } from "../../src/player.js";
+import { EYE, FISTS, attackTime } from "../../src/player.js";
 import { compileWorld } from "../../src/world/worldmodel.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
 import { attitude } from "../../src/factions.js";
@@ -279,7 +279,9 @@ export function checkCombat({ game, startRun, srcFiles }) {
       // Bare hands never outdo a weapon: fists (1-2, STR over RULES.d20.fistReq) below the dagger.
       const heldBody = p.body;
       p.body = makeBody(p.body?.plan || "humanoid"); invalidateStats(p);
-      const fistSpec = weaponSpec(p);
+      const fistSpec = weaponSpec(p), fistSwing = attackTime(p);
+      // Bare hands swing in 0.5 s (the balance decision of 2026-10-30, the user's: proposal §3.4; the parent's 0.3).
+      expect(FISTS.swing === 0.5 && fistSwing === FISTS.swing, `bare hands swing in ${fistSwing} s (FISTS ${FISTS.swing}; want 0.5)`);
       // In gauntlets 1d4; with truesteel knuckles fitted (WS5's implant) 2d4 that crush (WS5's request 7).
       const gloves = p.body.parts.find((q) => q.type === "gloves");
       p.body.equip[gloves.id] = { kind: "armour", id: "gauntlets", ench: 0, known: true }; invalidateStats(p);
