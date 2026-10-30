@@ -36,7 +36,7 @@ export const PEOPLE_WORDS = {
     who: "Mira, the Survey's cartographer for this block. I sell Location readings, and I'm usually right.",
     topics: [["Why the Survey?", "The Survey measured the world when nobody asked. Now everyone asks, and we're the only ones with numbers."]] },
   tamsin: { role: "priest", greet: "Turn, hand. Turn, hour. That's a prayer, not a request.",
-    who: "Brother Tamsin, of the Horary. I sell where the dial-steles stand, and I buy any Hour reading you bring me.",
+    who: "Brother Tamsin, of the Horary. I know where the dial-steles stand, and I'll trade that for any Hour reading you bring me.",
     topics: [["The Horary?", "We hold that the hours are meant to turn. The Vigil holds that noon should stay. We are very polite about it in Hollowmere."]] },
   brann: { role: "wanderer", greet: "you can see me\nthen your torch is out",
     who: "brann\ni went down the stair a long time ago\nsome of me came back",
@@ -201,7 +201,7 @@ export const PEOPLE_WORDS = {
   vesper: { bark: "you came all this way to stand in my light" },
 
   // --- C3's people of the roads (bible §12.6) ------------------------------------------------------------------
-  flatfolkWanderer: { role: "wanderer", greet: "Lost? I'm not. I'm drawn here. Big difference.",
+  flatfolkWanderer: { role: "merchant", greet: "Lost? I'm not. I'm drawn here. Big difference.",
     who: "A trader of the Plane. I sell what's light enough to carry flat." },
   pressedPilgrim: { role: "priest", greet: "Mind my hand. It's on the mosaic. So is the rest of me.",
     who: "A pilgrim of the Plane. I lie on every mosaic between Saltpage and the sea, and read it with my face." },
