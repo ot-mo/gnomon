@@ -1803,7 +1803,10 @@ export async function run(env) {
         if (best > commons.brewCost(t)) fail(`a brewed ${t} sells for ${best} at EGO 24 and Bright, more than its ${commons.brewCost(t)} to brew`);
       }
       setEgo(16);
-      if (POW.brew.needs || POW.hourScript.needs || POW.gossip.needs || POW.triangulator.needs || POW.oilFire.needs || POW.chime.needs) fail("a power B3 built still has its needs");
+      // Built, not offered yet (the coordinator, 2026-10-30: the pool waits on the user's decision): each holds B3's marker.
+      const PM = await m("content/powers.js");
+      for (const k of ["brew", "hourScript", "gossip", "triangulator", "oilFire", "chime"]) if (POW[k].needs !== PM.BUILT_B3) fail(`${k}: needs ${POW[k].needs}, want B3's marker`);
+      if (leveling.offerPowers(game, p(), { level: 5 }).some((k) => POW[k].needs === PM.BUILT_B3)) fail("a power B3 built is offered before the pool is balanced");
       // The shrine: the right view, once a day; the wrong view's words.
       const zone = game.zone, kind = v.culture.shrine, S2 = V.shrines[kind];
       zone.village = { siteId: site.id, shrine: { x: 5, y: 5, z: FLOOR_Z, view: S2.view, kind } };
