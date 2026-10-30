@@ -763,6 +763,16 @@ function setHeadroom(f, rooms, headroom) {
       for (let z = FLOOR_Z + headroom; z < f.h; z++) if (f.get(x, y, z) === B.AIR && f.get(x, y, FLOOR_Z) !== B.DOOR) f.set(x, y, z, B.ROCK);   // (a tall room's too)
     }
   f.headroom = headroom;
+  // What lay up on a feature the ceiling came down over goes to the nearest floor of its room.
+  f.refresh();
+  for (const it of f.items) {
+    const ix = Math.floor(it.x), iy = Math.floor(it.y);
+    if (f.get(ix, iy, Math.floor(it.z)) === B.AIR) continue;
+    const r = rooms.find((o) => ix >= o.x0 - 1 && ix <= o.x1 + 1 && iy >= o.y0 - 1 && iy <= o.y1 + 1);
+    const spots = (r ? interior(r) : []).filter(([x, y]) => f.stand[x + y * W] >= 0 && f.get(x, y, f.stand[x + y * W]) === B.AIR);
+    const s = spots.sort((a, b) => Math.abs(a[0] - ix) + Math.abs(a[1] - iy) - Math.abs(b[0] - ix) - Math.abs(b[1] - iy))[0];
+    if (s) Object.assign(it, { x: s[0] + 0.5, y: s[1] + 0.5, z: f.stand[s[0] + s[1] * W] });
+  }
 }
 // A pressed room (the Press, bible §5 I): one room whose contents exist only on the map, as a mosaic: its creatures are flat
 // (fought on the map) and its floor is laid in white mosaic, its centre tile gold. Stand on the centre and turn (Tab) and
