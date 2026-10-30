@@ -13,6 +13,14 @@
 //                                       and its secret learned (source "mural"). The only way a mural teaches anything:
 //                                       drawing and describing never do (R2).
 // The describer "murals" puts a mosaic's text on the map's inspect line, and says what a relief or rune needs. Pure.
+//
+// A landmark's three registers (bible §2.1 rule 3; B2, C1b #4), from the run's world (landmarks' `lines`):
+//   landmarkAt(game, zone, x, y) → landmark | null   the landmark whose plan the tile is part of (its surface zone, the
+//                                       plan's footprint: zone.gen.planAt)
+//   registerLine(game, L) → the line the view you're in reads: Flat on the map, Deep in 3D, Dark in 3D with your torch out
+// The describer "murals" ends with the Flat line on the map's inspect line over the plan; a look in 3D at it (WS8's L:
+// inspect open) logs the Deep line, or the Dark one with your torch out. (The world map's panel shows the Flat line too:
+// overworld/renderWorld.js spanLines.)
 import { on } from "../events.js";
 import { BLOCKS } from "../blocks.js";
 import { inDark } from "../light.js";
@@ -20,6 +28,7 @@ import { registerDescriber } from "../renderMap.js";
 import { learnSecret, muralSecret } from "./secrets.js";
 import { knows } from "./journal.js";
 import { hasKey } from "../keyset.js";
+import { dialFloorReading } from "../content/world/plans/dialFloor.js";
 
 const isMosaic = (zone, x, y, z) => !!BLOCKS[zone.get?.(x, y, z)]?.mosaic;
 
@@ -74,12 +83,41 @@ const nextAccount = (game, id) => {
   return ["flat", "deep", "dark"].map((r) => `${base}:${r}`).find((x) => x !== id && !knows(game, x)) || null;
 };
 
-on("inspect", (game, ev) => { readMural(game, ev); });
+on("inspect", (game, ev) => { readMural(game, ev); readLandmark(game, ev); });
+
+export function landmarkAt(game, zone, x, y) {
+  const pa = zone?.gen?.planAt;
+  if (!zone?.landmarkId || zone.z !== 0 || !pa || x < pa.x || y < pa.y || x >= pa.x + pa.w || y >= pa.y + pa.d) return null;
+  return game.run?.world?.landmarks?.get(zone.landmarkId) || null;
+}
+export function registerLine(game, L) {
+  const lines = L?.lines;
+  if (!lines) return null;
+  if (game.view === "map") return flatLine(game, L);
+  // The Dark line in the dark: your torch out where no daylight or lamp reaches you (as a rune reads), else the Deep one.
+  const p = game.player, dark = !!p && !p.torch && !!game.zone && inDark(game, game.zone, p.x, p.y, p.z + 1);
+  return (dark ? lines.dark : lines.deep) || null;
+}
+// A landmark's Flat line with the run's numbers in it: the Dial Floor's pips and bearing are its history's (B2, C1b #11).
+export function flatLine(game, L) {
+  const flat = L?.lines?.flat || null;
+  if (!flat || L.id !== "dialFloor") return flat;
+  const r = dialFloorReading(game.run, L.wx, L.wy);
+  return r ? flat.replace(/Pips \d+/, `Pips ${r.pips}`).replace(/bearing [a-z-]+/, `bearing ${r.bearing}`) : flat;
+}
+
+function readLandmark(game, ev) {
+  if (!ev?.open || game.view !== "3d") return;
+  const L = landmarkAt(game, ev.zone || game.zone, ev.x, ev.y), line = registerLine(game, L);
+  if (line) game.log?.(line.split("\n").join(" / "), line === L?.lines?.dark ? [175, 165, 230] : [215, 205, 180]);
+}
 
 // The map's inspect line: a mosaic reads plainly from above; a relief or a rune only says it's there.
+// (The landmark's Flat line ends this describer's part: P0's check-hud holds the describers' list.)
 registerDescriber("murals", (game, tile, { zone }) => {
   const ms = muralsAt(zone, tile.x, tile.y);
-  if (!ms.length) return null;
-  return ms.map((m) => (m.view === "map" ? `A mosaic: "${m.text}"` : m.view === "3d" ? "A carved relief (read it in 3D)." : null))
-    .filter(Boolean).join(" ") || null;
+  const said = ms.map((m) => (m.view === "map" ? `A mosaic: "${m.text}"` : m.view === "3d" ? "A carved relief (read it in 3D)." : null)).filter(Boolean);
+  const flat = game.view === "map" ? registerLine(game, landmarkAt(game, zone, tile.x, tile.y)) : null;
+  if (flat) said.push(flat);
+  return said.join(" ") || null;
 }, { order: 40 });

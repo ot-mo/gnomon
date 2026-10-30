@@ -12,21 +12,25 @@
 //                                    under it on level 1 (zones.js arrivalPoint "fall"; integrator, C1a #9)
 //   checkHistoric({ seeds })         the fixture history's two site requests, built (check-sites)
 //   checkLegends({ seeds })          a legend lives in exactly one zone; a dead one never returns (check-sites)
+//   checkLandmarkBottoms({ seeds })  the landmark dungeons' bottoms, mid-floor halls and murals (check-sites; B2)
 //   randomParams(i) → { seed, p }    the i-th random level (test.html draws the same ones)
 //
 // Timing: 20 levels are generated first and not counted (the JIT warming up), then the percentiles
 // are over all counted levels. Budget: p95 ≤ 40 ms (TECH_DESIGN §6.7, 0A1 gate).
 import { generateDungeonLevel, validateDungeonLevel, legacyParams, LEGACY_GUARDIANS, LEGACY_LEVELS, DUNGEON_THEMES, GIMMICKS } from "../../src/gen/dungeon.js";
-import { stampVault, buildVault, pickVault, registerLegend, vaultById, VAULTS, GUARDIAN_HALLS, BOSS_HALLS, LAIR_HALLS, RELIC_HALLS, STAMP_DEFAULTS, BOTTOM_LOOT } from "../../src/gen/vaults.js";
+import { stampVault, buildVault, pickVault, registerLegend, vaultById, VAULTS, GUARDIAN_HALLS, BOSS_HALLS, LAIR_HALLS, RELIC_HALLS, READING_HALLS, STAMP_DEFAULTS, BOTTOM_LOOT } from "../../src/gen/vaults.js";
 import { Zone, B, FLOOR_Z } from "../../src/world.js";
 import { makeRng, seedFor } from "../../src/rng.js";
 import { canTalk, CREATURE_TYPES } from "../../src/creatures.js";
 import { ITEM_KINDS } from "../../src/items.js";
-import { makeLegend, dungeonParams, sinkholeSpots, SITE_KINDS, SITE_BUILDERS } from "../../src/world/sites.js";
+import { makeLegend, dungeonParams, sinkholeSpots, legendOf, hourRelic, SITE_KINDS, SITE_BUILDERS } from "../../src/world/sites.js";
+import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../../src/pathing.js";
+import { standWith } from "../../src/world.js";
 import { arrivalPoint } from "../../src/zones.js";
 import { buildRun, zoneSeed } from "../../src/world/run.js";
 import { compileWorld, tierOfLevel } from "../../src/world/worldmodel.js";
 import { generateSurface, validateSurface } from "../../src/gen/surface.js";
+import { BLOCKS } from "../../src/blocks.js";
 import { TEST_WORLD } from "../../src/content/world/test-world.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
 import { DUNGEONS } from "../../src/content/dungeons.js";
@@ -66,7 +70,7 @@ export function checkVaultOptions() {
     "baseZ: the floor sits at baseZ − 1 with rock below");
   expect(STAMP_DEFAULTS.wallHeight === 4 && STAMP_DEFAULTS.roof === "rock" && STAMP_DEFAULTS.baseZ === FLOOR_Z, "defaults keep the legacy vaults");
   // Ids: every vault and hall is found by id; a pool with equal weights draws like rng.pick.
-  for (const v of [...VAULTS, ...Object.values(GUARDIAN_HALLS), ...Object.values(BOSS_HALLS), ...Object.values(LAIR_HALLS), ...Object.values(RELIC_HALLS)])
+  for (const v of [...VAULTS, ...Object.values(GUARDIAN_HALLS), ...Object.values(BOSS_HALLS), ...Object.values(LAIR_HALLS), ...Object.values(RELIC_HALLS), ...Object.values(READING_HALLS)])
     expect(vaultById(v.id) === v, `vaultById("${v.id}")`);
   for (let s = 1; s <= 50; s++) {
     const a = pickVault(makeRng(s), { level: 12 }).id, b = makeRng(s).pick(VAULTS).id;
@@ -195,11 +199,16 @@ function holesOutside(f, rect) {
 const ROWS = [["rat", 2, 1, 10], ["goblin", 2, 1, 15], ["orc", 1, 7, 30], ["troll", 1, 13, 30], ["wraith", 1, 10, 30]];
 // The i-th random level's seed and parameters: any theme, level 1-30, 0-3 gimmicks, any bottom on a last level,
 // sometimes a creature table, holesIn, a Cradle. test.html draws the same ones (parity).
+// The random levels draw WS10's ten gimmicks and its ten themes; the landmark dungeons' own (identicalRooms, offBeatDoors,
+// runeDoors; the "rule" theme: B2) are held on their landmarks' floors by check-sites, and kept out of this pool so the 1,000
+// levels (and test.html's signature) stay the ones they were.
+export const RANDOM_GIMMICKS = ["allDeep", "braziers", "collapsed", "flatland", "flooded", "haunted", "lightless", "murals", "oneBeat", "spikeworks"];
+const RANDOM_THEMES = () => Object.keys(DUNGEON_THEMES).filter((t) => t !== "rule").sort();
 export function randomParams(i) {
   const rng = makeRng(seedFor(9091, "random level", i));
   const level = rng.int(1, 30), count = rng.int(1, 5), z = rng.int(1, count), final = z === count;
-  const theme = rng.pick(Object.keys(DUNGEON_THEMES).sort());
-  const gimmicks = rng.shuffle(Object.keys(GIMMICKS).sort()).slice(0, rng.int(0, 3));
+  const theme = rng.pick(RANDOM_THEMES());
+  const gimmicks = rng.shuffle(RANDOM_GIMMICKS.slice()).slice(0, rng.int(0, 3));
   let bottom = null;
   if (final) {
     const kind = rng.pick(["none", "guardian", "legend", "legend", "relic", "relic"]);
@@ -267,6 +276,7 @@ export function siteLevelProblems(f, p) {
   if (p.creatureTable) {
     const allowed = new Set([...p.creatureTable.map((r) => (Array.isArray(r) ? r[0] : r)), "rat", "goblin", "skeleton", "flatling", "shade", "door"]);
     if (p.bottom?.legend) allowed.add(p.bottom.legend.species);
+    if (p.vaultGuardian) allowed.add(p.vaultGuardian);   // a landmark's own guardian in its hall (B2, C1b #6)
     const odd = f.creatures.filter((c) => !canTalk(c) && !c.guardian && !allowed.has(c.type));
     if (odd.length) out.push(`creatureTable: ${odd.map((c) => c.type).join(", ")} not in the table`);
   }
@@ -318,7 +328,7 @@ export function checkRandomLevels({ count = 1000, p95Budget = 40, from = 0 } = {
   }
   for (const [id, [n, done]] of Object.entries(effect))
     if (n && done < 0.9 * n) problems.push(`gimmick ${id}: did something on ${done} of its ${n} levels (want 90%)`);
-  for (const id of Object.keys(GIMMICKS)) if (!tally.gimmicks[id]) problems.push(`gimmick ${id} never drawn`);
+  for (const id of RANDOM_GIMMICKS) if (!tally.gimmicks[id] || !GIMMICKS[id]) problems.push(`gimmick ${id} never drawn`);
   const sorted = [...times].sort((a, b) => a - b);
   const p95 = pct(sorted, 0.95);
   if (p95 > p95Budget) problems.push(`generation p95 ${p95.toFixed(1)} ms is over the ${p95Budget} ms budget`);
@@ -494,6 +504,409 @@ export function checkHistoric({ seeds = SEEDS } = {}) {
     }
   }
   return { name: "historic sites", ok: problems.length === 0, problems, stats };
+}
+
+// --- The landmark dungeons' bottoms, halls and murals (B2: C1b #5, #6, #7) -----------------------------------------
+// On the real world, every seed: each landmark dungeon's last floor holds what the bible puts there (C1b's planned.bottom)
+// where the code builds it: the Grub Mother (a legend from the data, her species, name and level, in her lair, never
+// roaming), the Press-hall (its spot, three pistons on gantries 3, 4 and 5 up, each struck from its gantry's top), Noon's
+// floor (lampless, the shadowless woman in mosaic), the Noonglass's reliquary (the altar; the artifact named, laid once its
+// kind is in), the Under-Page's founding relic (the Second Hour's, which no Hour site holds) with that Hour's three
+// accounts, the Noon Socket (twelve hour platforms 1-3 up, all reachable), the Datum stone (its plinth 2 up, reachable,
+// the stone at eye height there); the Metronome keeps the Colossus's hall until the Escapement's kind is in. Halls on a
+// floor that isn't the last: Kettle Mesa's 2 the Flat Lie, the Under-Page's 2 the Speaking Door, the Unlit Choir's 4 the
+// Gloam Warden's hall (C3's Gloam Warden in it, its gate opening when it dies), and no other floor of theirs forced. The
+// Datum's floors carry its own mural. In a game: the Grub Mother lives in one zone; the Gloam Warden's death opens its gate.
+export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
+  const problems = [], stats = { bottoms: {}, halls: 0, murals: 0, pistons: 0, hours: 0 };
+  const expect = (ok, what) => { if (!ok) problems.push(what); };
+  const W = compileWorld(REAL_WORLD);
+  const reach = (f) => reachable(standWith(f, "all"), f.w, f.d, Math.floor(f.spawn.x), Math.floor(f.spawn.y), PLAYER_STEP_UP, PLAYER_DROP);
+  const WANT = { kettleMesa: "legend", datum: "reading", press: "boss", unlitChoir: "boss", metronome: "guardian", drownedLantern: "relic", dialWorks: "boss", underPage: "relic" };
+  const HALLS = { kettleMesa: { 2: "The Flat Lie" }, underPage: { 2: "The Speaking Door" }, unlitChoir: { 4: "The Gloom Warden's Hall" } };
+  for (const seed of seeds) {
+    const run = buildRun(seed, W);
+    for (const s of run.sites.values()) {
+      if (s.kind !== "landmark" || !s.dungeon || s.dungeon.legacy) continue;
+      const d = s.dungeon, id = d.id, at = `real world seed ${seed} ${id}`, n = d.levels;
+      const level = (z) => { const p = dungeonParams(run, s, z); return { p, f: generateDungeonLevel(zoneSeed(run, s.at.wx, s.at.wy, z), p) }; };
+      // Halls on the floors above the last.
+      for (let z = 1; z < n; z++) {
+        const p = dungeonParams(run, s, z), want = HALLS[id]?.[z] || null;
+        expect(!!p.forcedVault === !!want, `${at} floor ${z}: forced vault ${p.forcedVault}, want ${want}`);
+        if (!want) continue;
+        const { f } = level(z);
+        stats.halls++;
+        expect(f.vault.name === want && !validateDungeonLevel(f, p).length, `${at} floor ${z}: its hall is ${f.vault.name} (${validateDungeonLevel(f, p)}), want ${want}`);
+        if (id === "unlitChoir") expect(f.guardianHall?.type === "gloamWarden" && f.creatures.some((c) => c.type === "gloamWarden") && !f.creatures.some((c) => c.type === "warden") && f.guardianHall.gate.length,
+          `${at} floor ${z}: the Gloam Warden isn't in its hall behind a gate (${f.guardianHall?.type})`);
+      }
+      if (id === "datum") for (let z = 1; z <= n; z++) {
+        const { f } = level(z);
+        stats.murals++;
+        const own = REAL_WORLD.landmarks.find((l) => l.dungeon?.id === "datum").dungeon.planned.murals[0];
+        expect(f.murals?.some((m) => m.text === own.text) && f.murals.some((m) => m.text === own.map), `${at} floor ${z}: not the Datum's own murals (${(f.murals || []).map((m) => m.text)})`);
+      }
+      // The bottom.
+      const { p, f } = level(n), dist = reach(f), on = (x, y) => dist[x + y * f.w] >= 0, kind = p.bottom?.kind;
+      stats.bottoms[kind] = (stats.bottoms[kind] || 0) + 1;
+      expect(kind === (WANT[id] || undefined) || (!WANT[id] && !p.bottom), `${at}: its bottom is ${kind}, want ${WANT[id]}`);
+      expect(!validateDungeonLevel(f, p).length, `${at} bottom: ${validateDungeonLevel(f, p)}`);
+      if (id === "kettleMesa") {
+        const L = s.legend, c = f.creatures.find((o) => o.uid === L?.uid);
+        expect(L && L.species === "brineGrub" && L.name === "the Grub Mother" && L.level === p.level + 3 && c?.name === "the Grub Mother" && c.type === "brineGrub" && c.flags?.legend,
+          `${at}: the Grub Mother (${JSON.stringify(L && { species: L.species, name: L.name, level: L.level })}, ${c?.name})`);
+        expect(!run.legends.has(L?.uid) && legendOf(run, L?.uid) === L, `${at}: the Grub Mother roams (run.legends) or can't be found (legendOf)`);
+      }
+      if (id === "press") {
+        const ps = f.pistons || [];
+        stats.pistons += ps.length;
+        expect(f.bossSpot?.id === "pressMaster" && on(f.bossSpot.x, f.bossSpot.y), `${at}: the Press-Master's spot ${JSON.stringify(f.bossSpot)}`);
+        expect(JSON.stringify(ps.map((q) => q.gantry).sort()) === "[3,4,5]" && ps.every((q) => f.get(q.x, q.y, q.z) === B.METAL && f.get(q.x, q.y, q.z + 1) === B.METAL
+          && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => f.stand[q.x + dx + (q.y + dy) * f.w] === q.z && on(q.x + dx, q.y + dy))), `${at}: the pistons ${JSON.stringify(ps)}`);
+        expect(f.vault.name === "The Press-hall" && f.vault.y1 - f.vault.y0 >= 14, `${at}: not the Press-hall`);
+      }
+      if (id === "unlitChoir") {
+        const v = f.vault, gold = (() => { let k = 0; for (let y = v.y0; y <= v.y1; y++) for (let x = v.x0; x <= v.x1; x++) if (f.get(x, y, FLOOR_Z - 1) === B.MOSAIC_GOLD) k++; return k; })();
+        let lamps = 0;
+        for (let y = v.y0 - 1; y <= v.y1 + 1; y++) for (let x = v.x0 - 1; x <= v.x1 + 1; x++) for (let z = 0; z < f.h; z++) if (f.get(x, y, z) === B.LAMP) lamps++;
+        expect(f.bossSpot?.id === "noon" && on(f.bossSpot.x, f.bossSpot.y) && gold >= 20 && !lamps && !BOSS_HALLS.noon.plan.join("").includes("l"),
+          `${at}: Noon's floor (spot ${JSON.stringify(f.bossSpot)}, ${gold} gold tiles, ${lamps} lamps; the hall's own plan lampless)`);
+      }
+      if (id === "dialWorks") {
+        const plats = (f.hours || []).map((h) => f.stand[h.x + h.y * f.w] === h.z && on(h.x, h.y));
+        stats.hours += plats.filter(Boolean).length;
+        expect(f.bossSpot?.id === "vesper" && on(f.bossSpot.x, f.bossSpot.y) && plats.length === 12 && plats.every(Boolean), `${at}: the Noon Socket (spot ${JSON.stringify(f.bossSpot)}, ${plats.filter(Boolean).length} of ${plats.length} hours reachable)`);
+      }
+      if (id === "drownedLantern") {
+        const loot = f.bottomLoot || {}, laid = f.items.find((o) => o.kind === "artifact" && o.id === "noonglass");
+        expect(loot.artifact?.id === "noonglass" && loot.artifact.laid === !!laid && f.items.some((o) => f.get(Math.floor(o.x), Math.floor(o.y), FLOOR_Z) === B.ALTAR), `${at}: the Noonglass's altar (${JSON.stringify(loot.artifact)})`);
+      }
+      if (id === "underPage") {
+        const ruler = run.history.rulers[1], held = new Set(run.history.siteRequests.map((r) => r.relicId)), it = f.items.find((o) => o.histRelic);
+        const relic = run.history.relics.find((r) => r.id === it?.histRelic);
+        expect(relic && relic.rulerId === ruler.id && !held.has(relic.id) && f.bottomLoot?.relic === relic.id, `${at}: the founding relic ${it?.histRelic} (the Second Hour is ${ruler.id})`);
+        const texts = new Set(ruler.events.flatMap((e) => [e.text.inscription, e.text.gospel, e.text.hostile]));
+        expect(f.murals?.length && f.murals.every((m) => texts.has(m.text)) && new Set(f.murals.map((m) => m.view)).size === 3, `${at}: the Second-Hour stele's accounts (${(f.murals || []).map((m) => m.view)})`);
+      }
+      if (id === "datum") {
+        const st = f.datumStone;
+        expect(st && f.stand[st.x + st.y * f.w] === FLOOR_Z + 2 && on(st.x, st.y) && f.get(...st.stone) === B.MURAL && st.stone[2] === st.z + 1, `${at}: the Datum stone ${JSON.stringify(st)}`);
+      }
+      if (id === "metronome") expect(f.creatures.some((c) => c.guardian === "colossus"), `${at}: the Colossus's hall (the Escapement waits for its kind)`);
+      // Its places (C1b #20, #22, #24): the clue's fresh tunnel, the captive's spot, the Square's identical rooms and prisoners,
+      // the Root Canals' far mouth.
+      if (id === "kettleMesa") {
+        const { f: f3 } = level(3), c = f3.clue, d3 = reach(f3), t = c?.tunnel || [];
+        const open4 = ([x, y]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => f3.stand[x + dx + (y + dy) * f3.w] >= 0).length;
+        stats.clues = (stats.clues || 0) + (c ? 1 : 0);
+        expect(c && /plumb-seal/.test(c.what) && t.length >= 5 && t.length <= 7 && t.every(([x, y]) => f3.get(x, y, FLOOR_Z - 1) === B.DIRT && d3[x + y * f3.w] >= 0)
+          && c.x === t[t.length - 1][0] && c.y === t[t.length - 1][1] && open4([c.x, c.y]) === 1, `${at} floor 3: the sapper tunnel and its clue ${JSON.stringify(c && { x: c.x, y: c.y, len: t.length })}`);
+      }
+      if (id === "press") {
+        const { f: f3 } = level(3), d3 = reach(f3), c = f3.captive;
+        expect(c?.who === "toviHallen" && d3[c.x + c.y * f3.w] >= 0 && f3.stand[c.x + c.y * f3.w] === FLOOR_Z, `${at} floor 3: Tovi Hallen's place ${JSON.stringify(c)}`);
+        for (const z of [1, 2, 4, 5]) expect(!level(z).f.captive, `${at} floor ${z}: a captive's place on the wrong floor`);
+      }
+      if (id === "square") for (let z = 1; z <= n; z++) {
+        const { f: fz } = z === n ? { f } : level(z), marks = fz.roomMarks || [], dz = reach(fz);
+        stats.squareRooms = (stats.squareRooms || 0) + fz.rooms.length;
+        expect(new Set(fz.rooms.map((r) => `${r.theme.wall},${r.theme.floor}`)).size === 1 && marks.length >= fz.rooms.length - 1 && new Set(marks.map((m) => m.mark.join())).size === marks.length
+          && marks.every((m) => m.mark.every((c, d) => BLOCKS[fz.get(m.x + d, m.y, FLOOR_Z - 1)]?.mosaic)), `${at} floor ${z}: ${fz.rooms.length} rooms, ${marks.length} marks, materials ${new Set(fz.rooms.map((r) => `${r.theme.wall},${r.theme.floor}`)).size}`);
+        const pr = fz.prisoners || [];
+        stats.prisoners = (stats.prisoners || 0) + pr.length;
+        expect(z === 1 ? !pr.length : pr.length === 2 && pr.every((q) => dz[q.x + q.y * fz.w] >= 0 && fz.get(...q.wheel) === B.LEVER && fz.links.get(fz.index(...q.wheel))?.action === "unpress"),
+          `${at} floor ${z}: prisoners ${JSON.stringify(pr)}`);
+      }
+      if (id === "rootCanals") {
+        const e = f.exit, surf = generateSurface(run, s.at.wx, s.at.wy), sr = reach(surf);
+        expect(e && f.get(e.x, e.y, FLOOR_Z - 1) === B.STAIRS_UP && on(e.x, e.y) && e.key === `${s.at.wx},${s.at.wy},0` && surf.get(e.at[0], e.at[1], FLOOR_Z - 1) === B.METAL
+          && sr[e.at[0] + e.at[1] * surf.w] >= 0 && e.at[0] > surf.gen.planAt.x + 57, `${at} floor 2: the far mouth ${JSON.stringify(e)} (out on the grate east of the checkpoint)`);
+        expect(!level(1).f.exit, `${at} floor 1: a far mouth on the wrong floor`);
+      }
+    }
+  }
+  // The Keeper's Stair (C1b #15, WS10 #9; decided here): the real world lists its floors at levels 2-21 (bible §5 A, its place
+  // on the world's ladder), and they stay the parent's 20-level stack level for level (legacyParams' level z: golden (b)'s
+  // monsters and loot are picked by it). Both hold, so changing one without the other is seen.
+  {
+    const run = buildRun(seeds[0], W), ks = [...run.sites.values()].find((s) => s.landmarkId === "hollowmere");
+    const listed = REAL_WORLD.landmarks.find((l) => l.id === "hollowmere").dungeon.floors;
+    stats.keepersStair = `listed ${listed[0]}-${listed.at(-1)}, built as the legacy stack at ${legacyParams(1, 1).level}-${legacyParams(20, 1).level}`;
+    expect(ks?.dungeon?.legacy && ks.dungeon.levels === 20 && JSON.stringify(listed) === JSON.stringify(Array.from({ length: 20 }, (_, k) => k + 2))
+      && Array.from({ length: 20 }, (_, k) => legacyParams(k + 1, 1).level).every((l, k) => l === k + 1), `the Keeper's Stair: ${stats.keepersStair}`);
+  }
+  // The founding relic is one no Hour site holds, the mask first (a made-up history where the mask is a site's).
+  const fake = { history: { rulers: [{ id: "h1" }, { id: "h2" }], siteRequests: [{ relicId: "mask" }],
+    relics: [{ id: "lost", rulerId: "h2", lostAt: {} }, { id: "free", rulerId: "h2" }, { id: "mask", rulerId: "h2", mask: true }, { id: "other", rulerId: "h1", mask: true }] } };
+  expect(hourRelic(fake, 2)?.id === "free" && hourRelic({ history: { ...fake.history, siteRequests: [] } }, 2)?.id === "mask" && hourRelic(fake, 3) === null,
+    `the founding relic's rule: ${hourRelic(fake, 2)?.id}, ${hourRelic({ history: { ...fake.history, siteRequests: [] } }, 2)?.id}`);
+  // In a game: the Grub Mother claimed by her lair, once; the Gloam Warden's death opens its hall's gate.
+  const { game, startRun } = await import("../../src/game.js");
+  const { uidWhere } = await import("../../src/zones.js");
+  const { killMonster } = await import("../../src/monsters.js");
+  startRun(seeds[0], REAL_WORLD);
+  const km = [...game.run.sites.values()].find((s) => s.landmarkId === "kettleMesa"), deep = `${km.at.wx},${km.at.wy},${km.dungeon.levels}`;
+  game.debug.enterZone(deep);
+  const gm = game.zone.creatures.filter((c) => km.legend && c.uid === km.legend.uid);
+  expect(game.zone.key === deep && gm.length === 1 && uidWhere(game, km.legend?.uid) === deep, `in a game: the Grub Mother ${gm.length} in ${game.zone.key}, claimed by ${uidWhere(game, km.legend?.uid)}`);
+  const uc = [...game.run.sites.values()].find((s) => s.landmarkId === "unlitChoir"), hallKey = `${uc.at.wx},${uc.at.wy},4`;
+  game.debug.enterZone(hallKey);
+  const hall = game.zone.guardianHall, warden = game.zone.creatures.find((c) => c.type === "gloamWarden");
+  if (hall && warden) {
+    const shut = hall.gate.filter(([x, y, z]) => game.zone.get(x, y, z) === B.GATE).length;
+    killMonster(game, warden, "", true, true);
+    const open = hall.gate.every(([x, y, z]) => game.zone.get(x, y, z) === B.AIR);
+    stats.wardenGate = `${shut} gate blocks shut, ${open ? "open" : "still shut"} after its death`;
+    expect(shut > 0 && open, `in a game: the Gloam Warden's gate (${stats.wardenGate})`);
+  } else problems.push(`in a game: no Gloam Warden's hall on ${hallKey}`);
+  // In a game: a press-wheel turns only in 3D, and frees its prisoner (C1b #20); the far mouth comes out on Molar's grate (#22).
+  const { useColumn } = await import("../../src/interact.js"), { on } = await import("../../src/events.js"), { checkFloorEvents } = await import("../../src/screens/play.js");
+  const sq = [...game.run.sites.values()].find((s) => s.landmarkId === "square");
+  game.debug.enterZone(`${sq.at.wx},${sq.at.wy},2`);
+  const q = game.zone.prisoners?.[0], freed = [];
+  const off = on("prisoner:freed", (g, ev) => freed.push(ev.k));
+  if (q) {
+    game.view = "map";
+    const onMap = useColumn(game, q.wheel[0], q.wheel[1]);
+    const mapFreed = q.freed;
+    game.view = "3d";
+    const in3d = useColumn(game, q.wheel[0], q.wheel[1]);
+    stats.wheel = `map: ${onMap ? "turned" : "refused"}, 3D: ${in3d ? "turned" : "refused"}, freed ${q.freed}, events ${freed}`;
+    expect(!onMap && !mapFreed && in3d && q.freed && freed.join() === "0" && game.zone.get(...q.wheel) === B.LEVER_ON, `in a game: the press-wheel (${stats.wheel})`);
+  } else problems.push("in a game: no prisoner on the Square's floor 2");
+  off?.();
+  const mo = [...game.run.sites.values()].find((s) => s.landmarkId === "molar");
+  game.debug.enterZone(`${mo.at.wx},${mo.at.wy},2`);
+  const ex = game.zone.exit, pl = game.player;
+  if (ex) {
+    Object.assign(pl, { x: ex.x + 0.5, y: ex.y + 0.5, z: FLOOR_Z, onGround: true, vz: 0 });
+    checkFloorEvents(game);
+    stats.farMouth = `${game.zone.key} at (${Math.floor(pl.x)}, ${Math.floor(pl.y)}), the grate (${ex.at})`;
+    expect(game.zone.key === ex.key && Math.abs(pl.x - ex.at[0] - 0.5) + Math.abs(pl.y - ex.at[1] - 0.5) <= 2, `in a game: up the far mouth to ${stats.farMouth}`);
+  } else problems.push("in a game: no far mouth on the Root Canals' floor 2");
+  // In a game: Folio's drawn door on the map takes you into the archive and back out; a drawn wall holds you (C1b #12).
+  const { mapStep } = await import("../../src/turns.js");
+  const fo = game.run.world.landmarks.get("folio");
+  game.debug.enterZone(`${fo.wx},${fo.wy},0`);
+  game.view = "map";
+  const fd = game.zone.drawnDoors?.[0];
+  if (fd) {
+    const put = ([x, y]) => Object.assign(pl, { x: x + 0.5, y: y + 0.5, z: game.zone.stand[x + y * game.zone.w], onGround: true });
+    const dir = (a, b) => [Math.sign(b[0] - a[0]), Math.sign(b[1] - a[1])];
+    put(fd.outside);
+    const inOk = mapStep(game, ...dir(fd.outside, fd.wall)) && Math.floor(pl.x) === fd.inside[0] && Math.floor(pl.y) === fd.inside[1];
+    const outOk = mapStep(game, ...dir(fd.inside, fd.wall)) && Math.floor(pl.x) === fd.outside[0] && Math.floor(pl.y) === fd.outside[1];
+    const w = game.zone.mapWalls[0], wx = w % game.zone.w, wy = Math.floor(w / game.zone.w);
+    const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dy]) => game.zone.stand[wx + dx + (wy + dy) * game.zone.w] >= 0 && !game.zone.mapWalls.includes(wx + dx + (wy + dy) * game.zone.w));
+    put([wx + nb[0], wy + nb[1]]);
+    const held = !mapStep(game, -nb[0], -nb[1]) && Math.floor(pl.x) === wx + nb[0];
+    stats.drawnDoor = `in ${inOk}, out ${outOk}, a drawn wall holds ${held}`;
+    expect(inOk && outOk && held, `in a game: Folio's drawn door (${stats.drawnDoor})`);
+  } else problems.push("in a game: Folio has no drawn door");
+  // In a game: the Unlit Choir's rune doors (C1b #26) open only with your torch out, on the map and in 3D; its floors have
+  // them, every door a rune door with its rune over it.
+  const choir = game.run.world.landmarks.get("unlitChoir");
+  game.debug.enterZone(`${choir.wx},${choir.wy},1`);
+  const cz = game.zone, rd = cz.runeDoors || [];
+  const doorsAll = []; for (let i = 0; i < cz.w * cz.d; i++) if (cz.get(i % cz.w, Math.floor(i / cz.w), FLOOR_Z) === B.DOOR) doorsAll.push(i);
+  if (rd.length) {
+    const i = rd[0], x = i % cz.w, y = Math.floor(i / cz.w);
+    const tries = [];
+    for (const [view, torch] of [["map", true], ["3d", true], ["map", false]]) {
+      game.view = view; pl.torch = torch;
+      if (cz.get(x, y, FLOOR_Z) !== B.DOOR) { cz.set(x, y, FLOOR_Z, B.DOOR); cz.set(x, y, FLOOR_Z + 1, B.DOOR); }
+      tries.push(!!useColumn(game, x, y) && cz.get(x, y, FLOOR_Z) === B.AIR);
+    }
+    pl.torch = true;
+    stats.runeDoors = `${rd.length} rune doors of ${doorsAll.length} doors on floor 1; lit on the map ${tries[0]}, lit in 3D ${tries[1]}, dark ${tries[2]}`;
+    expect(doorsAll.every((k) => rd.includes(k)) && rd.every((k) => cz.get(k % cz.w, Math.floor(k / cz.w), FLOOR_Z + 2) === B.RUNE) && JSON.stringify(tries) === "[false,false,true]",
+      `in a game: the rune doors (${stats.runeDoors})`);
+  } else problems.push("in a game: no rune doors on the Unlit Choir's floor 1");
+  // The Gnomon's door (C1b #26, #10): shut over the stair at 09:00 and 14:00, open from 11:00 to 13:00 (by the clock while
+  // you stand there); outside them the Cube turned on the threshold opens it for good for 10 max HP (asked first), the
+  // Plumb Key opens it for nothing, and with neither it stays shut.
+  const { maxHp } = await import("../../src/stats.js"), { catchUp } = await import("../../src/clock.js"), st0 = await import("../../src/status.js");
+  const gn = game.run.world.landmarks.get("gnomon"), gk = `${gn.wx},${gn.wy},0`;
+  const atHour = (h) => { game.time = (h - 6) * 60 + 24 * 60 * Math.floor((game.time + 1) / (24 * 60)); };
+  const gnomonDoor = (h, setup) => {
+    startRun(seeds[0], REAL_WORLD); game.story.cube = false; atHour(h); setup?.();
+    game.debug.enterZone(gk);
+    return game.zone.needleDoor;
+  };
+  const shut = (d) => d && d.cells.every(([x, y]) => game.zone.get(x, y, FLOOR_Z) === B.GATE);
+  const g9 = shut(gnomonDoor(9)), g12 = !shut(gnomonDoor(12)), g14 = shut(gnomonDoor(14));
+  // the clock turning while you stand there
+  const d = gnomonDoor(10);
+  const before = shut(d);
+  game.clockSeen = game.time; game.time += 60 + 1; catchUp(game);   // past 11:00
+  const opened = !shut(d);
+  game.time += 2 * 60; catchUp(game);   // past 13:00
+  const closed = shut(d);
+  // its keys, at 14:00
+  const dc = gnomonDoor(14, () => { game.story.cube = true; }), hp0 = maxHp(game.player), [cx, cy] = dc.cells[0];
+  game.view = "map";
+  const ask = useColumn(game, cx, cy), asked = shut(dc) && maxHp(game.player) === hp0;
+  game.time += 1; useColumn(game, cx, cy);
+  const cube = !shut(dc) && dc.forGood && dc.how === "cube" && maxHp(game.player) === hp0 - 10;
+  const dk = gnomonDoor(14, () => { game.player.inv.push({ kind: "quest", id: "plumbKey", name: "the Plumb Key" }); }), hk = maxHp(game.player);
+  useColumn(game, ...dk.cells[0]);
+  const key = !shut(dk) && dk.how === "plumbKey" && maxHp(game.player) === hk;
+  const dn = gnomonDoor(14);
+  useColumn(game, ...dn.cells[0]); useColumn(game, ...dn.cells[0]);
+  const none = shut(dn);
+  // Flat, you don't slide under it either (the Plane gets under an ordinary gate).
+  const [nx, ny] = dn.cells[0];
+  Object.assign(game.player, { x: nx + 0.5, y: ny + 1.5, z: game.zone.stand[nx + (ny + 1) * game.zone.w], onGround: true });
+  st0.addStatus(game, game.player, "flat", { t: 5 }); game.view = "map";
+  mapStep(game, 0, -1);
+  const flatHeld = game.zone.key === gk && Math.floor(game.player.y) === ny + 1;
+  st0.removeStatus(game, game.player, "flat");
+  stats.gnomonDoor = { g9, g12, g14, clock: before && opened && closed, asked: !ask && asked, cube, key, none, flatHeld };
+  expect(Object.values(stats.gnomonDoor).every(Boolean), `in a game: the Gnomon's door ${JSON.stringify(stats.gnomonDoor)}`);
+  // The gimmicks' code (C1b #10), in a game:
+  //   the Metronome's off-beat doors: a door held on the beat, open on the off-beat;
+  //   the Datum's floor 2: its stair down sealed until beat 2 is reached (beat 1 done), then it takes you to floor 3;
+  //   Kettle Mesa: a fall down its shaft lands a floor down unhurt; its last floor's culvert carries you up into Hollowmere.
+  startRun(seeds[0], REAL_WORLD);
+  const P = game.player, site = (id) => [...game.run.sites.values()].find((s) => s.landmarkId === id), { offBeat } = await import("../../src/interact.js");
+  const met = site("metronome");
+  game.debug.enterZone(`${met.at.wx},${met.at.wy},1`);
+  const mz = game.zone, ob = mz.offBeatDoors || [];
+  let onBeat = null, offBeatOpen = null;
+  if (ob.length && mz.beat) {
+    const k = ob[0], dx = k % mz.w, dy = Math.floor(k / mz.w);
+    game.view = "map"; P.torch = true;
+    game.time = Math.ceil(game.time / 2) * 2;   // a beat's start: the on half
+    for (let n = 0; n < 16 && offBeat(game, mz); n++) game.time += 0.5;
+    onBeat = !useColumn(game, dx, dy) && mz.get(dx, dy, FLOOR_Z) === B.DOOR;
+    for (let n = 0; n < 16 && !offBeat(game, mz); n++) game.time += 0.5;
+    offBeatOpen = !!useColumn(game, dx, dy) && mz.get(dx, dy, FLOOR_Z) === B.AIR;
+  }
+  const dat = site("benchmark"), dk2 = `${dat.at.wx},${dat.at.wy},2`;
+  game.debug.enterZone(dk2);
+  const onStairs = () => { const st = game.zone.stairs; Object.assign(P, { x: st.x + 0.5, y: st.y + 0.5, z: FLOOR_Z, onGround: true, vz: 0 }); checkFloorEvents(game); return game.zone.key; };
+  const sealedAt = game.zone.sealedBelow, sealed = onStairs() === dk2;
+  game.fallThrough();   // a potion of descent: the seal holds too
+  const sealedFall = game.zone.key === dk2;
+  const { campaignOf } = await import("../../src/story/campaign.js");
+  campaignOf(game).done.beat1 = game.time;
+  const opened2 = onStairs() === `${dat.at.wx},${dat.at.wy},3`;
+  const kt = site("kettleMesa");
+  game.debug.enterZone(`${kt.at.wx},${kt.at.wy},1`);
+  const hpBefore = P.hp;
+  P.z = -2; checkFloorEvents(game);
+  const soft = game.zone.key === `${kt.at.wx},${kt.at.wy},2` && P.hp === hpBefore;
+  game.debug.enterZone(`${kt.at.wx},${kt.at.wy},3`);
+  const cv = game.zone.culvert;
+  if (cv) { Object.assign(P, { x: cv.x + 0.5, y: cv.y + 0.5, z: -2 }); checkFloorEvents(game); }
+  const home = game.run.world.landmarks.get("hollowmere");
+  const culvertHome = !!cv && game.zone.key === `${home.wx},${home.wy},0`;
+  // A fall from the Square's floor up lands inside the citadel, by the stair up of the zone below (not out of line with it).
+  const sqz = site("square");
+  game.debug.enterZone(`${sqz.at.wx},${sqz.at.wy},-1`);
+  game.fallThrough();
+  const sqs = game.zone.upStairs, upFall = game.zone.key === `${sqz.at.wx},${sqz.at.wy},0` && sqs && Math.abs(P.x - sqs.x - 0.5) + Math.abs(P.y - sqs.y - 0.5) <= 3;
+  stats.gimmicks = { offBeatDoors: ob.length, onBeat, offBeatOpen, sealedBelow: sealedAt?.beat, sealed, sealedFall, opened2, soft, culvert: culvertHome, upFall };
+  expect(ob.length && onBeat && offBeatOpen && sealedAt?.beat === 2 && sealed && sealedFall && opened2 && soft && stats.gimmicks.culvert && upFall, `in a game: the gimmicks ${JSON.stringify(stats.gimmicks)}`);
+  // The rest of the gimmicks (C1b #10), in a game, at the run's own floors:
+  let G2;
+  {
+  G2 = {};
+  const GM = await import("../../src/gimmicks.js"), ev = await import("../../src/events.js"), st = await import("../../src/status.js");
+  const enter = (id, z, h = null) => { const s = site(id); if (h !== null) game.time = (h - 6) * 60 + 24 * 60 * 3; game.debug.enterZone(`${s.at.wx},${s.at.wy},${z}`); return game.zone; };
+  const tick = (mode = "explore") => { game.mode = mode; ev.runUpdates(game, 0.05); };
+  // The Press: its ceilings 6, 5, 4 and 3 blocks over the floor (a room's middle), the Press-hall tall; a pressed room on every
+  // floor, its things flat until you turn on its gold centre; from floor 3 its plates press you flat for 10 s, unhurt.
+  G2.headroom = [1, 2, 3, 4].map((z) => { const f = enter("pressyard", z), r = f.rooms.find((o) => !o.hall && f.stand[o.cx + o.cy * f.w] === FLOOR_Z && !(f.vault && o.cx >= f.vault.x0 && o.cx <= f.vault.x1 && o.cy >= f.vault.y0 && o.cy <= f.vault.y1));
+    let k = FLOOR_Z; while (k < f.h && f.get(r.cx, r.cy, k) === B.AIR) k++; return k - FLOOR_Z; });
+  // (through a save and a load first: the room's pressed things must still be its own)
+  const { encodeZone, decodeZone } = await import("../../src/save/codec.js");
+  const pz0 = enter("pressyard", 2), back = await decodeZone(await encodeZone(pz0, { slot: "t", savedAt: 0 }, { deflate: false }));
+  pz0.creatures = back.creatures;
+  const pz = pz0, prr = pz.pressedRoom, pressed = pz.creatures.filter((c) => c.vis?.pressed && c.vis?.flat);
+  Object.assign(P, { x: prr.cx + 0.5, y: prr.cy + 0.5, z: FLOOR_Z, onGround: true });
+  game.view = "map"; tick("map"); game.view = "3d"; tick();
+  G2.pressed = { flatBefore: pressed.length, gold: pz.get(prr.cx, prr.cy, FLOOR_Z - 1) === B.MOSAIC_GOLD, deepAfter: pressed.every((c) => !c.vis.flat), done: prr.done };
+  const p3 = enter("pressyard", 3), plate = [...p3.spikes.keys()][0];
+  if (plate !== undefined) {
+    const { spikeState, updateSpikes } = await import("../../src/traps.js");
+    for (let n = 0; n < 40 && spikeState(p3, plate, game.time) !== "up"; n++) game.time += 0.25;
+    Object.assign(P, { x: plate % p3.w + 0.5, y: Math.floor(plate / p3.w) + 0.5, z: FLOOR_Z, onGround: true, spikeBeat: undefined });
+    const hp = P.hp; st.removeStatus(game, P, "flat"); updateSpikes(game);
+    G2.pressPlate = { flat: st.hasStatus(P, "flat"), unhurt: P.hp === hp, plates1: !!enter("pressyard", 1).pressPlates };
+    st.removeStatus(game, P, "flat");
+  }
+  // The Datum: the true level's plates; the wrong one does nothing, the sill's own opens the gate.
+  const dz = enter("benchmark", 1), tl = dz.trueLevel;
+  const shut = () => tl.gate.every(([x, y, z]) => dz.get(x, y, z) === B.GATE);
+  const sillMural = (dz.murals || []).find((m) => m.view === "3d" && /SILL IS (\d)/.test(m.text));
+  const plateMurals = (dz.murals || []).filter((m) => m.view === "map" && /plate set in the floor, numbered/.test(m.text)).length;
+  const onPlate = (n) => { const q = tl.plates.find((o) => o.n === n); Object.assign(P, { x: q.x + 0.5, y: q.y + 0.5, z: FLOOR_Z }); tick("map"); };
+  const clouds0 = dz.clouds.length, shut0 = shut(); onPlate(tl.answer === 1 ? 2 : 1); const wrong = shut(), gas = dz.clouds.length > clouds0;
+  onPlate(tl.answer); const dead = shut();   // straight on to the right one: the plates are dead
+  game.time += GM.TRUE_LEVEL.dead + 1; Object.assign(P, { x: tl.plates[0].x + 0.5, y: tl.plates[0].y - 1.5 }); tick("map"); onPlate(tl.answer);   // off the plates, then the right one
+  G2.trueLevel = { vault: dz.vault.name, plates: tl.plates.length, plateMurals, sill: sillMural && Number(/SILL IS (\d)/.exec(sillMural.text)[1]) === tl.answer, shut0, wrongShut: wrong, gas, dead, open: !shut() };
+  // The Drowned Lantern's tide: dry at noon, deep at 16:00 (the datum's floor), and it rises with the clock while you're there.
+  const lvl = (f) => { const t = f.tide.base?.[0]; return t ? f.get(t[0] % f.w, Math.floor(t[0] / f.w), FLOOR_Z - 1) : null; };
+  const dry = lvl(enter("drownedLantern", 1, 12)), deep = lvl(enter("drownedLantern", 2, 16));
+  const t3 = enter("drownedLantern", 3, 12); game.clockSeen = game.time; game.time += 60 + 1; (await import("../../src/clock.js")).catchUp(game);
+  G2.tide = { noon: dry !== B.WATER_SHALLOW && dry !== B.WATER_DEEP && dry !== null, at16: deep === B.WATER_DEEP, levels: [12, 13, 15, 17, 19, 3, 10, 11].map((h) => GM.tideLevel(t3, h)).join(""), byClock: t3.tide.level === 1 && lvl(t3) === B.WATER_SHALLOW };
+  // The Dial-works' sweeping hand: a quarter of a period later it lies elsewhere; under it you are pressed flat.
+  const sw = enter("gnomon", 1), cells = (t) => { let n = 0; for (let y = 0; y < sw.d; y++) for (let x = 0; x < sw.w; x++) if (GM.underSweep(sw, x, y, t)) n++; return n; };
+  let spot = null; for (let y = 0; y < sw.d && !spot; y++) for (let x = 0; x < sw.w && !spot; x++) if (sw.stand[x + y * sw.w] === FLOOR_Z && GM.underSweep(sw, x, y, game.time)) spot = [x, y];
+  st.removeStatus(game, P, "flat");
+  if (spot) { Object.assign(P, { x: spot[0] + 0.5, y: spot[1] + 0.5, z: FLOOR_Z }); tick(); }
+  // (a boss in the hand's shadow isn't pressed: a stand-in for Vesper on her spot's kind, at the player's tile)
+  const { spawnCreature: spc, addCreature: adc } = await import("../../src/creatures.js");
+  const bossM = adc(sw, spc("goblin", spot?.[0] ?? 1, spot?.[1] ?? 1, FLOOR_Z, { rng: Math.random, state: "idle", level: 3 }));
+  sw.bossSpot = { id: "goblin" }; tick();
+  const bossFlat = st.hasStatus(bossM, "flat"); sw.bossSpot = null; tick();
+  const plainFlat = st.hasStatus(bossM, "flat");
+  sw.creatures = sw.creatures.filter((c) => c !== bossM);
+  G2.sweep = { bossFlat, plainFlat, cells: cells(game.time), moved: [...Array(sw.w * sw.d).keys()].some((i) => GM.underSweep(sw, i % sw.w, Math.floor(i / sw.w), game.time) !== GM.underSweep(sw, i % sw.w, Math.floor(i / sw.w), game.time + sw.sweep.period / 4)), flat: !!spot && st.hasStatus(P, "flat") };
+  st.removeStatus(game, P, "flat");
+  // Dark-mapping in the Root Canals: three steps leave three tiles of track (none outside a dark-mapped dungeon).
+  const rc = enter("molar", 1), sx = Math.floor(rc.spawn.x), sy = Math.floor(rc.spawn.y);
+  for (const [dx, dy] of [[0, 0], [1, 0], [2, 0]]) { Object.assign(P, { x: sx + dx + 0.5, y: sy + dy + 0.5 }); tick(); }
+  G2.darkMapping = { trail: rc.trail.length, other: enter("pressyard", 1).trail === undefined };
+  // The Rootfold: entered by day its floor is the day layout; entered again at 20:00 it is the night one (another floor).
+  const day = enter("foldmother", 1, 12), dayBlocks = day.blocks.slice(), dayLayout = day.layout;
+  enter("foldmother", 0); const night = enter("foldmother", 1, 20);
+  const nightThings = night.items.length + night.creatures.length, nightLayout = night.layout, nightDiffers = night.blocks.some((b, i) => b !== dayBlocks[i]);
+  enter("foldmother", 0); const again = enter("foldmother", 1, 12);   // the day layout a second time: bare
+  const againThings = again.items.length + again.creatures.length;
+  game.time = (20 - 6) * 60 + 24 * 60 * 3; game.debug.enterZone(again.key, "load");   // a load at night keeps the day layout
+  G2.layouts = { day: dayLayout, night: nightLayout, differ: nightDiffers, same: night === day, nightThings, againThings, load: game.zone.layout };
+    // Foldmother (C1b #10): open by day, folded at night; standing on a branch as 18:00 strikes drops you, unhurt, onto the
+  // Rootfold's first floor; at dawn she opens again.
+  {
+    const fz = enter("foldmother", 0, 12), F = fz.fold, planks = () => F.planks.filter(([x, y, z]) => fz.get(x, y, z) === B.PLANK).length;
+    const day = planks();
+    const pk = F.planks.find(([x, y, z]) => !fz.get(x, y, z + 1) && !fz.get(x, y, z + 2));
+    game.time = (17 - 6) * 60 + 24 * 60 * 3 + 59; game.clockSeen = game.time;
+    Object.assign(P, { x: pk[0] + 0.5, y: pk[1] + 0.5, z: pk[2] + 1, onGround: true });
+    const hp = P.hp, { catchUp } = await import("../../src/clock.js");
+    game.time += 2; catchUp(game);
+    const dropped = game.zone.key === `${fz.wx},${fz.wy},1` && P.hp === hp, night = planks();
+    game.debug.enterZone(fz.key); game.clockSeen = game.time; game.time += 12 * 60; catchUp(game);
+    const dawn = planks();
+    // Arriving at night from a spot that happens to lie over a branch: you arrive on Foldmother's span, not dropped below.
+    game.time = (12 - 6) * 60 + 24 * 60 * 4; game.debug.enterZone(fz.key); const keep = planks();
+    game.debug.enterZone(`${fz.wx},${fz.wy},1`); Object.assign(P, { x: pk[0] + 0.5, y: pk[1] + 0.5, z: pk[2] + 1 });
+    game.time = (21 - 6) * 60 + 24 * 60 * 4; game.debug.enterZone(fz.key, "up");
+    const arrived = game.zone.key === fz.key;
+    G2.fold = { planks: F.planks.length, day, night, dropped, dawn, keep, arrived };
+  }
+  }
+  stats.gimmicks2 = G2;
+  expect(JSON.stringify(G2.headroom) === "[6,5,4,3]" && G2.pressed.flatBefore >= 1 && G2.pressed.gold && G2.pressed.deepAfter && G2.pressed.done
+    && G2.pressPlate?.flat && G2.pressPlate.unhurt && !G2.pressPlate.plates1
+    && G2.trueLevel.vault === "The True Level" && G2.trueLevel.plates === 4 && G2.trueLevel.plateMurals === 4 && G2.trueLevel.sill && G2.trueLevel.shut0 && G2.trueLevel.wrongShut && G2.trueLevel.gas && G2.trueLevel.dead && G2.trueLevel.open
+    && G2.tide.noon && G2.tide.at16 && G2.tide.levels === "01234440" && G2.tide.byClock && G2.sweep.cells > 20 && G2.sweep.moved && G2.sweep.flat && !G2.sweep.bossFlat && G2.sweep.plainFlat
+    && G2.darkMapping.trail === 3 && G2.darkMapping.other && G2.fold.day === G2.fold.planks && G2.fold.planks > 100 && G2.fold.night === 0 && G2.fold.dropped && G2.fold.dawn === G2.fold.planks && G2.fold.arrived && G2.layouts.day === "day" && G2.layouts.night === "night" && G2.layouts.differ && G2.layouts.nightThings > 0 && G2.layouts.againThings === 0 && G2.layouts.load === "day",
+    `in a game: the gimmicks ${JSON.stringify(G2)}`);
+  return { name: "landmark bottoms", ok: problems.length === 0, problems, stats };
 }
 
 // --- A legend lives in exactly one zone (zones.js claimUid; guardians.js on zone:prepare) ---------------------
@@ -783,5 +1196,5 @@ export async function run(env) {
   return [checkVaultOptions(), checkDungeonParams(),
     checkDungeons({ seeds: Number(env.args.seeds) || 50, p95Budget: Number(env.args.budget) || 40 }),
     checkRandomLevels({ count: Number(env.args.random) || 1000, p95Budget: Number(env.args.budget) || 40 }),
-    checkSites({ seeds }), checkHistoric({ seeds }), await checkLegends(), await checkTraps()];
+    checkSites({ seeds }), checkHistoric({ seeds }), await checkLegends(), await checkTraps(), await checkLandmarkBottoms({ seeds })];
 }

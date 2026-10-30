@@ -27,7 +27,7 @@
 // hint: logged the first time you step inside.
 import { B, FLOOR_Z, ROOM_TOP } from "../world.js";
 import { makeRng } from "../rng.js";
-import { spawnCreature, addCreature, canTalk } from "../creatures.js";
+import { spawnCreature, addCreature, canTalk, CREATURE_TYPES } from "../creatures.js";
 import { makeItem, randomPotion, randomScroll, randomEquipment, randomTreasure, ITEM_KINDS } from "../items.js";
 import { layoutSpikes } from "../traps.js";
 import { LEGENDS, legendLooks } from "../content/creatures/legends.js";
@@ -297,7 +297,131 @@ const LICH_THRONE = {
   ],
   links: [],
 };
-export const BOSS_HALLS = { lich: LICH_THRONE };
+// The landmark dungeons' bosses' halls (bible §5 I, J, N; B2, C1b #5): V is the boss's spot (the "landmarkBoss" handler:
+// zone.bossSpot, and the boss itself when its kind is registered, with the bottom's uid). Not the Lich's `B`: a kind
+// with the `boss` flag wins the parent's game when it dies.
+//   pressMaster  the Press-hall (the Pressyard's floor 5): tall again under the Press, its three pistons (a, b, c) on
+//                gantries 3, 4 and 5 blocks up, reached by climbing their steps in 3D (zone.pistons)
+//   noon         Noon's floor (the Unlit Choir's 6): lampless, a mosaic of a woman with no shadow laid in the floor, read
+//                on the map; Noon lies at its heart (a flat ghost: the map, with your torch out)
+//   vesper       the Noon Socket (the Dial-works' 8): twelve hour numerals stand round the socket as platforms 1 to 3
+//                blocks up (the deep phase is climbed by them), the socket's ring in gold
+const PRESS_HALL = {
+  id: "pressHall", name: "The Press-hall", height: 7, wall: B.METAL, floorBlock: B.TILE, links: [], boss: "pressMaster",
+  legend: { "4": "step4", "5": "step5", a: "piston3", b: "piston4", c: "piston5", V: "landmarkBoss" },
+  hint: "The ceiling is high again, and the Press fills it: three pistons on their gantries, rising and falling on one beat.",
+  plan: [
+    "#########l#########",
+    "#.................#",
+    "#.12345c..........#",
+    "#.................#",
+    "l.................l",
+    "#..........1234b..#",
+    "#.................#",
+    "#........V........#",
+    "#.................#",
+    "#.123a............#",
+    "l.................l",
+    "#.................#",
+    "#.................#",
+    "#.................#",
+    "#########E#########",
+  ],
+};
+// A woman drawn in gold and white tiles, with no shadow anywhere on the floor (x, y in the plan).
+const NOON_FIGURE = [[8, 2, "W"], [7, 3, "G"], [8, 3, "W"], [9, 3, "G"], [8, 4, "G"], [6, 5, "G"], [7, 5, "G"], [8, 5, "W"], [9, 5, "G"], [10, 5, "G"],
+  [7, 6, "G"], [8, 6, "W"], [9, 6, "G"], [7, 7, "G"], [8, 7, "W"], [9, 7, "G"], [6, 8, "G"], [7, 8, "G"], [8, 8, "G"], [9, 8, "G"], [10, 8, "G"],
+  [6, 9, "G"], [10, 9, "G"], [6, 10, "G"], [10, 10, "G"]];
+const NOON_HALL = {
+  id: "noonFloor", name: "Noon's Floor", height: 4, wall: B.STONE, floorBlock: B.TILE, links: [], boss: "noon", legend: { V: "landmarkBoss" },
+  hint: "No lamp has ever burned here. The floor is laid with something too big to see from where you stand.",
+  plan: [
+    "#################",
+    "#...............#",
+    "#...............#",
+    "#...............#",
+    "#...............#",
+    "#...............#",
+    "#.......V.......#",
+    "#...............#",
+    "#...............#",
+    "#...............#",
+    "#...............#",
+    "#...............#",
+    "########E########",
+  ],
+  mosaics: NOON_FIGURE.map(([x, y, c]) => [x, y, c === "G" ? B.MOSAIC_GOLD : B.MOSAIC_WHITE]),
+};
+// The Noon Socket: the twelve hours round a socket, each numeral a platform (1, 2, 3, 1, 2, 3…: u, v, w, zone.hours) with
+// its steps down toward the socket (a 3 has a 2 and a 1 in front of it), the ring in gold.
+const SOCKET_HOURS = [[8, 1], [11, 2], [13, 4], [14, 7], [13, 10], [11, 12], [8, 13], [5, 12], [3, 10], [2, 7], [3, 4], [5, 2]];
+const SOCKET_HALL = {
+  id: "noonSocket", name: "The Noon Socket", height: 6, wall: B.METAL, floorBlock: B.TILE, links: [], boss: "vesper",
+  legend: { V: "landmarkBoss", u: "hour1", v: "hour2", w: "hour3" },
+  hint: "A socket the size of a room, and round it the hours, each standing a little higher than the last.",
+  plan: (() => {
+    const g = Array.from({ length: 17 }, (_, y) => Array.from({ length: 17 }, (_, x) => (y === 0 || x === 0 || x === 16 || y === 16 ? "#" : ".")));
+    SOCKET_HOURS.forEach(([x, y], k) => {
+      const h = 1 + (k % 3), dx = Math.sign(8 - x), dy = Math.sign(7 - y), [sx, sy] = Math.abs(8 - x) >= Math.abs(7 - y) ? [dx, 0] : [0, dy];
+      g[y][x] = "uvw"[h - 1];
+      for (let j = 1; j < h; j++) g[y + sy * j][x + sx * j] = String(h - j);
+    });
+    g[7][8] = "V"; g[16][8] = "E"; g[0][8] = "l"; g[8][0] = "l"; g[8][16] = "l";
+    return g.map((r) => r.join(""));
+  })(),
+  mosaics: [[7, 6, B.MOSAIC_GOLD], [8, 6, B.MOSAIC_GOLD], [9, 6, B.MOSAIC_GOLD], [7, 8, B.MOSAIC_GOLD], [8, 8, B.MOSAIC_GOLD], [9, 8, B.MOSAIC_GOLD],
+    [7, 7, B.MOSAIC_GOLD], [9, 7, B.MOSAIC_GOLD]],
+};
+export const BOSS_HALLS = { lich: LICH_THRONE, pressMaster: PRESS_HALL, noon: NOON_HALL, vesper: SOCKET_HALL };
+
+// The Datum stone (Benchmark's Datum, floor 4: bible §5 D, beat 2's reading; B2, C1b #5): a 2-block plinth (P) with a
+// crate (c) beside it, the stone carved in the wall behind it at the height of your eyes when you stand on the plinth
+// (S). Read it standing at its level (zone.datumStone: where you stand, and the stone's block).
+const DATUM_HALL = {
+  id: "datumStone", name: "The Datum Stone", height: 5, wall: B.STONE, floorBlock: B.TILE, links: [], legend: { P: "plinth2", c: "crate1", S: "datumStone" },
+  hint: "A plinth two blocks high, and behind it a level line cut in the wall, as high as your eyes would be up there.",
+  plan: [
+    "######S######",
+    "#.....P.....#",
+    "#.....c.....#",
+    "#...........#",
+    "l...........l",
+    "#...........#",
+    "#...........#",
+    "#...........#",
+    "######E######",
+  ],
+};
+export const READING_HALLS = { datumStone: DATUM_HALL };
+
+// The true level (the Datum's floors, bible §5 D: "a door opens when you stand on the plate whose map number matches the 3D
+// height of the marked sill"; B2, C1b #10): a sill (S) `sill` blocks high, its height carved in the wall beside it, read in
+// 3D; four brass plates in the floor (a-d), numbered 1-4, read on the map; the treasure behind a gate (G). Standing on
+// the plate whose number is the sill's height opens it (src/gimmicks.js; zone.trueLevel { plates: [{ x, y, n }], answer,
+// gate, solved }). Not one of VAULTS (the legacy stack draws from those): a landmark's pool names it.
+function trueLevelPlan(rng) {
+  const sill = rng.int(1, 4);
+  return {
+    sill,
+    plan: [
+      "#############",
+      "#####*$*#####",
+      "#####GGG#####",
+      "#...........#",
+      "#...........#",
+      "#S..........#",
+      "#...........#",
+      "#..a.b.c.d..#",
+      "#...........#",
+      "######E######",
+    ],
+  };
+}
+export const LANDMARK_VAULTS = {
+  trueLevel: { id: "trueLevel", name: "The True Level", height: 5, wall: B.STONE, floorBlock: B.TILE, build: trueLevelPlan, links: [],
+    legend: { S: "trueSill", a: "plate", b: "plate", c: "plate", d: "plate" },
+    hint: "A sill stands out of the west wall, a line cut beside it, and brass plates lie in a row across the floor." },
+};
 
 // Lair halls (a lair's last level, p.bottom = { kind: "legend", id, uid, hall }): the legend in the middle of a
 // wide hall, its hoard behind it. By the hall its template asks for (content/creatures/legends.js):
@@ -360,11 +484,15 @@ export const RELIC_HALLS = { reliquary: RELIQUARY };
 //   trueMark(count)       a pile of true-marks (bible §10.4; WS5's item kind "credit"); null while that kind isn't
 //                         registered, so nothing unknown is ever laid on a floor
 //   bodyMod(rng, level)   an artifact, cell or implant (WS5's randomBodyMod); null until bodymods sets it
+//   artifact(id, rng)     that artifact (a landmark's relic bottom names one: the Noonglass), or null while its kind
+//                         can't do it (C4's ARTIFACTS_WAITING): the altar then holds treasure, and zone.bottomLoot.artifact
+//                         says which relic is still to come
 //   relic(relicDef, rng)  a history relic (WS7's History.relics entry) as an item; the default builds its base
 //                         item (an amulet, a weapon…) and marks it with the relic's id and name
 export const BOTTOM_LOOT = {
   trueMark: (count) => (ITEM_KINDS.credit ? { kind: "credit", count } : null),
   bodyMod: null,
+  artifact: () => null,   // a named artifact (a landmark's relic: the Noonglass), once its kind does what it says (bodymods/index.js)
   relic: (def) => ({ kind: def.base.kind, id: def.base.id, ench: 2, known: true, histRelic: def.id, relicName: def.name, powers: JSON.parse(JSON.stringify(def.powers || [])) }),
 };
 
@@ -402,7 +530,8 @@ export const GUARDIAN_HALLS = {
 
 // Any vault or hall by its id.
 export function vaultById(id) {
-  return VAULTS.find((v) => v.id === id) || GUARDIAN_HALLS[id] || BOSS_HALLS[id] || RELIC_HALLS[id]
+  return VAULTS.find((v) => v.id === id) || GUARDIAN_HALLS[id] || BOSS_HALLS[id] || RELIC_HALLS[id] || READING_HALLS[id]
+    || [...Object.values(BOSS_HALLS), ...Object.values(READING_HALLS)].find((v) => v.id === id) || LANDMARK_VAULTS[id] || null
     || Object.values(LAIR_HALLS).find((v) => v.id === id) || null;
 }
 // The hall a dungeon's bottom asks for: a guardian's, a boss's, a legend's lair (by its template's hall) or the
@@ -413,6 +542,7 @@ export function bottomHall(bottom) {
   if (bottom.kind === "boss") return BOSS_HALLS[bottom.id] || null;
   if (bottom.kind === "legend") return LAIR_HALLS[bottom.hall || bottom.legend?.hall || "plain"] || LAIR_HALLS.plain;
   if (bottom.kind === "relic") return RELIC_HALLS.reliquary;
+  if (bottom.kind === "reading") return READING_HALLS[bottom.id] || null;
   return null;
 }
 
@@ -424,20 +554,22 @@ export function buildVault(v, rng) {
 }
 
 // Which vault a dungeon level gets (p: the level's parameters, gen/dungeon.js):
-//   p.forcedVault        that one (the legacy stack's fixed sequence, a site's own hall)
+//   p.forcedVault        that one (the legacy stack's fixed sequence, a site's own hall), with p.vaultGuardian in a
+//                        guardian's hall in place of its own
 //   p.final + p.bottom   the bottom's hall (bottomHall): a guardian's, a boss's, a legend's lair, the reliquary
 //   otherwise            a pick from p.vaultPool (ids, or [id, weight]; default every puzzle vault),
 //                        keeping vaults whose `levels` range holds p.level, and on a last level only vaults
-//                        without chasms (`holes`: there's nowhere to fall to). Equal weights draw exactly as
+//                        without chasms (`holes`: there's nowhere to fall to; nor on a floor up, p.noHoles). Equal weights draw exactly as
 //                        rng.pick does, so the legacy stack's random vaults don't move (its last level is a hall).
 export function pickVault(rng, p = {}) {
   let v = p.forcedVault ? vaultById(p.forcedVault) : null;
+  if (v && p.vaultGuardian) v = { ...v, guardian: p.vaultGuardian };   // a landmark's own guardian in the hall (the Gloam Warden: B2, C1b #6)
   if (!v && p.final && p.bottom) v = bottomHall(p.bottom);
   if (!v) {
     const level = p.level ?? 1;
     const pool = (p.vaultPool || VAULTS.map((o) => o.id))
       .map((e) => (Array.isArray(e) ? { v: vaultById(e[0]), w: e[1] } : { v: vaultById(e), w: 1 }))
-      .filter(({ v: o }) => o && (!o.levels || (level >= o.levels[0] && level <= o.levels[1])) && !(p.final && o.holes));
+      .filter(({ v: o }) => o && (!o.levels || (level >= o.levels[0] && level <= o.levels[1])) && !((p.final || p.noHoles) && o.holes));
     if (!pool.length) throw new Error(`no vault fits level ${level}`);
     if (pool.every((e) => e.w === pool[0].w)) v = pool[Math.floor(rng() * pool.length)].v;
     else {
@@ -521,6 +653,8 @@ registerLegend("guardian", (c) => {
   addCreature(c.zone, spawnCreature(c.vault.guardian, c.x, c.y, c.z0, { rng: c.cosmetic, state: "idle", level: c.zone.level }));
 });
 registerLegend("stairs", (c) => { floorCol(c); at(c, -1, B.STAIRS); c.zone.stairs = { x: c.x, y: c.y }; });
+// Stairs up (a plan maps its own letter to it: the Square's gatehall, under its floors up; B2, C1b #8).
+registerLegend("stairsUp", (c) => { floorCol(c); at(c, -1, B.STAIRS_UP); c.zone.upStairs = { x: c.x, y: c.y }; });
 registerLegend("entrance", (c) => {
   wallCol(c);
   at(c, -1, c.vault.floorBlock); at(c, 0, B.AIR); at(c, 1, B.AIR);
@@ -572,6 +706,11 @@ registerLegend("bottomLoot", (c) => {
   const b = bottomOf(c), level = c.zone.level, rdef = b.kind === "relic" ? b.relic : null;
   let it = rdef ? BOTTOM_LOOT.relic(rdef, c.rng) : null;
   if (it) { it.uid = rdef.id; it.relicSpawn = true; note(c).relic = rdef.id; }
+  if (!it && b.kind === "relic" && b.artifact) {   // a landmark's named relic (the Noonglass): one in the world (its uid)
+    it = BOTTOM_LOOT.artifact(b.artifact, c.rng) || null;
+    note(c).artifact = { id: b.artifact, laid: !!it };
+    if (it) { it.uid = `relic:${b.artifact}`; it.relicSpawn = true; }
+  }
   if (!it && b.kind === "legend") { it = BOTTOM_LOOT.bodyMod?.(c.rng, level) || null; if (it) note(c).bodyMod = true; }
   it ||= randomTreasure(c.rng, level + 2);
   at(c, 0, B.ALTAR);
@@ -592,13 +731,52 @@ registerLegend("bodyMod", (c) => {
   else c.zone.items.push(makeItem(randomTreasure(c.rng, c.zone.level + 1), c.x + 0.5, c.y + 0.5, c.z0));
 });
 registerLegend("cradle", (c) => { floorCol(c); at(c, 0, B.STATION); at(c, 1, B.STATION); });
+// The landmark bottoms' parts (B2, C1b #5): higher steps, the Press's pistons on their gantries, a boss's spot, the Datum
+// stone's plinth, crate and stone.
+for (const n of [4, 5]) registerLegend(`step${n}`, (c) => { floorCol(c); for (let dz = 0; dz < n; dz++) at(c, dz, c.vault.wall); });
+for (const n of [3, 4, 5])
+  registerLegend(`piston${n}`, (c) => {   // the gantry's last step, and the piston on it (two blocks of metal)
+    floorCol(c);
+    for (let dz = 0; dz < n; dz++) at(c, dz, c.vault.wall);
+    at(c, n, B.METAL); at(c, n + 1, B.METAL);
+    (c.zone.pistons ||= []).push({ x: c.x, y: c.y, z: c.z0 + n, gantry: n });
+  });
+registerLegend("landmarkBoss", (c) => {
+  floorCol(c);
+  const b = bottomOf(c), id = b.id || c.vault.boss;
+  c.zone.bossSpot = { x: c.x, y: c.y, z: c.z0, id };
+  if (!CREATURE_TYPES[id]) return;   // its kind isn't in yet (C3, C5): the spot waits for it
+  const m = spawnCreature(id, c.x, c.y, c.z0, { rng: c.cosmetic, state: "idle", level: c.zone.level, uid: b.uid ?? null });
+  m.named = true;
+  addCreature(c.zone, m);
+});
+for (const n of [1, 2, 3]) registerLegend(`hour${n}`, (c) => { floorCol(c); for (let dz = 0; dz < n; dz++) at(c, dz, c.vault.wall); (c.zone.hours ||= []).push({ x: c.x, y: c.y, z: c.z0 + n }); });
+registerLegend("trueSill", (c) => {
+  floorCol(c);
+  const h = c.vault.sill || 1;
+  for (let dz = 0; dz < h; dz++) at(c, dz, c.vault.wall);
+  c.zone.set(c.x - 1, c.y, c.z0 + 1, B.MURAL);   // the mark, in the wall beside it at eye height
+  (c.zone.murals ||= []).push({ x: c.x - 1, y: c.y, z: c.z0 + 1, view: "3d", text: `THIS SILL IS ${h} BLOCK${h > 1 ? "S" : ""} UP.` });
+  (c.zone.trueLevel ||= { plates: [], answer: h, gate: [], solved: false }).answer = h;
+});
+registerLegend("plate", (c) => {
+  floorCol(c);
+  at(c, -1, B.MOSAIC_WHITE);
+  const n = "abcd".indexOf(c.ch) + 1;
+  (c.zone.murals ||= []).push({ x: c.x, y: c.y, z: c.z0 - 1, view: "map", text: `A brass plate set in the floor, numbered ${n}.` });
+  (c.zone.trueLevel ||= { plates: [], answer: 0, gate: [], solved: false }).plates.push({ x: c.x, y: c.y, n });
+});
+registerLegend("plinth2", (c) => { floorCol(c); at(c, 0, c.vault.wall); at(c, 1, c.vault.wall); });
+registerLegend("crate1", (c) => { floorCol(c); at(c, 0, B.CRATE); });
+// The stone: carved at eye height for someone standing on the plinth in front of it (2 up, eyes 2 above their feet).
+registerLegend("datumStone", (c) => { wallCol(c); at(c, 3, B.MURAL); c.zone.datumStone = { x: c.x, y: c.y + 1, z: c.z0 + 2, stone: [c.x, c.y, c.z0 + 3] }; });
 
 // A legend (world/sites.js makeLegend: { uid, template, species, name, epithet, level, mutations, opinions, hook })
 // standing at (x, y): its species at its level, ×2 health and ×10 experience (bible §12.13), named, with its uid
 // (zones.js claimUid keeps it in one zone; guardians.js claims it when you arrive). Its looks and mutations are
 // legendLooks's (content/creatures/legends.js), which guardians.js runs again on every entry (they aren't saved).
 export function spawnLegend(zone, def, x, y, z, rng) {
-  const c = spawnCreature(def.species, x, y, z, { rng, state: "idle", level: def.level, uid: def.uid, name: `${def.name} ${def.epithet}` });
+  const c = spawnCreature(def.species, x, y, z, { rng, state: "idle", level: def.level, uid: def.uid, name: def.epithet ? `${def.name} ${def.epithet}` : def.name });
   c.maxHp = c.hp = c.hp * LEGENDS.base.hpMul;
   c.xp *= LEGENDS.base.xpMul;
   c.named = true;
@@ -668,6 +846,7 @@ export function stampVault(zone, vault, vx, vy, rng, opts = {}) {
     };
   }
 
+  if (zone.trueLevel && cells.S) zone.trueLevel.gate = (cells.G || []).flatMap(([x, y]) => [[x, y, z0], [x, y, z0 + 1]]);   // (the true level's gate)
   // Braziers: each one's number is the numeral carved in the wall straight behind it.
   if (cells.F) {
     const numerals = ["5", "6", "7", "8"].flatMap((ch) => (cells[ch] || []).map(([x]) => [x, Number(ch) - 4]));

@@ -13,9 +13,10 @@ import { B, FLOOR_Z } from "./world.js";
 import { distance } from "./rng.js";
 import { applyDamage } from "./combat.js";
 import * as creatures from "./creatures.js";
-import { statusFlag, hasStatus } from "./status.js";
+import { statusFlag, hasStatus, addStatus } from "./status.js";
 
 export const TICK = 0.5;
+export const PRESS_FLAT = 10;   // seconds a press-plate keeps you flat
 
 // "up" (spikes out: it hurts), "warn" (they come up on the next beat) or "down". null if not a trap.
 export function spikeState(zone, i, time) {
@@ -63,12 +64,15 @@ export function updateSpikes(game) {
   const flatYou = creatures.touchesYou ? !creatures.touchesYou(game, null) : hasStatus(p, "flat");
   if (!statusFlag(p, "flying") && !flatYou && p.onGround !== false && hits(p.x, p.y, p.z, p.spikeBeat)) {
     p.spikeBeat = beat;
-    game.hurtPlayer(2 + Math.floor(zone.level / 3) + Math.floor(Math.random() * 3), "the spikes");
+    // A press-plate (the Press, from floor 3: zone.pressPlates; bible §5 I) presses you flat for 10 s instead (B2, C1b #10).
+    if (zone.pressPlates) addStatus(game, p, "flat", { t: PRESS_FLAT });
+    else game.hurtPlayer(2 + Math.floor(zone.level / 3) + Math.floor(Math.random() * 3), "the spikes");
   }
   for (const m of [...zone.creatures]) {
     const t = creatures.CREATURE_TYPES[m.type];
     if (creatures.canTalk(m) || m.vis.statue || t.hover || t.flat || t.boss || !hits(m.x, m.y, m.z, m.spikeBeat)) continue;
     m.spikeBeat = beat;
+    if (zone.pressPlates) { addStatus(game, m, "flat", { t: PRESS_FLAT }); continue; }
     // Nobody's harm (WS6a request 2): no grudge, no reputation, and a kill that isn't yours (no experience).
     // Nobody's harm (no grudge, no reputation: WS6a #2), but the kill's experience is yours, as in the parent (the
     // integrator's call on WS10 #10, as for status kills).

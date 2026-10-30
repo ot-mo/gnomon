@@ -13,7 +13,8 @@ import { pickUpHere } from "../items.js";
 import { bind } from "../keys.js";
 import { on } from "../events.js";
 import { isPlumb, gradeOf, gradeUsed, trueMarks, implantEffect } from "./implants.js";
-import { markHoles, randomBodyMod } from "./artifacts.js";
+import { markHoles, randomBodyMod, makeArtifact } from "./artifacts.js";
+import { ARTIFACTS } from "../content/items/artifacts.js";
 import { BOTTOM_LOOT } from "../gen/vaults.js";
 import { BEAT_SIGHT } from "../traps.js";
 export { canInstall, install, uninstall } from "./implants.js";
@@ -22,6 +23,9 @@ export { examineArtifact } from "./artifacts.js";
 // WS10's seams (at its merge): a lair's owner guards an artifact, a cell or an implant, and the reliquary's altar
 // holds one (drawn from the site's own stream); the metronome heart shows the spikes about to rise in 3D.
 BOTTOM_LOOT.bodyMod = randomBodyMod;
+// A landmark's named relic (the Noonglass at the Drowned Lantern's bottom: B2, C1b #5), known at once, once it is one of the
+// artifacts the game can do (C4's ARTIFACTS; it waits in ARTIFACTS_WAITING until its noon beam is built).
+BOTTOM_LOOT.artifact = (id, rng) => (ARTIFACTS[id] ? { ...makeArtifact(id, rng), known: true } : null);
 BEAT_SIGHT.has = (game) => implantEffect(game.player, "beatSight");
 
 // G (TECH_DESIGN §4.3, WS5's key): pick up what lies at your feet, in either view; it takes no time, as walking over

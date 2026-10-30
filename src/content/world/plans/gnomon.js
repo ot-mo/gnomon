@@ -2,9 +2,9 @@
 // sweepingHand): a leaning needle of black truesteel, so tall that the top of it is weather. Its foot is voxels, at the
 // span's middle (40, 24), where render3d starts the needle's billboard on whatever stands there (WS3 #10, WS2b #10):
 // a plinth a block high, 5 × 5; a base 3 × 3 and 3 high; the needle itself one column 14 high, scenery's ceiling. Its
-// door is south of the plinth, between two truesteel posts: the stair down into the Dial-works (the door opens only
-// from 11:00 to 13:00, to the Plumb Key, the Cube turned on the threshold or Hierarch Strade: integration request; until
-// then the doorway is open). Round the foot the ground is truesteel, and the Lattice's crystal stands in a broken ring.
+// door is south of the plinth, between two truesteel posts: a gate over the stair down into the Dial-works, open only from
+// 11:00 to 13:00, else to the Plumb Key, the Cube turned on the threshold or Hierarch Strade (zone.needleDoor: interact.js;
+// B2, C1b #26). Round the foot the ground is truesteel, and the Lattice's crystal stands in a broken ring.
 //
 // The plan is 31 × 21, its corner at (25, 14): its middle (15, 10) is the span's (40, 24). Letters:
 //   .  the ground as the world made it    ,  truesteel underfoot (metal)    p  the plinth (rock, 1)
@@ -40,6 +40,8 @@ export const GNOMON_PLAN = {
                        grounds: GROUNDS, stacks: STACKS }, ox, oy, makeRng(seedFor(zone.seed, "gnomon")), { roof: "none" });
     column(zone, ox + CX, oy + CY, FLOOR_Z + 3, FLOOR_Z + NEEDLE, B.SHALE);   // the needle's black, on its base
     for (const [x, y, h] of SPARS) column(zone, ox + x, oy + y, FLOOR_Z, FLOOR_Z + h, B.CRYSTAL);
+    // The door: shut over the stair (interact.js opens it by the hour, and to its keys), its posts either side.
+    zone.needleDoor = { cells: [[ox + CX, oy + CY + 4]], open: true, forGood: false, how: null };
     return { spawn: null, keyPoints: [] };
   },
 };

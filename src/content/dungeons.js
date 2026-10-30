@@ -21,6 +21,12 @@ const clampDark = (base, per, max) => (level) => Math.min(max, base + per * leve
 export const DUNGEONS = {
   themes: {
     // Deepwright rooms (ruins): old brick and tile, a little glass, rather dark.
+    // The Square's (bible §5 M; B2, C1b #20): one material, so every room is the same room in 3D (only the floor mosaic
+    // in each, read on the map, tells them apart: gen/dungeon.js GIMMICKS.identicalRooms).
+    rule: {
+      rooms: [{ wall: B.STONE, floor: B.TILE }],
+      darkRate: clampDark(0.05, 0.02, 0.3), count: (level) => Math.min(16, 3 + Math.round(level * 1.5)),
+    },
     deepwright: {
       rooms: [{ wall: B.BRICK, floor: B.TILE }, { wall: B.MUD_BRICK, floor: B.CLAY }, { wall: B.STONE, floor: B.TILE }, { wall: B.GLASS, floor: B.TILE }],
       darkRate: clampDark(0.2, 0.03, 0.6), count: (level) => Math.min(16, 3 + Math.round(level * 1.5)),

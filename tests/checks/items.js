@@ -499,6 +499,29 @@ export function checkItems(m) {
       p.genotype = "bent";
       game.messages = [];
       if (m.interact.useColumn(game, cx, cy) || game.mode === "truing" || !said(/Plumb/)) fail(`${view}: a Bent at the Cradle wasn't turned away`);
+      // The Square's Cradle (its first floor down) fits a Plumb for nothing at Assize Warm (+250), and only there and then
+      // (bible §5 M; B2, C1b #9): the screen's context waives the fee, and the fitting costs no glim.
+      p.genotype = "plumb";
+      const was = { lm: zone.landmarkId, z: zone.z }, rep0 = game.state.rep?.assize;
+      const waived = (lm, z, rep) => {
+        Object.assign(zone, { landmarkId: lm, z }); (game.state.rep ||= {}).assize = rep;
+        m.interact.useColumn(game, cx, cy);
+        const w = game.mode === "truing" && !!m.screens.modeData(game)?.at?.waive;
+        if (game.mode === "truing") m.keys.dispatchKey(game, "Escape", false, "");
+        return w;
+      };
+      const cases = [waived("square", 1, 250), waived("square", 1, 249), waived("square", 2, 400), waived("benchmark", 1, 400)];
+      if (JSON.stringify(cases) !== "[true,false,false,false]") fail(`${view}: the Square's free fittings (Warm, floor 1; under Warm; floor 2; Benchmark): ${cases}`);
+      p.inv.push(it);
+      const g0 = p.funds;
+      Object.assign(zone, { landmarkId: "square", z: 1 }); game.state.rep.assize = 300;
+      m.interact.useColumn(game, cx, cy);
+      const d2 = m.screens.modeData(game);
+      d2.list.sel = m.equipment.truingRows(game).findIndex((r) => r.kind === "pack" && r.item === it);
+      m.keys.dispatchKey(game, "Enter", false, "");
+      if (p.body.implants.face !== it || p.funds !== g0) fail(`${view}: a free fitting at the Square: ${p.body.implants.face ? "in" : "not in"}, glim ${g0} → ${p.funds}`);
+      m.keys.dispatchKey(game, "Escape", false, "");
+      Object.assign(zone, { landmarkId: was.lm, z: was.z }); game.state.rep.assize = rep0;
     }
     // A surgeon: the services as the shop runs them (pay, run, done).
     p = fresh();

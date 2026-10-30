@@ -17,9 +17,11 @@
 //
 // Site = { id, kind, at: { wx, wy }, name, tier, landmarkId?, checkpoint?, historyRef?, legend?, toppled?,
 //          surface: { builder, rect: { x, y, w, d } | null, params }, dungeon?: DungeonSpec }
-// DungeonSpec = { levels, theme, baseLevel, levelStep, gimmicks, floorGimmicks?, floorLevels?, up?, legacy?,
+// DungeonSpec = { levels, theme, baseLevel, levelStep, gimmicks, floorGimmicks?, floorLevels?, up?, namedUp?, legacy?,
 //                 optional?, named?, vaultPool?, cradle?: [z], murals?: [{ text, map }],
-//                 bottom: { kind: "guardian" | "legend" | "relic" | "boss" | "none", id, uid?, hall?, trueMarks? } }
+//                 bottom: { kind: "guardian" | "legend" | "relic" | "boss" | "reading" | "none", id, uid?, hall?, trueMarks?,
+//                           artifact?, hour? }, vaults?: { z: vaultId | { hall, guardian } } }
+//   up: the levels of its floors up (z = −1, −2…; the Square's), namedUp their names.
 //   Floor z's level is floorLevels[z − 1] when the floors are listed (the landmarks, bible §15.3), else
 //   round(baseLevel + z × levelStep); baseLevel is the surface level, so a generic site's floor k is the
 //   surface level + k (DECISIONS.md). The legacy stack has baseLevel 0: its levels are the parent's depths.
@@ -47,12 +49,13 @@ import { levelOfTier, tierOfLevel, SIDES, SITE_MARGIN } from "./worldmodel.js";
 import { SURFACE, B, FLOOR_Z } from "../world.js";
 import { makeRng, seedFor } from "../rng.js";
 import { countGen } from "./genstats.js";
-import { stampVault } from "../gen/vaults.js";
+import { stampVault, BOSS_HALLS, READING_HALLS } from "../gen/vaults.js";
 import { DUNGEON_W, DUNGEON_D } from "../gen/dungeon.js";
 import { pickCreatureType, CREATURE_TYPES } from "../creatures.js";
 import "../content/creatures/levels.js";   // (the level pool above 20, which it registers with creatures.js)
 import { DUNGEONS } from "../content/dungeons.js";
 import { LEGENDS } from "../content/creatures/legends.js";
+import { ARTIFACTS, ARTIFACTS_WAITING } from "../content/items/artifacts.js";
 
 export const SITE_BUILDERS = {};
 export function registerSiteBuilder(kind, fn) {
@@ -94,16 +97,16 @@ export function dungeonLevelOf(spec, z) {
 }
 
 // A landmark's dungeon definition (content) as a DungeonSpec.
-function landmarkDungeon(L) {
+function landmarkDungeon(L, world) {
   const d = L.dungeon, surface = levelOfTier(L.tier);
   const spec = {
     levels: d.floors ? d.floors.length : d.levels, theme: d.theme || "legacy",
     baseLevel: d.baseLevel ?? surface, levelStep: d.levelStep ?? 1, gimmicks: [...(d.gimmicks || [])],
-    bottom: d.bottom ? { kind: d.bottom.kind, id: d.bottom.id ?? null } : { kind: "none", id: null },
+    bottom: landmarkBottom(d),
   };
   if (d.id) spec.id = d.id;
   if (d.floors) spec.floorLevels = [...d.floors];
-  if (d.up) spec.up = [...d.up];
+  if (d.up) { spec.up = [...d.up]; if (d.planned?.up) spec.namedUp = [...d.planned.up]; }   // floors up: z = −1, −2… (B2, C1b #8)
   if (d.legacy) spec.legacy = true;
   if (d.optional) spec.optional = true;
   if (d.named) spec.named = [...d.named];
@@ -111,7 +114,51 @@ function landmarkDungeon(L) {
   if (d.cradle) spec.cradle = [...d.cradle];
   if (d.floorGimmicks) spec.floorGimmicks = d.floorGimmicks.map((g) => [...g]);
   if (d.planned?.creatures) spec.creatures = JSON.parse(JSON.stringify(d.planned.creatures));   // (its own inhabitants: dungeonParams)
+  if (d.planned?.vaults) spec.vaults = JSON.parse(JSON.stringify(d.planned.vaults));   // a hall on a floor that isn't the last (B2, C1b #6)
+  // Its places (B2): the clue and the captive (C1b #24: who stands there is C5's), the prisoners' cells (#20), and the far
+  // mouth up to its landmark's grate (#22: the Root Canals' floor 2 to Molar's X, east of the checkpoint).
+  const P = d.planned || {};
+  if (P.clue) spec.clue = { floor: P.clue.floor, what: P.clue.what };
+  if (P.captive) spec.captive = { floor: P.captive.floor, who: P.captive.who };
+  if (P.prisoners) spec.prisoners = { floors: [...P.prisoners.floors] };
+  if (P.theme && DUNGEONS.themes[P.theme]) spec.theme = P.theme;
+  const mouth = P.exit && world?.plans?.[world.landmarks.get(P.exit.to)?.plan]?.farMouth, to = P.exit && world?.landmarks.get(P.exit.to);
+  if (mouth && to?.anchor) spec.exit = { floor: P.exit.floor, key: `${to.wx},${to.wy},0`, at: [to.anchor[0] + mouth[0], to.anchor[1] + mouth[1]] };
+  // The gimmicks' places (B2, C1b #10): falls down Kettle Mesa's shaft land unhurt, and its last floor's culvert carries you
+  // up into Hollowmere's temple; the Datum's floors that open at a beat (the stair down to them sealed until then).
+  if (P.softFalls) spec.softFalls = true;
+  const home = P.culvert && world?.landmarks.get(P.culvert.to);
+  if (home) spec.culvert = { floor: P.culvert.from, key: `${home.wx},${home.wy},0` };
+  if (P.opensAtBeat) spec.opensAtBeat = { ...P.opensAtBeat };
+  // The rest of the gimmicks' parameters (C1b #10): each floor's headroom (the Press's lowering ceiling), the Press's pressed
+  // rooms and (from floor 3) its press-plates, the tide of the hours, the sweeping hand, dark-mapping, a day and a night layout.
+  if (P.headroom) spec.headroom = [...P.headroom];
+  if (P.pressedRooms) spec.pressedRooms = true;
+  if (P.tide) spec.tide = { ...P.tide, dry: [...P.tide.dry] };
+  if (P.sweepingHand) spec.sweep = { ...P.sweepingHand };
+  if (P.darkMapping) spec.darkMapping = true;
+  if (P.layouts) spec.layouts = JSON.parse(JSON.stringify(P.layouts));
+  if (d.planned?.murals || d.murals) spec.murals = (d.planned?.murals || d.murals).map((m) => ({ ...m }));   // its own murals' words (B2, C1b #7)
   return spec;
+}
+
+// A landmark dungeon's bottom (bible §5; C1b's planned.bottom, B2, C1b #5): what the bible puts on its last floor, where
+// the code builds it, else the bottom it stands on today (the Metronome's Escapement waits for its kind: the Colossus's
+// hall until then).
+//   legend    the Grub Mother: a LegendDef made from the data (placeSites: landmarkLegend), her lair hall
+//   relic     the Noonglass (an artifact: `artifact`, laid by BOTTOM_LOOT.artifact once its kind does what it says) or
+//             the Pressed's founding relic (`hour`: a relic of that Hour of the run's history that no Hour site holds)
+//   boss      a boss's hall (gen/vaults.js BOSS_HALLS: the Press-hall, Noon's floor, the Noon Socket): its spot, and
+//             the boss in it when its kind is registered (uid "boss:<site id>")
+//   reading   the Datum stone on its plinth (gen/vaults.js READING_HALLS)
+function landmarkBottom(d) {
+  const b = d.planned?.bottom, now = d.bottom ? { kind: d.bottom.kind, id: d.bottom.id ?? null } : { kind: "none", id: null };
+  if (!b) return now;
+  if (b.kind === "legend") return { kind: "legend", id: b.id, species: b.species, template: b.template || "plain", name: b.name };
+  if (b.kind === "relic") return { kind: "relic", id: b.id, artifact: ARTIFACTS[b.id] || ARTIFACTS_WAITING[b.id] ? b.id : null, hour: b.hour ?? null, trueMarks: [...(b.trueMarks || [])] };
+  if (b.kind === "boss" && BOSS_HALLS[b.id]) return { kind: "boss", id: b.id };
+  if (b.kind === "reading" && READING_HALLS[b.id]) return { kind: "reading", id: b.id };
+  return now;
 }
 
 // A landmark dungeon's own inhabitants on floor z (C1b's planned.creatures, [type, weight]; the Dial-works' by odd and even
@@ -167,27 +214,102 @@ export function sinkholeSpots(run, site) {
 // last level its bottom: a guardian's hall, a boss's throne, a legend's lair, an Hour site's reliquary ("none":
 // an ordinary level).
 export function dungeonParams(run, site, z) {
+  if (z < 0) return upParams(run, site, z);
   const spec = site.dungeon, level = dungeonLevelOf(spec, z), final = z >= spec.levels;
   const tile = run.world.tileAt(site.at.wx, site.at.wy);
   let bottom = null;
   const b = spec.bottom;
-  if (final && b && (b.kind === "guardian" || b.kind === "boss")) bottom = { kind: b.kind, id: b.id };
+  if (final && b && b.kind === "guardian") bottom = { kind: b.kind, id: b.id };
+  else if (final && b?.kind === "boss") bottom = { kind: "boss", id: b.id, ...(site.kind === "landmark" ? { uid: `boss:${site.id}` } : {}) };
+  else if (final && b?.kind === "reading") bottom = { kind: "reading", id: b.id };
   else if (final && b?.kind === "legend") {
     const legend = site.legend || null;
     bottom = legend ? { kind: "legend", id: b.id, uid: legend.uid, hall: legend.hall, legend: JSON.parse(JSON.stringify(legend)) } : null;
   } else if (final && b?.kind === "relic") {
-    const relic = b.id ? run.history?.relics?.find((r) => r.id === b.id) || null : null;
+    const relic = b.hour ? hourRelic(run, b.hour) : b.id && !b.artifact ? run.history?.relics?.find((r) => r.id === b.id) || null : null;
     bottom = { kind: "relic", id: b.id ?? null, relic: relic ? JSON.parse(JSON.stringify(relic)) : null, trueMarks: [...(b.trueMarks || [])] };
+    if (b.artifact) bottom.artifact = b.artifact;
   }
+  // A hall on a floor that isn't the last (C1b's planned.vaults: Kettle Mesa's Flat Lie, the Speaking Door, the Gloam
+  // Warden's hall with its own guardian in it; B2, C1b #6).
+  const v = !final && spec.vaults?.[z], forced = typeof v === "string" ? v : v?.hall || null;
   return {
     key: `${site.at.wx},${site.at.wy},${z}`, wx: site.at.wx, wy: site.at.wy, z, level, tier: tierOfLevel(level),
-    index: z, count: spec.levels, final, theme: spec.theme || "legacy", hasUp: true, forcedVault: null,
+    index: z, count: spec.levels, final, theme: spec.theme || "legacy", hasUp: true, forcedVault: forced, ...(v?.guardian ? { vaultGuardian: v.guardian } : {}),
     vaultPool: vaultPoolFor(spec, level), gimmicks: [...(spec.floorGimmicks?.[z - 1] || spec.gimmicks || [])], bottom, encounters: [],
     creatureTable: ownTable(spec, z, level) || run.world.regions?.[tile?.region]?.creatures || null, holesIn: null,   // (its own inhabitants first: integrator, C1b #19)
-    cradle: !!spec.cradle?.includes(z), murals: spec.murals ? spec.murals.map((m) => ({ ...m })) : null,
+    cradle: !!spec.cradle?.includes(z), murals: (final && b?.hour && hourAccounts(run, b.hour)) || (spec.murals ? spec.murals.map((m) => ({ ...m })) : null),
     name: spec.named?.[z - 1] || `${site.name}, level ${z}`,
     landings: z === 1 ? sinkholeSpots(run, site).map(([x, y]) => [x, y]) : null,
+    ...(spec.clue?.floor === z ? { clue: { ...spec.clue } } : {}), ...(spec.captive?.floor === z ? { captive: { ...spec.captive } } : {}),
+    ...(spec.prisoners?.floors.includes(z) ? { prisoners: 2 } : {}), ...(spec.exit?.floor === z ? { exit: { key: spec.exit.key, at: [...spec.exit.at] } } : {}),
+    ...(spec.softFalls ? { softFalls: true } : {}), ...(spec.culvert?.floor === z ? { culvert: { key: spec.culvert.key } } : {}),
+    ...(spec.opensAtBeat?.[z + 1] ? { sealedBelow: { beat: spec.opensAtBeat[z + 1] } } : {}),
+    ...(spec.headroom?.[z - 1] ? { headroom: spec.headroom[z - 1] } : {}), ...(spec.pressedRooms ? { pressedRoom: true, ...(z >= 3 ? { pressPlates: true } : {}) } : {}),
+    ...(spec.tide ? { tide: { ...spec.tide, dry: [...spec.tide.dry] } } : {}), ...(spec.sweep ? { sweep: { ...spec.sweep } } : {}),
+    ...(spec.darkMapping ? { darkMapping: true } : {}), ...(spec.layouts ? { layouts: JSON.parse(JSON.stringify(spec.layouts)) } : {}),
   };
+}
+
+// A floor up (z = −1, −2…; the Square's Rule Floor and Hierarch's Floor, levels 22 and 23: bible §5 M, §15.3; B2, C1b
+// #8): its level from spec.up, its name from spec.namedUp. The stair up from the surface (gen/surface.js: zone.hasAbove)
+// comes out by its stairs down, which lead back to z + 1; the top one has no stairs up. No holes and no vault with chasms
+// (a fall from the first floor up would land on the surface out of line with it), and no sinkholes over it.
+function upParams(run, site, z) {
+  const spec = site.dungeon, k = -z, level = spec.up[k - 1], top = k >= spec.up.length;
+  const tile = run.world.tileAt(site.at.wx, site.at.wy);
+  return {
+    key: `${site.at.wx},${site.at.wy},${z}`, wx: site.at.wx, wy: site.at.wy, z, level, tier: tierOfLevel(level),
+    index: z, count: spec.up.length, final: false, up: true, theme: spec.theme || "legacy", hasUp: !top, forcedVault: null,
+    vaultPool: (vaultPoolFor(spec, level) || null), noHoles: true, gimmicks: [...(spec.gimmicks || [])], bottom: null, encounters: [],
+    creatureTable: ownTable(spec, z, level) || run.world.regions?.[tile?.region]?.creatures || null, holesIn: { x0: 0, y0: 0, x1: -1, y1: -1 },
+    cradle: false, murals: spec.murals ? spec.murals.map((m) => ({ ...m })) : null,
+    name: spec.namedUp?.[k - 1] || `${site.name}, floor ${k} up`, landings: null,
+  };
+}
+
+// A relic of the run's Hour `hour` (1 the First … 5 the Fifth) that no Hour site holds and none lost: the Pressed's
+// founding relic is the Second Hour's (bible §5 O). null when the history has none (the test world's fixture).
+export function hourRelic(run, hour) {
+  const H = run.history, ruler = H?.rulers?.[hour - 1];
+  if (!ruler) return null;
+  const held = new Set((H.siteRequests || []).map((r) => r.relicId).filter(Boolean));
+  const own = (H.relics || []).filter((r) => r.rulerId === ruler.id && !held.has(r.id) && !r.lostAt);
+  return own.find((r) => r.mask) || own[0] || null;
+}
+
+// The Hour's stele on a bottom that names one (the Under-Page's Second-Hour stele, bible §5 O): its first event's three
+// accounts, carved in the walls, laid in the floor and cut as a rune (the murals gimmick). null without that Hour.
+function hourAccounts(run, hour) {
+  const e = run.history?.rulers?.[hour - 1]?.events?.find((ev) => ev.text?.inscription && ev.text?.gospel);
+  return e ? [{ text: e.text.inscription, map: e.text.gospel, dark: e.text.hostile, eventId: e.id }] : null;
+}
+
+// A landmark's legend (the Grub Mother: bible §5 C), from the data rather than drawn: her species and name, at the
+// bottom level + 3 as every legend (bible §12.13), the template's hall and hook, no mutations or opinions. She holds
+// her landmark's bottom: she never roams (placeLegends leaves her out of run.legends; guardians.js and legendOf find
+// her by her site).
+function landmarkLegend(site) {
+  const b = site.dungeon.bottom, tpl = LEGENDS.templates[b.template] || LEGENDS.templates.plain;
+  return { uid: `legend:${site.id}`, template: b.template, species: b.species, name: b.name, epithet: "", level: dungeonLevelOf(site.dungeon, site.dungeon.levels) + LEGENDS.base.levels,
+           mutations: [], opinions: [], hook: tpl.hook || null, hall: tpl.hall, siteId: site.id, roams: false };
+}
+
+// --- Holy places and dial-steles (B2, C1b #3, #21: the data C2's attitude and steleHour read) --------------------------
+// holyAt(zone, x, y) → { faction, rule } | null: whose holy place the tile is, finest first: a plan's area (Halfnight's
+// north row "noTorch", the West Ward's Hour-house "torchLit", Molar's checkpoint and Benchmark's fitting-house "holy"), else
+// the zone's own (a landmark's surface or span: zone.holy, rule "holy"; a landmark dungeon's holy floor the same). The
+// rules: "holy" (the faith's own trespass, bible §6), "noTorch" (a lit torch is trespass), "torchLit" (a torch out is).
+export function holyAt(zone, x, y) {
+  const a = (zone?.holyAreas || []).find((r) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1);
+  if (a) return { faction: a.faction, rule: a.rule };
+  return zone?.holy ? { faction: zone.holy, rule: "holy" } : null;
+}
+// steleAt(zone, x, y) → the carved hour (0-23) of the dial-stele on that tile, else null (the Tall Table's, Molar's,
+// Foldmother's: zone.steles).
+export function steleAt(zone, x, y) {
+  const st = (zone?.steles || []).find((s) => s.x === x && s.y === y);
+  return st ? st.hour : null;
 }
 
 // --- Legends (bible §12.13) ------------------------------------------------------------------------------
@@ -232,7 +354,7 @@ export function makeLegend(rng, site, bottomLevel, region = null) {
 }
 export function placeLegends(run) {
   const out = new Map();
-  for (const s of run.sites.values()) if (s.legend) out.set(s.legend.uid, s.legend);
+  for (const s of run.sites.values()) if (s.legend && s.legend.roams !== false) out.set(s.legend.uid, s.legend);
   return out;
 }
 export function legendOf(run, uid) {
@@ -296,7 +418,8 @@ export function placeSites(run) {
       landmarkId: L.id, checkpoint: L.checkpoint,
       surface: { builder: "landmark", rect: L.rect ? { ...L.rect } : null, params: { plan: L.plan, anchor: L.anchor } },
     };
-    if (L.dungeon) site.dungeon = landmarkDungeon(L);
+    if (L.dungeon) site.dungeon = landmarkDungeon(L, world);
+    if (site.dungeon?.bottom.kind === "legend") site.legend = landmarkLegend(site);
     addSite(run, site);
   }
 

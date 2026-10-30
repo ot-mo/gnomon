@@ -70,7 +70,7 @@ export function drawDead(game) {
   const at = overlay([
     ["YOU DIED", [255, 80, 80]],
     ["", null],
-    [`Killed by ${game.deathCause} ${game.zone.type === "dungeon" ? `on depth ${game.zone.dungeonIndex}` : `in ${game.zone.name}`}.`, [220, 220, 220]],
+    [`Killed by ${game.deathCause} ${game.zone.type === "dungeon" ? (game.zone.z < 0 ? `on floor ${-game.zone.z} up` : `on depth ${game.zone.dungeonIndex}`) : `in ${game.zone.name}`}.`, [220, 220, 220]],
     [`Seed ${game.seed}`, [140, 140, 140]],
     ["", null],
     ["Press R to start a new run", [255, 255, 255]],
@@ -96,7 +96,7 @@ export function drawWon(game) {
 // The beat between zones: "DEPTH n" (or the zone's name) on a black screen.
 export function drawTransition(game) {
   S.clear();
-  const t = game.zone.type === "dungeon" ? `DEPTH ${game.zone.dungeonIndex}` : game.zone.name.toUpperCase();
+  const t = game.zone.type === "dungeon" ? depthLabel(game.zone) : game.zone.name.toUpperCase();
   S.text((S.cols - t.length) >> 1, S.rows >> 1, t, 255, 230, 140);
   if (game.zone.final) {
     const sub = "The last floor. Something old waits here.";
@@ -251,7 +251,9 @@ function drawStatus(game, y, layout = layoutHud(game)) {
 }
 
 // Where you are, for the status line: "DEPTH 3/20" in a dungeon, the zone's name on the surface.
-const zoneLabel = (zone) => (zone.type === "dungeon" ? `DEPTH ${zone.dungeonIndex}${zone.dungeonLevels ? `/${zone.dungeonLevels}` : ""}`
+// A floor up (the Square's, z < 0: B2, C1b #8) says so: "UP 1/2".
+const depthLabel = (zone) => (zone.z < 0 ? `UP ${-zone.z}` : `DEPTH ${zone.dungeonIndex}`);
+const zoneLabel = (zone) => (zone.type === "dungeon" ? (zone.z < 0 ? `UP ${-zone.z}${zone.dungeonLevels ? `/${zone.dungeonLevels}` : ""}` : `DEPTH ${zone.dungeonIndex}${zone.dungeonLevels ? `/${zone.dungeonLevels}` : ""}`)
   : zone.name.toUpperCase().replace(/^THE /, ""));
 
 // Phase 0's segments, in the order they stand (the parent's order). Later: ability cooldowns (WS4, 70)

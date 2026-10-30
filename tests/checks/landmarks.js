@@ -28,7 +28,8 @@
 //    make them), the same twice (section 3), every open seam on the world function wherever the plan leaves the ground
 //    as it was, every person's place a key point (reachable on the map) but the Tall Table's top, which a 3D walk
 //    reaches; its dungeon's floors at the bible's levels with their names, gimmicks (each landmark's the union of its
-//    §15.3 keys' in GIMMICK_KEYS), cradles and bottom; its holy place a faction; and what its own plan promises (below,
+//    §15.3 keys' in GIMMICK_KEYS), cradles and bottom, and its floors up (the Square's two, levels 22 and 23: z = −1 and −2,
+//    reached by the surface's stair up; B2, C1b #8); its holy place a faction; and what its own plan promises (below,
 //    PROMISES). The 3D walk (reach3d): steps up of one block, drops, and jumps across up to 2 open tiles walking or 4
 //    sprinting at the same height or lower, orthogonally; ghost planks underfoot or not.
 // 6. Who stands where (the integrator, C5 #3 with C1b #18; story/landmark-people.js), on every span of section 3: one
@@ -70,6 +71,15 @@ import { dialogueIds } from "../../src/talk.js";
 import { dayNumber } from "../../src/clock.js";
 import { emit } from "../../src/events.js";
 import { trimCreature, rebuildCreature } from "../../src/save/codec.js";
+import { FOLIO_PEOPLE } from "../../src/content/world/plans/folio.js";
+import { dialFloorReading, MAX_PIPS } from "../../src/content/world/plans/dialFloor.js";
+import { flatLine } from "../../src/story/murals.js";
+const registerFlat = (run, L, r) => { const f = flatLine({ run }, L); return !!r && f.includes(`Pips ${r.pips}.`) && f.includes(`bearing ${r.bearing}`); };
+import { upFrom } from "../../src/screens/play.js";   // B2
+import { holyAt, steleAt } from "../../src/world/sites.js";
+import { LANDMARK_BUILDERS } from "../../src/gen/biomes/index.js";
+import { ZONE_GENERATORS } from "../../src/zones.js";
+import "../../src/world/zonegen.js";
 
 const pct = (sorted, q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))];
 const holesOf = (z) => {
@@ -476,14 +486,25 @@ const anyIn = (z, x0, y0, x1, y1, test) => { for (let y = y0; y <= y1; y++) for 
 const noLamp = (z, x0, y0, x1, y1) => !anyIn(z, x0, y0, x1, y1, (x, y) => { for (let k = 0; k < z.h; k++) if (z.get(x, y, k) === B.LAMP) return true; return false; });
 const road = (z, x, y) => z.stand[x + y * z.w] > 0 && z.get(x, y, z.stand[x + y * z.w] - 1) === B.ROAD;
 const PROMISES = {
-  dialFloor: ({ z, cell }) => {
+  dialFloor: ({ z, cell, run, L, pa }) => {
     const m = Object.fromEntries((z.murals || []).map((u) => [u.view, u]));
+    // The run's reading (B2, C1b #11): the nearest Fifth-Hour site's event in all three accounts; the arrow four gold tiles
+    // from the pin toward it, the pips its distance; the Flat line with those numbers.
+    const R = run.history.rulers[4], r = dialFloorReading(run, L.wx, L.wy), [[px, py]] = cell("P");
+    const sites = [...run.sites.values()].filter((s) => s.kind === "historic" && s.historyRef.rulerId === R.id);
+    const near = Math.min(...sites.map((s) => Math.max(Math.abs(s.at.wx - L.wx), Math.abs(s.at.wy - L.wy))));
+    const e = R.events.find((v) => v.id === r?.eventId), site = run.sites.get(r?.siteId);
+    const dx = site ? site.at.wx - L.wx : 0, dy = site ? site.at.wy - L.wy : 0, [ax, ay] = r?.dir || [0, 0];
+    const white = (() => { let n = 0; for (let y = pa.y; y < pa.y + pa.d; y++) for (let x = pa.x; x < pa.x + pa.w; x++) if (z.get(x, y, FLOOR_Z - 1) === B.MOSAIC_WHITE) n++; return n; })();
     return [
       [m.map && BLOCKS[z.get(m.map.x, m.map.y, m.map.z)]?.mosaic, "the Flat Account isn't on a mosaic tile"],
       [m["3d"] && z.get(m["3d"].x, m["3d"].y, m["3d"].z) === B.MURAL, "the Deep Inscription isn't on a carved panel"],
       [m.dark && z.get(m.dark.x, m.dark.y, m.dark.z) === B.RUNE, "the Dark Gloss isn't on a rune"],
-      [cell("a").every(([x, y]) => z.get(x, y, FLOOR_Z - 1) === B.MOSAIC_GOLD) && cell("w").length === 5 && cell("w").every(([x, y]) => z.get(x, y, FLOOR_Z - 1) === B.MOSAIC_WHITE),
-        "the arrow isn't gold or the pips aren't five white tiles"],
+      [r && site && sites.length && Math.max(Math.abs(dx), Math.abs(dy)) === near && m.map?.text === e.text.gospel && m["3d"]?.text === e.text.inscription && m.dark?.text === e.text.hostile,
+        `the accounts aren't the nearest Fifth-Hour site's event (${r?.siteId}, ${near} spans)`],
+      [r && (ax === 0 || Math.sign(dx) === ax) && (ay === 0 || Math.sign(dy) === ay) && (ax || ay) && [1, 2, 3, 4].every((k) => z.get(px + ax * k, py + ay * k, FLOOR_Z - 1) === B.MOSAIC_GOLD)
+        && r.pips === Math.min(MAX_PIPS, near) && white === r.pips && z.dialFloor?.pips === r.pips, `the arrow (${r?.dir}) or the pips (${white}, want ${r?.pips}) don't point to the site (${dx}, ${dy})`],
+      [registerFlat(run, L, r), "the Flat line doesn't carry the run's pips and bearing"],
       [cell("P").every(([x, y]) => solidUp(z, x, y, FLOOR_Z, FLOOR_Z + 4)), "the pin isn't 4 high"]];
   },
   kettleMesa: ({ z, cell, reach }) => [
@@ -511,11 +532,33 @@ const PROMISES = {
       "the Old Rule doesn't run through the gullet's two mouths"],
     [z.get(pa.x + 63, pa.y + 26, FLOOR_Z - 1) === B.METAL && reach[pa.x + 63 + (pa.y + 26) * z.w] >= 0, "the Root Canals' far mouth east of the checkpoint"],
     [[17, 18, 19, 20, 21].every((y) => z.get(pa.x + TOLL_GATE, pa.y + y, FLOOR_Z + 4) === B.STONE && z.stand[pa.x + TOLL_GATE + (pa.y + y) * z.w] === FLOOR_Z), "the toll gate's arch over the gullet, the way under it open"]],
-  folio: ({ z, pa, plan, cell }) => {
+  folio: ({ z, pa, plan, cell, reach }) => {
     let walls = 0, mosaic = 0;
     plan.rows.forEach((r, y) => [...r].forEach((ch, x) => { const k = z.kind[pa.x + x + (pa.y + y) * z.w]; if (k === KIND.WALL && ch !== "A") walls++; if (k === KIND.MOSAIC) mosaic++; }));
+    // The map's walk (B2, C1b #12): from the market, held by the drawn walls (zone.mapWalls) and stepping through the drawn
+    // door (zone.drawnDoors), it reaches every person and the archive's room; without the door, not the archive; in 3D the
+    // box has no way in.
+    const mapWalk = (useDoor) => {
+      const seen = new Set(), start = [pa.x + plan.hub[0], pa.y + plan.hub[1]], q = [start], walls = new Set(z.mapWalls || []);
+      seen.add(start.join());
+      while (q.length) {
+        const [x, y] = q.shift();
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          let nx = x + dx, ny = y + dy;
+          const door = (z.drawnDoors || []).find((d) => d.wall[0] === nx && d.wall[1] === ny);
+          if (door) { if (!useDoor) continue; const to = [x, y].join() === door.outside.join() ? door.inside : [x, y].join() === door.inside.join() ? door.outside : null; if (!to) continue; [nx, ny] = to; }
+          else if (nx < pa.x || ny < pa.y || nx >= pa.x + pa.w || ny >= pa.y + pa.d || walls.has(nx + ny * z.w) || z.kind[nx + ny * z.w] === KIND.WALL || z.stand[nx + ny * z.w] < 0) continue;
+          if (!seen.has(`${nx},${ny}`)) { seen.add(`${nx},${ny}`); q.push([nx, ny]); }
+        }
+      }
+      return seen;
+    };
+    const walk = mapWalk(true), noDoor = mapWalk(false), room = cell("a");
+    const people = Object.keys(FOLIO_PEOPLE).flatMap((ch) => cell(ch));
     return [[walls === 0, `${walls} walls on the map that aren't the archive (Folio's walls are drawn)`], [mosaic > 400, `only ${mosaic} mosaic tiles`],
-      [cell("A").every(([x, y]) => z.kind[x + y * z.w] === KIND.WALL) && cell("d").every(([x, y]) => z.get(x, y, FLOOR_Z - 1) === B.MOSAIC_GOLD), "the archive or its drawn door"]];
+      [cell("A").every(([x, y]) => z.kind[x + y * z.w] === KIND.WALL) && cell("d").every(([x, y]) => z.get(x, y, FLOOR_Z - 1) === B.MOSAIC_GOLD), "the archive or its drawn door"],
+      [(z.mapWalls || []).length > 300 && people.every(([x, y]) => walk.has(`${x},${y}`)) && room.every(([x, y]) => walk.has(`${x},${y}`) && !noDoor.has(`${x},${y}`) && reach[x + y * z.w] < 0 && z.get(x, y, FLOOR_Z + 3) === B.STONE),
+        `the map's walk: ${(z.mapWalls || []).length} drawn walls, ${people.filter(([x, y]) => walk.has(`${x},${y}`)).length} of ${people.length} people, the archive ${room.filter(([x, y]) => walk.has(`${x},${y}`)).length} of ${room.length} through the door, ${room.filter(([x, y]) => noDoor.has(`${x},${y}`)).length} without, ${room.filter(([x, y]) => reach[x + y * z.w] >= 0).length} in 3D`]];
   },
   halfnightWest: (c) => [...ward(c), [c.cell("B").length === 9 && c.z.get(c.pa.x + 34, c.pa.y + 37, FLOOR_Z + 11) === B.METAL, "the Noon Bell's tower"],
     [(c.z.murals || []).some((u) => u.view === "3d" && u.text === "LAMPS STAY LIT. THE HOURS ARE WATCHING."), "the Hour-house's sign"]],
@@ -581,7 +624,7 @@ function ward({ z, pa, plan, cell }) {
 
 function checkC1b(seeds, expect) {
   const ids = LANDMARK_INDEX.map((l) => l.id).filter((id) => id !== "hollowmere");
-  const tally = { zones: 0, seams: 0, seamTiles: 0, keys: 0, floors: 0, promises: 0, climbs: 0 };
+  const tally = { zones: 0, seams: 0, seamTiles: 0, keys: 0, floors: 0, promises: 0, climbs: 0, up: 0, steles: 0, holy: 0, holyFloors: 0 };
   for (const seed of seeds) {
     const runs = { real: buildRun(seed, REAL_WORLD) }, cache = new Map();
     const surface = (run, wx, wy) => { const k = `${run === runs.real ? "r" : "w"}${wx},${wy}`; if (!cache.has(k)) cache.set(k, generateSurface(run, wx, wy)); return cache.get(k); };
@@ -626,8 +669,25 @@ function checkC1b(seeds, expect) {
       const reach = mapReach(z);
       for (const [ok, what] of PROMISES[t.plan]({ z, pa, plan, cell, run: t.run, L, reach })) { tally.promises++; expect(ok, `${at}: ${what}`); }
       if (t.id === "tallTable" || t.id === "foldmother") tally.climbs++;
-      // Its dial-steles: a carving where each stands, with its carved hour (the Horary pray there within the hour).
-      for (const st of plan.steles || []) { tally.promises++; expect(z.get(pa.x + st.at[0], pa.y + st.at[1], FLOOR_Z + (st.z ?? 1)) === B.MURAL && st.hour >= 0 && st.hour < 24, `${at}: its dial-stele at ${st.at}`); }
+      // Its dial-steles: a carving where each stands, with its carved hour (the Horary pray there within the hour), on the
+      // zone with that hour (zone.steles, sites.js steleAt: B2, C1b #21); and nothing else there is a stele.
+      for (const st of plan.steles || []) {
+        tally.promises++; tally.steles++;
+        const sx = pa.x + st.at[0], sy = pa.y + st.at[1];
+        expect(z.get(sx, sy, FLOOR_Z + (st.z ?? 1)) === B.MURAL && st.hour >= 0 && st.hour < 24 && steleAt(z, sx, sy) === st.hour, `${at}: its dial-stele at ${st.at} (hour ${steleAt(z, sx, sy)}, want ${st.hour})`);
+      }
+      expect((z.steles || []).length === (plan.steles || []).length && steleAt(z, pa.x - 1, pa.y - 1) === null, `${at}: ${(z.steles || []).length} steles on the zone, its plan has ${(plan.steles || []).length}`);
+      // Its holy places (B2, C1b #3): the landmark's or the span's faith on the zone, each plan area at its place with its rule
+      // (finest first), the rest of the plan the zone's.
+      const holy = typeof def.holy === "string" ? def.holy : def.holy?.[`${L.wx},${L.wy}`] ?? null;
+      expect((z.holy ?? null) === holy && (z.holyAreas || []).length === (plan.areas || []).length, `${at}: holy ${z.holy} (want ${holy}), ${(z.holyAreas || []).length} areas (its plan ${(plan.areas || []).length})`);
+      for (const a of plan.areas || []) {
+        tally.holy++;
+        const cx = pa.x + ((a.rect[0] + a.rect[2]) >> 1), cy = pa.y + ((a.rect[1] + a.rect[3]) >> 1), h = holyAt(z, cx, cy);
+        expect(h?.faction === a.faction && h.rule === a.rule && FACTIONS[a.faction], `${at}: its ${a.faction} area holds ${JSON.stringify(h)}`);
+      }
+      const outside = plan.rows.flatMap((r, y) => [...r].map((c, x) => [pa.x + x, pa.y + y])).find(([x, y]) => !(z.holyAreas || []).some((r) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1));
+      if (outside) { tally.holy++; const h = holyAt(z, ...outside); expect(holy ? h?.faction === holy && h.rule === "holy" : h === null, `${at}: outside its areas, ${JSON.stringify(h)} (want ${holy})`); }
       // Its dungeon: the bible's levels, its names, gimmicks (its keys' union), cradles and bottom.
       const site = siteWithDungeon(t.run, L.wx, L.wy), want = LANDMARK_INDEX.find((l) => l.id === t.id)?.dungeon;
       if (!want || t.run === runs.wards) { expect(!site || t.run === runs.wards, `${at}: a dungeon it shouldn't have`); continue; }
@@ -649,17 +709,46 @@ function checkC1b(seeds, expect) {
           expect(p.bottom?.kind === want.bottom.kind && (want.bottom.kind !== "guardian" || f.creatures.some((c) => c.guardian === want.bottom.id)), `${at}: its bottom ${JSON.stringify(p.bottom)}`);
         }
       }
+      // Its floors up (the Square's: bible §5 M, levels 22 and 23; B2, C1b #8): the surface's stair up a key point with the
+      // zone above it; each floor at its level with its name, valid, its stair up leading on (the top one has none) and its
+      // stairs down back; the zone generator makes exactly those floors.
+      if (want.up) {
+        const up = REAL_WORLD.landmarks.find((l) => l.dungeon?.id === want.id).dungeon.planned?.up || [];
+        expect(z.upStairs && z.get(z.upStairs.x, z.upStairs.y, FLOOR_Z - 1) === B.STAIRS_UP && z.hasAbove && z.gen.keyPoints.some((k) => k.x === z.upStairs.x && k.y === z.upStairs.y),
+          `${at}: its stair up (${JSON.stringify(z.upStairs)}, hasAbove ${z.hasAbove}) isn't a reachable STAIRS_UP`);
+        expect(JSON.stringify(upFrom({}, z)) === JSON.stringify({ wx: L.wx, wy: L.wy, z: -1, key: `${L.wx},${L.wy},-1` }), `${at}: its stair up leads to ${JSON.stringify(upFrom({}, z))}`);
+        for (let k = 1; k <= want.up.length; k++) {
+          const lz = -k, p = dungeonParams(t.run, site, lz), f = ZONE_GENERATORS.dungeon({ run: t.run }, { wx: L.wx, wy: L.wy, z: lz, key: `${L.wx},${L.wy},${lz}` });
+          tally.floors++; tally.up++;
+          expect(p.level === want.up[k - 1] && p.name === up[k - 1] && f && f.level === p.level, `${at} floor ${k} up: level ${p.level} (${want.up[k - 1]}), name "${p.name}"`);
+          if (!f) continue;
+          for (const pr of validateDungeonLevel(f, p)) expect(false, `${at} floor ${k} up: ${pr}`);
+          const top = k === want.up.length, next = upFrom({}, f);
+          expect(f.stairs && f.hasBelow && (top ? !f.upStairs && !next : f.upStairs && next?.z === lz - 1), `${at} floor ${k} up: stairs down ${!!f.stairs}, up ${!!f.upStairs} → ${JSON.stringify(next)}`);
+          expect(!f.blocks.some((b, i) => i < f.w * f.d && !b), `${at} floor ${k} up: a hole (a fall would land out of line on the surface)`);
+        }
+        expect(!ZONE_GENERATORS.dungeon({ run: t.run }, { wx: L.wx, wy: L.wy, z: -want.up.length - 1, key: "x" }), `${at}: a floor up above the last`);
+      } else expect(!z.hasAbove && !upFrom({}, z), `${at}: a stair up with no floors up`);
+      // Its holy floors (B2, C1b #3): each floor the zone generator makes is its faith's where holyFloors says, no one's else.
+      for (let lz = 1; lz <= site.dungeon.levels; lz++) {
+        const f = ZONE_GENERATORS.dungeon({ run: t.run }, { wx: L.wx, wy: L.wy, z: lz, key: `${L.wx},${L.wy},${lz}` }), wantHoly = def.holyFloors?.[lz] ?? null;
+        tally.holyFloors++;
+        expect((f?.holy ?? null) === wantHoly && (!wantHoly || holyAt(f, f.spawn.x | 0, f.spawn.y | 0)?.faction === wantHoly), `${at} floor ${lz}: holy ${f?.holy}, want ${wantHoly}`);
+      }
       const cast = new Set(want.cast || []);   // (gimmicks that place its inhabitants, beyond its keys: Kettle Mesa's first flatlings)
       expect([...union].every((g) => used.has(g)) && [...used].every((g) => union.has(g) || cast.has(g)), `${at}: its floors play ${[...used]}, its keys (${keys}) map onto ${[...union]}${cast.size ? `, its cast ${[...cast]}` : ""}`);
     }
   }
+  // No landmark builds by a builder: every one has a plan (LANDMARK_BUILDERS empty: the Gnomon's foot is its plan's; B2, C1b #17).
+  expect(REAL_WORLD.landmarks.every((l) => l.plan && !LANDMARK_BUILDERS[l.id]) && !Object.keys(LANDMARK_BUILDERS).length, `a landmark builder still in use: ${Object.keys(LANDMARK_BUILDERS)}`);
   // Holy places (C2 #5): each names a faction.
   const holy = REAL_WORLD.landmarks.flatMap((l) => [...(l.holy ? (typeof l.holy === "string" ? [[l.id, l.holy]] : Object.entries(l.holy).map(([k, f]) => [`${l.id} ${k}`, f])) : []),
     ...Object.entries(l.holyFloors || {}).map(([k, f]) => [`${l.id} floor ${k}`, f])]);
   for (const [where, f] of holy) expect(FACTIONS[f], `${where}: holy to ${f}, which is no faction`);
   return {
     c1b: `${ids.length} landmarks and Halfnight's 2 other wards on ${seeds.length} seeds: ${tally.zones} zones on their plans; ${tally.seams} seams (${tally.seamTiles} tiles) on the world function; ` +
-      `${tally.keys} people's places reachable; ${tally.promises} promises held, ${tally.climbs} climbs walked in 3D; ${tally.floors} dungeon floors at the bible's levels with their names, gimmicks and cradles`,
+      `${tally.keys} people's places reachable; ${tally.promises} promises held, ${tally.climbs} climbs walked in 3D; ${tally.floors} dungeon floors at the bible's levels with their names, gimmicks and cradles (${tally.up} of them floors up); ` +
+      `${tally.steles} dial-steles with their hours; ${tally.holy} holy places and ${tally.holyFloors} floors' faiths`,
     holy: holy.map(([w, f]) => `${w}: ${f}`).join(", "),
   };
 }

@@ -26,6 +26,42 @@ import { isKnown, knownSites, pinsAt } from "./discovery.js";
 import { isLost, lostChance } from "./lost.js";
 import { encounterChance } from "./encounters.js";
 import { stepHours, travelPath } from "./travel.js";
+import { flatLine } from "../story/murals.js";
+import { underHand } from "../clock.js";
+import { registerService } from "../talk.js";
+import { learnSecret, secretDef } from "../story/secrets.js";
+
+// Benchmark's rooms (bible §5 D; B2, C1b #23): what its Signal Room and Map Room sell, as services (talk.js; who stands in
+// them, the signaller and the Map Room's surveyor, is the integrator's placing, C5's words: a person whose
+// merchant.services names these):
+//   signalRoom   the Hand on your world map from now on (game.state.atlas.hand: its spans shaded, its line in the panel)
+//   mapRoom      a Location reading of a site you don't know yet, the nearest first (up to MAP_ROOM.offers), at twice what
+//                the reading sells for (the Survey's maps; money is never plentiful)
+// The tier layer the Map Room shows is the world map's T (anyone's, already).
+export const SIGNAL_ROOM = { price: 25 }, MAP_ROOM = { offers: 3, markup: 2 };
+const HAND_COLOR = [120, 96, 170];
+registerService("signalRoom", {
+  available: (game) => (game.state.atlas?.hand ? [] : [{}]),
+  label: () => "Watch the Signal Room's board: the Hand, on your world map",
+  price: () => SIGNAL_ROOM.price,
+  info: () => "The Survey's signallers track the Gnomon's shadow span by span. From now on your world map shows it.",
+  run: (game) => { (game.state.atlas ||= {}).hand = true; },
+  done: (game, c) => `${c.name} marks the Hand on your map: you'll see it move with the hours. (${SIGNAL_ROOM.price} glim)`,
+});
+registerService("mapRoom", {
+  available(game) {
+    const run = game.run, z = game.zone, at = { wx: z?.wx ?? 0, wy: z?.wy ?? 0 };
+    const unknown = [...(run?.sites?.values() || [])].filter((s) => s.kind !== "landmark" && s.kind !== "village" && secretDef(run, `loc:${s.id}`)
+      && !knownSites(game, s.at.wx, s.at.wy).includes(s));   // (a reading learned pins its span: known)
+    const d = (s) => Math.max(Math.abs(s.at.wx - at.wx), Math.abs(s.at.wy - at.wy));
+    return unknown.sort((a, b) => d(a) - d(b) || a.id.localeCompare(b.id)).slice(0, MAP_ROOM.offers).map((s) => ({ siteId: s.id }));
+  },
+  label: (game, c, t) => `A Location reading: ${secretDef(game.run, `loc:${t.siteId}`)?.tags?.[0] === "historic" ? "an Hour site" : `a ${game.run.sites.get(t.siteId).kind}`}`,
+  price: (game, c, t) => MAP_ROOM.markup * (secretDef(game.run, `loc:${t.siteId}`)?.value || 20),
+  info: (game, c, t) => `Somewhere ${Math.max(Math.abs(game.run.sites.get(t.siteId).at.wx - (game.zone?.wx ?? 0)), Math.abs(game.run.sites.get(t.siteId).at.wy - (game.zone?.wy ?? 0)))} spans off: the reading pins it on your world map.`,
+  run: (game, c, t) => { learnSecret(game, `loc:${t.siteId}`, "bought"); },
+  done: (game, c, t, price) => `${c.name} unrolls a survey sheet and copies a place onto yours. (${price} glim)`,
+});
 
 export const worldView = { x0: 0, y0: 1, viewW: 0, viewH: 0, sx0: 0, sy0: 0, w: 0, h: 0, panel: "right", keys: [] };
 export const PANEL_W = 40, STRIP_H = 6;
@@ -95,6 +131,9 @@ export function spanLines(game, wx, wy) {
   }
   for (const s of knownSites(game, wx, wy)) line(`${s.kind === "landmark" ? initial(s.name) : SITE_MARK[s.kind] || "*"} ${s.name}`, s.kind === "landmark" ? GOLD : UI.sel);
   for (const p of pinsAt(game, wx, wy)) if (p.label) line(`! ${p.label}`, PIN);
+  // A known landmark's Flat line (bible §2.1 rule 3: the map's register; B2, C1b #4).
+  for (const s of knownSites(game, wx, wy)) if (s.kind === "landmark" && world.landmarks.get(s.landmarkId)?.lines?.flat) line(flatLine(game, world.landmarks.get(s.landmarkId)), scale(GOLD, 0.8));
+  if (A.hand && underHand(game, wx, wy)) line("Under the Hand: the Gnomon's shadow lies here now.", HAND_COLOR);
   if (R?.line) line(R.line, UI.dim);   // (the region's one sentence for a span, bible §2.1 rule 8; last, so it never pushes a site or pin out of the strip; integrator, C1a #4)
   return out;
 }
@@ -143,7 +182,10 @@ export function renderWorld(game) {
       if (trip && wx === trip.wx && wy === trip.wy) { ch = "@"; col = YOU; }
       S.put(x, y, ch, ...col);
       let c2 = " ", col2 = col;
+      const hand = A.hand && underHand(game, wx, wy);   // the Hand, once the Signal Room shows it (B2, C1b #23)
+      if (hand) col = scale(col, 0.55);
       if (pinned.has(k)) { c2 = "!"; col2 = PIN; }
+      else if (hand) { c2 = "/"; col2 = HAND_COLOR; }
       else if (onPath.has(k)) { c2 = "·"; col2 = UI.cursor; }
       else if (t.road.e) { c2 = "-"; col2 = scale(ROAD, night); }
       else if (t.river.e) { c2 = "~"; col2 = scale(RIVER, night); }

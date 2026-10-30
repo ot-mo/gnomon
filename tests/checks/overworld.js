@@ -55,7 +55,9 @@ import { reveal, isKnown, pin, pinsAt, knownSites, discoveryXp, sight } from "..
 import { encounterChance, rollEncounter, placeEncounter, legendsFor, hiddenSiteRoll, bandOf } from "../../src/overworld/encounters.js";
 import { atlas, canStep, edgeBetween, spanKey, OW } from "../../src/overworld/state.js";
 import { isLost, lostChance } from "../../src/overworld/lost.js";
-import { worldView, spanLines } from "../../src/overworld/renderWorld.js";
+import { worldView, spanLines, renderWorld } from "../../src/overworld/renderWorld.js";
+import { serviceDef } from "../../src/talk.js";
+import { underHand } from "../../src/clock.js";
 import { CREATURE_TYPES } from "../../src/creatures.js";
 import { attitude } from "../../src/factions.js";
 import { compileWorld } from "../../src/world/worldmodel.js";
@@ -1077,6 +1079,33 @@ function screen(G, scr, problems) {
     const g = fresh(G, 61, REAL_WORLD), W = g.run.world, st = W.start, t = W.tileAt(st.wx, st.wy), R = W.regions?.[t.region];
     const lines = spanLines(g, st.wx, st.wy).map((l) => l.text);
     if (!R?.line || lines.at(-1) !== R.line) problems.push(`screen: the panel of (${st.wx}, ${st.wy}) ends "${lines.at(-1)}", not its region's line`);
+    // A known landmark's Flat line in its panel, before the region's (B2, C1b #4); none on a span without one.
+    const flat = W.landmarks.get(st.landmarkId)?.lines?.flat, near = spanLines(g, st.wx + 2, st.wy - 2).map((l) => l.text);
+    if (!flat || lines.at(-2) !== flat || near.some((l) => /^[A-Z ]+\. /.test(l))) problems.push(`screen: the panel of (${st.wx}, ${st.wy}) shows "${lines.at(-2)}", not its Flat line "${flat}"`);
+    out.landmarkLine = flat;
+    // Benchmark's rooms (B2, C1b #23): the Signal Room's service puts the Hand on your world map (its spans shaded with "/",
+    // its line in the panel), once, for its price; the Map Room's sells a Location reading of an unknown site, nearest
+    // first, at twice the reading's value: it is learned and pinned.
+    const svc = (id) => serviceDef(id), signaller = { name: "the signaller" }, bm = W.landmarks.get("benchmark");
+    goTo(g, bm.wx, bm.wy);
+    g.time = 2 * 60 * 60 / 60;   // 08:00 of day 1: the Hand lies across the world (one world hour is 60 s)
+    const hand = []; for (let wy = 0; wy < W.h; wy++) for (let wx = 0; wx < W.w; wx++) if (underHand(g, wx, wy)) hand.push([wx, wy]);
+    const drawHand = () => { g.trip = { wx: bm.wx, wy: bm.wy, viewOnly: true, cursor: { wx: hand[0][0], wy: hand[0][1] } }; renderWorld(g); scr.S.present(); const v = worldView;
+      return hand.filter(([wx, wy]) => wx >= v.sx0 && wy >= v.sy0 && wx < v.sx0 + v.viewW && wy < v.sy0 + v.viewH && scr.capture.chars[(v.y0 + wy - v.sy0) * scr.capture.cols + (wx - v.sx0) * 2 + 1] === "/").length; };
+    const before = drawHand(), panelBefore = spanLines(g, ...hand[0]).some((l) => /Under the Hand/.test(l.text));
+    const offer = svc("signalRoom").available(g, signaller);
+    svc("signalRoom").run(g, signaller, offer[0]);
+    const after = drawHand(), panelAfter = spanLines(g, ...hand[0]).some((l) => /Under the Hand/.test(l.text)), again = svc("signalRoom").available(g, signaller).length;
+    g.trip = null;
+    const maps = svc("mapRoom").available(g, signaller), first = maps[0] && g.run.sites.get(maps[0].siteId);
+    const dist = (s) => Math.max(Math.abs(s.at.wx - bm.wx), Math.abs(s.at.wy - bm.wy));
+    const nearest = Math.min(...[...g.run.sites.values()].filter((s) => s.kind !== "landmark" && s.kind !== "village").map(dist));
+    const price = maps[0] && svc("mapRoom").price(g, signaller, maps[0]);
+    if (maps[0]) svc("mapRoom").run(g, signaller, maps[0]);
+    const learned = first && g.state.journal?.secrets?.[`loc:${first.id}`] && pinsAt(g, first.at.wx, first.at.wy).length > 0 && !svc("mapRoom").available(g, signaller).some((t) => t.siteId === first.id);
+    out.benchmark = { hand: hand.length, before, after, panelBefore, panelAfter, again, signalPrice: svc("signalRoom").price(g, signaller, {}), maps: maps.length, nearest: first && dist(first) === nearest, price, learned: !!learned };
+    if (!(hand.length && before === 0 && after > 0 && !panelBefore && panelAfter && again === 0 && maps.length === 3 && out.benchmark.nearest && price >= 2 * 15 && learned))
+      problems.push(`screen: Benchmark's rooms: ${JSON.stringify(out.benchmark)}`);
     out.regionLine = `${t.region}: "${(R?.line || "").slice(0, 40)}…"`;
   }
   // The browser game's world (config.js WORLD, read by main.js; the last wiring merge): the real one, unless the URL

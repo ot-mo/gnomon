@@ -20,7 +20,10 @@ import { BLOCKS, B, FLOOR_Z } from "./world.js";
 import { EYE } from "./player.js";
 import { spawnCreature, addCreature, pickCreatureType, talkersIn, ghostHidden, canTalk } from "./creatures.js";
 import { lineOfSight } from "./raycast.js";
-import { emit } from "./events.js";
+import { emit, on } from "./events.js";
+import { raiseMaxHp, maxHp } from "./stats.js";
+import { TICK } from "./traps.js";
+import { hourOf } from "./clock.js";
 
 const REACH = 2.0;   // the rune-lever puzzle relies on this: you must step onto the trap floor to reach
 
@@ -115,6 +118,11 @@ function useBlock(game, x, y, z) {
 registerUse("lever", (game, x, y, z) => {
   const { zone } = game, info = BLOCKS[zone.get(x, y, z)];
   if (info.on) { game.log("The lever won't move back.", [170, 170, 170]); return false; }
+  // A press-wheel (the Square's cells, B2): it takes your weight, in 3D; from above it is only a spoked circle.
+  if (zone.links.get(zone.index(x, y, z))?.action === "unpress" && game.view === "map") {
+    game.log("A press-wheel, drawn as a spoked circle on the wall. It would take your weight to turn it: in 3D.", [170, 170, 190]);
+    return false;
+  }
   zone.set(x, y, z, B.LEVER_ON);
   game.log("You pull the lever. *clunk*", [220, 220, 220]);
   const link = zone.links.get(zone.index(x, y, z));
@@ -123,6 +131,14 @@ registerUse("lever", (game, x, y, z) => {
 });
 registerUse("door", (game, x, y, z) => {
   const { zone, player } = game, info = BLOCKS[zone.get(x, y, z)];
+  if (zone.runeDoors?.includes(x + y * zone.w) && player.torch) {   // a rune door (the Unlit Choir: dungeon.js runeDoors, B2)
+    game.log("A rune is cut over this door, and it won't open to a lit torch. Put your torch out (F).", [175, 165, 230]);
+    return false;
+  }
+  if (zone.offBeatDoors?.includes(x + y * zone.w) && !offBeat(game, zone)) {   // the Metronome's (dungeon.js offBeatDoors, B2)
+    game.log("The door is held shut on the beat. It gives on the off-beat: wait for it.", [200, 190, 150]);
+    return false;
+  }
   if (info.locked) {
     if (player.keys <= 0) { game.log("It's locked. You need a key.", [240, 200, 80]); return false; }
     player.keys--;
@@ -131,10 +147,49 @@ registerUse("door", (game, x, y, z) => {
   for (let k = 0; k < zone.h; k++) if (BLOCKS[zone.get(x, y, k)].door) zone.set(x, y, k, B.AIR);
   return true;
 });
-registerUse("gate", (game) => {
+registerUse("gate", (game, x, y, z) => {
+  if (game.zone.needleDoor?.cells.some(([cx, cy]) => cx === x && cy === y)) return needleDoor(game);
   game.log("The iron gate won't budge. There must be a mechanism somewhere.", [170, 170, 190]);
   return false;
 });
+
+// The Gnomon's door (bible §5 N; B2, C1b #26, #10): a truesteel gate over the stair into the Dial-works, open from 11:00 to
+// 13:00 (clock.js's noon window: it opens and shuts by the hour, NEEDLE_DOOR.hours). Outside them it opens, for good, to
+// the Plumb Key (a quest item, id plumbKey), to Hierarch Strade as your ally (game.state.stradeAlly: the integrator's
+// beat 10), or to the Cube turned on its threshold, which takes a little of your shadow: NEEDLE_DOOR.cubeCost max HP, for
+// good (use the gate again within NEEDLE_DOOR.askFor seconds of being asked). zone.needleDoor = { cells: [[x, y]], open, forGood, how }.
+export const NEEDLE_DOOR = { hours: [11, 13], cubeCost: 10, plumbKey: "plumbKey", askFor: 10 };
+export function setNeedleDoor(zone, open) {
+  const d = zone?.needleDoor;
+  if (!d || d.open === open) return;
+  d.open = open;
+  for (const [x, y] of d.cells) for (const z of [FLOOR_Z, FLOOR_Z + 1]) zone.set(x, y, z, open ? B.AIR : B.GATE);
+  zone.refresh();
+}
+const needleOpenNow = (game) => { const h = hourOf(game); return h >= NEEDLE_DOOR.hours[0] && h < NEEDLE_DOOR.hours[1]; };
+const followClock = (game, zone) => { if (zone?.needleDoor && !zone.needleDoor.forGood) setNeedleDoor(zone, needleOpenNow(game)); };
+on("zone:prepare", (game, { zone }) => followClock(game, zone));
+on("clock:hour", (game) => followClock(game, game.zone));
+
+function needleDoor(game) {
+  const { zone, player: p } = game, d = zone.needleDoor;
+  const forGood = (how, line) => { d.forGood = true; d.how = how; setNeedleDoor(zone, true); game.log(line, [255, 230, 140]); return true; };
+  if (p.inv?.some((it) => it.kind === "quest" && it.id === NEEDLE_DOOR.plumbKey))
+    return forGood("plumbKey", "The Plumb Key goes into the square hole as if it had always been there. The door opens, and stays open.");
+  if (game.state?.stradeAlly) return forGood("strade", "Hierarch Strade lays her palm on the truesteel. The door knows her, and opens.");
+  if (game.story?.cube) {
+    if (!(game.time - (d.cubeAsked ?? -Infinity) <= NEEDLE_DOOR.askFor)) {   // (asked, and used again within askFor seconds: done)
+      d.cubeAsked = game.time;
+      game.log(`The door is shut until 11:00. You could turn the Cube on its threshold: it would take a little of your shadow, ${NEEDLE_DOOR.cubeCost} max HP, for good. (Use the door again to do it.)`, [255, 200, 140]);
+      return false;
+    }
+    raiseMaxHp(p, -NEEDLE_DOOR.cubeCost);
+    if (p.hp > maxHp(p)) p.hp = maxHp(p);
+    return forGood("cube", "You turn the Cube on the threshold. Something of your shadow goes into it, and the door swings open.");
+  }
+  game.log("The door is shut. It opens from 11:00 to 13:00.", [200, 190, 160]);
+  return false;
+}
 registerUse("brazier", (game, x, y, z) => {
   const { zone, player } = game, info = BLOCKS[zone.get(x, y, z)];
   if (info.on) { game.log("The brazier is already burning.", [170, 170, 170]); return false; }
@@ -144,6 +199,14 @@ registerUse("brazier", (game, x, y, z) => {
   brazierLit(game, x, y);
   return true;
 });
+
+// The off half of a level's one beat (zone.beat { period, phase }: traps.js's ticks): an off-beat door opens then.
+export function offBeat(game, zone) {
+  const b = zone.beat;
+  if (!b) return true;
+  const k = (((Math.floor((game.time || 0) / TICK) - b.phase) % b.period) + b.period) % b.period;
+  return k >= b.period / 2;
+}
 
 // What a lever does:
 //   open   – removes the gate (or whatever) at `cells`
@@ -161,6 +224,11 @@ function runLink(game, link) {
     const lio = talkersIn(zone).find((n) => n.type === "lio");
     if (lio) lio.talk.state.free = true;
     game.log("Somewhere on this floor, bars grind down into the stone. A distant voice: \"Yes! YES!\"", [160, 220, 255]);
+  } else if (link.action === "unpress") {   // a press-wheel (the Square's cells: gen/dungeon.js placeLandmarkParts, B2)
+    const q = zone.prisoners?.[link.prisoner];
+    if (q) q.freed = true;
+    game.log("The wheel turns with a long groan. On the floor of the cell, something drawn takes a breath and starts to stand up.", [160, 220, 255]);
+    emit(game, "prisoner:freed", { zone, prisoner: q, k: link.prisoner });
   } else if (link.action === "dud") {
     game.log(link.msg || "The lever clanks. Nothing happens.", [170, 170, 170]);
   } else if (link.action === "part") {

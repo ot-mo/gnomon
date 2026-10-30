@@ -154,12 +154,13 @@ const LANDMARK_DUNGEONS = {
     named: ["Kettle Mesa, the Rim", "Kettle Mesa, the Ledges", "Kettle Mesa, the Kettle's Bottom"],
     planned: { bottom: { kind: "legend", id: "grubMother", name: "the Grub Mother", species: "brineGrub", template: "plain" },
                creatures: [["brineGrub", 4], ["saltrat", 3], ["rustbackScav", 2], ["flatling", 2]],
-               daylight: [1], vaults: { 2: "flatLie" }, culvert: { from: 3, to: "hollowmere" },
+               daylight: [1], vaults: { 2: "flatLie" }, culvert: { from: 3, to: "hollowmere" }, softFalls: true,
                clue: { floor: 3, what: "a fresh sapper tunnel with an Assize plumb-seal in it (beat 1's clue)" } } },
-  datum: { theme: "deepwright", floorGimmicks: [["murals"], ["murals", "allDeep"], ["murals", "allDeep"], ["murals", "allDeep"]],
+  datum: { theme: "deepwright", floorGimmicks: [["murals"], ["murals", "allDeep"], ["murals", "allDeep"], ["murals", "allDeep"]], vaultPool: ["trueLevel"],   // (the true level's puzzle: B2, C1b #10)
     named: ["the Datum, the Gauge Room", "the Datum, the Plate Hall", "the Datum, the Long Level", "the Datum, the Stone"],
     planned: { bottom: { kind: "reading", id: "datumStone", name: "the Datum stone", plinth: 2 }, opensAtBeat: { 3: 2, 4: 2 },
-               murals: [{ text: "THIS SILL IS 3 BLOCKS UP.", map: "A brass plate set in the floor, numbered 3." }] } },
+               // (the true level's own sill and plates carry the numbers: gen/vaults.js trueLevel; these say how to read them)
+               murals: [{ text: "ALL HEIGHTS FROM THE DATUM. MEASURE THE SILL; STAND ON ITS NUMBER.", map: "The Survey's rule, in brass letters: the true plate is as high as the sill." }] } },
   rootCanals: { theme: "deepwright", gimmicks: ["lightless", "flooded", "haunted"],
     named: ["the Root Canals, the Upper Cut", "the Root Canals, the Smugglers' Run"],
     planned: { darkMapping: true, creatures: [["chandlerGuard", 3], ["lampHound", 3], ["shade", 1]],
@@ -169,13 +170,13 @@ const LANDMARK_DUNGEONS = {
     planned: { bottom: { kind: "boss", id: "pressMaster", name: "Press-Master Sevrin Marr-Orrum", with: "the Press, its three pistons on gantries 3 to 5 blocks up" },
                creatures: [["pressHound", 3], ["mosaicGolem", 2], ["erratum", 1], ["assizer", 1]],
                headroom: [6, 5, 4, 3, null], pressedRooms: true, captive: { floor: 3, who: "toviHallen" } } },
-  unlitChoir: { theme: "shade", gimmicks: ["lightless", "haunted", "braziers"],
+  unlitChoir: { theme: "shade", gimmicks: ["lightless", "haunted", "braziers", "runeDoors"],
     named: ["the Unlit Choir, the Narthex", "the Unlit Choir, the Nave", "the Unlit Choir, the Quire", "the Unlit Choir, the Warden's Crypt",
             "the Unlit Choir, the Undercroft", "the Unlit Choir, Noon's Floor"],
     planned: { bottom: { kind: "boss", id: "noon", name: "Noon", flat: true, darkOnly: true },
                vaults: { 4: { hall: "warden", guardian: "gloamWarden" } },   // the Gloom Warden's hall, C3's Gloam Warden in it
                creatures: [["lamplessChanter", 3], ["shade", 3], ["wraith", 2], ["longshadow", 1]], darkMapping: true, runeDoors: true } },
-  metronome: { theme: "gears", gimmicks: ["spikeworks", "oneBeat"], cradle: [1],
+  metronome: { theme: "gears", gimmicks: ["spikeworks", "oneBeat", "offBeatDoors"], cradle: [1],
     named: ["the Metronome, the Casting Floor", "the Metronome, the Gear Floor", "the Metronome, the Rack Floor", "the Metronome, the Spring Floor",
             "the Metronome, the Bob Floor", "the Metronome, the Escapement"],
     bottom: { kind: "guardian", id: "colossus" },
@@ -187,7 +188,7 @@ const LANDMARK_DUNGEONS = {
     planned: { bottom: { kind: "relic", id: "noonglass", name: "the Noonglass", dryOnlyAtNoon: true },
                legend: { floor: 5, id: "drownedBellwether", name: "the Drowned Bellwether" }, tide: { dry: [11, 13], rise: 1, every: 2, max: 4 },
                creatures: [["glassCrab", 3], ["mirrorEel", 2], ["slagSalamander", 2]] } },
-  square: { theme: "deepwright", gimmicks: ["murals"], cradle: [1],
+  square: { theme: "deepwright", gimmicks: ["murals", "identicalRooms"], cradle: [1],   // (planned.theme "rule": B2, C1b #20)
     named: ["the Square, the Hall Below", "the Square, the Cells", "the Square, the Deep Cells"],
     planned: { up: ["the Square, the Rule Floor", "the Square, the Hierarch's Floor"], identicalRooms: true, ruleBanners: true, freeFittings: true,
                theme: "rule",   // one material: every room the same in 3D
@@ -202,7 +203,7 @@ const LANDMARK_DUNGEONS = {
                creatures: { odd: [["latticeTroll", 2], ["askewAngle", 3], ["fold", 3]], even: [["smoother", 3], ["burnisher", 3], ["planarQueen", 1]] } } },
   underPage: { theme: "salt", gimmicks: ["murals"], vaultPool: ["mosaicHall"],   // (the Speaking Door is floor 2's alone: planned.vaults)
     named: ["the Under-Page, the First Leaf", "the Under-Page, the Speaking Door", "the Under-Page, the Founding"],
-    planned: { bottom: { kind: "relic", id: "pressedFounding", name: "the Pressed's founding relic", with: "a Second-Hour stele with all three accounts; a reading that names Vesper" },
+    planned: { bottom: { kind: "relic", id: "pressedFounding", name: "the Pressed's founding relic", hour: 2, with: "a Second-Hour stele with all three accounts; a reading that names Vesper" },
                vaults: { 2: "speakingDoor" }, creatures: [["tileMimic", 2], ["flatling", 2], ["pressedPilgrim", 1]] } },
   rootfold: { theme: "horn", gimmicks: ["allDeep"],
     named: ["the Rootfold, the Upper Roots", "the Rootfold, the Fold", "the Rootfold, the Heartroot"],
@@ -226,10 +227,10 @@ export const GIMMICK_KEYS = {
   mystery: { gimmicks: [], code: "Who Lit the Hush? (C5, beat 6)" },
   pressing: { gimmicks: ["flatland", "spikeworks", "oneBeat"], code: "pressed rooms unpressed by turning on their centre; plates that press you flat for 10 s" },
   loweringCeiling: { gimmicks: [], code: "headroom 6, 5, 4 and 3 blocks, then the tall Press-hall" },
-  theDark: { gimmicks: ["lightless", "haunted", "braziers"], code: "the doors rune doors; the Unlit seen only with your torch out" },
-  oneBeat: { gimmicks: ["spikeworks", "oneBeat"], code: "doors on the off-beat; machines acting on the beat" },
+  theDark: { gimmicks: ["lightless", "haunted", "braziers", "runeDoors"], code: "the Unlit seen only with your torch out" },
+  oneBeat: { gimmicks: ["spikeworks", "oneBeat", "offBeatDoors"], code: "machines acting on the beat" },
   tideOfHours: { gimmicks: ["flooded"], code: "dry 11:00-13:00, the water up a block every 2 hours to 4; the waterline on the map" },
-  identicalRooms: { gimmicks: ["murals"], code: "a lattice of identical rooms of one material; patrols' straight traces on the map; pressed prisoners talked to and freed on the map by turning their press-wheels in 3D; the floors up" },
+  identicalRooms: { gimmicks: ["murals", "identicalRooms"], code: "a lattice of identical rooms (built: one material, each room's mark in the floor, the prisoners' places and press-wheels, the floors up); patrols' straight traces on the map" },
   ruleBanners: { gimmicks: [], code: "banners that make a 12-tile Trued zone" },
   sweepingHand: { gimmicks: ["allDeep", "spikeworks", "oneBeat", "flatland"], code: "the inner hand's shadow, a turn every 40 s, pressing flat what it covers" },
   answerInFloor: { gimmicks: ["murals"], vaults: ["mosaicHall", "speakingDoor"] },
@@ -273,7 +274,7 @@ const terrainKey = {
 for (const l of LANDMARK_INDEX) terrainKey[l.letter] = l.terrain;
 
 export const WORLD = {
-  id: "gnomon", version: 3, w: 42, h: 21, name: "the Long Noon",   // (2: C1a's regions and Hollowmere; 3: C1b's landmark plans; a real-world run saved before them doesn't restore; integrator, C1a #6, C1b #16)
+  id: "gnomon", version: 4, w: 42, h: 21, name: "the Long Noon",   // (2: C1a's regions and Hollowmere; 3: C1b's landmark plans; 4: B2's landmark dungeons, floors up and surfaces; a real-world run saved before them doesn't restore; integrator, C1a #6, C1b #16)
   terrain: WORLD_ROWS, terrainKey,
   tiers: TIER_ROWS,                       // the tier of every span (bible §4.5); a region's tier is its lowest
   regions: REGION_ROWS, regionKey: REGION_KEY,

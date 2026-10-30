@@ -185,6 +185,8 @@ export function mapStep(game, dx, dy, { force = shiftHeld() } = {}) {
     passTime(game, attackTime(p));
     return true;
   }
+  if (mapOnly(game, tx, ty, nx, ny)) return true;
+  if (drawnWall(zone, nx, ny)) { game.log("A wall, drawn in lines. On the map it holds.", [220, 220, 230]); return false; }
   if (flat) return flatStep(game, dx, dy, nx, ny);
 
   const kind = zone.kind[nx + ny * zone.w];
@@ -266,10 +268,34 @@ function swapPlaces(game, m) {
 // A step in the Plane (pressed flat; see the header). Walls stop you; levers and the like stand up out
 // of it; doors and gates you slide under; chasms, pits and deep water are floor at your height.
 const DOORISH = new Set([B.DOOR, B.LOCKED, B.GATE]);
+// What only the map holds (a town that is a drawing: Folio, bible §5 G; B2, C1b #12): its drawn walls (zone.mapWalls, cell
+// indices) stop you on the map, where 3D walks over them as faded tiles; and its drawn door (zone.drawnDoors [{ wall,
+// outside, inside }]) takes a step from the door's floor into the room behind the wall, or back out: the wall is a blank
+// stone face in 3D. mapOnly → true when the step was through the door (taken); drawnWall → whether a drawn wall stands there.
+function mapOnly(game, tx, ty, nx, ny) {
+  const { zone, player: p } = game;
+  const door = zone.drawnDoors?.find((d) => d.wall[0] === nx && d.wall[1] === ny);
+  if (door) {
+    const from = [tx, ty].join(), to = from === door.outside.join() ? door.inside : from === door.inside.join() ? door.outside : null;
+    if (!to) return false;
+    p.x = to[0] + 0.5; p.y = to[1] + 0.5; p.z = zone.stand[to[0] + to[1] * zone.w];
+    game.log(to === door.inside ? "You walk through the door drawn on the floor. Inside, it is an archive." : "You walk out through the drawn door.", [240, 210, 120]);
+    passTime(game, 2 * STEP_TIME);
+    return true;
+  }
+  return false;
+}
+const drawnWall = (zone, nx, ny) => !!zone.mapWalls?.includes(nx + ny * zone.w);
+
 function flatStep(game, dx, dy, nx, ny) {
   const { zone, player: p } = game;
   const kind = zone.kind[nx + ny * zone.w];
   if (kind === KIND.WALL) return false;
+  // A gate the landmarks' puzzles keep shut is sealed to the floor (the Gnomon's door, the true level's: B2): the Plane
+  // doesn't get under it, as it does under an ordinary door or gate.
+  const sealed = (zone.needleDoor && !zone.needleDoor.open && zone.needleDoor.cells.some(([x, y]) => x === nx && y === ny))
+    || (zone.trueLevel && !zone.trueLevel.solved && zone.trueLevel.gate.some(([x, y]) => x === nx && y === ny));
+  if (sealed) { game.log("The gate is sealed to the floor. Not even the Plane gets under it.", [220, 220, 230]); return false; }
   if (kind === KIND.LEVER || zone.get(nx, ny, FLOOR_Z) === B.BRAZIER || usableAt(game, nx, ny, { legacy: false }) >= 0) {
     game.log("You can't work that from the Plane: it stands up out of it.", [220, 220, 230]);
     return false;
