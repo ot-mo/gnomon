@@ -19,6 +19,7 @@ import { inDark } from "../light.js";
 import { registerDescriber } from "../renderMap.js";
 import { learnSecret, muralSecret } from "./secrets.js";
 import { knows } from "./journal.js";
+import { hasKey } from "../keyset.js";
 
 const isMosaic = (zone, x, y, z) => !!BLOCKS[zone.get?.(x, y, z)]?.mosaic;
 
@@ -58,10 +59,20 @@ export function readMural(game, ev) {
     const id = m.secret || muralSecret(game.run, m.text);
     const fresh = id && !knows(game, id);
     if (ev.open || fresh || !id) game.log?.(`${SAYS[m.view] || SAYS.map} "${m.text}"`, [230, 210, 150]);
-    if (fresh && learnSecret(game, id, "mural")) learned.push(id);
+    if (fresh && learnSecret(game, id, "mural")) {
+      learned.push(id);
+      // Hour script (the lore power; B3): one more of the event's accounts read from the same stele, the next you lack.
+      const more = hasKey(game.player?.perks, "hourScript") && /^hist:/.test(id) ? nextAccount(game, id) : null;
+      if (more && learnSecret(game, more, "hourScript")) { learned.push(more); game.log?.("You read the Hour's script between the lines: another account of the same day.", [230, 210, 150]); }
+    }
   }
   return learned;
 }
+
+const nextAccount = (game, id) => {
+  const base = id.slice(0, id.lastIndexOf(":"));
+  return ["flat", "deep", "dark"].map((r) => `${base}:${r}`).find((x) => x !== id && !knows(game, x)) || null;
+};
 
 on("inspect", (game, ev) => { readMural(game, ev); });
 

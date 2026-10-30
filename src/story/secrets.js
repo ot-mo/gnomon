@@ -37,6 +37,7 @@ import { parseKey } from "../zones.js";
 import { gainXp, xpReward } from "../leveling.js";
 import * as discovery from "../overworld/discovery.js";
 import { villageOf } from "./villages.js";
+import { hasKey } from "../keyset.js";
 
 export const ACCOUNT = { flat: "gospel", deep: "inscription", dark: "hostile" };
 export const READINGS = ["flat", "deep", "dark"];
@@ -226,7 +227,8 @@ function triangulate(game, def) {
       emit(game, "cultPass", { rulerId: R.id });
     }
   }
-  const xp = TRIANGULATION.xp(levelOfTier(tier));
+  // The Triangulator power doubles it (bible §13.2 lore; B3).
+  const xp = TRIANGULATION.xp(levelOfTier(tier)) * (hasKey(game.player?.perks, "triangulator") ? 2 : 1);
   game.log?.(`Triangulated: all three accounts agree on what they disagree about. (+${xp} XP)`, [255, 230, 120]);
   if (fact) game.log?.(fact, [200, 220, 255]);
   emit(game, "triangulate", { key, xp });

@@ -1446,6 +1446,9 @@ export async function run(env) {
     items.useItem(game, p(), p().inv[0]);
     if (p().hp !== 7 || !p().inv.some((i) => i.kind === "vial" && i.effect === "")) fail(`fresh water: hp ${p().hp}, ${JSON.stringify(p().inv)}`);
     liquids.drinkLiquid(game, p(), "ink");
+    // B3 (C2 #9): bible §13.7, 5 s of confusion first, then Flat.
+    if (p().status?.flat || !p().status?.confused) fail("ink: not confused first, or Flat at once");
+    { const t0 = game.time; game.time += 6; events.emit(game, "clock:tick", { t0, t1: game.time }); }
     if (!p().status?.flat) fail("ink didn't make you Flat");
     for (const f of Object.values(F.FACTIONS)) {
       if (f.hidden || f.group) continue;
@@ -1469,7 +1472,7 @@ export async function run(env) {
   // eyes) it does what the data says. The money's words and reference numbers are §3.1's.
   {
     const L = (await m("content/liquids.js")).LIQUIDS, { CURRENCY: CUR } = await m("content/currency.js"), ST = await m("status.js");
-    const WANTED = ["glowing", "nausea", "confused"];   // statuses §13.7 needs that status.js hasn't (integration request)
+    const WANTED = [];   // statuses §13.7 needs that the game hasn't (B3, C2 #9: glowing, nausea and confused are social/liquids.js's)
     const KNOWN = ["heal", "hurt", "status", "save", "burns", "douse", "clean", "ward", "stain", "draws", "shortcut", "dark", "seek", "reroll",
       "shutdown", "transform", "seePlane", "rep", "again"];
     let effects = 0;
@@ -1497,12 +1500,12 @@ export async function run(env) {
       ["clearGlim", "touch", "burns", "burns", 12], ["turnwater", "drink", "shutdown", "days", 1], ["turnwater", "touch", "transform", "transform", "sameTier"],
       ["blood", "touch", "stain", "stain", { sight: 2, t: 30 }], ["blood", "touch", "draws", "draws", "saltbeasts"],
     ];
-    // A vial's words say what drinking does today: a liquid whose drink waits on a status or effect the game hasn't
-    // got keeps the bible's words in `full`, and its shown words don't name what isn't there.
+    // A vial's words say what drinking does: since B3 (C2 #9) every effect lands, so no liquid keeps a `full` of words
+    // waiting, and every drink status is one the game has.
     for (const [id, d] of Object.entries(L)) {
       if (d.sameAs) continue;
-      const waits = (d.effects.drink || []).some((e) => WANTED.includes(e.status) || e.reroll || e.seePlane || e.after);
-      if (waits && (!d.full?.drink || /glow for|nausea|confus|re-roll|see the Plane|blind/.test(d.drink))) fail(`liquid ${id}: "${d.drink}" promises what drinking doesn't do yet`);
+      if (d.full) fail(`liquid ${id}: still keeps words waiting in full (${JSON.stringify(d.full).slice(0, 60)})`);
+      for (const e of d.effects.drink || []) if (e.status && !ST.STATUS_DEFS[e.status]) fail(`liquid ${id}: drink status ${e.status} isn't one`);
     }
     for (const [id, part, key, field, want] of bible) {
       const got = eff(id, part, key)?.[field];
