@@ -86,6 +86,22 @@ registerAbility("fling", {
   },
 });
 
+// --- Time Lag (B1, C4 #8) ---------------------------------------------------------------------------------------
+// Every hostile within LAG_R tiles is "lagged" for LAG_T s: it moves, strikes and shoots at LAG of its pace (ai.js).
+export const LAG_R = 4, LAG_T = 6;
+registerAbility("timeLag", {
+  name: "Time Lag", source: "mutation", target: "self", radius: LAG_R, mapTime: 0.5,
+  cooldown: () => 20,
+  info: () => `Enemies within ${LAG_R} tiles act 30% slower for ${LAG_T} s.`,
+  use(game, e) {
+    const near = (e === game.player ? hostilesTo(game, e) : []).filter((c) => Math.hypot(c.x - e.x, c.y - e.y) <= LAG_R);
+    if (!near.length) { say(game, e, "Time drags around you, and nothing is near enough to feel it."); return false; }
+    for (const c of near) addStatus(game, c, "lagged", { t: LAG_T, stack: "refresh" });
+    say(game, e, `The moment thickens: ${near.length === 1 ? "one foe moves" : `${near.length} foes move`} as if through glue.`);
+    return true;
+  },
+});
+
 // --- Wings ------------------------------------------------------------------------------------------------------
 registerAbility("wingsUp", {
   name: "Wings", source: "mutation", target: "self", mapTime: 0.5,

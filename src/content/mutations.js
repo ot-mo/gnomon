@@ -139,6 +139,23 @@ export const MUTATIONS = {
     name: "Crooked Manner", kind: "defect", cost: -2, max: 1, excludes: [], repAll: -50,
     info: () => "Everything you say comes out wrong: -50 with every faction.",
   },
+  // --- B1 (C4 #8): built, moved here from MUTATIONS_WAITING ---
+  timeLag: {
+    name: "Time Lag", kind: "mental", cost: 4, max: 10, excludes: [], ability: "timeLag",
+    info: () => "Enemies within 4 tiles act 30% slower for 6 s.",
+  },
+  readhand: {
+    name: "Readhand", kind: "mental", cost: 4, max: 1, excludes: [],
+    info: () => "You know an artifact the moment you pick it up.",   // (bodymods/artifacts.js onPickup; engravings' accounts wait for the story's engraved items)
+  },
+  sleepwalker: {
+    name: "Sleepwalker", kind: "defect", cost: -2, max: 1, excludes: [],
+    info: () => "Each world-map move has a 1 in 10 chance of drifting a span off.",   // (overworld/travel.js worldStep)
+  },
+  beatDeaf: {
+    name: "Beat-deaf", kind: "defect", cost: -3, max: 1, excludes: ["foresight"],
+    info: () => "The map stops warning you of spike beats.",   // (renderMap.js)
+  },
 };
 
 // Bible §13.5's other 20 (C4): the data for each, waiting for its code. Costs are 4 as above (§15.6), a defect's
@@ -213,11 +230,6 @@ export const MUTATIONS_WAITING = {
     info: () => "Raise a pane of force that stops deep and flat beings alike.",
     needs: "a pane that comes and goes, solid to flat beings too (world.js, creatures.js), as the force pane artifact's",
   },
-  timeLag: {
-    name: "Time Lag", kind: "mental", cost: 4, max: 10, excludes: [],
-    info: () => "Enemies within 4 tiles act 30% slower for 6 s.",
-    needs: "a slowed status for creatures (status.js speed, ai.js)",
-  },
   foresight: {
     name: "Foresight", kind: "mental", cost: 4, max: 10, excludes: ["beatDeaf"], planar: true,
     bridge: "the map shows what comes next; 3D slows before a blow lands",
@@ -229,11 +241,6 @@ export const MUTATIONS_WAITING = {
     info: () => "The next mental attack on you goes back to its sender.",
     needs: "mental attacks to turn back (the Assize's Overrule, C2's Chime, Endear)",
   },
-  readhand: {
-    name: "Readhand", kind: "mental", cost: 4, max: 1, excludes: [],
-    info: () => "You know an artifact by touch, and read the account on any engraving.",
-    needs: "identify on touch (bodymods/artifacts.js identify, on pickup) and engraved items' accounts (story, WS7)",
-  },
   // --- Defects ---
   brittleBones: {
     name: "Brittle Bones", kind: "defect", cost: -3, max: 1, excludes: ["heavyBones"],
@@ -244,15 +251,5 @@ export const MUTATIONS_WAITING = {
     name: "Shadowless", kind: "defect", cost: -3, max: 1, excludes: [],
     info: () => "Flat beings can't perceive you: the Flatfolk won't talk, but Smoothers ignore you.",
     needs: "flat beings that don't perceive you (ai.js, talk.js with the Flatfolk; Folio needs another route, C1b, C5)",
-  },
-  sleepwalker: {
-    name: "Sleepwalker", kind: "defect", cost: -2, max: 1, excludes: [],
-    info: () => "Each world-map move has a 1 in 10 chance of drifting a span off.",
-    needs: "a drift on world-map moves (overworld/travel.js)",
-  },
-  beatDeaf: {
-    name: "Beat-deaf", kind: "defect", cost: -3, max: 1, excludes: ["foresight"],
-    info: () => "The map stops warning you of spike beats.",
-    needs: "hiding the map's spike warnings (renderMap.js, traps.js)",
   },
 };

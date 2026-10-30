@@ -102,6 +102,7 @@ const REFUSED = {
   diagonal: "Not between those two: go round.",
 };
 
+export const SLEEPWALK = 0.1;
 export function worldStep(game, dx, dy, { confirm = false, fast = false, drop = true } = {}) {
   const trip = game.trip;
   if (!trip || trip.viewOnly) return { ok: false, why: "not travelling" };
@@ -109,15 +110,26 @@ export function worldStep(game, dx, dy, { confirm = false, fast = false, drop = 
   const world = game.run.world, from = { wx: trip.wx, wy: trip.wy };
   const no = canStep(world, from, dx, dy);
   if (no) { if (!fast) say(game, REFUSED[no] || "You can't go that way."); return { ok: false, why: no, from }; }
-  const to = { wx: from.wx + dx, wy: from.wy + dy }, t = world.tileAt(to.wx, to.wy), edge = edgeBetween(world, from, to);
+  let to = { wx: from.wx + dx, wy: from.wy + dy }, t = world.tileAt(to.wx, to.wy), edge = edgeBetween(world, from, to);
   const k = spanKey(to.wx, to.wy);
   if (!confirm && t.tier >= playerTier(game) + OW().tierWarning && !trip.warned?.[k]) {
     trip.prompt = { kind: "tier", dx, dy, to, line: `${capital(regionName(game, t))} is tier ${t.tier}, far beyond you. Go on?` };
     return { ok: false, why: "tier", confirm: "tier", from, to };
   }
+  // Sleepwalker (B1, C4 #8): 1 move in 10 drifts a span off course, to one side of the way you meant (where that
+  // step is open from here).
+  let drifted = false;
+  if (game.player.mutations?.sleepwalker && roll(game) < SLEEPWALK) {
+    const sides = dx && dy ? [[dx, 0], [0, dy]] : dx ? [[dx, 1], [dx, -1]] : [[1, dy], [-1, dy]];
+    const [ex, ey] = sides[roll(game) < 0.5 ? 0 : 1];
+    if (!canStep(world, from, ex, ey)) {
+      to = { wx: from.wx + ex, wy: from.wy + ey }; t = world.tileAt(to.wx, to.wy); edge = edgeBetween(world, from, to); drifted = true;
+      say(game, "You walk on half asleep, and wake a span off your way.", [200, 190, 230]);
+    }
+  }
   const hours = stepHours(game, from, to, edge), flying = statusFlag(game.player, "flying");   // as you set out
   const sk = skipTime(game, hours * hourSeconds(), { interruptible: false, reason: "travel" });
-  const res = { ok: true, from, to, hours, seconds: sk.elapsed, lost: false, encounter: null, site: null, dropped: false, dead: false };
+  const res = { ok: true, from, to, hours, seconds: sk.elapsed, lost: false, encounter: null, site: null, dropped: false, dead: false, drifted };
   trip.wx = to.wx; trip.wy = to.wy; trip.came = { dx, dy }; trip.moved = true; trip.cursor = null;
   if (game.mode === "dead") {
     res.dead = true;

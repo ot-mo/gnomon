@@ -424,6 +424,13 @@ function artifactInfo(game, it) {
 }
 registerItemKind("artifact", {
   stack: false, weight: () => 2,
+  // Readhand (B1, C4 #8): you know one by touch, the moment you pick it up.
+  onPickup(game, e, it) {
+    if (e === game.player && e.mutations?.readhand && it.known !== true && !it.broken) {
+      identify(game, it);
+      game.log(`You know it by touch: ${artifactName(it)}.`, [200, 190, 255]);
+    }
+  },
   name: (game, it) => artifactName(it),
   glyph: (game, it) => ["Θ", it.broken ? [120, 110, 130] : VIOLET],
   info: artifactInfo,

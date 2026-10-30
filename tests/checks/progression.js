@@ -645,7 +645,8 @@ export async function checkProgression(m) {
         for (let l = 1; l <= 10; l++) if (typeof d.info(l) !== "string" || !d.info(l) || /undefined|NaN/.test(d.info(l))) fail(`${at}: info(${l}) = ${d.info(l)}`);
         for (let l = 1; l <= d.max; l++) for (const k of Object.keys(d.bonus?.(l, { body: { equip: {} } }) || {})) if (!st.BONUS_KEYS.includes(k)) fail(`${at}: bonus key ${k}`);
         if (d.ability && (A.ABILITIES[d.ability]?.source !== "mutation")) fail(`${at}: its ability ${d.ability} isn't a registered mutation ability`);
-        for (const x of d.excludes || []) if (!MU[x] || !MU[x].excludes?.includes(id)) fail(`${at}: excludes ${x}, which doesn't exclude it back`);
+        // (the other may still wait: B1 made Beat-deaf live, Foresight waits)
+        for (const x of d.excludes || []) { const o = MU[x] || m.mutations.MUTATIONS_WAITING?.[x]; if (!o || !o.excludes?.includes(id)) fail(`${at}: excludes ${x}, which doesn't exclude it back`); }
         for (const f of Object.keys(d.rep || {})) if (!m.mutations.BIBLE_FACTIONS.includes(f)) fail(`${at}: reputation with ${f}, no faction of bible §15.4`);
         if (d.kind === "defect" && (d.ability || d.planar)) fail(`${at}: a defect with an ability or planar`);
       }
@@ -856,6 +857,9 @@ export async function checkProgression(m) {
                     return { bx, by };
                   }, ok: (p, s) => game.zone.get(s.bx, s.by, WD.FLOOR_Z) === WD.B.BRAZIER_LIT },
         foldStep: { muts: ["foldStep"], ok: (p, s, at) => Math.floor(p.x) === at.x + 5 && Math.floor(p.y) === at.y },
+        // (B1, C4 #8: a hostile rat 3 tiles off is lagged 6 s; one 6 tiles off isn't)
+        timeLag: { muts: ["timeLag"], set: (p, at) => ({ r: rat(at.x + 3, at.y, at.z, { state: "chase" }), far: rat(at.x + 6, at.y, at.z, { state: "chase" }) }),
+                   ok: (p, s) => STS.hasStatus(s.r, "lagged") && Math.abs(STS.statusLeft(s.r, "lagged") - 6) < 0.6 && !STS.hasStatus(s.far, "lagged") },
       };
       // On the map an aimed ability opens WS8's target screen (since the WS4b merge): the tile each case means, east
       // of you (Bellows: what the screen starts on, the rat).
@@ -1114,6 +1118,68 @@ export async function checkProgression(m) {
         step(1 / 60);
         if (game.state.cast?.turns) fail(`a forced flat map counted as a turn (${game.state.cast.turns})`);
       } finally { off(); offTurn(); }
+    }
+
+    // 7.55 The mutations B1 built (C4 #8): a lagged creature's blows come at 0.7 of its pace; Readhand knows an artifact
+    // picked up (without it, unknown); Beat-deaf hides a spike's warning on the map; Sleepwalker drifts world-map moves a
+    // span to one side about 1 in 10 (none without it).
+    {
+      const p = bentIn(["timeLag"], { view: "3d" }), at = runEast(game.zone, 9);
+      place(p, at, 0);
+      const a = rat(at.x + 7, at.y, at.z, { state: "wander", speedMul: 0 }), b = rat(at.x + 8, at.y, at.z, { state: "wander", speedMul: 0 });
+      a.cd = b.cd = 5;
+      STS.addStatus(game, a, "lagged", { t: 10 });
+      for (let k = 0; k < 60; k++) game.debug.step(1 / 60);
+      const lagged = 5 - a.cd, plain = 5 - b.cd;
+      if (!(plain > 0.9) || Math.abs(lagged / plain - 0.7) > 0.02) fail(`Time Lag: a lagged rat's cooldown ran ${lagged.toFixed(3)} s in 1 s, a plain one's ${plain.toFixed(3)} (want 0.7 of it)`);
+      out.timeLag = `a lagged rat's cooldown ran ${lagged.toFixed(2)} s a second, a plain one's ${plain.toFixed(2)}`;
+      // Readhand: an unknown fold-knife under your feet, picked up.
+      const touch = (muts) => {
+        const q = bentIn(muts, { view: "map" });
+        const it = { kind: "artifact", id: "foldKnife", known: false, cell: null };
+        game.zone.items.push(m.items.makeItem(it, q.x, q.y, q.z));
+        m.items.pickUpItems(game);
+        const got = q.inv.find((x) => x.kind === "artifact" && x.id === "foldKnife");
+        return got?.known;
+      };
+      const read = touch(["readhand"]), plainTouch = touch([]);
+      if (read !== true || plainTouch === true) fail(`Readhand: a fold-knife picked up is known ${read} with it, ${plainTouch} without`);
+      // Beat-deaf: a spike about to rise beside you, drawn on the map.
+      const carets = (muts) => {
+        const q = bentIn([], { view: "map" }), z = game.zone, tx = Math.floor(q.x) + 1, ty = Math.floor(q.y), TR = m.traps;
+        for (const id of muts) q.mutations[id] = 1;   // (a defect comes only from the start: set here)
+        z.kind[tx + ty * z.w] = WD.KIND.SPIKES; z.seen[tx + ty * z.w] = 1;
+        z.spikes.set(tx + ty * z.w, { phase: ((Math.floor(game.time / TR.TICK) + 1) % 4 + 4) % 4, period: 4, up: 1, pattern: "test" });
+        if (TR.spikeState(z, tx + ty * z.w, game.time) !== "warn") return -1;
+        frame();
+        return capture.chars.filter((c) => c === "^").length;
+      };
+      const warned = carets([]), deaf = carets(["beatDeaf"]);
+      if (warned < 1 || deaf !== warned - 1) fail(`Beat-deaf: ${warned} "^" on the map without it, ${deaf} with it (want one fewer)`);
+      out.senses = `Readhand: picked up known ${read}; Beat-deaf: ${warned} "^" → ${deaf}`;
+    }
+    {
+      // Sleepwalker, on GNOMON's world: 300 moves back and forth along an open row, fast and kept on the map.
+      const walk = (muts) => {
+        const p = bentIn([], { view: "map" });
+        for (const id of muts) p.mutations[id] = 1;   // (a defect comes only from the start: set here)
+        const W = m.worldmap.REAL_WORLD;
+        m.gameMod.startRun(23, W, { player: p });
+        game.pages = null; game.story.cube = true;
+        m.travel.enterWorldMap(game);
+        let drifts = 0, moves = 0, side = 0;
+        for (let k = 0; k < 300; k++) {
+          const dx = k % 2 ? -1 : 1, r = m.travel.worldStep(game, dx, 0, { confirm: true, fast: true, drop: false });
+          if (!r.ok) continue;
+          moves++;
+          if (r.drifted) { drifts++; if (r.to.wy !== r.from.wy) side++; }
+          if (game.trip?.prompt) game.trip.prompt = null;
+        }
+        return { drifts, moves, side };
+      };
+      const sw = walk(["sleepwalker"]), calm = walk([]);
+      if (sw.moves < 200 || sw.drifts < 10 || sw.drifts > 0.16 * sw.moves || sw.side !== sw.drifts || calm.drifts) fail(`Sleepwalker: ${sw.drifts} drifts in ${sw.moves} moves (${sw.side} to a side; want about 1 in 10), ${calm.drifts} without it`);
+      out.sleepwalker = `${sw.drifts} drifts in ${sw.moves} moves, ${calm.drifts} without`;
     }
 
     // 7.6 Defects that come and go.
@@ -1414,6 +1480,7 @@ export async function run(env) {
     codec: await src("save/codec.js"), rng: await src("rng.js"), items: await src("items.js"), playerMod: await src("player.js"), body: await src("body.js"),
     implants: await src("content/items/implants.js"), mutations: await src("content/mutations.js"),
     pmut: await src("progression/mutations.js"), abilities: await src("abilities.js"), turns: await src("turns.js"), inventory: await src("inventory.js"),
+    traps: await src("traps.js"), travel: await src("overworld/travel.js"), worldmap: await src("content/world/worldmap.js"), gameMod: await src("game.js"),
     creatures: await src("creatures.js"), world: await src("world.js"), status: await src("status.js"), events: await src("events.js"),
     factions: await src("factions.js"), charsheet: await src("screens/charsheet.js"), light: await src("light.js"), time: await src("time.js"),
     content: { ...genotypes, ...backgrounds, ...powers },

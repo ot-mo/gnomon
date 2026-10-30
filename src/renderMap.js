@@ -178,7 +178,7 @@ export function renderMap(game) {
       } else if (kind === KIND.SPIKES) {   // up now, up next beat, or down
         const st = spikeState(zone, i, game.time);
         if (st === "up") S.put(sx, sy, "▲", 255, 70, 60);
-        else if (st === "warn") S.put(sx, sy, "^", 255, 170, 60);
+        else if (st === "warn" && !game.player.mutations?.beatDeaf) S.put(sx, sy, "^", 255, 170, 60);   // (Beat-deaf: no warning, B1)
         else S.put(sx, sy, ",", 130, 110, 100);
       } else {
         const [ch, c] = (zone.hasSky ? groundLook(zone, i, kind) : waterLook(zone, i, kind)) || GLYPHS[kind] || GLYPHS[KIND.FLOOR];

@@ -58,13 +58,16 @@ import { flowField, canWalk, DIRS8, UNREACHABLE, MONSTER_STEP_UP, MONSTER_DROP }
 import { fearLight } from "./guardians.js";
 import { B, FLOOR_Z } from "./world.js";
 import { EYE, RADIUS } from "./player.js";
-import { hasStatus, statusFlag, tickStatuses, removeStatus, capStatus, catchUpStatuses, cooldownLeft } from "./status.js";
+import { hasStatus, statusFlag, tickStatuses, removeStatus, capStatus, catchUpStatuses, cooldownLeft, registerStatus } from "./status.js";
 import { RULES, extendRules } from "./rules.js";
 import { CREATURE_TYPES, spawnCreature, addCreature, removeCreature, isFlat, canTalk, creaturesNear, buildBuckets, dropBuckets, sees, theOf, TheOf } from "./creatures.js";
 import { attitude } from "./factions.js";
 import { distance } from "./rng.js";
 import { killMonster } from "./monsters.js";
 import { resolveAttack, naturalSpec } from "./combat.js";
+// Time Lag's mark (B1, C4 #8): a creature acts at LAG of its pace.
+export const LAG = 0.7;
+registerStatus("lagged", { color: [160, 160, 220], t: 6, stack: "refresh", hud: (s) => `LAGGED ${Math.ceil(s.t)}s` });
 import { on } from "./events.js";
 import { zoneState } from "./zones.js";
 import { ABILITIES, abilitiesOf, activate } from "./abilities.js";
@@ -171,7 +174,7 @@ export function updateCreatures(game, dt, radius = Infinity) {
         arrive(game, m, occ);
       }
       if (m.state !== "chase" && m.state !== "flee" && !b?.target && !b?.leader && Math.hypot(m.x - player.x, m.y - player.y) > radius) continue;
-      const pace = (hasStatus(m, "chilled") ? 0.5 : 1) * (hasStatus(m, "hasted") ? RULES.haste : 1);
+      const pace = (hasStatus(m, "chilled") ? 0.5 : 1) * (hasStatus(m, "hasted") ? RULES.haste : 1) * (hasStatus(m, "lagged") ? LAG : 1);   // (lagged: Time Lag, B1)
       m.anim += dt;
       m.hurt = Math.max(0, m.hurt - dt);
       m.cd = Math.max(0, m.cd - dt * pace);   // chilled: half as often; hasted: faster
