@@ -29,3 +29,7 @@ export { holyNow, trespassed, darkPass } from "./holy.js";
 import "./legends.js";
 export { cultFaction, ensureCult, cultOfSite } from "./cults.js";
 export { takeFromLamp, cookDish, brewTonic, prayAtShrine, BREWS } from "./commons.js";
+export { sendSmoothers } from "./smoothers.js";
+export { bankHere, deposit, withdraw } from "./bank.js";
+export { OIL_FIRE, CHIME } from "./powers.js";
+export { gradeCap } from "./stocks.js";

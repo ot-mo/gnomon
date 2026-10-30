@@ -74,7 +74,7 @@ export const POWERS = {
   faintRunes:   { tree: "shadowcraft", name: "Faint runes", info: "Runes show faintly while your torch is lit.", needs: "runes drawn faintly with the torch lit (materials.js, render3d.js; the dark lens's too)" },
   thriftyWick:  { tree: "glimcraft", name: "Thrifty wick",  info: "Your torch costs half as much glim.", bonus: () => ({ torchCost: -0.5 }) },
   kindleAtRange:{ tree: "glimcraft", name: "Kindle at range", info: "Light braziers from 4 tiles away.", needs: "lighting a brazier from 4 tiles (interact.js; Kindle the mutation reaches 5 + level)" },
-  oilFire:      { tree: "glimcraft", name: "Oil fire",      info: "Set glim puddles alight.", needs: "glim puddles that burn when lit (C2's glim liquid burns for 6 s if lit: social/liquids.js, status burning)" },
+  oilFire:      { tree: "glimcraft", name: "Oil fire",      info: "Set glim puddles alight." },
   keenEyeSites: { tree: "survey",    name: "Keen Eye",      info: "You find hidden sites twice as often on the road (20%)." },   // (overworld/encounters.js reads it)
   readHeights:  { tree: "survey",    name: "Read heights",  info: "For 10 s after a look in 3D, map tiles show their height as a digit.", needs: "height digits on the map for 10 s after a look in 3D (renderMap.js; the height lens's too)" },
   hourScript:   { tree: "lore",      name: "Hour script",   info: "You read one more account on every stele." },
@@ -91,7 +91,7 @@ export const POWERS = {
   homingSense:  { tree: "pathcraft", name: "Homing sense",  info: "Half the time you find your way again at once when lost." },   // (overworld/lost.js)
   warmHands:    { tree: "parley",    name: "Warm Hands",    info: "Later Kindlings go 20 further." },   // (social/ritual.js reads it)
   intimidate:   { tree: "parley",    name: "Intimidate",    info: "Make the weak think twice.", needs: "the weak thinking twice: a morale or flee check (ai.js)" },
-  chime:        { tree: "parley",    name: "Chime",         info: "Recruit by preaching.", needs: "recruiting by preaching (social: C2's Chime, the followers)" },
+  chime:        { tree: "parley",    name: "Chime",         info: "Recruit by preaching.", ability: "chime" },
 };
 
 export const LEGACY_PERKS = ["swimmer", "brightTorch", "tough", "mighty", "fleet", "stealthy", "leaper", "regen", "cartographer",

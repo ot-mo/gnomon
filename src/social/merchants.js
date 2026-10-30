@@ -83,6 +83,7 @@ export function priceNote(game, c) {
 // --- Stock -------------------------------------------------------------------------------------------------------
 const STOCKS = new Map();
 export function registerStock(id, fn) { STOCKS.set(id, fn); }
+export const stockOf = (id) => STOCKS.get(id) || STOCKS.get("general");   // (B3: the surgeon's and tinker's packs add the general one)
 const stockIdOf = (c) => c.merchant?.stock ?? typeOf(c)?.merchant?.stock ?? "general";
 // The legacy peddler keeps the parent game's rules: his pack is rolled once, where he's placed (content/legacy/
 // encounters.js peddlerStock), and never restocked, so the old game's crystals stay as rare as they were.
@@ -191,7 +192,7 @@ export function tradeRow(game, c, tab, row) {
   const over = receive(game, p, row.price);
   if (over) {   // the flask can't hold it all: the sale is refused (what fit goes back), and the trader offers goods
     pay(game, p, row.price - over);
-    return { ok: false, offer: "theirs", line: say(game, `"Your flask won't hold ${formatPrice(row.price)}. Take something of mine for it instead?"`, [230, 200, 150]) };
+    return { ok: false, offer: "theirs", line: say(game, `"${CURRENCY.lines.overflow}" (${formatPrice(row.price)})`, [230, 200, 150]) };   // (the money's words: B3, C2 #13)
   }
   if (row.it.count > 1) row.it.count--; else p.inv.splice(p.inv.indexOf(row.it), 1);
   return { ok: true, line: say(game, `You sell the ${name} for ${formatPrice(row.price)}.`, GOOD) };
