@@ -240,11 +240,13 @@ registerMapOverlay("slam", (game, { zone, onScreen, toScreen }) => {
 }, { order: 10 });
 
 // Items you've seen, over the dressing's props you've seen (WS2b: one glyph each, never on a tile the map draws as
-// wall, as a cliff top's are 3D's); your markers.
+// wall, as a cliff top's are 3D's, unless the prop's kind says `overWall`: the Tall Table's nests on their perches, whose
+// height the map never shows, bible §5 E; B2, C1b #13); your markers.
+const onMap = (zone, P, i) => !!P && !!zone.seen[i] && (zone.kind[i] !== KIND.WALL || !!P.overWall);
 registerMapOverlay("items", (game, { zone, onScreen, toScreen }) => {
   for (const pr of zone.props || []) {
     const tx = Math.floor(pr.x), ty = Math.floor(pr.y), P = PROPS[pr.kind], i = tx + ty * zone.w;
-    if (!P || !zone.seen[i] || zone.kind[i] === KIND.WALL || !onScreen(tx, ty)) continue;
+    if (!onMap(zone, P, i) || !onScreen(tx, ty)) continue;
     const [sx, sy] = toScreen(tx, ty);
     S.put(sx, sy, P.glyph, ...P.color);
   }
@@ -443,7 +445,7 @@ function seenProps(zone) {
   const counts = new Map();
   for (const pr of zone.props || []) {
     const P = PROPS[pr.kind], i = Math.floor(pr.x) + Math.floor(pr.y) * zone.w;
-    if (!P || !zone.seen[i] || zone.kind[i] === KIND.WALL) continue;
+    if (!onMap(zone, P, i)) continue;
     const e = counts.get(pr.kind) || { glyph: P.glyph, color: P.color, name: P.name.replace(/^an? /, ""), n: 0 };
     e.n++; counts.set(pr.kind, e);
   }
@@ -548,9 +550,8 @@ registerDescriber("sightings", (game, tile, { zone }) => {
 // The dressing's props on the tile (zone.props), by name, as the map draws them: not on a tile drawn as wall (a cliff
 // top's are 3D's). Integrator, WS2b #7.
 registerDescriber("props", (game, tile, { zone, i }) => {
-  if (zone.kind[i] === KIND.WALL) return null;
   const names = new Set();
-  for (const pr of zone.props || []) if (PROPS[pr.kind] && Math.floor(pr.x) === tile.x && Math.floor(pr.y) === tile.y) names.add(PROPS[pr.kind].name);
+  for (const pr of zone.props || []) if (Math.floor(pr.x) === tile.x && Math.floor(pr.y) === tile.y && onMap(zone, PROPS[pr.kind], i)) names.add(PROPS[pr.kind].name);
   return names.size ? [...names].map((n) => `${capitalize(n)}.`) : null;
 }, { order: 35 });
 

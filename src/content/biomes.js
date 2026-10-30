@@ -69,7 +69,8 @@ export const PROPS = {
   ashDrift: { name: "an ash drift", glyph: "`", color: [110, 104, 110], art: ["  a  ", "aaAaa"], palette: { a: [[90, 86, 92], 0], A: [[120, 116, 122], 0] } },
   inkStain: { name: "an ink stain", glyph: "`", color: [40, 40, 60], art: ["kkkk"], palette: { k: [[25, 25, 40], 0] } },
   web: { name: "a web", glyph: "-", color: [220, 220, 230], art: ["w w w", " www ", "wwWww", " www ", "w w w"], palette: { w: [[210, 210, 220], 0.1], W: [[240, 240, 250], 0.2] } },
-  nest: { name: "a nest", glyph: "°", color: [210, 200, 150], art: [" ppp ", "pPpPp", " ppp "], palette: { p: [[200, 190, 140], 0], P: [[230, 220, 170], 0] } },
+  // overWall: the map shows a kite's nest over its perch, where it draws the cliff as wall, never its height (B2, C1b #13).
+  nest: { name: "a nest", glyph: "°", color: [210, 200, 150], overWall: true, art: [" ppp ", "pPpPp", " ppp "], palette: { p: [[200, 190, 140], 0], P: [[230, 220, 170], 0] } },
 };
 
 const flatsProps = [["reeds", 4], ["glimseed", 2], ["saltBloom", 2], ["bones", 1]];

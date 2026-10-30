@@ -812,6 +812,38 @@ export async function checkRender(m) {
     out.folio = { shadows: n1, slide: h1 !== h2, drawn: h1 !== h0, onMap: nMap, scratch3d: scratches("3d", fz.key), scratchMap: scratches("map", fz.key), scratchElsewhere: scratches("3d", clearKey) };
     expect(n1 >= 20 && out.folio.slide && out.folio.drawn && nMap === 0 && out.folio.scratch3d >= 20 / 1.3 - 1 && out.folio.scratch3d <= 20 / 0.4 && !out.folio.scratchMap && !out.folio.scratchElsewhere,
       `Folio in 3D: ${JSON.stringify(out.folio)}`);
+    // The Tall Table's nests on the map (C1b #13): every perch the map draws as wall still shows its nest, and the inspect
+    // line names it without a height; a plain prop on a wall tile still doesn't.
+    {
+      const tt = Wd.landmarks.get("tallTable");
+      fresh(4242, worldmap.REAL_WORLD);
+      game.debug.enterZone(`${tt.wx},${tt.wy},0`, "start");
+      const z = game.zone;
+      z.seen.fill(1);
+      game.view = "map"; game.mode = "map"; renderMap.mapView.top = 2; renderMap.mapView.panX = renderMap.mapView.panY = 0;
+      const nests = z.perches || [];
+      let shown = 0, said = 0, onWall = 0, visible = 0;
+      for (const pc of nests) {
+        if (z.kind[pc.x + pc.y * z.w] === world.KIND.WALL) onWall++;
+        p().x = pc.x + 0.5; p().y = pc.y + 3.5;   // (the map centres on you: the perch in view)
+        renderMap.renderMap(game); S.present();
+        const mv = renderMap.mapView, sx = (pc.x - mv.tx0) * 2, sy = mv.top + pc.y - mv.ty0;
+        if (sx < 0 || sy < 0 || sx >= capture.cols || sy >= capture.rows) continue;
+        visible++;
+        if (capture.chars[sy * capture.cols + sx] === "°") shown++;
+        const d = renderMap.describeTile(game, { x: pc.x, y: pc.y });
+        if (/nest/i.test(d) && !/\d+ (blocks|up)|high/i.test(d)) said++;
+      }
+      // A prop of another kind on the same wall tile (a bone, say) stays 3D's.
+      const pc = nests.find((q) => z.kind[q.x + q.y * z.w] === world.KIND.WALL), plain = Object.keys(m.biomes.PROPS).find((k) => !m.biomes.PROPS[k].overWall);
+      z.props = z.props.filter((pr) => !(Math.floor(pr.x) === pc.x && Math.floor(pr.y) === pc.y));
+      z.props.push({ x: pc.x + 0.5, y: pc.y + 0.5, z: pc.z, kind: plain });
+      p().x = pc.x + 0.5; p().y = pc.y + 3.5;
+      renderMap.renderMap(game); S.present();
+      const mv = renderMap.mapView, plainCh = capture.chars[(mv.top + pc.y - mv.ty0) * capture.cols + (pc.x - mv.tx0) * 2];
+      out.nests = { perches: nests.length, onWall, visible, shown, said, plainOnWall: plainCh === m.biomes.PROPS[plain].glyph };
+      expect(nests.length >= 3 && onWall > 0 && visible === nests.length && shown === nests.length && said === nests.length && !out.nests.plainOnWall, `the Tall Table's nests on the map: ${JSON.stringify(out.nests)}`);
+    }
     game.view = "3d";
     stats.skies = out;
   }
