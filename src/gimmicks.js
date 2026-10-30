@@ -105,7 +105,7 @@ function unpress(game, zone) {
   const pr = zone.pressedRoom;
   pr.done = true;
   for (const m of zone.creatures)
-    if (m.pressed && m.x >= pr.x0 && m.x < pr.x1 + 1 && m.y >= pr.y0 && m.y < pr.y1 + 1) { m.vis = { ...(m.vis || {}), flat: false }; m.pressed = false; m.state = "chase"; }
+    if (m.vis?.pressed && m.x >= pr.x0 && m.x < pr.x1 + 1 && m.y >= pr.y0 && m.y < pr.y1 + 1) { m.vis = { ...m.vis, flat: false, pressed: false }; m.state = "chase"; }
   game.log("You turn on the bright centre tile, and the room unpresses: what was drawn on the floor stands up into the world.", [255, 220, 140]);
 }
 

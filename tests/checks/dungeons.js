@@ -820,7 +820,11 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
   // floor, its things flat until you turn on its gold centre; from floor 3 its plates press you flat for 10 s, unhurt.
   G2.headroom = [1, 2, 3, 4].map((z) => { const f = enter("pressyard", z), r = f.rooms.find((o) => !o.hall && f.stand[o.cx + o.cy * f.w] === FLOOR_Z && !(f.vault && o.cx >= f.vault.x0 && o.cx <= f.vault.x1 && o.cy >= f.vault.y0 && o.cy <= f.vault.y1));
     let k = FLOOR_Z; while (k < f.h && f.get(r.cx, r.cy, k) === B.AIR) k++; return k - FLOOR_Z; });
-  const pz = enter("pressyard", 2), prr = pz.pressedRoom, pressed = pz.creatures.filter((c) => c.pressed && c.vis?.flat);
+  // (through a save and a load first: the room's pressed things must still be its own)
+  const { encodeZone, decodeZone } = await import("../../src/save/codec.js");
+  const pz0 = enter("pressyard", 2), back = await decodeZone(await encodeZone(pz0, { slot: "t", savedAt: 0 }, { deflate: false }));
+  pz0.creatures = back.creatures;
+  const pz = pz0, prr = pz.pressedRoom, pressed = pz.creatures.filter((c) => c.vis?.pressed && c.vis?.flat);
   Object.assign(P, { x: prr.cx + 0.5, y: prr.cy + 0.5, z: FLOOR_Z, onGround: true });
   game.view = "map"; tick("map"); game.view = "3d"; tick();
   G2.pressed = { flatBefore: pressed.length, gold: pz.get(prr.cx, prr.cy, FLOOR_Z - 1) === B.MOSAIC_GOLD, deepAfter: pressed.every((c) => !c.vis.flat), done: prr.done };

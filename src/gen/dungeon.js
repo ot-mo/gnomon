@@ -786,8 +786,7 @@ function pressRoom(f, rng, rooms, ctx, p) {
   f.set(r.cx, r.cy, FLOOR_Z - 1, B.MOSAIC_GOLD);
   for (const [x, y] of rng.shuffle(spots).slice(0, 2)) {
     const m = spawnCreature(pickFrom(rng, ctx.depth, p.creatureTable), x, y, FLOOR_Z, { rng: ctx.cosmetic, state: "idle", level: ctx.depth });
-    m.vis = { ...(m.vis || {}), flat: true };
-    m.pressed = true;
+    m.vis = { ...(m.vis || {}), flat: true, pressed: true };   // (vis: saved with the creature)
     addCreature(f, m);
   }
   f.pressedRoom = { x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1, cx: r.cx, cy: r.cy, done: false };
