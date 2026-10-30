@@ -6,7 +6,8 @@
 //   { kind: "weapon", id: "handAxe", made: "copper", material: 0, ench, known, … }
 //     made       a MATERIALS id: what it is made of (its name, price, colour; armour's +AV)
 //     material   the damage the material adds to a weapon (combat.js weaponSpec and missiles.js read this number:
-//                "the weapon range + material + floor((STR − req) / 2) + enchantment", DECISIONS §1); items/gear.js
+//                "the weapon range + material + floor((STR − req) / 2) + enchantment", DECISIONS §1; since the light-weapon
+//                fix, 2026-10-30, material and STR over 10 × the swing ÷ RULES.d20.swingRef, rounded); items/gear.js
 //                makeGear sets it from `made`
 // The parent's gear has no `made`, so the test world's legacy stack, golden (b) and the legacy fights see the parent's
 // items exactly as before.

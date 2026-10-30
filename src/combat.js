@@ -14,7 +14,8 @@
 //               blow lands, 12% + crit bonus crits (×2, Sunder ×3), elites soak a flat `armour`, your armour
 //               soaks 0..AV, a thrown knife crits 12%.
 //     "d20"     d20 + toHitMod > DV, a natural 1 misses, a natural ≥ critNat hits and crits (× RULES.d20.crit);
-//               damage = the weapon's range + material + floor((STR − req) / 2) + enchantment, then the
+//               damage = the weapon's range + round((material + floor((STR − 10) / 2)) × swing ÷ 0.7) +
+//               enchantment (RULES.d20.strOver, swingRef: the light-weapon fix, 2026-10-30), then the
 //               element/holy/crush/burn/executioner/giant-slayer multipliers; armour soaks 0..AV at random.
 //               A missile weapon's shot adds its material and enchantment, not STR. Creatures roll
 //               d20 + floor(level / 3) against your DV (stats.js dv, 0 while unable to act). Every blow
@@ -41,7 +42,7 @@ import { lineOfSight } from "./raycast.js";
 import { solidFor } from "./world.js";
 import { strNeeded, WEAPONS, ELEMENTS } from "./items.js";
 import { colossusCore } from "./guardians.js";
-import { EYE, attackTime, armourValue, weaponReach } from "./player.js";
+import { EYE, FISTS, attackTime, armourValue, weaponReach } from "./player.js";
 import { sfx } from "./sfx.js";
 import { attr, maxHp, mod, bonus } from "./stats.js";
 import { wielded, worn } from "./body.js";
@@ -80,8 +81,8 @@ export function resistText(m) {
 
 // --- Specs ------------------------------------------------------------------------------------------
 // The wielded weapon (bonus maxDmg widens the top of the range). Material: bible §13.1, 0 until items
-// carry one. Bare hands (fists): req 0 for the legacy set and the to-hit; d20 damage counts STR over
-// RULES.d20.fistReq instead. Fists hit for 1-2; in gauntlets 1d4; with truesteel knuckles fitted (WS5's implant,
+// carry one. Bare hands (fists): req 0 (no to-hit cost); under d20 every blow, a fist's too, counts STR over
+// RULES.d20.strOver, scaled by its swing (`swing`: the weapon's, FISTS.swing for bare hands). Fists hit for 1-2; in gauntlets 1d4; with truesteel knuckles fitted (WS5's implant,
 // effect "knuckles"; bible §13.6) 2d4, and they crush (×2 against the brittle, as bonus crush does).
 const fitted = (e, effect) => !!e.body?.implants && e.body.parts.some((q) => IMPLANTS[e.body.implants[q.id]?.id]?.effect === effect);
 export function weaponSpec(e) {
@@ -89,11 +90,11 @@ export function weaponSpec(e) {
   if (!w) {
     const knuckles = fitted(e, "knuckles"), gauntlets = !knuckles && worn(e).some((g) => g.kind === "armour" && g.id === "gauntlets");
     const dmg = knuckles ? [2, 8] : gauntlets ? [1, 4] : [1, 2];
-    return { kind: "melee", weapon: null, dmg: [dmg[0], dmg[1] + bonus(e, "maxDmg")], ench: 0, element: null, req: 0, acc: 0, material: 0, fists: true,
+    return { kind: "melee", weapon: null, dmg: [dmg[0], dmg[1] + bonus(e, "maxDmg")], ench: 0, element: null, req: 0, acc: 0, material: 0, fists: true, swing: FISTS.swing,
              ...(knuckles ? { crush: true } : {}) };
   }
   return { kind: "melee", weapon: it, dmg: [w.dmg[0], w.dmg[1] + bonus(e, "maxDmg")], ench: it.ench || 0, element: it.element || null,
-           req: strNeeded(it), acc: w.acc || 0, material: it.material || 0 };
+           req: strNeeded(it), acc: w.acc || 0, material: it.material || 0, swing: w.swing };
 }
 // A creature's own blow: its type's damage range and its level bonus (+1 per 4 levels, creatures.js).
 export function naturalSpec(c) {
@@ -411,11 +412,12 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
     return "noticed";   // (resolveAttack: noticeBlow after the "attack" event)
   }
   const crit = result.crit;
-  // 3 Damage: the range, + material, + STR over the requirement, + enchantment (your blade; a missile
+  // 3 Damage: the range, + material and STR over RULES.d20.strOver scaled by the blade's swing ÷ swingRef (rounded
+  // once), + enchantment (your blade; a spec without a swing counts as swingRef; a missile
   // weapon's shot takes material and enchantment, no STR); a creature's level bonus; then the multipliers
   // and the crit.
   let dmg = spec.fixed ?? roll(rng, spec.dmg[0], spec.dmg[1]) + (spec.plus || 0);
-  if (you && spec.kind === "melee") dmg += (spec.material || 0) + Math.floor((attr(p, "str") - (spec.fists ? D.fistReq : spec.req)) / 2) + spec.ench;
+  if (you && spec.kind === "melee") dmg += Math.round(((spec.material || 0) + Math.floor((attr(p, "str") - D.strOver) / 2)) * (spec.swing ?? D.swingRef) / D.swingRef) + spec.ench;
   else if (you && spec.kind === "missile" && spec.fixed === undefined) dmg += (spec.material || 0) + (spec.ench || 0);
   dmg = Math.max(1, dmg);
   if (onYou) {

@@ -339,7 +339,7 @@ registerItemKind("scroll", {
   use: "read",
 });
 function weaponInfo(game, it) {
-  const w = WEAPONS[it.id], m = materialDmg(it);
+  const w = WEAPONS[it.id], m = Math.round(materialDmg(it) * w.swing / RULES.d20.swingRef);   // what the material adds a blow (combat.js: × swing ÷ swingRef)
   const el = it.element ? ` · ${ELEMENTS[it.element].info}` : "";
   return `${w.dmg[0] + m}-${w.dmg[1] + m} damage · ${w.swing}s per swing · reach ${w.reach}${w.thrust ? " · thrusts" : ""}${el}${extrasInfo(it)}${newInfo(it)} · needs ${strNeeded(it)} STR`;
 }

@@ -10,7 +10,8 @@
 //      against creatures of several levels, and for creatures against your DV. Crit rates too. One row
 //      also goes through the whole resolveAttack (10⁵ blows on a goblin that can't die). A natural 20
 //      hits a DV no roll can beat (5% of rolls, each a natural-20 crit), through rollToHit and resolveAttack.
-//   2b. Damage and soak (d20): your blade's mean (range + material + floor((STR − req)/2) + enchantment)
+//   2b. Damage and soak (d20): your blade's mean (range + round((material + floor((STR − 10)/2)) × swing ÷ 0.7) +
+//       enchantment, the light-weapon fix of 2026-10-30)
 //      and ×crit; a creature's armour soaks 0..AV uniformly; bare hands below a dagger; a creature's blow on you (range + level
 //      bonus, ×crit), and your armour's soak 0..AV, uniformly.
 //   3. Both views, one resolution: a bump duel on the map and a swing duel in 3D with the same combat RNG
@@ -55,7 +56,7 @@ import { killXp, offerPowers, takePerk } from "../../src/leveling.js";
 import { BACKGROUNDS } from "../../src/content/backgrounds.js";
 import { suggestSpread } from "../../src/progression/chargen.js";
 import { hasKey } from "../../src/keyset.js";
-import { randomGear } from "../../src/content/items/gear.js";
+import { randomGear, makeGear } from "../../src/content/items/gear.js";
 import { mapStep, passTime, refreshView, startTravel, travelStep } from "../../src/turns.js";
 import { overrideRules, RULES } from "../../src/rules.js";
 import { invalidateStats, mod, attr, maxHp, av as armourValue, bonusTable, bonus } from "../../src/stats.js";
@@ -245,15 +246,18 @@ export function checkCombat({ game, startRun, srcFiles }) {
     }
 
     // --- 2b. Damage and soak (d20) ------------------------------------------------------------------------
-    // Your blade: range + material + floor((STR − req) / 2) + enchantment, ×crit; a creature's armour soaks
+    // Your blade: range + round((material + floor((STR − strOver) / 2)) × swing ÷ swingRef) + enchantment, ×crit (the
+    // light-weapon fix, the user's rule B of 2026-10-30: STR over 10 for every blade, scaled by its swing ÷ 0.7); a
+    // creature's armour soaks
     // a random 0..AV. A creature's blow: range + its level bonus, ×crit, then your armour soaks 0..AV.
     {
       const mean = (xs) => xs.reduce((a, x) => a + x, 0) / Math.max(1, xs.length);
       const DT = 0.05, N = 40000;
       const dummy = mk("goblin", 1);
       dummy.hp = dummy.maxHp = 1e9;
-      const blade = { ...sword, dmg: [2, 5], req: 6, ench: 1, material: 1 };   // STR 10: +floor(4/2) = +2
-      const wantPlain = 3.5 + 1 + 2 + 1;
+      // STR 10 over 10: +0 (over its requirement of 6 it was +2); material 4 × 0.35 ÷ 0.7 = +2; enchantment +1, unscaled.
+      const blade = { ...sword, dmg: [2, 5], req: 6, ench: 1, material: 4, swing: 0.35 };
+      const wantPlain = 3.5 + 2 + 1;
       const blows = (tgt, spec, n = N) => {
         const out = [];
         for (let k = 0; k < n; k++) {
@@ -265,7 +269,13 @@ export function checkCombat({ game, startRun, srcFiles }) {
       game.combatRng = makeRng(31);
       let landed = blows(dummy, blade);
       const plain = mean(landed.filter((x) => !x.crit).map((x) => x.dmg)), crits = mean(landed.filter((x) => x.crit).map((x) => x.dmg));
-      expect(Math.abs(plain - wantPlain) <= DT, `your blade (2-5, +1 material, +1 enchantment, STR 10 over req 6): mean ${plain.toFixed(3)}, want ${wantPlain}`);
+      expect(Math.abs(plain - wantPlain) <= DT, `your blade (2-5, +4 material, +1 enchantment, STR 10, a 0.35 s swing): mean ${plain.toFixed(3)}, want ${wantPlain}`);
+      {   // a slow blade: 4 × 1.4 ÷ 0.7 = +8
+        game.combatRng = makeRng(33);
+        const slow = mean(blows(dummy, { ...blade, swing: 1.4 }).filter((x) => !x.crit).map((x) => x.dmg));
+        expect(Math.abs(slow - (3.5 + 8 + 1)) <= DT, `a 1.4 s blade (2-5, +4 material, +1 enchantment, STR 10): mean ${slow.toFixed(3)}, want ${3.5 + 8 + 1}`);
+        game.combatRng = makeRng(31);
+      }
       expect(Math.abs(crits - wantPlain * RULES.d20.crit) <= DT * 4, `your crits: mean ${crits.toFixed(3)}, want ×${RULES.d20.crit} = ${wantPlain * RULES.d20.crit}`);
       expect(landed.every((x) => x.soaked === 0), "a creature with no armour soaked a blow");
       // Its armour: 0..4 at random, uniformly.
@@ -274,14 +284,24 @@ export function checkCombat({ game, startRun, srcFiles }) {
       const soaks = landed.map((x) => x.soaked), counts = [0, 1, 2, 3, 4].map((v) => soaks.filter((s) => s === v).length / soaks.length);
       expect(soaks.every((s) => s >= 0 && s <= 4) && counts.every((c) => Math.abs(c - 0.2) <= 0.02) && Math.abs(mean(soaks) - 2) <= DT,
         `a creature's AV 4 soaks ${counts.map((c) => c.toFixed(3))} of 0..4 (mean ${mean(soaks).toFixed(3)}), want 0.2 each, mean 2`);
-      expect(landed.every((x) => x.dmg + x.soaked >= 6), "a blow on an armoured creature lost more than its soak");
+      expect(landed.every((x) => x.dmg + x.soaked >= 2 + 2 + 1), "a blow on an armoured creature lost more than its soak");   // (its least: 2 + 2 + 1)
       dummy.armour = 0;
-      // Bare hands never outdo a weapon: fists (1-2, STR over RULES.d20.fistReq) below the dagger.
+      // Bare hands never outdo a weapon: fists (1-2, STR over RULES.d20.strOver at their 0.5 s swing) below the dagger,
+      // a blow and a second.
       const heldBody = p.body;
       p.body = makeBody(p.body?.plan || "humanoid"); invalidateStats(p);
       const fistSpec = weaponSpec(p), fistSwing = attackTime(p);
       // Bare hands swing in 0.5 s (the balance decision of 2026-10-30, the user's: proposal §3.4; the parent's 0.3).
       expect(FISTS.swing === 0.5 && fistSwing === FISTS.swing, `bare hands swing in ${fistSwing} s (FISTS ${FISTS.swing}; want 0.5)`);
+      // The specs carry the swing their blows scale by: the fists' and the wielded weapon's.
+      p.body.equip.hand_r = { kind: "weapon", id: "dagger", ench: 0, known: true }; invalidateStats(p);
+      const daggerSwing = weaponSpec(p).swing;
+      p.body.equip.hand_r = null; invalidateStats(p);
+      expect(fistSpec.swing === FISTS.swing && daggerSwing === WEAPONS.dagger.swing, `the specs' swing: fists ${fistSpec.swing}, a dagger ${daggerSwing} (want ${FISTS.swing}, ${WEAPONS.dagger.swing})`);
+      {   // what a made blade's info line shows: its range + the material × swing ÷ 0.7 (a noonsilver dagger +3, a maul +7)
+        const line = (id) => ITEM_KINDS.weapon.info(game, makeGear("weapon", id, "noonsilver")).split(" damage")[0];
+        expect(line("dagger") === "5-7" && line("maul") === "13-18", `noonsilver info lines: a dagger ${line("dagger")}, a maul ${line("maul")} (want 5-7, 13-18)`);
+      }
       // In gauntlets 1d4; with truesteel knuckles fitted (WS5's implant) 2d4 that crush (WS5's request 7).
       const gloves = p.body.parts.find((q) => q.type === "gloves");
       p.body.equip[gloves.id] = { kind: "armour", id: "gauntlets", ench: 0, known: true }; invalidateStats(p);
@@ -300,10 +320,11 @@ export function checkCombat({ game, startRun, srcFiles }) {
         expect(Math.abs(crushed / unCrushed - 2) < 0.05, `truesteel knuckles on a skeleton: ${crushed.toFixed(2)} against ${unCrushed.toFixed(2)} without the crush (want ×2)`);
       }
       p.body = heldBody; invalidateStats(p);
-      const dagger = { kind: "melee", weapon: null, dmg: [...WEAPONS.dagger.dmg], ench: 0, element: null, req: WEAPONS.dagger.str, acc: 0, material: 0 };
+      const dagger = { kind: "melee", weapon: null, dmg: [...WEAPONS.dagger.dmg], ench: 0, element: null, req: WEAPONS.dagger.str, acc: 0, material: 0, swing: WEAPONS.dagger.swing };
       const fistMean = mean(blows(dummy, fistSpec, 20000).filter((x) => !x.crit).map((x) => x.dmg));
       const daggerMean = mean(blows(dummy, dagger, 20000).filter((x) => !x.crit).map((x) => x.dmg));
-      expect(fistSpec.fists && fistMean < daggerMean, `bare hands mean ${fistMean.toFixed(3)} against the dagger's ${daggerMean.toFixed(3)} (want less)`);
+      expect(fistSpec.fists && fistMean < daggerMean && fistMean / FISTS.swing < daggerMean / WEAPONS.dagger.swing,
+        `bare hands mean ${fistMean.toFixed(3)} (${(fistMean / FISTS.swing).toFixed(2)} a second) against the dagger's ${daggerMean.toFixed(3)} (${(daggerMean / WEAPONS.dagger.swing).toFixed(2)}) (want less)`);
       stats.damage = { yours: { plain: +plain.toFixed(3), crit: +crits.toFixed(3), want: wantPlain }, creatureSoak: counts.map((c) => +c.toFixed(3)),
                        fists: +fistMean.toFixed(3), dagger: +daggerMean.toFixed(3) };
       // A creature's blow on you (goblin level 5: 2-4 + 5, d20's 3 + floor(4 / 1.5) since the balance decision of
@@ -1659,7 +1680,8 @@ export function typicalBuilds(game) {
       const str = attr(p, "str");
       const blow = (it) => {
         const w = WEAPONS[it.id], req = strNeeded(it);
-        return ((w.dmg[0] + w.dmg[1]) / 2 + (it.material || 0) + Math.floor((str - req) / 2)) * (1 - 0.1 * Math.min(6, 2 * Math.max(0, req - str)));
+        const add = Math.round(((it.material || 0) + Math.floor((str - RULES.d20.strOver) / 2)) * w.swing / RULES.d20.swingRef);   // (combat.js)
+        return ((w.dmg[0] + w.dmg[1]) / 2 + add) * (1 - 0.1 * Math.min(6, 2 * Math.max(0, req - str)));
       };
       const shown = (it) => ITEM_KINDS.armour.av({ ...it, ench: 0 });
       const kit = build.at[level].kit;
