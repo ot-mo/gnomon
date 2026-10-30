@@ -49,7 +49,7 @@
 import { Zone, B, FLOOR_Z } from "../../src/world.js";
 import { enterZone, changeZone, cachedZone, zoneState } from "../../src/zones.js";
 import { spawnCreature, addCreature, CREATURE_TYPES, pickCreatureType, touchable, nearestCreature, witnessesOf, creaturesAlong } from "../../src/creatures.js";
-import { resolveAttack, rollToHit, hitChance, toHitMod, critNat, dvOf, weaponSpec, naturalSpec, playerMelee, bumpAttack, combatLine, thrownSpec } from "../../src/combat.js";
+import { resolveAttack, rollToHit, hitChance, toHitMod, critNat, dvOf, weaponSpec, naturalSpec, playerMelee, bumpAttack, combatLine, thrownSpec, GEAR as COMBAT_GEAR } from "../../src/combat.js";
 import { guardianThink } from "../../src/guardians.js";
 import { pushPlayerOut, killMonster } from "../../src/monsters.js";
 import { killXp, offerPowers, takePerk } from "../../src/leveling.js";
@@ -69,7 +69,7 @@ import { setMode } from "../../src/screens.js";
 import { updateCreatures, recruit, AI_RULES } from "../../src/ai.js";
 import { registerFaction, FACTIONS } from "../../src/factions.js";
 import { registerAbility, ABILITIES } from "../../src/abilities.js";
-import { addStatus, hasStatus, tickStatuses } from "../../src/status.js";
+import { addStatus, hasStatus, tickStatuses, statusFlag } from "../../src/status.js";
 import { snapshotZone } from "../../src/save/codec.js";
 import { memoryAdapter } from "../../src/save/store.js";
 import { saveGame, whenWritten } from "../../src/save/save.js";
@@ -1645,7 +1645,7 @@ function wearTypical(p, build, level) {
   for (const [slot, it] of Object.entries(kit.armour)) p.body.equip[p.body.parts.find((q) => q.type === slot).id] = { ...it, known: true };
   invalidateStats(p);
 }
-export function typicalBuilds(game) {
+export function typicalBuilds(game, pref = TYPICAL_PREF) {
   const p = game.player, out = [], last = BANDS[BANDS.length - 1].level;
   for (const bgId of TYPICAL_BGS) for (const seed of TYPICAL_SEEDS) {
     const bg = BACKGROUNDS[bgId], snaps = {}, keepSeed = game.seed;
@@ -1659,7 +1659,7 @@ export function typicalBuilds(game) {
         p.level = level;
         invalidateStats(p);
         const offers = offerPowers(game, p, { level });
-        const pick = TYPICAL_PREF.find((k) => offers.includes(k)) || offers[0];
+        const pick = pref.find((k) => offers.includes(k)) || offers[0];
         if (pick) takePerk(game, pick);
         if (level % RULES.progression.level.attrPointEvery === 0) p.attrs[point++ % 2 ? "agi" : "str"]++;
         invalidateStats(p);
@@ -1714,7 +1714,9 @@ function blowsToKill(dmgs, hp, low = null, lowBelow = 0) {
   }
   return E[hp];
 }
-export function ttkTables(ctx, { blows = 1500, typicalBlows = 40 } = {}) {
+// pref: the typical build's preference (the default TYPICAL_PREF); typicalOnly: only the typical rows, with no bounds
+// held (B1's measurement of the powers' worth, 2026-10-30).
+export function ttkTables(ctx, { blows = 1500, typicalBlows = 40, pref = TYPICAL_PREF, typicalOnly = false } = {}) {
   const { game, seedRandom, restoreRandom } = ctx;
   const problems = [], stats = {};
   const expect = (ok, m) => { if (!ok) problems.push(m); return ok; };
@@ -1726,13 +1728,13 @@ export function ttkTables(ctx, { blows = 1500, typicalBlows = 40 } = {}) {
   const saved = { attrs: { ...p.attrs }, level: p.level, body: p.body, perks: p.perks, perkRank: p.perkRank, maxHpGain: p.maxHpGain, mutations: p.mutations,
                   background: p.background, genotype: p.genotype, trees: p.trees };
   const table = {};
-  const sets = [["d20", "attributes"], ["legacy", "legacy"], ["d20", "attributes", "powers"], ["d20", "attributes", "mutations"], ["d20", "attributes", "real"],
-                ["d20", "attributes", "typical"]];
+  const sets = typicalOnly ? [["d20", "attributes", "typical"]] : [["d20", "attributes"], ["legacy", "legacy"], ["d20", "attributes", "powers"], ["d20", "attributes", "mutations"],
+                ["d20", "attributes", "real"], ["d20", "attributes", "typical"]];
   // The typical build's row at a band: each build against the real world's kinds of the band, typicalBlows a side
   // (the blows to kill from their spread: blowsToKill), the means over the builds; the worst kind by its mean cost.
   let builds = null;
   const typicalRow = (tier, level) => {
-    builds ||= typicalBuilds(game);
+    builds ||= typicalBuilds(game, pref);
     const counts = realBand(game, tier, level), kinds = {}, rs = [];
     game.combatRng = makeRng(level * 97 + 3);
     for (const b of builds) {
@@ -1740,14 +1742,28 @@ export function ttkTables(ctx, { blows = 1500, typicalBlows = 40 } = {}) {
       const hpMax = maxHp(p), swing = attackTime(p), regenHps = bonus(p, "regen") / 12, r = { you: 0, it: 0, cost: 0 };
       const exec = hasKey(p.perks, "executioner");
       for (const [type, n] of Object.entries(counts)) {
+        wearTypical(p, b, level);   // (fresh for each kind: a chip or a snap from the last fight doesn't carry over; B1)
         const T = CREATURE_TYPES[type], c = addCreature(z, spawnCreature(type, 5, 5, FLOOR_Z, { rng: () => 0.5, level, state: "chase" }));
         const itsHp = c.maxHp, yours = [], theirs = [], low = exec ? [] : null;
         c.hp = c.maxHp = 1e12; c.cd = Infinity;
+        c.status.pinned = { t: Infinity, mag: 1, src: null, acc: 0 };   // (held where it stands: a great blade's knockback would walk it off; B1)
+        // What the powers do in the fight (B1, the user's "measure, then decide", 2026-10-30): after each of your blows
+        // its statuses run for your swing's time, so a bleed's ticks count as your damage and a daze or a disarm lasts as
+        // long as it should; its blow while dazed is lost (and its DV is 0 meanwhile, combat.js dvOf); a disarmed one's
+        // is halved (combat.js); a long blade's Riposte parries the share of its blows your swings fall within 0.2 s of
+        // (0.2 ÷ your swing time). Cleave, High ground and Dark backstab show nothing against one creature on flat ground
+        // with your torch lit, which this model is.
+        const parry = weaponSpec(p).cls === "longBlade" && hasKey(p.perks, "riposte") ? Math.min(1, COMBAT_GEAR.riposteWindow / swing) : 0;
         for (let k = 0; k < typicalBlows; k++) {
-          yours.push(resolveAttack(game, p, c, weaponSpec(p), { view: "map" }).dmg);
+          let dealt = resolveAttack(game, p, c, weaponSpec(p), { view: "map" }).dmg;
           if (low) { const h = c.hp; c.hp = 1e11; low.push(resolveAttack(game, p, c, weaponSpec(p), { view: "map" }).dmg); c.hp = h; }
+          const h0 = c.hp;
+          tickStatuses(game, c, swing);
+          dealt += h0 - c.hp;
+          yours.push(dealt);
           p.hp = 1e9;
-          theirs.push(resolveAttack(game, c, p, naturalSpec(c)).dmg);
+          const lost = statusFlag(c, "noAct") || (parry > 0 && game.combatRng() < parry);
+          theirs.push(lost ? 0 : resolveAttack(game, c, p, naturalSpec(c)).dmg);
         }
         game.effects.length = 0; run.logged.length = 0;
         z.creatures.splice(z.creatures.indexOf(c), 1);
@@ -1801,6 +1817,7 @@ export function ttkTables(ctx, { blows = 1500, typicalBlows = 40 } = {}) {
           const c = addCreature(z, spawnCreature(type, 5, 5, FLOOR_Z, { rng: () => 0.5, level, state: "chase" }));
           const itsHp = c.maxHp, T = CREATURE_TYPES[type];
           c.hp = c.maxHp = 1e12; c.cd = Infinity;
+          c.status.pinned = { t: Infinity, mag: 1, src: null, acc: 0 };   // (held where it stands, as above; B1)
           const yours = [], theirs = [];
           let thorns = 0;
           for (let b = 0; b < blows; b++) {
@@ -1831,6 +1848,7 @@ export function ttkTables(ctx, { blows = 1500, typicalBlows = 40 } = {}) {
       while (undo.length) undo.pop()();
       table[build || combat] = rows;
     }
+    if (typicalOnly) { stats.typical = table.typical.map((r) => r.costPct); return resultOf("combat: the typical build's cost a kill (measured)", [], stats); }
     // The bounds hold the typical build against the real world's creatures (the balance decision of 2026-10-30): you
     // win a fight with a creature of your level at every band, in a sane time; the first four tiers stay near the
     // parent game's numbers; tiers 5-8 cost 25-38% of your health a kill, ±3 (the parent's 25-35%). The plain fighter's
