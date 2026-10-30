@@ -2059,6 +2059,26 @@ export async function run(env) {
     events.emit(game, "zone:enter", { zone: game.zone, how: "walk" });
     if (known() !== g0 + 1) fail("Gossip told twice in one village");
     game.zone.siteId = keep;
+    // The Chime (review 5): a neutral creature recruited by EGO against WIL, one at a time, a sermon a day; kept through a save.
+    {
+      setup(); setEgo(30); keyset.addKey(p().perks, "chime");
+      const abil = await m("abilities.js"), codec = await m("save/codec.js");
+      if (!abil.abilitiesOf(p()).some((a) => a.id === "chime")) fail("the Chime gives no ability");
+      const a1 = mob("drovers", "neutral", { x: Math.floor(p().x) + 2, y: Math.floor(p().y) }), a2 = mob("drovers", "neutral", { x: Math.floor(p().x) + 3, y: Math.floor(p().y) });
+      for (const c of [a1, a2]) { delete c.attrs; creatures.addCreature(game.zone, c); }
+      abil.activate(game, p(), "chime", { creature: a1 });
+      const back = codec.rebuildCreature(JSON.parse(JSON.stringify(codec.trimCreature(a1))), game.zone);
+      if (a1.brain?.leader !== "player" || !back.chimed || back.chimedAt !== a1.chimedAt) fail(`the Chime: ${JSON.stringify({ l: a1.brain?.leader, saved: { c: back.chimed, at: back.chimedAt } })}`);
+      status.clearCooldown(p(), "chime");
+      if (abil.activate(game, p(), "chime", { creature: a1 })) fail("a second sermon to the same one the same day");
+      status.clearCooldown(p(), "chime");
+      abil.activate(game, p(), "chime", { creature: a2 });
+      if (a2.brain?.leader !== "player" || a1.brain?.leader === "player") fail("the Chime keeps two followers at once");
+      const hostile = mob(null, null, { x: Math.floor(p().x) + 1, y: Math.floor(p().y) + 1 }); creatures.addCreature(game.zone, hostile);
+      status.clearCooldown(p(), "chime");
+      if (abil.activate(game, p(), "chime", { creature: hostile })) fail("the Chime recruited a monster out for you");
+      setEgo(16);
+    }
     out.lore = `Hour script one more account; Triangulator ${doubled} XP for ${plain}; Gossip one rumour a village`;
     stats.b3 = out;
   }

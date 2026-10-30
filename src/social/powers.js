@@ -12,6 +12,7 @@ import { hashInt } from "../rng.js";
 import { hasKey } from "../keyset.js";
 import * as ai from "../ai.js";
 import { lightPuddle } from "./liquids.js";
+import { registerCreatureField } from "../save/codec.js";
 
 export const OIL_FIRE = { reach: 4 };
 on("inspect", (game, ev) => {
@@ -43,3 +44,6 @@ registerAbility("chime", {
     return true;
   },
 });
+// (kept through a save: one chimed follower at a time, and a sermon a creature a world day, after a reload too)
+registerCreatureField("chimed");
+registerCreatureField("chimedAt");
