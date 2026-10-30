@@ -59,7 +59,7 @@ export const PEOPLE_WORDS = {
   quintVey: { role: "villager", greet: "Stand where you are. Thank you. You were the only thing in the room not level.",
     who: "Teodor Quint-Vey, Surveyor-General. I measure the noon Hand, and lately it measures back.",
     topics: [["The Hand?", "The Gnomon's noon shadow. It was fifteen and a half spans when I was a boy. I have the figures, and the figures are not happy."]],
-    after: { beat2: "A finger's width. I've written it down four times and it stays a finger's width.", beat9: "The Mark stands. So do we, mostly. Thank you." } },
+    after: { beat2: "A finger's width. I've written it down four times and it stays a finger's width.", beat9: "It's over, one way or the other. I've written down which, and I'm not reading it twice." } },
   saaraTovi: { role: "merchant", greet: "Don't touch the theodolite. Touch anything else, I'll charge you for that too.",
     who: "Saara Tovi, instrument-master. I keep the station's eyes clean." },
   benchmarkLeech: { role: "priest", greet: "Sit. Bleed there, not on the plans.",
