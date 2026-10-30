@@ -243,11 +243,13 @@ registerAbility("dialSpine", {
 
 // --- The balm pump (B1, C4 #14; bible §13.6 "a balm below 40% HP") -------------------------------------------------
 // When a blow leaves you under BALM_PUMP_AT of your health it injects a balm tonic from your pack (takeOne, then
-// content/items/tonics.js injectTonic: the TOU save if another tonic still works), unless a balm already works.
+// content/items/tonics.js injectTonic: the TOU save if another tonic still works), unless a balm already works or the
+// balm sickness (tonic:sick) would waste it.
 export const BALM_PUMP_AT = 0.4;
 on("hurt", (game, { tgt }) => {
   const p = game.player;
-  if (tgt !== p || !(p.hp > 0) || p.hp >= BALM_PUMP_AT * maxHp(p) || !implantEffect(p, "balmPump") || p.status?.["tonic:balm"]) return;
+  // (not while a balm works, nor while an overdone balm's sickness stops balms: it would waste them; verification finding)
+  if (tgt !== p || !(p.hp > 0) || p.hp >= BALM_PUMP_AT * maxHp(p) || !implantEffect(p, "balmPump") || p.status?.["tonic:balm"] || p.status?.["tonic:sick"]) return;
   const balm = (p.inv || []).find((s) => s.kind === "tonic" && s.effect === "balm");
   if (!balm) return;
   takeOne(p, balm);

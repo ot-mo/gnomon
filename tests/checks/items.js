@@ -1766,7 +1766,9 @@ export function checkB1Gear(m) {
       return p.inv.find((s) => s.kind === "tonic")?.count ?? 0;
     };
     const used = pump(0.3, true), above = pump(0.5, true), none = pump(0.3, false), busy = pump(0.3, true, true);
-    if (used !== 1 || above !== 2 || none !== 2 || busy !== 2) fail(`the balm pump: at 30% ${2 - used} used (want 1), at 50% ${2 - above}, without it ${2 - none}, a balm working ${2 - busy}`);
+    const sickPump = (() => { reset(); p.hp = Math.floor(m.stats.maxHp(p) * 0.3); p.body.implants.back = { kind: "implant", id: "balmPump" }; S.addStatus(game, p, "tonic:sick", { t: 30 });
+      p.inv = p.inv.filter((s) => s.kind !== "tonic"); p.inv.push({ kind: "tonic", effect: "balm", count: 2 }); E.emit(game, "hurt", { tgt: p, src: null, dmg: 1 }); return p.inv.find((s) => s.kind === "tonic")?.count ?? 0; })();
+    if (used !== 1 || above !== 2 || none !== 2 || busy !== 2 || sickPump !== 2) fail(`the balm pump: at 30% ${2 - used} used (want 1), at 50% ${2 - above}, without it ${2 - none}, a balm working ${2 - busy}, balm-sick ${2 - sickPump}`);
     reset(); p.hp = Math.floor(m.stats.maxHp(p) * 0.3); p.body.implants.back = { kind: "implant", id: "balmPump" };
     p.inv.push({ kind: "tonic", effect: "balm", count: 1 }); E.emit(game, "hurt", { tgt: p, src: null, dmg: 1 });
     if (!S.hasStatus(p, "tonic:balm")) fail("the balm pump's balm doesn't work");
