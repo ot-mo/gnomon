@@ -24,7 +24,7 @@ import { pushMode, popMode } from "./screens.js";
 import { emit } from "./events.js";
 import { UI, hit, at, hitLabel, list, listKey, listWheel, tabs, tabsKey, wrap } from "./ui.js";
 import { WEAPONS, ARMOURS, ELEMENTS, ITEM_KINDS, itemName, itemInfo, itemGlyph, itemAura, itemWeight, makeItem, isGear, strNeeded, takeOne,
-  registerItemAction, useItem, canUse, RELIC_COLOR } from "./items.js";
+  registerItemAction, useItem, canUse, RELIC_COLOR, mendItem } from "./items.js";
 import { drinkPotion, readScroll } from "./effects.js";
 import { RULES } from "./rules.js";
 import { armourValue, bonus, weaponReach } from "./player.js";
@@ -194,6 +194,7 @@ export function equip(game, it, index, part = defaultPart(game.player, it)) {
   if (!check.ok) {
     if (check.reason === "weak") game.log(`You're not strong enough for the ${itemName(game, it)} (needs ${check.need} STR, you have ${attr(p, "str")}).`, BAD);
     else if (check.reason === "cursed") game.log(`Your cursed ${itemName(game, check.item)} won't come off! A scroll of remove curse would help.`, CURSE);
+    else if (check.reason === "broken") return mendItem(game, p, it) > 0;   // (B1: the Repair power mends it; else it says so)
     else game.log(`You have nowhere to put the ${itemName(game, it)}.`, DIM);
     return false;
   }

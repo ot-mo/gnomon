@@ -23,18 +23,15 @@
 //     strReq   pleatmetal's −3 STR requirement (items.js strNeeded doesn't read it yet: docs/c4.md)
 //     needs    the rest of the bible's line, for the code that will do it (docs/c4.md, integration requests)
 export const MATERIALS = {
-  bone:       { name: "bone",       tier: 1, dmg: -1, av: 0, value: 0.5, color: [222, 212, 182], info: "cheap and light",
-                needs: "1 hit in 50 snaps it (combat.js)" },
+  bone:       { name: "bone",       tier: 1, dmg: -1, av: 0, value: 0.5, color: [222, 212, 182], info: "cheap and light; 1 hit in 50 snaps it" },
   copper:     { name: "copper",     tier: 2, dmg: 0,  av: 0, value: 1,   color: [205, 125, 75],  info: "soft and green" },
   iron:       { name: "iron",       tier: 3, dmg: 1,  av: 0, value: 1.5, color: [150, 154, 168], info: "plain iron, honest and heavy",
                 needs: "rusts in brine (-1) unless lacquered (liquids: brine touch)" },
   saltsteel:  { name: "saltsteel",  tier: 4, dmg: 2,  av: 1, value: 2,   color: [188, 206, 212], info: "brine-tempered by the Drovers; it never rusts" },
-  blackglass: { name: "blackglass", tier: 5, dmg: 3,  av: 1, value: 3,   color: [78, 70, 98],    info: "a Glass Sea razor",
-                needs: "a crit against armour 4 or more chips it (-1) (combat.js)" },
-  truesteel:  { name: "truesteel",  tier: 6, dmg: 4,  av: 2, value: 4,   color: [214, 224, 240], info: "Deepwright alloy; it never bends",
-                needs: "ignores 1 point of armour (combat.js soak)" },
-  pleatmetal: { name: "pleatmetal", tier: 7, dmg: 5,  av: 2, value: 5.5, color: [176, 146, 206], info: "folded a thousand times", strReq: -3,
-                needs: "-3 STR requirement (items.js strNeeded reads strReq); draws as a hairline on the map (renderMap.js)" },
+  blackglass: { name: "blackglass", tier: 5, dmg: 3,  av: 1, value: 3,   color: [78, 70, 98],    info: "a Glass Sea razor; a crit on armour 4 or more chips it" },
+  truesteel:  { name: "truesteel",  tier: 6, dmg: 4,  av: 2, value: 4,   color: [214, 224, 240], info: "Deepwright alloy; it ignores a point of armour" },
+  pleatmetal: { name: "pleatmetal", tier: 7, dmg: 5,  av: 2, value: 5.5, color: [176, 146, 206], info: "folded a thousand times; -3 STR needed", strReq: -3,
+                needs: "draws as a hairline on the map (renderMap.js)" },
   noonsilver: { name: "noonsilver", tier: 8, dmg: 6,  av: 3, value: 7.5, color: [255, 244, 206], info: "it casts no shadow",
                 weaponInfo: "it cuts flat beings in 3D", bonus: { cutsFlat: 1 },
                 needs: "glows at noon (hud.js, render3d.js); a noonsilver bolt cutting flat beings too (combat.js passes `blade` for melee only)" },
@@ -51,13 +48,14 @@ export const FORGED = { missile: ["boltBow"], armour: ["chain", "scale", "plate"
 // CLASSES[id] = { name, info?, needs }: a class's identity. info: what the game does now (the item's line shows it);
 // needs: the rest, for the code (docs/c4.md). CLASS_OF maps every WEAPONS id to its class, the parent's too.
 export const CLASSES = {
-  shortBlade: { name: "short blade", info: "the fastest swing", needs: "bleeds; x2 backstab from the dark (combat.js, a bleeding status)" },
-  longBlade:  { name: "long blade", needs: "parry: strike in the 0.2 s before an enemy's blow lands and it is cancelled (combat.js)" },
-  cudgel:     { name: "cudgel", needs: "dazes for 1 s; smashes crates and cracked walls (combat.js, interact.js)" },
-  axe:        { name: "axe", needs: "cleaves a second adjacent enemy for half; disarms people (combat.js)" },
-  polearm:    { name: "polearm", info: "a long reach", needs: "+50% from a ledge above; holds chargers off (combat.js, ai.js)" },
-  greatBlade: { name: "great blade", info: "slow and heavy", needs: "knocks the target back 1 tile: off ledges, into chasms (combat.js)" },
-  flail:      { name: "lantern-flail", needs: "is your torch; double damage to shades and ghosts; each swing sweeps light around you; useless with the torch out (torch.js, combat.js, light.js)" },
+  // (B1: combat.js builds each class's blows; the powers named in brackets open the rest, bible §10.8)
+  shortBlade: { name: "short blade", info: "the fastest swing; x2 on the unaware from the dark (Bleed: crits bleed)" },
+  longBlade:  { name: "long blade", info: "Riposte: strike in the 0.2 s before a blow lands and it is cancelled" },
+  cudgel:     { name: "cudgel", info: "Daze: dazes for 1 s", needs: "smashes crates and cracked walls (Wallbreaker: interact.js, WS10's crates and cracked walls)" },
+  axe:        { name: "axe", info: "Cleave: half a blow to a second foe; Disarm: armed foes drop their weapon" },
+  polearm:    { name: "polearm", info: "a long reach; High ground: +50% from a ledge above", needs: "holds chargers off (Brace: ai.js, C3's chargers)" },
+  greatBlade: { name: "great blade", info: "slow and heavy; knocks the target back a tile" },
+  flail:      { name: "lantern-flail", info: "x2 against shades and ghosts; useless with the torch out", needs: "is your torch; each swing sweeps light around you (torch.js, light.js, render3d.js)" },
 };
 export const CLASS_OF = {
   dagger: "shortBlade", stylus: "shortBlade", shortsword: "longBlade", longsword: "longBlade", mace: "cudgel", maul: "cudgel",
@@ -128,8 +126,8 @@ export const GEAR_ARMOURS = {
   hourMask:      { name: "Hour mask", armour: 0, str: 0, tier: 4, metal: false, slot: "face", wornRep: "hour", hourRep: 200,
                    info: "+200 with its Hour's favoured factions, -200 with its hated ones while you wear it" },
   // Body
-  glassScale:    { name: "glass-scale", armour: 3, str: 14, tier: 5, metal: false, slot: "body", bonus: { ward: 1 }, info: "missiles do 1 less",
-                   needs: "reflects 15% of missiles (missiles.js)" },
+  glassScale:    { name: "glass-scale", armour: 3, str: 14, tier: 5, metal: false, slot: "body", bonus: { ward: 1 }, reflect: 0.15,
+                   info: "turns 15% of arrows and bolts aside; the rest do 1 less" },   // (reflect: combat.js turnedAside, B1)
   pleatedCoat:   { name: "pleated coat", armour: 2, str: 10, tier: 7, metal: true, slot: "body", bonus: { dv: 1 } },
   // Back
   reedCloak:     { name: "reed cloak", armour: 0, str: 0, tier: 1, metal: false, slot: "back", bonus: { stealth: 0.1 } },
@@ -145,7 +143,7 @@ export const GEAR_ARMOURS = {
                    needs: "allies +1 damage while you carry it (combat.js, followers)" },
   // Arms
   buckler:       { name: "buckler", armour: 0, str: 9, tier: 2, metal: true, slot: "arm", block: 0.2,
-                   needs: "blocks 20% of blows (combat.js)" },
+                   info: "takes a fifth of the blows that would land on you" },   // (block: combat.js turnedAside, B1)
   climbingHooks: { name: "climbing hooks", armour: 0, str: 0, tier: 2, metal: true, slot: "arm", climb: 2,
                    needs: "climb 2 blocks on the map, grab walls in 3D (turns.js, player.js)" },
   // Hands

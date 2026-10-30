@@ -21,6 +21,7 @@
 import { sfx } from "./sfx.js";
 import { emit } from "./events.js";
 import { seededSort } from "./rng.js";
+import { hasKey } from "./keyset.js";
 import { RULES } from "./rules.js";
 import { POTIONS, SCROLLS, SYLLABLES, ELEMENTS, WEAPONS, ARMOURS, PROPERTIES, RINGS, AMULETS, RELICS, RELIC_COLOR } from "./content/items/legacy.js";
 import { MATERIALS } from "./content/items/forge.js";
@@ -89,6 +90,24 @@ export function strNeeded(it) {
   const base = (it.kind === "weapon" ? WEAPONS : ARMOURS)[it.id].str;
   // (B1, C4 #4: a material's own, pleatmetal's -3)
   return Math.max(0, base + (MATERIALS[it.made]?.strReq || 0) + (it.props || []).reduce((s, k) => s + (PROPERTIES[k].strReq || 0), 0));
+}
+
+// The Repair power (B1, bible §10.8 Artificing): E on a broken thing mends it, a snapped bone weapon or a broken
+// artifact (and a chipped blackglass blade's edge with it). Without the power it says what would.
+//   mendItem(game, e, it) → seconds (0: nothing done)
+export const MEND_TIME = 10;
+export function mendItem(game, e, it) {
+  const chipped = it?.made && it.chips > 0;
+  if (!it || (!it.broken && !chipped)) return 0;
+  const name = itemName(game, it);
+  if (!hasKey(e.perks, "repair")) {
+    if (e === game.player) game.log(`The ${name} needs mending first (the Repair power).`, [170, 170, 170]);
+    return 0;
+  }
+  it.broken = false;
+  if (chipped) { it.material = MATERIALS[it.made].dmg; it.chips = 0; }
+  if (e === game.player) game.log(`You mend the ${itemName(game, it)}.`, [200, 220, 200]);
+  return MEND_TIME;
 }
 
 // --- How things look lying on the floor ---------------------------------------

@@ -22,7 +22,7 @@
 // Kinds: `artifact` { kind, id, known, cell, on?, mark?, broken? } and `cell` { kind, id, charge }.
 import { ARTIFACTS, CELLS } from "../content/items/artifacts.js";
 import { IMPLANTS } from "../content/items/implants.js";
-import { registerItemKind, takeOne, addToInventory } from "../items.js";
+import { registerItemKind, takeOne, addToInventory, mendItem } from "../items.js";
 import { carried } from "../body.js";
 import { bonus, invalidateStats, examineScore } from "../stats.js";
 import { addStatus, removeStatus, hasStatus, registerStatus } from "../status.js";
@@ -37,6 +37,7 @@ import { zoneIsLightless } from "../light.js";
 import { KIND, FLOOR_Z } from "../world.js";
 import { on } from "../events.js";
 import { implantEffect } from "./implants.js";
+import { hasKey } from "../keyset.js";
 
 export const EXAMINE_TIME = 10;      // seconds a try at identifying takes (on the map: game time)
 export const USE_TIME = 1;           // a use, on the map
@@ -176,6 +177,7 @@ export function chargeText(game, cell) {
 // --- Using one ---------------------------------------------------------------------------------------
 export function useArtifact(game, p, it) {
   const def = ARTIFACTS[it.id];
+  if (it.broken && hasKey(p.perks, "repair")) return mendItem(game, p, it);   // (the Repair power, B1)
   if (it.broken) { game.log(`The ${artifactName(it)} is broken. A tinker might give you a glim or two for it.`, [170, 170, 170]); return 0; }
   if (it.known !== true) {
     const r = examineArtifact(game, p, it);

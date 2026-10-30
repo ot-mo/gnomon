@@ -7,7 +7,7 @@
 //   defaultPart(e, item) → partId | null     where E in the inventory puts it: the primary hand for weapons, else the
 //                                            first part of its type (one ring at a time "as in the existing game",
 //                                            bible §13.3; the second finger takes one only when asked by part id)
-//   canEquip(game, e, item, partId) → { ok, reason, item?, need? }   reason: "part" | "slot" | "weak" | "cursed"
+//   canEquip(game, e, item, partId) → { ok, reason, item?, need? }   reason: "part" | "slot" | "weak" | "cursed" | "broken"
 //   equip(game, e, item, partId) → { ok, removed: [], time, reason }   what it pushed off is the caller's to put away
 //   unequip(game, e, partId) → { ok, item, reason }                  cursed things stick (reason "cursed")
 //   worn(e) → item[]                          equipped items and implants, each once (bonus() sees implants too)
@@ -136,6 +136,7 @@ export function canEquip(game, e, it, partId = defaultPart(e, it)) {
   if (!part) return { ok: false, reason: "part" };
   if (slotType(it) !== part.type) return { ok: false, reason: "slot" };
   if (held(e, partId) !== it && worn(e).includes(it)) return { ok: false, reason: "worn" };   // one item, one place (else its bonuses count twice)
+  if (it.broken) return { ok: false, reason: "broken" };   // (a snapped bone weapon, B1: mended first, items.js mendItem)
   const ids = partsTaken(e, it, partId);
   if (!ids) return { ok: false, reason: "slot" };   // two-handed, one hand
   const need = ITEM_KINDS[it.kind]?.req?.(it)?.str;

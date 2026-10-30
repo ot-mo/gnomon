@@ -78,6 +78,8 @@ import { fire, fireAt, readyLauncher, missileSpec } from "../../src/missiles.js"
 import { requestTarget, cursorTarget, lineOfFire, targetText } from "../../src/screens/target.js";
 import { mapView } from "../../src/renderMap.js";
 import { MISSILES } from "../../src/content/items/missiles.js";
+import { canEquip } from "../../src/body.js";
+import { itemName, mendItem } from "../../src/items.js";
 import { EYE, FISTS, attackTime } from "../../src/player.js";
 import { compileWorld } from "../../src/world/worldmodel.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
@@ -1864,6 +1866,239 @@ export function ttkTables(ctx, { blows = 1500, typicalBlows = 40 } = {}) {
   return resultOf("combat: time to kill by level band (WS8)", problems, stats);
 }
 
+// =============================================================================================================
+// B1: the real world's gear in a fight (C4 #4, #5, #6 and the powers that go with them), under d20.
+// =============================================================================================================
+// checkB1Combat(ctx) → { name: "combat: B1's gear", … }: each blow with a fixed die (ctx.rng a constant, or a seeded
+// stream for the shares), against a dummy that can't die:
+//   materials   truesteel's soak 0..AV−1; blackglass chips on a crit against AV 4 (and not AV 3, not without a crit);
+//               bone snaps 1 hit in 50 (the share over 4,000 hits), into the pack broken, not to be held, mended by
+//               Repair only; pleatmetal −3 STR needed
+//   classes     the short blade ×2 from the dark on the unaware (not lit, not on a hunter; any blade with Dark
+//               backstab); the great blade's knockback (a tile back; not into a wall, not when pinned); the lantern-
+//               flail ×2 on a shade, 1 with the torch out
+//   powers      Bleed (a short blade's crit, 3 s at 1 a second; not a long blade's), Daze (a cudgel, a quarter of the
+//               blows), Cleave (an axe: half the blow to the nearest other hostile), Disarm (an axe on an armed kind, a
+//               fifth; its blows halved), High ground (a polearm from a block up: ×1.5), Riposte (a long blade at a foe
+//               within 0.2 s of its blow: its cooldown starts again; not at 0.5 s); none without its power or class
+//   armour      the buckler blocks a fifth of the blows on you; the glass-scale turns 15% of arrows, a raised mirror
+//               shield half, both 57.5%; melee blows aren't turned by either
+export function checkB1Combat(ctx) {
+  const { game } = ctx;
+  const problems = [], stats = {};
+  const expect = (ok, m) => { if (!ok) problems.push(m); return ok; };
+  const run = fresh(ctx, 91);
+  const p = game.player;
+  const field = arena("b1-gear");
+  enterZone(game, field, { how: "start" });
+  Object.assign(p, { x: 5.5, y: 5.5, z: FLOOR_Z, yaw: 0, pitch: 0, attackCd: 0 });
+  p.torch = true; p.attrs.str = 20; p.attrs.agi = 14; p.perks = {}; invalidateStats(p);
+  const wield = (id, made = "copper") => { const it = makeGear("weapon", id, made); p.body.equip.hand_r = it; p.body.equip.hand_l = WEAPONS[id].hands === 2 ? "hand_r" : null; invalidateStats(p); return it; };
+  const perk = (...ids) => { p.perks = Object.fromEntries(ids.map((k) => [k, 1])); invalidateStats(p); };
+  const fixed = (v) => () => v;
+  const hit = (tgt, rng = fixed(0.6), view = "map") => resolveAttack(game, p, tgt, weaponSpec(p), { view, rng });
+  const at = (type, x, y, level = 5, state = "chase") => dummy(field, type, x, y, level, state);
+  const clear = () => { field.creatures.length = 0; };
+  const log = run.logged;
+  try {
+    // --- Materials ---------------------------------------------------------------------------------------------
+    clear();
+    const tank = at("goblin", 6, 5); tank.armour = 4;
+    const meanSoak = (made) => { wield("longsword", made); let s = 0, n = 0; for (let k = 0, rng = makeRng(5); k < 4000; k++) { const r = hit(tank, rng); if (r.hit) { s += r.soaked; n++; } } return s / n; };
+    const soakT = meanSoak("truesteel"), soakI = meanSoak("iron");
+    expect(Math.abs(soakI - 2) < 0.12 && Math.abs(soakT - 1.5) < 0.12,
+      `truesteel against AV 4: mean soak ${soakT.toFixed(2)} (want about 1.5: 0..3), iron ${soakI.toFixed(2)} (about 2: 0..4)`);
+    stats.truesteel = `mean soak against AV 4: truesteel ${soakT.toFixed(2)}, iron ${soakI.toFixed(2)}`;
+    const glass = wield("dagger", "blackglass");
+    hit(tank, fixed(0.6));
+    expect(glass.material === 3, `blackglass without a crit chipped to ${glass.material}`);
+    hit(tank, fixed(0.99));   // a natural 20: a crit
+    expect(glass.material === 2 && glass.chips === 1 && /^chipped /.test(itemName(game, glass)), `blackglass crit on AV 4: material ${glass.material}, chips ${glass.chips}, named "${itemName(game, glass)}"`);
+    tank.armour = 3;
+    hit(tank, fixed(0.99));
+    expect(glass.material === 2, `blackglass crit on AV 3 chipped it to ${glass.material}`);
+    tank.armour = 0;
+    // Bone: 1 in 50.
+    clear();
+    const foe = at("goblin", 6, 5);
+    let snaps = 0, landed = 0;
+    const bs = makeRng(77);
+    for (let k = 0; k < 6000; k++) {
+      const it = wield("dagger", "bone");
+      const r = hit(foe, bs);
+      if (!r.hit || r.dmg <= 0) continue;
+      landed++;
+      if (it.broken) { snaps++; if (p.body.equip.hand_r === it || !p.inv.includes(it)) { expect(false, "a snapped bone dagger stayed in hand or missed the pack"); break; } p.inv.splice(p.inv.indexOf(it), 1); }
+    }
+    expect(Math.abs(snaps / landed - 0.02) < 0.007, `bone snapped ${snaps} times in ${landed} hits (want 1 in 50)`);
+    const snapped = wield("dagger", "bone"); p.body.equip.hand_r = null; snapped.broken = true; p.inv.push(snapped);
+    expect(canEquip(game, p, snapped, "hand_r").reason === "broken", "a snapped dagger can be held");
+    expect(mendItem(game, p, snapped) === 0 && snapped.broken, "a snapped dagger mended without Repair");
+    perk("repair");
+    expect(mendItem(game, p, snapped) > 0 && !snapped.broken && canEquip(game, p, snapped, "hand_r").ok, "Repair didn't mend the snapped dagger");
+    glass.chips = 1; glass.material = 2;
+    mendItem(game, p, glass);
+    expect(glass.material === 3 && !glass.chips, `Repair left the chipped blackglass at ${glass.material}`);
+    perk();
+    stats.bone = `${snaps} snaps in ${landed} hits (${(100 * snaps / landed).toFixed(2)}%)`;
+    expect(strNeeded(makeGear("weapon", "glaive", "pleatmetal")) === WEAPONS.glaive.str - 3 && strNeeded(makeGear("weapon", "glaive", "iron")) === WEAPONS.glaive.str,
+      `pleatmetal's STR needed: ${strNeeded(makeGear("weapon", "glaive", "pleatmetal"))} against ${WEAPONS.glaive.str}`);
+
+    // --- Classes ----------------------------------------------------------------------------------------------
+    clear();
+    const sleeper = at("goblin", 6, 5, 5, "idle"), hunter = at("goblin", 5, 6, 5, "chase");
+    const dmgOf = (tgt) => { if (tgt.dummyState) tgt.state = tgt.dummyState; return hit(tgt, fixed(0.6)).dmg; };   // (a blow sets it hunting)
+    sleeper.dummyState = "idle"; hunter.dummyState = "chase";
+    wield("dagger");
+    const lit = dmgOf(sleeper);
+    p.torch = false;
+    const dark = dmgOf(sleeper), darkHunter = dmgOf(hunter);
+    wield("longsword");
+    const swordDark = dmgOf(sleeper);
+    perk("darkBackstab");
+    const swordStab = dmgOf(sleeper);
+    perk(); p.torch = true;
+    const swordLit = dmgOf(sleeper);
+    expect(dark === 2 * lit && darkHunter === lit && swordDark === swordLit && swordStab === 2 * swordLit,
+      `from the dark: a dagger ${lit} lit, ${dark} dark on the unaware, ${darkHunter} on a hunter; a longsword ${swordLit} lit, ${swordDark} dark, ${swordStab} with Dark backstab`);
+    stats.backstab = `dagger ${lit} → ${dark} from the dark; longsword ${swordLit} → ${swordStab} with Dark backstab`;
+    // The great blade's knockback.
+    clear();
+    const shoved = at("goblin", 6, 5); shoved.status = {};
+    wield("greatsword");
+    hit(shoved);
+    expect(Math.floor(shoved.x) === 7 && Math.floor(shoved.y) === 5, `a greatsword's blow left the goblin at ${shoved.x}, ${shoved.y} (want a tile back, 7.5, 5.5)`);
+    field.set(8, 5, FLOOR_Z, B.STONE); field.set(8, 5, FLOOR_Z + 1, B.STONE); field.refresh();
+    Object.assign(p, { x: 6.5 });
+    hit(shoved);
+    expect(Math.floor(shoved.x) === 7, `knocked into a wall the goblin moved to ${shoved.x}`);
+    field.set(8, 5, FLOOR_Z, B.AIR); field.set(8, 5, FLOOR_Z + 1, B.AIR); field.refresh();
+    const pinned = at("goblin", 5, 6);
+    Object.assign(p, { x: 5.5 });
+    hit(pinned);
+    expect(Math.floor(pinned.y) === 6, "a pinned goblin was knocked back");
+    wield("longsword"); Object.assign(shoved, { x: 6.5, y: 5.5, tx: 6, ty: 5 });
+    hit(shoved);
+    expect(Math.floor(shoved.x) === 6, "a longsword knocked the goblin back");
+    // The lantern-flail.
+    clear();
+    const shade = at("shade", 6, 5), gob = at("goblin", 5, 6);
+    shade.status.pinned = gob.status.pinned;
+    wield("lanternFlail");
+    const fs = dmgOf(shade), fg = dmgOf(gob);
+    p.torch = false;
+    const fOut = dmgOf(gob);
+    p.torch = true;
+    expect(fs === 2 * fg && fOut === 1, `the lantern-flail: ${fs} on a shade, ${fg} on a goblin, ${fOut} with the torch out (want ×2, and 1)`);
+    stats.flail = `${fg} on a goblin, ${fs} on a shade, ${fOut} with the torch out`;
+
+    // --- Powers ----------------------------------------------------------------------------------------------
+    clear();
+    const t1 = at("goblin", 6, 5);
+    wield("dagger");
+    hit(t1, fixed(0.99));
+    expect(!hasStatus(t1, "bleeding"), "a dagger's crit bled without Bleed");
+    perk("bleed");
+    hit(t1, fixed(0.6));
+    expect(!hasStatus(t1, "bleeding"), "Bleed: a dagger's blow without a crit bled");
+    hit(t1, fixed(0.99));
+    const hp0 = t1.hp;
+    expect(hasStatus(t1, "bleeding") && Math.abs(t1.status.bleeding.t - 3) < 1e-9, `Bleed: a dagger's crit, bleeding ${JSON.stringify(t1.status.bleeding)}`);
+    tickStatuses(game, t1, 3.01);
+    expect(hp0 - t1.hp === 3 && !hasStatus(t1, "bleeding"), `bleeding 3 s took ${hp0 - t1.hp} (want 3), still ${hasStatus(t1, "bleeding")}`);
+    wield("longsword");
+    hit(t1, fixed(0.99));
+    expect(!hasStatus(t1, "bleeding"), "Bleed: a longsword's crit bled");
+    // Daze: a quarter of a cudgel's blows.
+    const share = (setup, test, n = 4000, seed = 31) => { const rng = makeRng(seed); let k = 0, yes = 0; for (; k < n; k++) { setup(); const r = hit(t1, rng); if (r.hit && r.dmg > 0) { if (test()) yes++; } else k--; if (k > 3 * n) break; } return yes / n; };
+    wield("mace"); perk("daze");
+    t1.status = { pinned: t1.status.pinned };
+    const dz = share(() => { delete t1.status.stunned; }, () => hasStatus(t1, "stunned"));
+    expect(Math.abs(dz - 0.25) < 0.03, `Daze: ${(dz * 100).toFixed(1)}% of a mace's blows dazed (want 25%)`);
+    hit(t1); const dazeT = t1.status.stunned?.t;
+    perk();
+    const dz0 = share(() => { delete t1.status.stunned; }, () => hasStatus(t1, "stunned"), 400);
+    wield("longsword"); perk("daze");
+    const dzSword = share(() => { delete t1.status.stunned; }, () => hasStatus(t1, "stunned"), 400);
+    expect(dz0 === 0 && dzSword === 0 && (dazeT === undefined || dazeT <= 1 + 1e-9), `Daze without the power ${dz0}, with a longsword ${dzSword}, a daze ${dazeT} s`);
+    stats.daze = `${(dz * 100).toFixed(1)}% of 4,000 mace blows`;
+    // Disarm: a fifth of an axe's blows on an armed kind; its blows halved.
+    wield("waraxe"); perk("disarm");
+    const dr = share(() => { delete t1.status.disarmed; }, () => hasStatus(t1, "disarmed"));
+    expect(Math.abs(dr - 0.2) < 0.03, `Disarm: ${(dr * 100).toFixed(1)}% of an axe's blows disarmed a goblin (want 20%)`);
+    const rat = at("rat", 4, 5);
+    let ratDis = 0;
+    for (let k = 0, rng = makeRng(8); k < 400; k++) { delete rat.status.disarmed; hit(rat, rng); if (hasStatus(rat, "disarmed")) ratDis++; }
+    expect(ratDis === 0, `Disarm: a rat dropped its weapon ${ratDis} times`);
+    const blow = (c) => { const D = []; for (let k = 0, rng = makeRng(12); k < 2000; k++) { const r = resolveAttack(game, c, p, naturalSpec(c), { rng }); if (r.hit) D.push(r.dmg + (r.soaked || 0)); p.hp = maxHp(p); } return D.reduce((a, b) => a + b, 0) / D.length; };
+    p.status = {};
+    delete t1.status.disarmed;
+    const armedMean = blow(t1);
+    addStatus(game, t1, "disarmed", { t: 10 });
+    const disMean = blow(t1);
+    expect(disMean < armedMean * 0.6 && disMean > armedMean * 0.35, `a disarmed goblin's blows: ${disMean.toFixed(2)} against ${armedMean.toFixed(2)} (want about half)`);
+    stats.disarm = `${(dr * 100).toFixed(1)}% of 4,000 axe blows; its blows ${armedMean.toFixed(2)} → ${disMean.toFixed(2)}`;
+    // Cleave: half to the nearest other hostile within 1.5 tiles of you.
+    clear();
+    const c1 = at("goblin", 6, 5), c2 = at("goblin", 5, 6), far = at("goblin", 8, 8);
+    wield("waraxe"); perk("cleave");
+    const h2 = c2.hp, hf = far.hp, r1 = hit(c1);
+    expect(h2 - c2.hp === Math.floor(r1.dmg / 2) && hf === far.hp, `Cleave: a ${r1.dmg} blow gave the goblin beside you ${h2 - c2.hp} (want ${Math.floor(r1.dmg / 2)}), the far one ${hf - far.hp}`);
+    perk(); const h3 = c2.hp; hit(c1);
+    wield("longsword"); perk("cleave"); hit(c1);
+    expect(c2.hp === h3, "Cleave without the power, or with a longsword, still cut the second goblin");
+    // High ground: a polearm from a block up.
+    clear();
+    const low = at("goblin", 6, 5);
+    wield("spear"); perk("highGround");
+    const flat = dmgOf(low);
+    field.set(5, 5, FLOOR_Z, B.STONE); field.refresh(); Object.assign(p, { z: FLOOR_Z + 1 });
+    const up = dmgOf(low);
+    perk(); const upNo = dmgOf(low);
+    wield("longsword"); perk("highGround"); const upSword = dmgOf(low);
+    field.set(5, 5, FLOOR_Z, B.AIR); field.refresh(); Object.assign(p, { z: FLOOR_Z });
+    perk(); const flatSword = dmgOf(low);
+    expect(up === Math.ceil(flat * 1.5) && upNo === flat && upSword === flatSword, `High ground: a spear ${flat} → ${up} from a block up (${upNo} without the power); a longsword ${flatSword} → ${upSword}`);
+    stats.highGround = `a spear ${flat} → ${up}`;
+    // Riposte.
+    clear();
+    const duel = at("goblin", 6, 5);
+    const cool = CREATURE_TYPES.goblin.cooldown * (duel.cdMul || 1);
+    wield("longsword"); perk("riposte");
+    duel.cd = 0.1; hit(duel);
+    const parried = duel.cd;
+    duel.cd = 0.5; hit(duel);
+    const late = duel.cd;
+    perk(); duel.cd = 0.1; hit(duel);
+    const noPower = duel.cd;   // (a landed blow staggers it to 0.4 s at least: hurtCreature, the parent's)
+    wield("dagger"); perk("riposte"); duel.cd = 0.1; hit(duel);
+    const dagger = duel.cd;
+    expect(Math.abs(parried - cool) < 1e-9 && late === 0.5 && noPower < cool && dagger < cool && log.some((l) => /turn the goblin's blow aside/.test(l)),
+      `Riposte: a longsword at 0.1 s left its cooldown ${parried} (want ${cool}); at 0.5 s ${late}; without the power ${noPower}; a dagger ${dagger}`);
+    perk();
+
+    // --- Armour on you ---------------------------------------------------------------------------------------
+    clear();
+    const archer = at("goblin", 6, 5);
+    p.body.equip.hand_r = null;
+    const wear = (id) => { const it = makeGear("armour", id); p.body.equip[ARMOURS[id].slot === "arm" ? "arms" : ARMOURS[id].slot] = it; invalidateStats(p); return it; };
+    const turned = (ranged, n = 4000) => { let t = 0, landed = 0; for (let k = 0, rng = makeRng(99); k < n; k++) { const r = resolveAttack(game, archer, p, naturalSpec(archer), { rng, ranged }); if (r.hit) { landed++; if (r.turned) t++; } p.hp = maxHp(p); } return t / Math.max(1, landed); };
+    const none = turned(true, 400);
+    wear("buckler");
+    const buck = turned(false);
+    p.body.equip.arms = null; wear("glassScale");
+    const gsMelee = turned(false, 400), gs = turned(true);
+    addStatus(game, p, "running:mirrorShield", { t: 1e6 });
+    const both = turned(true);
+    expect(none === 0 && Math.abs(buck - 0.2) < 0.03 && gsMelee === 0 && Math.abs(gs - 0.15) < 0.03 && Math.abs(both - 0.575) < 0.03,
+      `turned aside: nothing ${none}; a buckler ${(buck * 100).toFixed(1)}% of blows (want 20); a glass-scale ${(gsMelee * 100).toFixed(1)}% of blows, ${(gs * 100).toFixed(1)}% of arrows (want 0 and 15); with a mirror shield ${(both * 100).toFixed(1)}% (want 57.5)`);
+    stats.turned = `buckler ${(buck * 100).toFixed(1)}% of blows, glass-scale ${(gs * 100).toFixed(1)}% of arrows, with the mirror shield ${(both * 100).toFixed(1)}%`;
+  } catch (err) {
+    problems.push(`threw: ${err.stack?.split("\n").slice(0, 3).join(" / ")}`);
+  } finally { run.restore(); }
+  return resultOf("combat: B1's gear", problems, stats);
+}
+
 // tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
 // inputs tools/check-combat.mjs gives.
 export async function run(env) {
@@ -1871,7 +2106,7 @@ export async function run(env) {
   const { game, startRun, inputHandlers } = await env.src("game.js");
   const { keys } = await env.src("input.js");
   const ctx = { game, startRun, inputHandlers, keys, seedRandom: env.seedRandom, restoreRandom: env.restoreRandom };
-  return [checkCombat({ game, startRun, srcFiles: await env.srcFiles() }), checkTargeting(ctx), await checkAiDepth(ctx), checkArena(ctx), ttkTables(ctx)];
+  return [checkCombat({ game, startRun, srcFiles: await env.srcFiles() }), checkTargeting(ctx), await checkAiDepth(ctx), checkArena(ctx), ttkTables(ctx), checkB1Combat(ctx)];
 }
 
 // --- passTime with 60 creatures (Node only: tools/check-combat.mjs --perf) ----------------------------------------

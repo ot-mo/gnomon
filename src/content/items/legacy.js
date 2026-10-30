@@ -280,7 +280,8 @@ function gearName(game, it) {
   const el = it.element ? `${ELEMENTS[it.element].adj} ` : "";
   const made = it.made && MATERIALS[it.made] ? `${MATERIALS[it.made].name} ` : "";   // C4: "saltsteel scale mail"
   const fixed = jewel && jewelTable(it)[it.id].fixed;
-  return `${it.known && it.ench && !fixed ? signed(it.ench) + " " : ""}${adj}${el}${made}${base}${suffix}`;
+  const worn = it.broken ? "snapped " : it.chips ? "chipped " : "";   // (B1: a bone blade snaps, a blackglass one chips)
+  return `${worn}${it.known && it.ench && !fixed ? signed(it.ench) + " " : ""}${adj}${el}${made}${base}${suffix}`;
 }
 // What the peddler charges at level 0 (deeper down, everything costs more: currency.js priceLevel).
 function gearPrice(it) {
@@ -301,7 +302,7 @@ function newInfo(it) {
   const parts = [cls?.info, def.info, it.made && materialLine(it.made, it.kind)].filter(Boolean);
   return parts.length ? " · " + parts.join(" · ") : "";
 }
-const materialDmg = (it) => (it.made ? MATERIALS[it.made]?.dmg || 0 : 0);
+const materialDmg = (it) => (it.made ? (it.kind === "weapon" ? it.material ?? MATERIALS[it.made]?.dmg : MATERIALS[it.made]?.dmg) || 0 : 0);   // (a chipped blade's is less: B1)
 const materialAv = (it) => (it.made ? MATERIALS[it.made]?.av || 0 : 0);
 const gearDetails = (info) => (game, it) => [TEXT[it.id], info(game, it)].filter(Boolean);
 // A forged item's colour: the metal letters of its art (and its glyph) in its material's.

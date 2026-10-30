@@ -2,7 +2,7 @@
 // creatures, and the event bus; WS8's targeting, look, throws and missile weapons; the AI's depth (followers
 // and hunters over an edge, catch-up, the Plane, wary, flee, follow, abilities, the activity radius, the log);
 // an arena of two factions; time-to-kill tables by level band (see tests/checks/combat.js).
-//   node tools/check-combat.mjs [--only combat,targeting,ai,arena,ttk] [--runs 100]
+//   node tools/check-combat.mjs [--only combat,targeting,ai,arena,ttk,gear] [--runs 100]
 //   node tools/check-combat.mjs --perf [--seconds 40] [--against <a tree's root>]
 //       passTime per simulated second with 60 creatures in the map's active radius, two ways: hunting you
 //       (as check-perf), and two factions fighting each other around you (§3.4); with --against, the same
@@ -32,13 +32,14 @@ const C = await import("../tests/checks/combat.js");
 const srcFiles = fs.readdirSync(SRC, { recursive: true }).filter((f) => f.endsWith(".js"))
   .map((f) => ({ file: f.split(path.sep).join("/"), text: fs.readFileSync(path.join(SRC, f), "utf8") }));
 const ctx = { game, startRun, inputHandlers, keys, seedRandom, restoreRandom, env };
-const only = opt("only", "combat,targeting,ai,arena,ttk").split(",");
+const only = opt("only", "combat,targeting,ai,arena,ttk,gear").split(",");
 const parts = {
   combat: () => C.checkCombat({ game, startRun, srcFiles }),
   targeting: () => C.checkTargeting(ctx),
   ai: () => C.checkAiDepth(ctx),
   arena: () => C.checkArena(ctx, { runs: Number(opt("runs", 100)) }),
   ttk: () => C.ttkTables(ctx),
+  gear: () => C.checkB1Combat(ctx),   // (B1's: the real world's gear in a fight)
 };
 let code = 0;
 for (const name of only) {

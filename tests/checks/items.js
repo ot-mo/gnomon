@@ -1227,7 +1227,7 @@ export function checkGear(m) {
     // since B1 a special that is built (a worn reputation).
     const LOOT_ARMOUR = ["leather", "chain", "scale", "plate", "copperCap", "ironHelm", "goggles", "cloak", "bracers", "gauntlets", "boots",
       "helm", "plumbHelm", "lampCrownHat", "monocle", "glassScale", "pleatedCoat", "reedCloak", "featherCloak", "mapCase", "kiteGlider", "examiningKit",
-      "stiltSandals", "stiltBoots", "featheredHood", "assizeWrit"];   // (B1: the hood and the writ, their worn reputation built)
+      "stiltSandals", "stiltBoots", "featheredHood", "assizeWrit", "buckler"];   // (B1: the hood and the writ, their worn reputation built)
     const drawnArmour = new Set();
     const tally = {};
     for (let level = 1; level <= 30; level++) {

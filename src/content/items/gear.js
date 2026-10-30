@@ -40,7 +40,7 @@ export function useful(kind, id) {
   if (kind === "missile") return id in LAUNCHER_TIER;
   const a = ARMOURS[id];
   // (B1: a reputation table while worn counts; an Hour mask's waits for whoever lays one with its Hour)
-  return !!a && (a.armour > 0 || Object.keys(a.bonus || {}).length > 0 || (!!a.wornRep && typeof a.wornRep === "object"));
+  return !!a && (a.armour > 0 || Object.keys(a.bonus || {}).length > 0 || (!!a.wornRep && typeof a.wornRep === "object") || a.block > 0 || a.reflect > 0);
 }
 
 // The real world's gear by the tier it first turns up at: the light classes from the start, the heavy ones later (as
