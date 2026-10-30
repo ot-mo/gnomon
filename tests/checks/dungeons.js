@@ -848,7 +848,9 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
   game.time += GM.TRUE_LEVEL.dead + 1; Object.assign(P, { x: tl.plates[0].x + 0.5, y: tl.plates[0].y - 1.5 }); tick("map"); onPlate(tl.answer);   // off the plates, then the right one
   G2.trueLevel = { vault: dz.vault.name, plates: tl.plates.length, plateMurals, sill: sillMural && Number(/SILL IS (\d)/.exec(sillMural.text)[1]) === tl.answer, shut0, wrongShut: wrong, gas, dead, open: !shut() };
   // The Drowned Lantern's tide: dry at noon, deep at 16:00 (the datum's floor), and it rises with the clock while you're there.
-  const lvl = (f) => { const t = f.tide.base?.[0]; return t ? f.get(t[0] % f.w, Math.floor(t[0] / f.w), FLOOR_Z - 1) : null; };
+  // (a tile the water covers that is dry floor of its own: a level may hold shallow water that stays wet at noon, and
+  // which tile comes first moves with the layout; the integrator, at the merge of p4b-b1)
+  const lvl = (f) => { const t = f.tide.base?.find(([, b]) => b !== B.WATER_SHALLOW); return t ? f.get(t[0] % f.w, Math.floor(t[0] / f.w), FLOOR_Z - 1) : null; };
   const dry = lvl(enter("drownedLantern", 1, 12)), deep = lvl(enter("drownedLantern", 2, 16));
   const t3 = enter("drownedLantern", 3, 12); game.clockSeen = game.time; game.time += 60 + 1; (await import("../../src/clock.js")).catchUp(game);
   G2.tide = { noon: dry !== B.WATER_SHALLOW && dry !== B.WATER_DEEP && dry !== null, at16: deep === B.WATER_DEEP, levels: [12, 13, 15, 17, 19, 3, 10, 11].map((h) => GM.tideLevel(t3, h)).join(""), byClock: t3.tide.level === 1 && lvl(t3) === B.WATER_SHALLOW };

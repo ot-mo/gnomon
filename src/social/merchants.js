@@ -25,8 +25,8 @@
 // always finds the same goods. A full purse can't take a sale (bible §3.1: "a payment that would overflow your
 // flask is refused. The trader says so and offers goods instead"): nothing changes hands, and the trade screen turns
 // to the trader's goods (tradeRow answers { offer: "theirs" }). Money is never plentiful: selling pays 0.3 of the worth at Grey, buying costs 1.5.
-import { itemPrice, itemName, itemGlyph, itemInfo, addToInventory, ITEM_KINDS, randomPotion, randomScroll,
-  randomEquipment, isGear } from "../items.js";
+import { itemPrice, itemName, itemGlyph, itemInfo, addToInventory, ITEM_KINDS, randomScroll,
+  isGear, lootGear, lootPotion, lootTonic, realWorld } from "../items.js";
 import { buyPrice, sellPrice, priceLevel, pay, receive, formatPrice, CURRENCY } from "../currency.js";
 import { mod, priceMul } from "../stats.js";
 import { RULES, extendRules } from "../rules.js";
@@ -93,14 +93,17 @@ const legacyPeddler = (c) => c.type === "pell" && !c.merchant?.stock;
 // four levels better (bible §3.5 "the best stock").
 registerStock("general", (game, c, rng) => {
   const level = c.level || 1, sac = standingOf(game, c).faction ? sacramentOf(standingOf(game, c).faction) : null;
-  const gear = (lv) => { const it = { ...randomEquipment(rng, lv, 0.3), known: true }; if (isGear(it) && it.ench < 0) it.ench = 0; return it; };
+  // The real world's (B1, C4 #1): C4's gear by the merchant's level, tonics among the potions and two on the shelf.
+  const real = realWorld(game.run);
+  const gear = (lv) => { const it = { ...lootGear(rng, lv, 0.3, real), known: true }; if (isGear(it) && it.ench < 0) it.ench = 0; return it; };
   const stock = [
     { item: { kind: "potion", effect: "healing" }, count: 2 },
     { item: { kind: "knife" }, count: 4 },
     { item: { kind: "bomb" }, count: 1 + Math.floor(rng() * 2) },
     { item: { kind: "vial", effect: "" }, count: 3 },
-    { item: randomPotion(rng), count: 1 },
+    { item: lootPotion(rng, real), count: 1 },
     { item: randomScroll(rng), count: 1 },
+    ...(real ? [{ item: lootTonic(rng), count: 2 }] : []),
     { item: gear(level), count: 1 },
     { item: gear(level + 1), count: 1 },
     { item: gear(level + 4), count: 1, best: true },

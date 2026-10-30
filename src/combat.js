@@ -38,23 +38,43 @@
 //   elementVs(c, el), resistText(c)
 //   combatRng(game)          game.combatRng if a test set one, else Math.random
 // Events (events.js): "attack" { att, tgt, result } after every resolution; "hurt" { tgt, src, dmg }.
+//
+// The real world's gear and the powers that go with it (B1: C4 #4 and #5, bible §13.1-§13.2, §10.8), under d20
+// only (the legacy set is the parent's, draw for draw). A blow of yours with a weapon (spec.cls: its class,
+// forge.js CLASS_OF; spec.made: its material):
+//   materials  truesteel ignores 1 point of the target's armour in the soak; blackglass chips (material −1, to 0)
+//              on a crit against armour 4 or more; bone snaps 1 hit in 50 (GEAR.boneSnap): it comes off your
+//              hand into the pack, `broken`, until mended (the Repair power; body.js won't hold it). (Pleatmetal's
+//              −3 STR is items.js strNeeded's.)
+//   classes    a short blade, and any weapon with the Dark backstab power, ×2 against an unaware target (not
+//              hunting you) while your torch is out; a great blade knocks a target that can move 1 tile back
+//              (off ledges; not into walls); a lantern-flail ×2 against ghosts and shades, and with the torch out
+//              it does 1 (useless).
+//   powers     Bleed (a short blade's crit: bleeding 3 s, 1 a second), Daze (a cudgel's blow: stunned 1 s a
+//              quarter of the time), Cleave (an axe's blow: the nearest other hostile within 1.5 tiles of you
+//              takes half, soaked), Disarm (an axe on someone who talks or is a person's kind: a fifth of the
+//              time "disarmed" 10 s, its blows halved), High ground (a polearm from a block or more above: +50%),
+//              Riposte (a long blade's blow that hits a foe whose blow lands within 0.2 s: that blow is cancelled, its
+//              cooldown starts again).
+//   armour     a buckler blocks a fifth of the blows that land on you (before armour); a glass-scale turns 15% of
+//              arrows and bolts aside, a raised mirror shield half (bible §13.3, §13.4).
 import { lineOfSight } from "./raycast.js";
 import { solidFor } from "./world.js";
-import { strNeeded, WEAPONS, ELEMENTS } from "./items.js";
+import { strNeeded, WEAPONS, ARMOURS, ELEMENTS } from "./items.js";
 import { colossusCore } from "./guardians.js";
 import { EYE, FISTS, attackTime, armourValue, weaponReach } from "./player.js";
 import { sfx } from "./sfx.js";
-import { attr, maxHp, mod, bonus } from "./stats.js";
-import { wielded, worn } from "./body.js";
-import { IMPLANTS } from "./content/items/implants.js";
-import { addStatus, hasStatus, statusFlag, cooldownLeft, startCooldown, dvOf as playerDv } from "./status.js";
+import { attr, maxHp, mod, bonus, invalidateStats, clampHp } from "./stats.js";
+import { wielded, worn, fittedEffect } from "./body.js";
+import { addStatus, hasStatus, statusFlag, cooldownLeft, startCooldown, registerStatus, dvOf as playerDv } from "./status.js";
 import { RULES } from "./rules.js";
 import { emit } from "./events.js";
 import { distance } from "./rng.js";
-import { CREATURE_TYPES, touchable, touchesYou, isFlat, ghostHidden, theOf, TheOf } from "./creatures.js";
+import { CREATURE_TYPES, touchable, touchesYou, isFlat, ghostHidden, theOf, TheOf, canTalk, isGhostly } from "./creatures.js";
 import { attitude } from "./factions.js";
 import { killMonster } from "./monsters.js";
 import { hasKey } from "./keyset.js";
+import { CLASS_OF } from "./content/items/forge.js";
 
 const legacy = () => RULES.combat === "legacy";
 export const combatRng = (game) => game.combatRng || Math.random;
@@ -84,7 +104,7 @@ export function resistText(m) {
 // carry one. Bare hands (fists): req 0 (no to-hit cost); under d20 every blow, a fist's too, counts STR over
 // RULES.d20.strOver, scaled by its swing (`swing`: the weapon's, FISTS.swing for bare hands). Fists hit for 1-2; in gauntlets 1d4; with truesteel knuckles fitted (WS5's implant,
 // effect "knuckles"; bible §13.6) 2d4, and they crush (×2 against the brittle, as bonus crush does).
-const fitted = (e, effect) => !!e.body?.implants && e.body.parts.some((q) => IMPLANTS[e.body.implants[q.id]?.id]?.effect === effect);
+export const fitted = fittedEffect;   // (body.js; B1)
 export function weaponSpec(e) {
   const it = wielded(e), w = it && WEAPONS[it.id];
   if (!w) {
@@ -94,15 +114,16 @@ export function weaponSpec(e) {
              ...(knuckles ? { crush: true } : {}) };
   }
   return { kind: "melee", weapon: it, dmg: [w.dmg[0], w.dmg[1] + bonus(e, "maxDmg")], ench: it.ench || 0, element: it.element || null,
-           req: strNeeded(it), acc: w.acc || 0, material: it.material || 0, swing: w.swing };
+           req: strNeeded(it), acc: w.acc || 0, material: it.material || 0, swing: w.swing, cls: CLASS_OF[it.id] || null, made: it.made || null };
 }
 // A creature's own blow: its type's damage range and its level bonus (+1 per 4 levels, creatures.js).
 export function naturalSpec(c) {
   const t = CREATURE_TYPES[c.type];
   return { kind: "natural", dmg: t.damage, plus: c.bonus || 0, acc: t.acc || 0 };
 }
+// (B1, WS5 #8: gyro wrists' +2 for a thrown knife, beside Knife juggler's)
 export function thrownSpec(game) {
-  return { kind: "thrown", dmg: [2, 4], plus: hasKey(game.player.perks, "juggler") ? 2 : 0, acc: 0 };
+  return { kind: "thrown", dmg: [2, 4], plus: (hasKey(game.player.perks, "juggler") ? 2 : 0) + (fitted(game.player, "gyroWrists") ? 2 : 0), acc: 0 };
 }
 
 // --- The d20 numbers --------------------------------------------------------------------------------
@@ -310,6 +331,116 @@ function yourMultipliers(game, p, m, dmg, el, vs, crushes = false) {
   return dmg;
 }
 
+// --- The real world's gear and its powers (B1; the header says what each does) ------------------------------------------
+export const GEAR = { boneSnap: 1 / 50, chipAv: 4, bleedT: 3, dazeChance: 0.25, dazeT: 1, disarmChance: 0.2, disarmT: 10,
+  cleaveRange: 1.5, highGround: 1.5, riposteWindow: 0.2, block: 0.2 };
+// Who carries a weapon to drop (Disarm: bible "humanoids drop their weapon"), besides anyone who talks.
+export const ARMED = new Set(["goblin", "skeleton", "archer", "orc", "barrowSkeleton", "assizeOutrider", "rustbackScav", "rustbackSlinger",
+  "rustbackBrute", "plumbknight", "assizer", "chimePriest", "chandlerGuard", "lamplessChanter", "draughtsman", "mootWalker"]);
+registerStatus("bleeding", { color: [200, 40, 50], t: GEAR.bleedT, stack: "refresh", flags: { noRegen: true }, period: () => 1, cause: "bleeding",
+  hud: () => "BLEEDING", ended: "The bleeding stops.", killed: (e) => `${TheOf(e)} bleeds out.` });
+registerStatus("disarmed", { color: [190, 190, 150], t: GEAR.disarmT, stack: "refresh", hud: (s) => `DISARMED ${Math.ceil(s.t)}s` });
+const unaware = (game, m) => m.state !== "chase" && m.state !== "flee";   // (not hunting you, not running: a sleeper, a wanderer)
+const isShade = (m) => isGhostly(m) || !!CREATURE_TYPES[m.type]?.ghostly || m.type === "shade" || m.type === "wraith";
+function gearMultipliers(game, p, m, dmg, spec) {
+  if (!p.torch && unaware(game, m) && (spec.cls === "shortBlade" || hasKey(p.perks, "darkBackstab"))) dmg *= 2;   // from the dark
+  if (spec.cls === "polearm" && hasKey(p.perks, "highGround") && groundOf(game, p) - groundOf(game, m) >= RULES.d20.highGroundZ) dmg = Math.ceil(dmg * GEAR.highGround);
+  if (spec.cls === "flail") dmg = p.torch ? (isShade(m) ? dmg * 2 : dmg) : 1;   // the lantern-flail: useless with the torch out
+  return dmg;
+}
+// Before the roll: a long blade's riposte (the foe's blow about to land is cancelled).
+function riposte(game, p, m, spec) {
+  if (spec.cls !== "longBlade" || !hasKey(p.perks, "riposte") || !(m.cd > 0) || m.cd > GEAR.riposteWindow) return false;
+  if (attitude(game, m, p) !== "hostile" || distance(p.x - m.x, p.y - m.y) > (CREATURE_TYPES[m.type]?.reach ?? 1.6) + 0.5) return false;
+  m.cd = (CREATURE_TYPES[m.type]?.cooldown || 1) * (m.cdMul || 1);
+  game.log(`You turn ${theOf(m)}'s blow aside.`, [200, 220, 255]);
+  sfx("block", { at: m });
+  return true;
+}
+// After your blade landed (alive or not): the material's wear and the class's after-effects.
+function gearAfter(game, p, m, spec, result, rng) {
+  const it = spec.weapon, alive = !result.killed && m.hp > 0 && game.zone.creatures.includes(m);
+  if (it && spec.made === "blackglass" && result.crit && avOf(m) >= GEAR.chipAv && (it.material || 0) > 0) {
+    it.material--; it.chips = (it.chips || 0) + 1;
+    game.log(`Your blackglass ${WEAPONS[it.id].name} chips on ${theOf(m)}'s armour.`, [150, 140, 190]);
+  }
+  if (alive) {
+    if (spec.cls === "shortBlade" && result.crit && hasKey(p.perks, "bleed")) {
+      if (!hasStatus(m, "bleeding")) game.log(`${TheOf(m)} bleeds.`, [200, 60, 70]);
+      addStatus(game, m, "bleeding", { t: GEAR.bleedT, src: "player" });
+    }
+    if (spec.cls === "cudgel" && hasKey(p.perks, "daze") && rng() < GEAR.dazeChance) {
+      addStatus(game, m, "stunned", { t: GEAR.dazeT, stack: "max" });
+      game.log(`${TheOf(m)} reels, dazed.`, [215, 205, 160]);
+    }
+    if (spec.cls === "axe" && hasKey(p.perks, "disarm") && (canTalk(m) || ARMED.has(m.type)) && !hasStatus(m, "disarmed") && rng() < GEAR.disarmChance) {
+      addStatus(game, m, "disarmed", { t: GEAR.disarmT });
+      game.log(`${TheOf(m)} drops ${canTalk(m) ? "what it was holding" : "its weapon"} and fumbles for it.`, [215, 205, 160]);
+    }
+    if (spec.cls === "greatBlade") knockBack(game, p, m);
+  }
+  if (spec.cls === "axe" && hasKey(p.perks, "cleave") && result.dmg > 1) cleave(game, p, m, result, rng);
+  if (it && spec.made === "bone" && rng() < GEAR.boneSnap) snap(game, p, it);
+}
+function cleave(game, p, m, result, rng) {
+  let other = null, near = Infinity;
+  for (const o of game.zone.creatures) {
+    if (o === m || o.hp <= 0 || !touchable(game, o, p, { blade: true }) || attitude(game, o, p) !== "hostile") continue;
+    const d = distance(o.x - p.x, o.y - p.y);
+    if (d <= GEAR.cleaveRange && d < near) { other = o; near = d; }
+  }
+  if (!other) return;
+  const n = Math.max(0, Math.floor(result.dmg / 2) - soakRoll(rng, avOf(other)));
+  if (n <= 0) { game.log(`Your swing glances off ${theOf(other)}.`, [170, 180, 200]); return; }
+  hurtCreature(game, other, n, `${n}`, [255, 255, 255], p);
+  if (other.hp <= 0) killMonster(game, other, `Your swing carries through and slays ${theOf(other)}.`);
+  else game.log(`Your swing carries through to ${theOf(other)} (${n}).`, [230, 230, 230]);
+}
+// A great blade's blow: 1 tile straight back from you, if the target can move and the tile has room; off a ledge it
+// drops, and into a chasm (no floor) it falls out of the fight (yours, no loot).
+function knockBack(game, p, m) {
+  if (statusFlag(m, "noMove") || CREATURE_TYPES[m.type]?.guardian || CREATURE_TYPES[m.type]?.boss || m.legend) return;
+  const z = game.zone, ax = m.x - p.x, ay = m.y - p.y;
+  const dx = Math.abs(ax) >= Math.abs(ay) * 0.5 ? Math.sign(ax) : 0, dy = Math.abs(ay) >= Math.abs(ax) * 0.5 ? Math.sign(ay) : 0;
+  if (!dx && !dy) return;
+  const hover = CREATURE_TYPES[m.type]?.hover || 0, x0 = Math.floor(m.x), y0 = Math.floor(m.y);
+  const tx = x0 + dx, ty = y0 + dy, zz = Math.floor(m.z - hover + 1e-6);
+  if (tx < 0 || ty < 0 || tx >= z.w || ty >= z.d) return;
+  const walled = (x, y) => { for (let k = 0; k < Math.max(1, Math.ceil(m.h ?? 1)); k++) if (z.solid(x, y, zz + k)) return true; return false; };
+  if (walled(tx, ty) || (dx && dy && (walled(x0 + dx, y0) || walled(x0, y0 + dy)))) return;   // a wall (or a corner): it stands
+  if (z.creatures.some((o) => o !== m && Math.floor(o.x) === tx && Math.floor(o.y) === ty)) return;
+  const stand = z.stand[tx + ty * z.w];
+  if (stand < 0 && hover) return;   // (a flier over a chasm keeps flying: it isn't knocked out over it)
+  m.x += dx; m.y += dy; m.tx = tx; m.ty = ty; m.path = null;
+  if (stand < 0) { killMonster(game, m, `Your blow sends ${theOf(m)} over the edge and into the dark.`, false); return; }
+  if (stand + hover < m.z) m.z = stand + hover;   // (off a ledge it drops; a hoverer keeps its height over the ground)
+  game.log(`Your blow knocks ${theOf(m)} back.`, [230, 230, 230]);
+}
+function snap(game, p, it) {
+  const part = Object.keys(p.body.equip).find((id) => p.body.equip[id] === it);
+  if (!part) return;
+  for (const id in p.body.equip) if (id === part || p.body.equip[id] === part) p.body.equip[id] = null;
+  it.broken = true;
+  (p.inv ||= []).push(it);
+  invalidateStats(p);
+  clampHp(p);
+  emit(game, "gear", { e: p });   // (what you hold changed, as body.js unequip says it: verification finding)
+  game.log(`Your bone ${WEAPONS[it.id].name} snaps! (It goes in your pack, to be mended.)`, [222, 212, 182]);
+  sfx("block", { at: p });
+}
+// A blow landing on you, before armour: the buckler's block; an arrow or bolt turned by the glass-scale or a raised
+// mirror shield (one roll for both: 1 − (1 − 0.15)(1 − 0.5)).
+function turnedAside(game, p, ranged, rng) {
+  if (ranged) {
+    let keep = 1;
+    for (const g of worn(p)) if (g.kind === "armour" && ARMOURS[g.id]?.reflect) keep *= 1 - ARMOURS[g.id].reflect;
+    if (hasStatus(p, "running:mirrorShield")) keep *= 0.5;
+    if (keep < 1 && rng() >= keep) return "Your gear turns the shot aside.";
+  }
+  if (worn(p).some((g) => g.kind === "armour" && ARMOURS[g.id]?.block) && rng() < GEAR.block) return "Your buckler takes the blow.";
+  return null;
+}
+
 // After your blade lands: the number, the log, the kill or the element's after-effects, the arc.
 // line(killed): the d20 set's log line (combatLine); without it the parent's lines.
 function yourBladeLanded(game, p, m, dmg, { crit, el, vs, core, rng, soak, line = null }) {
@@ -405,6 +536,9 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
   }
   // 2 To-hit.
   Object.assign(result, rollToHit(game, att, tgt, spec, ctx, rng));
+  // A long blade's parry (B1): your strike, landing in the 0.2 s before its blow, cancels it. Only a hit parries, so a
+  // flurry of misses can't hold a foe off for good (verification finding).
+  if (you && spec.kind === "melee" && result.hit) result.riposte = riposte(game, p, tgt, spec);
   if (!result.hit) {
     float(game, tgt, "miss", [170, 170, 180]);
     tell(game, result, spec, ctx, [170, 170, 180]);
@@ -417,10 +551,17 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
   // weapon's shot takes material and enchantment, no STR); a creature's level bonus; then the multipliers
   // and the crit.
   let dmg = spec.fixed ?? roll(rng, spec.dmg[0], spec.dmg[1]) + (spec.plus || 0);
+  if (!you && hasStatus(att, "disarmed")) dmg = Math.floor(dmg / 2);   // (Disarm: B1)
   if (you && spec.kind === "melee") dmg += Math.round(((spec.material || 0) + Math.floor((attr(p, "str") - D.strOver) / 2)) * (spec.swing ?? D.swingRef) / D.swingRef) + spec.ench;
   else if (you && spec.kind === "missile" && spec.fixed === undefined) dmg += (spec.material || 0) + (spec.ench || 0);
   dmg = Math.max(1, dmg);
   if (onYou) {
+    const aside = turnedAside(game, p, !!ctx.ranged, rng);   // (B1: the buckler, the glass-scale, the mirror shield)
+    if (aside) {
+      result.dmg = 0; result.turned = true;
+      game.log(aside, [200, 220, 255]); sfx("block", { at: att });
+      return;
+    }
     result.mult = crit ? D.crit : 1;
     dmg *= result.mult;
     const soaked = soakRoll(rng, armourValue(p));
@@ -431,6 +572,7 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
   const t = CREATURE_TYPES[tgt.type];
   const el = you && spec.kind === "melee" ? spec.element : null, vs = elementVs(tgt, el);
   if (you) dmg = yourMultipliers(game, p, tgt, dmg, el, vs, !!spec.crush);
+  if (you && spec.kind === "melee") dmg = gearMultipliers(game, p, tgt, dmg, spec);
   const sunder = you && crit && spec.kind === "melee" && bonus(p, "sunder") > 0;   // Sunder: crits ×3, through armour
   result.mult = crit ? (sunder ? 3 : D.crit) : 1;
   dmg *= result.mult;
@@ -438,7 +580,8 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
   const core = you && t.guardian === "colossus" ? colossusCore(game, tgt) : true;
   if (!core) dmg = 1;
   // 4 Soak: 0..AV at random (a glancing blow on the Colossus's legs is never soaked to nothing).
-  const soaked = sunder ? 0 : Math.min(soakRoll(rng, avOf(tgt)), core ? dmg : 0);
+  const pierce = you && spec.made === "truesteel" ? 1 : 0;   // (truesteel ignores a point of armour: B1)
+  const soaked = sunder ? 0 : Math.min(soakRoll(rng, Math.max(0, avOf(tgt) - pierce)), core ? dmg : 0);
   dmg -= soaked;
   result.soaked = soaked;
   result.dmg = dmg;
@@ -453,6 +596,7 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
   const line = (killed) => combatLine(game, { ...result, killed }, spec, ctx);
   if (you && spec.kind === "melee") {
     result.killed = yourBladeLanded(game, p, tgt, dmg, { crit, el, vs, core, rng, line, soak: (o, n) => Math.max(0, n - soakRoll(rng, avOf(o))) || 1 });
+    gearAfter(game, p, tgt, spec, result, rng);
   } else if (you) {
     hurtCreature(game, tgt, dmg, crit ? `${dmg}!` : `${dmg}`, crit ? [255, 220, 80] : [255, 255, 255], p);
     if (tgt.hp <= 0) killMonster(game, tgt, line(true));

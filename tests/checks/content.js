@@ -174,15 +174,21 @@ export function checkContent(m) {
       need(PARTS.has(a.slot), `${at}: slot ${a.slot}, not a part of the humanoid body`);
       need(Number.isInteger(a.tier) && a.tier >= 1 && a.tier <= 8, `${at}: tier ${a.tier}`);
       bonusOk(at, a.bonus);
-      need(a.armour > 0 || Object.keys(a.bonus || {}).length > 0 || str(a.needs), `${at}: does nothing and says nothing of what it needs`);
+      // B1 (the coordinator's approval, 2026-10-30): a built special has an info line instead of needs (check-items' B1
+      // section maps each such piece to a special it tests the behaviour of)
+      need(a.armour > 0 || Object.keys(a.bonus || {}).length > 0 || str(a.info) || str(a.needs), `${at}: does nothing and says nothing of what it needs`);
       need(a.info === undefined || (str(a.info) && sentences(a.info) <= 1), `${at}: info`);
       if (a.wornRep === "hour") need(Number.isInteger(a.hourRep) && a.hourRep > 0, `${at}: an Hour mask's hourRep`);
       else if (a.wornRep !== undefined) repOk(at, a.wornRep);
-      if (a.wornRep !== undefined) need(str(a.needs), `${at}: a worn reputation with no needs (the hook is a request)`);
+      // B1 (approved 2026-10-30): the worn reputation hook is built (social/reputation.js syncWornRep; check-social holds
+      // every wornRep piece on and off), so no piece may still wait for it
+      if (a.wornRep !== undefined) need(!/worn reputation/.test(a.needs || ""), `${at}: still waits for the worn reputation hook (B1 built it: social/reputation.js syncWornRep)`);
     }
     for (const id of Fg.FORGED.armour) need(I.ARMOURS[id], `forged armour ${id}: no such armour`);
     for (const id of Object.keys(Fg.VALUE)) need(I.WEAPONS[id] || I.ARMOURS[id] || m.c4.missiles.MISSILES[id], `value ${id}: no such weapon, armour or missile weapon`);
-    for (const [id, c] of Object.entries(Fg.CLASSES)) need(str(c.name) && (c.info === undefined || str(c.info)) && str(c.needs), `class ${id}: name, info and needs`);
+    // B1 (approved 2026-10-30): a class whose identity is built drops needs and says it in its info (check-combat's B1
+    // section asserts each such class's identity)
+    for (const [id, c] of Object.entries(Fg.CLASSES)) need(str(c.name) && (c.info === undefined || str(c.info)) && (str(c.needs) || str(c.info)), `class ${id}: name, info and needs`);
     for (const [id, t] of Object.entries(Tn.TONICS)) {
       need(str(t.name) && num(t.value) && t.value > 0 && num(t.t) && t.t > 0 && fn(t.info) && str(t.info(1)) && sentences(t.info(1)) <= 3 && str(t.info(0.5)) && fn(t.use) && fn(t.overdose),
         `tonic ${id}: name, value, time, info(k), use and overdose`);

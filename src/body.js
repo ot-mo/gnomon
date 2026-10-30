@@ -7,7 +7,8 @@
 //   defaultPart(e, item) → partId | null     where E in the inventory puts it: the primary hand for weapons, else the
 //                                            first part of its type (one ring at a time "as in the existing game",
 //                                            bible §13.3; the second finger takes one only when asked by part id)
-//   canEquip(game, e, item, partId) → { ok, reason, item?, need? }   reason: "part" | "slot" | "weak" | "cursed"
+//   canEquip(game, e, item, partId) → { ok, reason, item?, need? }   reason: "part" | "slot" | "weak" | "cursed" | "broken" |
+//                                                                   "shell" (Shellback: no body armour)
 //   equip(game, e, item, partId) → { ok, removed: [], time, reason }   what it pushed off is the caller's to put away
 //   unequip(game, e, partId) → { ok, item, reason }                  cursed things stick (reason "cursed")
 //   worn(e) → item[]                          equipped items and implants, each once (bonus() sees implants too)
@@ -17,6 +18,11 @@
 //   carried(e) → item[]                      worn, the belt, then the pack: everything you have
 //   swapBelt(game, e) → { ok, time, reason } R: the weapon in hand and the one on the belt change places
 //   addPart(e, part), removePart(e, partId) → item[]   extra limbs from mutations (WS4); what it held comes off
+//   fittedEffect(e, effect) → bool          an implant fitted in one of e's parts names that effect (IMPLANTS[id].effect;
+//                                            bodymods/implants.js implantEffect's question, for modules that load before it)
+// Events: "gear" { e } after equip and unequip changed what e wears (B1: social/reputation.js syncWornRep follows it for
+// worn reputation; it follows bodymods' "uninstall" too, as a part that comes off, removePart, has no game). Not sent
+// without a game (character creation).
 //
 // A two-handed weapon (WEAPONS[id].hands === 2) takes every holding part: the primary one holds it
 // and the others hold the primary's part id (a string), so no item sits in two places in a save.
@@ -29,8 +35,11 @@
 import { ITEM_KINDS } from "./items.js";
 import { attr, invalidateStats, clampHp } from "./stats.js";
 import { RULES } from "./rules.js";
+import { emit } from "./events.js";
+import { IMPLANTS } from "./content/items/implants.js";
 
 export const BODY_PLANS = {};
+export const fittedEffect = (e, effect) => !!e?.body?.implants && e.body.parts.some((q) => IMPLANTS[e.body.implants[q.id]?.id]?.effect === effect);
 export function registerBodyPlan(id, parts) {
   if (BODY_PLANS[id]) throw new Error(`registerBodyPlan: ${id} already exists`);
   const ids = new Set();
@@ -133,6 +142,9 @@ export function canEquip(game, e, it, partId = defaultPart(e, it)) {
   if (!part) return { ok: false, reason: "part" };
   if (slotType(it) !== part.type) return { ok: false, reason: "slot" };
   if (held(e, partId) !== it && worn(e).includes(it)) return { ok: false, reason: "worn" };   // one item, one place (else its bonuses count twice)
+  if (it.broken) return { ok: false, reason: "broken" };   // (a snapped bone weapon, B1: mended first, items.js mendItem)
+  // Shellback (bible §13.5 "no body armour"; B1, WS4 #19): the shell takes nothing heavier than clothes on the body.
+  if (e.mutations?.shellback && part.type === "body" && it.kind === "armour" && it.id !== "clothes") return { ok: false, reason: "shell" };
   const ids = partsTaken(e, it, partId);
   if (!ids) return { ok: false, reason: "slot" };   // two-handed, one hand
   const need = ITEM_KINDS[it.kind]?.req?.(it)?.str;
@@ -153,6 +165,7 @@ export function equip(game, e, it, partId = defaultPart(e, it)) {
   for (const id of ids.slice(1)) e.body.equip[id] = ids[0];
   invalidateStats(e);   // STR, max HP and armour follow your gear (stats.js)
   clampHp(e);
+  if (game) emit(game, "gear", { e });
   return { ok: true, removed, time: RULES.body.equipTime };
 }
 function clearItem(e, it) {
@@ -169,6 +182,7 @@ export function unequip(game, e, partId) {
   clearItem(e, it);
   invalidateStats(e);
   clampHp(e);
+  if (game) emit(game, "gear", { e });
   return { ok: true, item: it };
 }
 

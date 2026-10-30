@@ -22,7 +22,7 @@
 // Kinds: `artifact` { kind, id, known, cell, on?, mark?, broken? } and `cell` { kind, id, charge }.
 import { ARTIFACTS, CELLS } from "../content/items/artifacts.js";
 import { IMPLANTS } from "../content/items/implants.js";
-import { registerItemKind, takeOne, addToInventory } from "../items.js";
+import { registerItemKind, takeOne, addToInventory, mendItem } from "../items.js";
 import { carried } from "../body.js";
 import { bonus, invalidateStats, examineScore } from "../stats.js";
 import { addStatus, removeStatus, hasStatus, registerStatus } from "../status.js";
@@ -31,12 +31,15 @@ import { requestTarget } from "../abilities.js";
 import { mapUseTime } from "../turns.js";
 import { applyDamage, elementVs } from "../combat.js";
 import { touchable, ghostHidden, theOf, TheOf } from "../creatures.js";
-import { arrivalPoint } from "../zones.js";
+import { arrivalPoint, changeZone, zoneKey } from "../zones.js";
+import { attitude } from "../factions.js";
+import { findSite, reveal } from "../overworld/discovery.js";
 import { nightSeconds } from "../clock.js";
 import { zoneIsLightless } from "../light.js";
 import { KIND, FLOOR_Z } from "../world.js";
 import { on } from "../events.js";
 import { implantEffect } from "./implants.js";
+import { hasKey } from "../keyset.js";
 
 export const EXAMINE_TIME = 10;      // seconds a try at identifying takes (on the map: game time)
 export const USE_TIME = 1;           // a use, on the map
@@ -100,9 +103,11 @@ export function loadCell(game, p, it) {
   return true;
 }
 
+// (the Recharge power, B1, C4 #9: sun and dark cells from glim too; a heart cell never)
+const fillable = (p, def) => !!def && (def.recharge === "glim" || ((def.recharge === "sun" || def.recharge === "dark") && hasKey(p.perks, "recharge")));
 export function fillCell(game, p, cell) {
   const def = CELLS[cell?.id];
-  if (!def || def.recharge !== "glim") return 0;
+  if (!fillable(p, def)) return 0;
   const room = def.charge - cell.charge, glim = Math.min(Math.ceil(room / CHARGE_PER_GLIM), funds(p));
   if (glim <= 0 || !pay(game, p, glim)) return 0;
   cell.charge = Math.min(def.charge, cell.charge + glim * CHARGE_PER_GLIM);
@@ -176,6 +181,7 @@ export function chargeText(game, cell) {
 // --- Using one ---------------------------------------------------------------------------------------
 export function useArtifact(game, p, it) {
   const def = ARTIFACTS[it.id];
+  if (it.broken && hasKey(p.perks, "repair")) return mendItem(game, p, it);   // (the Repair power, B1)
   if (it.broken) { game.log(`The ${artifactName(it)} is broken. A tinker might give you a glim or two for it.`, [170, 170, 170]); return 0; }
   if (it.known !== true) {
     const r = examineArtifact(game, p, it);
@@ -186,7 +192,7 @@ export function useArtifact(game, p, it) {
   }
   if (def.per) return toggle(game, p, it);
   if (needs(it) && !loadCell(game, p, it)) { game.log(`The ${def.name} needs ${needs(it)} charge (${chargeText(game, it.cell)}), and you have no cell that full.`, [255, 150, 120]); return 0; }
-  if (it.id === "glimgun" && funds(p) < 1) { game.log("The glimgun needs a glim from your purse for each shot.", [255, 150, 120]); return 0; }
+  if (it.id === "glimgun" && funds(p) < 1 && !freeShot(p, it)) { game.log("The glimgun needs a glim from your purse for each shot.", [255, 150, 120]); return 0; }
   if (def.target) return { aim: it };
   return fireArtifact(game, p, it, null);
 }
@@ -201,6 +207,8 @@ function toggle(game, p, it) {
 }
 
 const AIM_RANGE = { foldKnife: 4, glimgun: 10, lancet: 8 };
+// Glimgunner (B1, C4 #9): a glim for every two shots (the first of each pair pays; it.shots counts them).
+const freeShot = (p, it) => hasKey(p.perks, "glimgunner") && (it.shots || 0) % 2 === 1;
 export function aimArtifact(game, p, it) {
   requestTarget(game, { range: AIM_RANGE[it.id] || 10, target: ARTIFACTS[it.id].target }, (target) => {
     // No target (cancelled, or on the map nothing in sight to aim at): nothing happens, nothing is paid.
@@ -266,7 +274,41 @@ function blink(game, p, fx, fy) {
   return true;
 }
 
+// B1 (C4 #7): the homing pip, the snuffer, the theodolite.
+export const HOME_CLEAR = 7, SNUFF_R = 6, SNUFF_T = 20;
 const EFFECTS = {
+  homingPip(game, p) {
+    const s = game.run?.world?.start;
+    if (!s) return false;
+    if (game.zone.creatures.some((m) => attitude(game, m, p) === "hostile" && Math.hypot(m.x - p.x, m.y - p.y) <= HOME_CLEAR)) {
+      game.log(`The pip won't settle: something hostile within ${HOME_CLEAR} tiles.`, [255, 150, 120]);
+      return false;
+    }
+    game.log("The pip leans west, then pulls, and the world folds you home.", [200, 160, 255]);
+    changeZone(game, zoneKey(s.wx, s.wy, 0), { how: "travel" });   // (at the anchor; "start" would be a checkpoint save: verification finding)
+    return true;
+  },
+  snuffer(game, p) {
+    const z = game.zone;
+    z.snuffs = (z.snuffs || []).filter((d) => d.until > game.time);
+    z.snuffs.push({ x: p.x, y: p.y, r: SNUFF_R, until: game.time + SNUFF_T });
+    game.log(`You tip the snuffer. The dark pours out ${SNUFF_R} tiles round, torch or no.`, [150, 140, 190]);
+    return true;
+  },
+  theodolite(game, p) {
+    const z = game.zone;
+    if (!game.run?.sites) return false;
+    let found = 0;
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++)
+        for (const id of game.run.sitesAt?.get(`${z.wx + dx},${z.wy + dy}`) || []) {
+          const site = game.run.sites.get(id);
+          if (site && site.kind !== "landmark" && findSite(game, site, "theodolite")) found++;
+        }
+    reveal(game, z.wx, z.wy, 1);
+    game.log(found ? `Through the brass eye: ${found} site${found > 1 ? "s" : ""} in the spans around you go onto your world map.` : "Through the brass eye: nothing in the spans around you that you didn't know of.", [220, 200, 140]);
+    return true;
+  },
   plumbBob(game, p) {
     const n = holesNear(game.zone, p.x, p.y, 3);
     game.log(n ? `The bob swings and points true down. ${n} hidden drop${n > 1 ? "s" : ""} near you go${n > 1 ? "" : "es"} onto your map.` : "The bob hangs still and points true down. No pits within 3 tiles.", [200, 190, 255]);
@@ -283,7 +325,8 @@ const EFFECTS = {
     return true;
   },
   glimgun(game, p, it, target) {
-    if (!pay(game, p, 1)) return false;
+    if (!freeShot(p, it) && !pay(game, p, 1)) return false;
+    it.shots = (it.shots || 0) + 1;
     const c = target?.creature;
     if (!c || !touchable(game, c) || ghostHidden(game, c)) { game.log("The glimgun spits a bolt of burning glim into the dark.", [255, 160, 70]); return true; }
     const vs = elementVs(c, "fire"), dmg = Math.max(1, Math.round(d6(2) * (vs === "resist" ? 0.5 : vs === "weak" ? 1.5 : 1)));
@@ -383,6 +426,13 @@ function artifactInfo(game, it) {
 }
 registerItemKind("artifact", {
   stack: false, weight: () => 2,
+  // Readhand (B1, C4 #8): you know one by touch, the moment you pick it up.
+  onPickup(game, e, it) {
+    if (e === game.player && e.mutations?.readhand && it.known !== true && !it.broken) {
+      identify(game, it);
+      game.log(`You know it by touch: ${artifactName(it)}.`, [200, 190, 255]);
+    }
+  },
   name: (game, it) => artifactName(it),
   glyph: (game, it) => ["Θ", it.broken ? [120, 110, 130] : VIOLET],
   info: artifactInfo,
@@ -413,7 +463,7 @@ registerItemKind("cell", {
   price: (it) => Math.round((CELLS[it.id]?.value || 0) * (0.25 + 0.75 * chargeOf(it) / (cellMax(it) || 1))),
   use(game, e, it) {
     const def = CELLS[it.id];
-    if (def?.recharge !== "glim") { game.log(`The ${def?.name || "cell"} can't be filled from a purse.`, [170, 170, 170]); return 0; }
+    if (!fillable(e, def)) { game.log(`The ${def?.name || "cell"} can't be filled from a purse${def?.recharge === "sun" || def?.recharge === "dark" ? " (the Recharge power could)" : ""}.`, [170, 170, 170]); return 0; }
     if (it.charge >= def.charge) { game.log(`The ${def.name} is full.`, [170, 170, 170]); return 0; }
     const glim = fillCell(game, e, it);
     if (!glim) { game.log("Your purse is dry.", [255, 150, 120]); return 0; }

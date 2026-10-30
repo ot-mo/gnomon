@@ -34,7 +34,7 @@ export const ARTIFACTS = {
   echoBell: { name: "echo-bell", vague: "a cold brass bell", class: "a mapper", complexity: 2, charge: 100, value: 220,
     info: "Rung once, it draws every surface within 10 tiles onto your map, lit or not." },
   lanternMote: { name: "lantern-mote", vague: "a warm disc", class: "a lamp", complexity: 2, charge: 10, per: "minute", bonus: { torch: 0.4 }, value: 260,
-    info: "Switched on, a mote of light follows you: your torch reaches further, and your hands stay free." },
+    info: "Switched on, a mote of light follows you: 6 tiles of light, torch or no, and your torch reaches further." },   // (player.js torchRange, light.js inDark: B1)
   glimgun: { name: "glimgun", vague: "an oily brass tube", class: "a weapon", complexity: 2, charge: 0, target: "creature", value: 240,
     info: "Spits a bolt of burning glim at what you aim at: 2d6 fire. Each shot costs a glim from your purse.",
     needs: "C4: its shot lights the target's area, a trespass in the Lampless' holy places (bible §13.2: light.js, C2's holy places)" },
@@ -55,23 +55,21 @@ export const ARTIFACTS = {
     bonus: { jump: 2 }, value: 360, info: "Strapped on and wound, they add 2 blocks to your jump, and you climb 2 on the map.",
     needs: "25 charge a jump rather than 100 a minute (player.js, turns.js: a jump's hook)" },
   mirrorShield: { name: "mirror shield", vague: "a dish that shows you yourself", class: "a ward", complexity: 3, charge: 300, per: "minute",
-    bonus: { ward: 3 }, value: 380, info: "Raised, it turns arrows and bolts aside: they do 3 less.",
-    needs: "the bible's 50% of missiles reflected (missiles.js), for the ward meanwhile" },
+    bonus: { ward: 3 }, value: 380, info: "Raised, it turns half the arrows and bolts aside; the rest do 3 less." },   // (combat.js turnedAside: B1)
+  // B1 (C4 #7): built in bodymods/artifacts.js EFFECTS, moved here from the waiting table.
+  homingPip: { name: "homing pip", vague: "a pip that leans west", class: "a mover", complexity: 1, charge: 2500, value: 300,
+    info: "Takes you home to where the run began (the Temple of Angles; on GNOMON's world Hollowmere), with no hostile within 7 tiles." },
+  snuffer: { name: "snuffer", vague: "a cold black cup", class: "a lamp", complexity: 2, charge: 200, value: 200,
+    info: "Dark for 20 s, 6 tiles round, torch or no: runes, planks and ghosts show there." },
+  theodolite: { name: "theodolite", vague: "a brass eye on three legs", class: "a finder", complexity: 3, charge: 100, value: 420,
+    info: "Sights the spans around you: their sites, hidden ones too, go onto your world map.",
+    needs: "the Hand on the world map (WS1's and WS3's Hand, once it exists)" },
 };
 
 // Bible §13.4's others: data for the code that will do each (docs/c4.md, integration requests). Same shape as ARTIFACTS.
 export const ARTIFACTS_WAITING = {
-  homingPip: { name: "homing pip", vague: "a pip that leans west", class: "a mover", complexity: 1, charge: 2500, value: 300,
-    info: "Home to the Temple of Angles, with no hostile within 7 tiles.",
-    needs: "the teleport home (zones.js changeZone to the temple; on the real world Hollowmere's, C1a)" },
   programmablePip: { name: "programmable pip", vague: "a pip with a blank face", class: "a mover", complexity: 3, charge: 5000, value: 600,
     info: "Set once to a village you have seen; then it takes you there.", needs: "setting a village and the journey (overworld/travel.js)" },
-  theodolite: { name: "theodolite", vague: "a brass eye on three legs", class: "a finder", complexity: 3, charge: 100, value: 420,
-    info: "The Hand on the world map, and hidden sites in the next spans.",
-    needs: "the Hand on the world map and the hidden sites of the adjacent spans (overworld: WS1's discovery)" },
-  snuffer: { name: "snuffer", vague: "a cold black cup", class: "a lamp", complexity: 2, charge: 200, value: 200,
-    info: "Dark for 20 s, 6 tiles round: runes, planks and ghosts show.",
-    needs: "a dark circle for 20 s (light.js inDark, render3d.js; the shades' AI)" },
   shadowLamp: { name: "shadow-lamp", vague: "a lamp that is darker lit", class: "a lamp", complexity: 5, charge: 600, per: "minute", cells: ["dark"], value: 700,
     info: "Dark light: runes, ghosts and planks show in its cone, torch or no.",
     needs: "dark light in a cone (render3d.js, light.js; renderMap.js for the map)" },

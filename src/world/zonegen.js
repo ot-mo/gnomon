@@ -19,6 +19,7 @@ import { generateSurface, surfaceSteps, buildApronBand } from "../gen/surface.js
 import { generateDungeonLevel } from "../gen/dungeon.js";
 import { legacyZone } from "./legacy.js";
 import { zoneSeed } from "./run.js";
+import { realWorld } from "../items.js";
 import { siteWithDungeon, dungeonParams, DUNGEON_PEOPLE } from "./sites.js";
 import { hashInt } from "../rng.js";
 import { hourOf } from "../clock.js";
@@ -60,6 +61,7 @@ function dungeonZone(game, { wx, wy, z }) {
 function makeLevel(run, site, z, layout = null) {
   const seed = zoneSeed(run, site.at.wx, site.at.wy, z), p = dungeonParams(run, site, z);
   if (layout) p.layout = layout;
+  p.realLoot = realWorld(run);   // (B1, C4 #1: the real world's loot)
   return generateDungeonLevel(layout === "night" ? hashInt(seed, "night") : seed, p);
 }
 export function layoutNow(game, site) {

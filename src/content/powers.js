@@ -60,24 +60,25 @@ export const POWERS = {
   // --- The bible's other powers. Those with a bonus the game already reads work now; the rest wait (needs). ---
   crushing:     { tree: "bludgeon",  name: "Crushing",      info: "Double damage to the brittle (skeletons, golems).", bonus: () => ({ crush: 1 }) },
   longReach:    { tree: "polearm",   name: "Long reach",    info: "+0.4 reach.", bonus: () => ({ reach: 0.4 }) },
-  bleed:        { tree: "blades",    name: "Bleed",         info: "Short blades make a target bleed for 3 s on a critical hit.", needs: "a bleeding status, put on by a short blade's crit (status.js, combat.js)" },
-  riposte:      { tree: "blades",    name: "Riposte",       info: "Long blades: strike in the 0.2 s before a blow lands, and it's cancelled.", needs: "the long blade's parry in the 0.2 s before a blow lands (combat.js)" },
-  daze:         { tree: "bludgeon",  name: "Daze",          info: "A blow dazes the target for 1 s, a quarter of the time.", needs: "a daze from your blows, a quarter of the time (combat.js onHit, as the sling's stone)" },
+  // (B1: combat.js builds the class's blows these name; each works with its class only)
+  bleed:        { tree: "blades",    name: "Bleed",         info: "Short blades make a target bleed for 3 s on a critical hit (1 a second)." },
+  riposte:      { tree: "blades",    name: "Riposte",       info: "Long blades: strike in the 0.2 s before a blow lands, and it's cancelled." },
+  daze:         { tree: "bludgeon",  name: "Daze",          info: "Cudgels: a blow dazes the target for 1 s, a quarter of the time." },
   wallbreaker:  { tree: "bludgeon",  name: "Wallbreaker",   info: "Smash crates and cracked walls; at rank II open secret rooms without bombs.", max: 2, needs: "smashing crates and cracked walls with a cudgel (interact.js; rank II WS10's secret rooms)" },
-  cleave:       { tree: "axe",       name: "Cleave",        info: "A second enemy next to you takes half the blow.", needs: "the axe's half blow on a second adjacent enemy (combat.js)" },
-  disarm:       { tree: "axe",       name: "Disarm",        info: "People you strike sometimes drop their weapon.", needs: "people dropping their weapon (combat.js, ai.js)" },
-  highGround:   { tree: "polearm",   name: "High ground",   info: "+50% damage striking from a ledge above.", needs: "+50% damage from a ledge above (combat.js; the d20's +1 to hit from high ground is everyone's)" },
+  cleave:       { tree: "axe",       name: "Cleave",        info: "Axes: a second enemy next to you takes half the blow." },
+  disarm:       { tree: "axe",       name: "Disarm",        info: "Axes: armed foes you strike sometimes drop their weapon (half damage for 10 s)." },
+  highGround:   { tree: "polearm",   name: "High ground",   info: "Polearms: +50% damage striking from a ledge above." },
   brace:        { tree: "polearm",   name: "Brace",         info: "Chargers stop on your point.", needs: "chargers stopping on your point (ai.js charges, combat.js)" },
   // (check-content holds every bonus key to stats.js BONUS_KEYS, so `bonus: () => ({ missileAcc: 2 })` comes with the key)
   steadyHand:   { tree: "missile",   name: "Steady hand",   info: "+2 to hit with slings and bolt-bows.", bonus: () => ({ missileAcc: 2 }) },
-  pin:          { tree: "missile",   name: "Pin",           info: "Your bolts pin what they hit for 2 s.", needs: "a pin beyond the bolt-bow's own 2 s (missiles.js onHit; the balance pass: say +1 s, or slings' stones too)" },
-  glimgunner:   { tree: "missile",   name: "Glimgunner",    info: "The glimgun costs 1 glim for every 2 shots.", needs: "a glim every second shot (bodymods/artifacts.js EFFECTS.glimgun; the Lamplighter's kit holds one)" },
+  pin:          { tree: "missile",   name: "Pin",           info: "Your bolts pin what they hit a second longer (3 s)." },   // (missiles.js PIN_MORE: B1)
+  glimgunner:   { tree: "missile",   name: "Glimgunner",    info: "The glimgun costs 1 glim for every 2 shots." },   // (bodymods/artifacts.js: B1)
   returnDisc:   { tree: "throwing",  name: "Return",        info: "Thrown discs come back to your hand.", needs: "discs, a thrown kind that bounces to a second target (throwing.js; the item is C4's once it is)" },
   roll:         { tree: "tumbling",  name: "Roll",          info: "A dodge-roll in 3D.", needs: "a dodge-roll in 3D (player.js)" },
-  darkBackstab: { tree: "shadowcraft", name: "Dark backstab", info: "Double damage against an unaware target while your torch is out.", needs: "x2 against an unaware target with your torch out (combat.js, ai.js awareness)" },
+  darkBackstab: { tree: "shadowcraft", name: "Dark backstab", info: "Double damage against an unaware target while your torch is out, with any weapon." },
   faintRunes:   { tree: "shadowcraft", name: "Faint runes", info: "Runes show faintly while your torch is lit.", needs: "runes drawn faintly with the torch lit (materials.js, render3d.js; the dark lens's too)" },
   thriftyWick:  { tree: "glimcraft", name: "Thrifty wick",  info: "Your torch costs half as much glim.", bonus: () => ({ torchCost: -0.5 }) },
-  kindleAtRange:{ tree: "glimcraft", name: "Kindle at range", info: "Light braziers from 4 tiles away.", needs: "lighting a brazier from 4 tiles (interact.js; Kindle the mutation reaches 5 + level)" },
+  kindleAtRange:{ tree: "glimcraft", name: "Kindle at range", info: "Light braziers from 4 tiles away in 3D (E, your torch lit)." },   // (interact.js lookTarget: B1)
   oilFire:      { tree: "glimcraft", name: "Oil fire",      info: "Set glim puddles alight.", needs: BUILT_B3 },
   keenEyeSites: { tree: "survey",    name: "Keen Eye",      info: "You find hidden sites twice as often on the road (20%)." },   // (overworld/encounters.js reads it)
   readHeights:  { tree: "survey",    name: "Read heights",  info: "For 10 s after a look in 3D, map tiles show their height as a digit.", needs: "height digits on the map for 10 s after a look in 3D (renderMap.js; the height lens's too)" },
@@ -86,8 +87,8 @@ export const POWERS = {
   triangulator: { tree: "lore",      name: "Triangulator",  info: "Triangulating an event gives twice the XP.", needs: BUILT_B3 },
   staunch:      { tree: "leechcraft", name: "Staunch",      info: "You stop bleeding.", needs: "a bleeding status to stop (status.js)" },
   brew:         { tree: "leechcraft", name: "Brew",         info: "Mix tonics at a village oven.", needs: BUILT_B3 },
-  repair:       { tree: "artificing", name: "Repair",       info: "Mend your gear.", needs: "something to mend: a broken artifact (bodymods/artifacts.js it.broken), a snapped bone weapon" },
-  recharge:     { tree: "artificing", name: "Recharge",     info: "Refill cells with glim.", needs: "filling sun and dark cells from glim as well (bodymods/artifacts.js fillCell fills glim cells only)" },
+  repair:       { tree: "artificing", name: "Repair",       info: "Mend your gear: E on a snapped weapon, a chipped edge or a broken artifact." },
+  recharge:     { tree: "artificing", name: "Recharge",     info: "Refill sun and dark cells with glim too (a glim per 100 charge)." },   // (bodymods/artifacts.js fillCell: B1)
   keenFingers:  { tree: "artificing", name: "Keen fingers", info: "+3 to examine artifacts.", bonus: () => ({ examine: 3 }) },
   mod:          { tree: "artificing", name: "Mod",          info: "Add one property to an item.", needs: "adding one property to an item (an item action over items.js PROPERTIES)" },
   pathfinder:   { tree: "pathcraft", name: "Pathfinder",    info: "You travel half again as far in an hour.", bonus: () => ({ travel: 0.5 }) },   // (overworld/travel.js)

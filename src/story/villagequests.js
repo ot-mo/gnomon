@@ -36,7 +36,7 @@ import { QUESTS } from "../content/quests.js";
 import { VILLAGES } from "../content/villages.js";
 import { FLOOR_Z } from "../world.js";
 import { spawnCreature, addCreature, removeCreature, pickCreatureType } from "../creatures.js";
-import { makeItem, addToInventory, randomEquipment, randomJewel, randomPotion, itemName } from "../items.js";
+import { makeItem, addToInventory, randomJewel, itemName, lootGear, lootPotion, realWorld } from "../items.js";
 import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../pathing.js";
 import { standWith } from "../world.js";
 import { KIND } from "../blocks.js";
@@ -175,8 +175,9 @@ export function rewardOf(game, q) {
 function offersFor(game, q, level) {
   if (q.vars.offers) return q.vars.offers;
   const rng = makeRng(seedFor(game.run?.seed ?? 0, "reward", q.id));
-  const depth = Math.min(20, level + 3);   // weapons at the village's tier + 1
-  return [randomEquipment(rng, depth, 0.3), randomJewel(rng, depth, 0.3), { ...randomPotion(rng), count: 2 }];
+  const depth = Math.min(20, level + 3), real = realWorld(game.run);   // weapons at the village's tier + 1
+  // (the real world's loot, B1, C4 #1: C4's gear at the village's level + 3, a tonic pair as often as a potion pair)
+  return [lootGear(rng, real ? level + 3 : depth, 0.3, real), randomJewel(rng, depth, 0.3), { ...lootPotion(rng, real), count: 2 }];
 }
 function giveReward(game, q) {
   const r = rewardOf(game, q), p = game.player;

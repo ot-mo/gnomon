@@ -35,13 +35,14 @@
 import { IMPLANTS, IMPLANT_VALUE } from "../content/items/implants.js";
 import { registerItemKind, takeOne } from "../items.js";
 import { addPart, removePart } from "../body.js";
-import { invalidateStats, clampHp, cooldownMul } from "../stats.js";
+import { invalidateStats, clampHp, cooldownMul, maxHp } from "../stats.js";
 import { registerAbility, registerAbilitySource } from "../abilities.js";
 import { registerStatus, addStatus } from "../status.js";
 import { pay, funds, formatPrice } from "../currency.js";
 import { skipTime } from "../time.js";
 import { arrivalPoint } from "../zones.js";
-import { emit } from "../events.js";
+import { emit, on } from "../events.js";
+import { injectTonic } from "../content/items/tonics.js";
 
 export const START_GRADE = 2;      // bible §15.6: grade 2 and one free implant of grade 2 or less
 export const IMPLANT_FEE = 25;     // glim per grade to fit one
@@ -238,4 +239,20 @@ registerAbility("dialSpine", {
     if (e === game.player) game.log("The dial in your spine turns once. Everything else stops.", [200, 210, 230]);
     return true;
   },
+});
+
+// --- The balm pump (B1, C4 #14; bible §13.6 "a balm below 40% HP") -------------------------------------------------
+// When a blow leaves you under BALM_PUMP_AT of your health it injects a balm tonic from your pack (takeOne, then
+// content/items/tonics.js injectTonic: the TOU save if another tonic still works), unless a balm already works or the
+// balm sickness (tonic:sick) would waste it.
+export const BALM_PUMP_AT = 0.4;
+on("hurt", (game, { tgt }) => {
+  const p = game.player;
+  // (not while a balm works, nor while an overdone balm's sickness stops balms: it would waste them; verification finding)
+  if (tgt !== p || !(p.hp > 0) || p.hp >= BALM_PUMP_AT * maxHp(p) || !implantEffect(p, "balmPump") || p.status?.["tonic:balm"] || p.status?.["tonic:sick"]) return;
+  const balm = (p.inv || []).find((s) => s.kind === "tonic" && s.effect === "balm");
+  if (!balm) return;
+  takeOne(p, balm);
+  game.log("Your balm pump hisses: a balm, into the spine.", [230, 90, 110]);
+  injectTonic(game, p, "balm");
 });

@@ -20,7 +20,7 @@
 //   judgeFrame(ms, now)       one frame's cast time (ms) at time now (ms) for dynamic resolution (render3d calls it)
 import * as S from "./screen.js";
 import { castRay, hit, setGhostVisible, rayInfo } from "./raycast.js";
-import { sampleGrid, inDark, zoneIsLightless, daylight, syncLight, sunState, sunlitGrid } from "./light.js";
+import { sampleGrid, inDark, zoneIsLightless, daylight, syncLight, sunState, sunlitGrid, snuffing } from "./light.js";
 import { sunDir, skyColors, fogFor, spanOf, daylightAt, minutes, clockLabel, phase, gnomonOf, handAngle, inNoonWindow } from "./clock.js";
 import { material, albedo, setMaterialTime, setDarkSight, DARK_SIGHT_BLOCKS } from "./materials.js";
 import { noise2, hash, hashInt } from "./rng.js";
@@ -31,6 +31,8 @@ import { itemSprite } from "./items.js";
 import { PROPS } from "./content/biomes.js";
 import { projectileSprites } from "./throwing.js";
 import { EYE, torchRange, torchPower } from "./player.js";
+import { fittedEffect } from "./body.js";
+export const SURVEY_LENS = 2;
 import { FLOOR_Z, B, BLOCKS } from "./world.js";
 import { liquidColor } from "./renderMap.js";
 import { neighbourAddr, cachedZone } from "./zones.js";
@@ -575,11 +577,12 @@ export function render3d(game) {
   if (depth.length !== S.cols * S.rows) depth = new Float32Array(S.cols * S.rows);
   torch.power = torchPower(player, game.time);
   torch.range = torchRange(player);
-  const seeRange = torch.range;
+  // What 3D marks on your map: the lit, and within your torch's reach; twice that with the survey lens (B1, WS5 #9).
+  const seeRange = torch.range * (fittedEffect(player, "surveyLens") ? SURVEY_LENS : 1);
   frameLook(game, zone);
   // Runes glow and ghost planks show only in the dark (light.js inDark). Without sky that's your torch
   // alone, decided once for the frame; under the sky it's asked at each ghost block or rune a ray meets.
-  darkPerHit = !zoneIsLightless(zone) && !player.torch;
+  darkPerHit = (!zoneIsLightless(zone) && !player.torch) || snuffing(game, zone);   // (a snuffer's circle: asked at each hit, B1)
   setDarkSight(!player.torch && !darkPerHit);
   setGhostVisible(!darkPerHit ? !player.torch : (x, y, z) => inDark(game, zone, x, y, z));
 

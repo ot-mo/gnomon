@@ -32,6 +32,10 @@ import { PLAYER_STEP_UP } from "./pathing.js";
 import { updateSpikes, nearSpikes, TICK } from "./traps.js";
 import { tryWalkOff } from "./zones.js";
 import { hasKey } from "./keyset.js";
+import { fittedEffect, worn } from "./body.js";
+import { ARMOURS } from "./items.js";
+// A worn piece with climb 2 (the climbing hooks, B1, C4 #6) climbs 2 blocks on the map, as High jumper does.
+const climbsTwo = (p) => worn(p).some((g) => g.kind === "armour" && ARMOURS[g.id]?.climb >= 2);
 
 export const STEP_TIME = 1 / WALK;   // ≈ 0.24 s per tile
 const USE_TIME = 0.5;                // pulling a lever, opening a door
@@ -153,7 +157,7 @@ export function mapStep(game, dx, dy, { force = shiftHeld() } = {}) {
   settle(game);
   const S = solidFor(game);
   const flying = statusFlag(p, "flying"), swimmer = canSwim(p), flat = statusFlag(p, "flat");
-  const climb = PLAYER_STEP_UP + (jumpBonus(p) >= 1 ? 1 : 0);
+  const climb = PLAYER_STEP_UP + (jumpBonus(p) >= 1 || fittedEffect(p, "gripSoles") || climbsTwo(p) ? 1 : 0);   // (grip soles, climbing hooks: B1)
   const tx = Math.floor(p.x), ty = Math.floor(p.y);
   const nx = tx + dx, ny = ty + dy;
   if (nx < 0 || ny < 0 || nx >= zone.w || ny >= zone.d) return stepOffEdge(game, dx, dy, nx, ny);

@@ -26,6 +26,8 @@ const weapon = (id, made) => makeGear("weapon", id, made);
 const armour = (id, made) => makeGear("armour", id, made);
 const tonic = (effect, count) => ({ kind: "tonic", effect, count });
 const vial = (effect, count = 1) => ({ kind: "vial", effect, count });
+// An artifact the kit names, known, with a glim cell partly charged (B1, C4 #13: the snuffer 3 uses, the theodolite 5).
+const kitArtifact = (id, charge) => ({ kind: "artifact", id, known: true, cell: { id: "glim", charge } });
 const CLOTHES = armour("clothes");
 
 export const LEVELS = {
@@ -62,8 +64,7 @@ export const BACKGROUNDS = {
   hushNovice: {
     name: "Hush Novice", genotype: "bent", info: "You learned to sit in the dark until the dark sat with you.",
     bonus: { wil: 2 }, trees: ["shadowcraft", "lore"], glim: 40, rep: { lampless: 200, unlit: 100, horary: -100, moths: -100 },
-    kit: { equip: { hand_r: weapon("dagger", "bone"), body: CLOTHES }, pack: [vial("umbra")],
-           wants: ["a snuffer (items/artifacts.js ARTIFACTS_WAITING: its dark circle)"] },
+    kit: { equip: { hand_r: weapon("dagger", "bone"), body: CLOTHES }, pack: [vial("umbra"), kitArtifact("snuffer", 600)], wants: [] },
   },
   pressedPilgrim: {
     name: "Pressed Pilgrim", genotype: "bent", info: "You walked the Tessellate to learn what the floor remembers.",
@@ -85,8 +86,7 @@ export const BACKGROUNDS = {
     info: "You were sent down from the Archive to measure what the Pressing left.",
     bonus: { int: 2, agi: 1 }, trees: ["survey", "missile"], glim: 80, rep: { survey: 200 },
     kit: { equip: { hand_r: weapon("dagger", "copper"), body: CLOTHES, back: armour("mapCase") },   // (the dagger: a weapon in hand)
-           pack: [{ kind: "missile", id: "boltBow", ench: 0 }, { kind: "ammo", effect: "bolt", count: 20 }],
-           wants: ["the theodolite (items/artifacts.js ARTIFACTS_WAITING: the Hand and hidden sites on the world map)"] },
+           pack: [{ kind: "missile", id: "boltBow", ench: 0 }, { kind: "ammo", effect: "bolt", count: 20 }, kitArtifact("theodolite", 500)], wants: [] },
   },
   forgehandOfOrrum: {
     name: "Forgehand of Orrum", genotype: "plumb", level: "orrum", implant: "knuckles",
@@ -112,8 +112,7 @@ export const BACKGROUNDS = {
     name: "Night-warden of Cassin", genotype: "plumb", level: "cassin", implant: "darkLens",
     info: "You watched the Lamp's dark side, where its light ends.",
     bonus: { wil: 2, agi: 1 }, trees: ["shadowcraft", "blades"], glim: 60, rep: { lampless: 100, unlit: 100 },
-    kit: { equip: { hand_r: weapon("dagger", "copper"), body: CLOTHES }, belt: weapon("dagger", "copper"), pack: [],
-           wants: ["a snuffer (items/artifacts.js ARTIFACTS_WAITING: its dark circle)"] },
+    kit: { equip: { hand_r: weapon("dagger", "copper"), body: CLOTHES }, belt: weapon("dagger", "copper"), pack: [kitArtifact("snuffer", 600)], wants: [] },
   },
 };
 

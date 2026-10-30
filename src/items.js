@@ -21,8 +21,10 @@
 import { sfx } from "./sfx.js";
 import { emit } from "./events.js";
 import { seededSort } from "./rng.js";
+import { hasKey } from "./keyset.js";
 import { RULES } from "./rules.js";
 import { POTIONS, SCROLLS, SYLLABLES, ELEMENTS, WEAPONS, ARMOURS, PROPERTIES, RINGS, AMULETS, RELICS, RELIC_COLOR } from "./content/items/legacy.js";
+import { MATERIALS } from "./content/items/forge.js";
 export { POTIONS, POTION_COLORS, SCROLLS, ELEMENTS, WEAPONS, WEAPON_PALETTE, ARMOURS, PROPERTIES, RINGS, AMULETS, GEMS, RELICS,
   RELIC_COLOR, FLOOR_ART, makeRelic, pickRelic } from "./content/items/legacy.js";
 
@@ -86,7 +88,26 @@ export function itemBonuses(it) {
 // Strength needed to use a weapon or armour ("light" armour needs less).
 export function strNeeded(it) {
   const base = (it.kind === "weapon" ? WEAPONS : ARMOURS)[it.id].str;
-  return Math.max(0, base + (it.props || []).reduce((s, k) => s + (PROPERTIES[k].strReq || 0), 0));
+  // (B1, C4 #4: a material's own, pleatmetal's -3)
+  return Math.max(0, base + (MATERIALS[it.made]?.strReq || 0) + (it.props || []).reduce((s, k) => s + (PROPERTIES[k].strReq || 0), 0));
+}
+
+// The Repair power (B1, bible §10.8 Artificing): E on a broken thing mends it, a snapped bone weapon or a broken
+// artifact (and a chipped blackglass blade's edge with it). Without the power it says what would.
+//   mendItem(game, e, it) → seconds (0: nothing done)
+export const MEND_TIME = 10;
+export function mendItem(game, e, it) {
+  const chipped = it?.made && it.chips > 0;
+  if (!it || (!it.broken && !chipped)) return 0;
+  const name = itemName(game, it);
+  if (!hasKey(e.perks, "repair")) {
+    if (e === game.player) game.log(`The ${name} needs mending first (the Repair power).`, [170, 170, 170]);
+    return 0;
+  }
+  it.broken = false;
+  if (chipped) { it.material = MATERIALS[it.made].dmg; it.chips = 0; }
+  if (e === game.player) game.log(`You mend the ${itemName(game, it)}.`, [200, 220, 200]);
+  return MEND_TIME;
 }
 
 // --- How things look lying on the floor ---------------------------------------
@@ -143,6 +164,25 @@ export function randomEquipment(rand, depth, luck = 0) {
   return it;
 }
 
+// The real world's loot (B1, C4 #1): its gear is C4's classes and pieces in materials (content/items/gear.js
+// randomGear, by level) and a share of its potions are tonics (content/items/tonics.js randomTonic), which those
+// modules register here as they load (they import this one). The test world, the legacy stack under it and the
+// parent's peddler keep the parent's draws exactly (golden (b)); `real` is realWorld(game.run) or the generator's flag.
+//   realWorld(run) → bool                      a run on GNOMON's world (not the test world)
+//   lootGear(rand, depth, luck, real)          randomGear(rand, level, luck) on the real world, else randomEquipment
+//   lootPotion(rand, real)                     on the real world a tonic TONIC_SHARE of the time, else randomPotion
+//   lootTonic(rand) → { kind: "tonic", effect } | null   a tonic (a shelf's)
+//   registerLoot("gear" | "tonic", fn)        (a function, so gear.js and tonics.js can call it while this module loads)
+function loot() { return (loot.table ||= { gear: null, tonic: null }); }
+export function registerLoot(kind, fn) { loot()[kind] = fn; }
+export const TONIC_SHARE = 0.4;
+export const realWorld = (run) => !!run?.world && run.world.id !== "test";
+export const lootGear = (rand, depth, luck = 0, real = false) =>
+  (real && loot().gear ? loot().gear(rand, depth, luck) : randomEquipment(rand, depth, luck));
+export const lootTonic = (rand = Math.random) => loot().tonic?.(rand) ?? null;
+export const lootPotion = (rand = Math.random, real = false) =>
+  (real && loot().tonic && rand() < TONIC_SHARE ? loot().tonic(rand) : randomPotion(rand));
+
 // A ring or an amulet (from floor 3 on). Mostly +1; deeper, sometimes +2 or +3. 1 in 5 cursed.
 export function randomJewel(rand, depth, luck = 0) {
   const kind = rand() < 0.55 ? "ring" : "amulet";
@@ -156,13 +196,13 @@ export function randomJewel(rand, depth, luck = 0) {
 
 // Something worth risking a jump for. Crystals are the rare prize; on the deepest floors, now
 // and then a relic ("relic?": which one is chosen when you arrive, so you never find one twice).
-export function randomTreasure(rand, depth) {
+export function randomTreasure(rand, depth, real = false) {
   const R = RULES.relics;
   if (depth >= R.minLevel && depth <= R.maxLevel && rand() < R.chance) return { kind: "relic?" };
   const roll = rand();
   if (roll < 0.08) return { kind: "strength" };
   if (roll < 0.16) return { kind: "heart" };
-  if (roll < 0.5) return randomEquipment(rand, depth + 1, 0.15);
+  if (roll < 0.5) return lootGear(rand, depth + 1, 0.15, real);
   if (roll < 0.62 && depth >= 3) return randomJewel(rand, depth + 1, 0.1);
   if (roll < 0.8) return randomScroll(rand);
   return { kind: "knife", count: 3 + Math.floor(rand() * 3) };
@@ -187,6 +227,9 @@ export function makeItem(item, x, y, z) {
 // Into the pack: stackable things join a stack with the same key. Returns the stack it's in.
 export function addToInventory(e, it) {
   const { x, y, z, dropped, ...item } = it;
+  // Readhand (B1, C4 #8): an artifact is known as it comes into your hands, by any way (found, bought, given). The
+  // artifact kind's onPickup says so for one picked up; a trade or a gift hands its onPickup a copy (verification finding).
+  if (item.kind === "artifact" && e.mutations?.readhand && item.known !== true && !item.broken) item.known = true;
   const key = stackKey(item);
   if (key) {
     const n = item.count || 1;

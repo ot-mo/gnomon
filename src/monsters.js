@@ -7,7 +7,7 @@
 //       factions } (events.js) last: content/legacy/encounters.js logs Rook's quarry and story/quests.js
 //       routes it to his quest, game.js opens a guardian's gate and wins the run when the boss falls. src: the killer (the player when byPlayer, else a creature or null).
 import { DIRS8 } from "./pathing.js";
-import { makeItem, randomPotion, randomScroll, randomEquipment, randomJewel, awayFromWalls } from "./items.js";
+import { makeItem, randomScroll, randomJewel, awayFromWalls, lootGear, lootPotion } from "./items.js";
 import { HEIGHT, RADIUS, moveAxis, bonus } from "./player.js";
 import { gainXp, killXp, modeXp } from "./leveling.js";
 import { RULES } from "./rules.js";
@@ -20,11 +20,12 @@ import { CREATURE_TYPES, spawnCreature, addCreature, removeCreature, isFlat, gho
 import { hasKey } from "./keyset.js";
 import { membershipsOf } from "./factions.js";
 
-// What an elite leaves behind: always something, sometimes gear, a ring or an amulet.
-function eliteLoot(depth, luck = 0) {
+// What an elite leaves behind: always something, sometimes gear, a ring or an amulet. real: the real world's loot
+// (B1, C4 #1: C4's gear, tonics among the potions; items.js lootGear).
+function eliteLoot(depth, luck = 0, real = false) {
   const r = Math.random();
-  return r < 0.35 ? randomPotion() : r < 0.55 ? randomScroll() : r < 0.68 && depth >= 3 ? randomJewel(Math.random, depth + 1, 0.1 + luck)
-    : randomEquipment(Math.random, depth + 1, 0.2 + luck);
+  return r < 0.35 ? lootPotion(Math.random, real) : r < 0.55 ? randomScroll() : r < 0.68 && depth >= 3 ? randomJewel(Math.random, depth + 1, 0.1 + luck)
+    : lootGear(Math.random, depth + 1, 0.2 + luck, real);
 }
 
 // byPlayer: you killed it (by blade, fire or lightning), so you get its XP.
@@ -70,10 +71,13 @@ export function killMonster(game, m, message, dropLoot = true, byPlayer = true, 
     if (m.elite || Math.random() < 0.25 * luck)
       zone.items.push(makeItem({ kind: "cash", amount: Math.round((1 + Math.floor(Math.random() * (2 + zone.level * 0.6))) * (m.elite ? 1.5 : 1)) }, ...awayFromWalls(zone, m.x + 0.15, m.y + 0.1, ground), ground));
     const [ix, iy] = awayFromWalls(zone, m.x, m.y, ground);
-    if (m.elite) zone.items.push(makeItem(eliteLoot(zone.level, luck > 1 ? 0.15 : 0), ix, iy, ground));
+    // (the zone's own loot, as its floors': the real world's surface and site floors; the Keeper's Stair, the parent's
+    // stack inside the real world, keeps the parent's; verification finding)
+    const real = !!zone.realLoot;
+    if (m.elite) zone.items.push(makeItem(eliteLoot(zone.level, luck > 1 ? 0.15 : 0, real), ix, iy, ground));
     else if (Math.random() < 0.25 * luck) {
       const r = Math.random();
-      zone.items.push(makeItem(r < 0.5 ? randomPotion() : r < 0.8 ? randomScroll() : { kind: "bomb", count: 1 }, ix, iy, ground));
+      zone.items.push(makeItem(r < 0.5 ? lootPotion(Math.random, real) : r < 0.8 ? randomScroll() : { kind: "bomb", count: 1 }, ix, iy, ground));
     }
   }
   // A slime splits in two (into the free tiles around it).

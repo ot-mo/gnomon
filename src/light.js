@@ -168,8 +168,12 @@ export function naturalLight(game, zone, x, y, z) {
   return sampleLight(zone, zone.skyLight, x, y, z, true) * daylight(game);
 }
 
+// A snuffer's circle (B1, C4 #7: zone.snuffs [{ x, y, r, until }]) is dark whatever lights it, your torch too.
+export const snuffedAt = (game, zone, x, y) => !!zone?.snuffs?.some((d) => d.until > (game.time || 0) && Math.hypot(x - d.x, y - d.y) <= d.r);
+export const snuffing = (game, zone) => !!zone?.snuffs?.some((d) => d.until > (game.time || 0));
 export function inDark(game, zone, x, y, z) {
-  if (game.player.torch) return false;
+  if (snuffedAt(game, zone, x, y)) return true;
+  if (game.player.torch || game.player.status?.["running:lanternMote"]) return false;   // (the lantern-mote is light too: B1, WS5 #19)
   return zoneIsLightless(zone) || naturalLight(game, zone, x, y, z) < RULES.dark.threshold;
 }
 

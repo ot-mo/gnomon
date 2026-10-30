@@ -1235,7 +1235,8 @@ export function checkGear(m) {
     for (const [it, price, name] of want) {
       if (I.itemPrice(it) !== price || I.itemName(game, it) !== name) fail(`${name}: ${I.itemName(game, it)} at ${I.itemPrice(it)}, want ${name} at ${price}`);
     }
-    if (ARC.ARTIFACTS_WAITING.homingPip.value !== 300) fail(`the homing pip's value ${ARC.ARTIFACTS_WAITING.homingPip.value}, want 300`);
+    const pip = ARC.ARTIFACTS.homingPip || ARC.ARTIFACTS_WAITING.homingPip;   // (live since B1)
+    if (pip.value !== 300) fail(`the homing pip's value ${pip.value}, want 300`);
     // Up the ladder, worth more at every rung.
     const ladder = LADDER.map(([mat]) => I.itemPrice(GR.makeGear("weapon", "longsword", mat)));
     if (ladder.some((v, k) => k && v <= ladder[k - 1])) fail(`a longsword's price up the ladder: ${ladder.join(", ")}`);
@@ -1246,10 +1247,11 @@ export function checkGear(m) {
     const tierOf = (level) => Math.min(8, Math.ceil((level + 1) / 3));
     let launchers = 0;
     const HEAVY = { greatsword: 4, maul: 4, glaive: 4, waraxe: 3, longsword: 3 };
-    // The armour that does something now (written out, not read from gear.js useful): armour, or a bonus the stat bus reads.
+    // The armour that does something now (written out, not read from gear.js useful): armour, a bonus the stat bus reads, or
+    // since B1 a special that is built (a worn reputation).
     const LOOT_ARMOUR = ["leather", "chain", "scale", "plate", "copperCap", "ironHelm", "goggles", "cloak", "bracers", "gauntlets", "boots",
       "helm", "plumbHelm", "lampCrownHat", "monocle", "glassScale", "pleatedCoat", "reedCloak", "featherCloak", "mapCase", "kiteGlider", "examiningKit",
-      "stiltSandals", "stiltBoots"];
+      "stiltSandals", "stiltBoots", "featheredHood", "assizeWrit", "buckler", "climbingHooks"];   // (B1: the hood and the writ, their worn reputation built)
     const drawnArmour = new Set();
     const tally = {};
     for (let level = 1; level <= 30; level++) {
@@ -1344,7 +1346,7 @@ export function checkGear(m) {
       ironbark: (p) => St.bonus(p, "av") === 2 && St.bonus(p, "str") === 2, foldSap: (p) => has(p, "flat"), clearwit: (p) => St.bonus(p, "examine") === 5 && St.bonus(p, "int") === 2,
     };
     const od = {
-      balm: (p) => has(p, "tonic:sick"), hasp: (p) => has(p, "hasted") && has(p, "tonic:crash"), gloam: (p) => has(p, "darkened") && m.player.torchRange(p) < 6,
+      balm: (p) => has(p, "tonic:sick"), hasp: (p) => has(p, "hasted") && has(p, "tonic:crash"), gloam: (p) => has(p, "blinded") && (p.torch = true) && m.player.torchRange(p) <= 1,   // (B1, C4 #10: blind in any light)
       ironbark: (p) => has(p, "tonic:heavy"), foldSap: (p) => m.status.statusLeft(p, "flat") === 60, clearwit: () => !game.zone.seen.some(Boolean),
     };
     if (JSON.stringify(Object.keys(TN.TONICS)) !== JSON.stringify(Object.keys(expect))) fail(`tonics ${Object.keys(TN.TONICS).join(", ")}, want bible §13.8's six`);
@@ -1458,7 +1460,7 @@ export function checkGear(m) {
       const od = (id, check) => { const q = fresh(); game.zone.seen.fill(1); game.zone.holeSeen.fill(1); TN.injectTonic(game, q, "ironbark", seq(0.9)); TN.injectTonic(game, q, id, seq(0)); return check(q); };
       const ods = {
         balm: od("balm", (q) => m.status.statusLeft(q, "tonic:sick") === 30 && m.status.statusFlag(q, "noRegen")),
-        gloam: od("gloam", (q) => m.status.statusLeft(q, "darkened") === 20),
+        gloam: od("gloam", (q) => m.status.statusLeft(q, "blinded") === 20),   // (B1, C4 #10: blind in any light, player.js torchRange)
         ironbark: od("ironbark", (q) => m.status.statusLeft(q, "tonic:heavy") === 20 && m.status.statusSpeed(q) === 0.5),
         hasp: od("hasp", (q) => m.status.statusLeft(q, "hasted") === 15 && m.status.statusLeft(q, "tonic:crash") === 15),
         foldSap: od("foldSap", (q) => m.status.statusLeft(q, "flat") === 60),
@@ -1575,6 +1577,447 @@ export function checkGear(m) {
   return { name: "items: C4's gear", ok: problems.length === 0, problems, stats };
 }
 
+// --- B1: gear and powers (the backlog of C4's and WS5's requests, 2026-10-30) ------------------------------------------
+// checkB1Gear(m) → { name: "items: B1's gear", ok, problems, stats }: each applied request held, written out here.
+//   1. The real world's loot (C4 #1): lootGear and lootPotion give the parent's draws exactly off the real world
+//      (the same rng, the same items) and C4's gear and tonics on it; a real-world run's dungeon floors, surface
+//      rewards, elite drops and merchants' shelves draw C4's gear (forged weapons in a material, no parent weapon) and
+//      tonics; the test world's dungeons none.
+export function checkB1Gear(m) {
+  const problems = [], stats = {};
+  const fail = (msg) => problems.push(msg);
+  const { game, startRun } = m.game, I = m.items;
+  const section = (name, fn) => { try { fn(); } catch (err) { fail(`${name}: threw ${err.stack?.split("\n").slice(0, 3).join(" / ") || err}`); } };
+  const c4Gear = (it) => (it.kind === "weapon" && !!it.made) || (it.kind === "missile" && (it.id === "sling" || !!it.made)) ||
+    (it.kind === "armour" && (!!it.made || !m.forge.FORGED.armour.includes(it.id)));
+  const isGearKind = (it) => ["weapon", "armour", "missile"].includes(it?.kind);
+
+  section("loot", () => {
+    // Off the real world: the parent's draws, draw for draw.
+    for (let k = 0; k < 300; k++) {
+      const a = m.rng.makeRng(900 + k), b = m.rng.makeRng(900 + k), depth = 1 + (k % 20);
+      const x = I.lootGear(a, depth, 0.15, false), y = I.randomEquipment(b, depth, 0.15);
+      if (JSON.stringify(x) !== JSON.stringify(y) || a() !== b()) { fail(`lootGear off the real world drew ${JSON.stringify(x)}, randomEquipment ${JSON.stringify(y)}`); break; }
+      const a2 = m.rng.makeRng(k), b2 = m.rng.makeRng(k);
+      if (JSON.stringify(I.lootPotion(a2, false)) !== JSON.stringify(I.randomPotion(b2)) || a2() !== b2()) { fail("lootPotion off the real world isn't randomPotion"); break; }
+    }
+    // On it: C4's gear and a share of tonics.
+    let forged = 0, tonics = 0, potions = 0;
+    for (let k = 0; k < 2000; k++) {
+      const it = I.lootGear(m.rng.makeRng(7000 + k), 1 + (k % 26), 0.15, true);
+      if (!c4Gear(it)) fail(`lootGear on the real world drew the parent's ${it.kind} ${it.id} (no material)`);
+      if (it.made) forged++;
+      const pt = I.lootPotion(m.rng.makeRng(k), true);
+      if (pt.kind === "tonic") tonics++; else if (pt.kind === "potion") potions++;
+      else fail(`lootPotion drew a ${pt.kind}`);
+    }
+    if (Math.abs(tonics / 2000 - I.TONIC_SHARE) > 0.04) fail(`lootPotion on the real world: ${tonics} tonics in 2000, want about ${I.TONIC_SHARE * 2000}`);
+    stats.loot = `off the real world 300 gear and potion draws equal to the parent's; on it 2000 gear draws all C4's (${forged} forged), ${tonics} tonics and ${potions} potions`;
+
+    // A real-world run: its dungeon floors; the same seed's test world.
+    const counts = { real: { gear: 0, parent: 0, tonic: 0, zones: 0 }, test: { gear: 0, parent: 0, tonic: 0, zones: 0 } };
+    for (const [name, world] of [["real", m.worldmap.REAL_WORLD], ["test", m.testWorld.TEST_WORLD]]) {
+      startRun(11, world);
+      const run = game.run, c = counts[name];
+      for (const site of run.sites.values()) {
+        if (!site.dungeon || site.dungeon.legacy || c.zones >= 30) continue;
+        for (let z = 1; z <= Math.min(2, site.dungeon.levels); z++) {
+          const zone = m.zones.ZONE_GENERATORS.dungeon(game, { wx: site.at.wx, wy: site.at.wy, z });
+          if (!zone) continue;
+          c.zones++;
+          if (!!zone.realLoot !== (name === "real")) fail(`${name} ${site.id} level ${z}: realLoot ${zone.realLoot}`);
+          for (const it of zone.items) {
+            if (it.kind === "tonic") c.tonic++;
+            if (!isGearKind(it)) continue;
+            if (c4Gear(it) && (name === "real" || it.made)) c.gear++; else c.parent++;
+          }
+        }
+      }
+    }
+    const R = counts.real, T = counts.test;
+    if (R.zones < 20 || R.parent > 0 || R.gear < 10 || R.tonic < 3) fail(`real-world dungeon floors: ${JSON.stringify(R)} (want C4's gear only, and tonics)`);
+    if (T.tonic > 0 || T.gear > 0 || T.parent < 5) fail(`test-world dungeon floors: ${JSON.stringify(T)} (want the parent's gear only, no tonics)`);
+    // Surface rewards (on and off the real world), elite drops, a merchant's shelf.
+    const sr = { gear: 0, parent: 0, tonic: 0 };
+    for (let k = 0; k < 600; k++) {
+      const it = m.common.surfaceReward(m.rng.makeRng(k), 2 + (k % 24), true);
+      if (it.kind === "tonic") sr.tonic++;
+      else if (isGearKind(it)) c4Gear(it) ? sr.gear++ : sr.parent++;
+      const t = m.common.surfaceReward(m.rng.makeRng(k), 2 + (k % 24), false);
+      if (t.kind === "tonic" || (isGearKind(t) && t.made)) { fail(`surfaceReward off the real world drew ${JSON.stringify(t)}`); break; }
+    }
+    if (sr.parent || sr.gear < 200 || sr.tonic < 10) fail(`surfaceReward on the real world: ${JSON.stringify(sr)}`);
+    startRun(11, m.worldmap.REAL_WORLD);
+    const p = game.player, zone = game.zone, drops = { gear: 0, parent: 0, tonic: 0 };
+    const rand = Math.random;
+    try {
+      let s = 1;
+      Math.random = () => (((s = (Math.imul(s ^ (s >>> 15), 0x2c1b3c6d) + 0x9e3779b9) >>> 0)) / 4294967296);
+      for (let k = 0; k < 200; k++) {
+        const c = m.creatures.addCreature(zone, m.creatures.spawnCreature("goblin", Math.floor(p.x), Math.floor(p.y), p.z, { level: 14, elite: true, rng: () => 0.5 }));
+        const before = zone.items.length;
+        m.monsters.killMonster(game, c, "", true, true);
+        for (const it of zone.items.slice(before)) {
+          if (it.kind === "tonic") drops.tonic++;
+          else if (isGearKind(it)) c4Gear(it) ? drops.gear++ : drops.parent++;
+        }
+        zone.items.length = before;
+      }
+    } finally { Math.random = rand; }
+    if (drops.parent || drops.gear < 20 || drops.tonic < 10) fail(`a real-world elite's drops: ${JSON.stringify(drops)}`);
+    // The Keeper's Stair (the parent's stack inside the real world) keeps the parent's drops, as its floors do.
+    const was = zone.realLoot, before = zone.items.length, legacyDrops = { c4: 0, tonic: 0, n: 0 };
+    try {
+      zone.realLoot = false;   // (as a floor of the Keeper's Stair is)
+      let s = 7;
+      Math.random = () => (((s = (Math.imul(s ^ (s >>> 15), 0x2c1b3c6d) + 0x9e3779b9) >>> 0)) / 4294967296);
+      for (let k = 0; k < 120; k++) {
+        const c = m.creatures.addCreature(zone, m.creatures.spawnCreature("goblin", Math.floor(p.x), Math.floor(p.y), p.z, { level: 14, elite: true, rng: () => 0.5 }));
+        m.monsters.killMonster(game, c, "", true, true);
+      }
+      for (const it of zone.items.slice(before)) { legacyDrops.n++; if (it.kind === "tonic") legacyDrops.tonic++; else if (isGearKind(it) && it.made) legacyDrops.c4++; }
+    } finally { zone.realLoot = was; zone.items.length = before; Math.random = rand; }
+    if (!legacyDrops.n || legacyDrops.c4 || legacyDrops.tonic) fail(`elite drops on a parent's floor in the real world: ${JSON.stringify(legacyDrops)}`);
+    const trader = { type: "villager", level: 9, talk: { state: {} }, merchant: { stock: "general" }, uid: "b1-trader" };
+    const shelf = m.merchants.restock(game, trader).map((s) => s.item);
+    if (!shelf.some((it) => it.kind === "tonic") || shelf.some((it) => isGearKind(it) && !c4Gear(it)) || !shelf.some((it) => it.made))
+      fail(`a real-world merchant's shelf: ${shelf.map((it) => `${it.kind}:${it.id || it.effect}${it.made ? `(${it.made})` : ""}`).join(", ")}`);
+    stats.lootWorld = `real dungeon floors ${JSON.stringify(R)}, test ${JSON.stringify(T)}; surface rewards ${JSON.stringify(sr)}; elite drops ${JSON.stringify(drops)}; a shelf of ${shelf.length}`;
+  });
+
+  // 2. Light (WS5 #19, WS6b #3, C4 #10): the lantern-mote lights 6 tiles torch or no and counts you lit (light.js inDark);
+  //    the Snuffer's mark takes a tile off a lit torch; gloam's 6 tiles with the torch out (3 for the Bent); blinded leaves
+  //    a tile in any light, the dark sight with the torch out.
+  section("light", () => {
+    startRun(13, m.testWorld.TEST_WORLD);
+    const s0 = game.run.world.start;
+    game.debug.enterZone(`${s0.wx},${s0.wy},3`, "down");   // (a dungeon floor of the legacy stack: dark)
+    const p = game.player, P = m.player, L = m.light, S = m.status;
+    p.status = {}; p.mutations = {}; p.torch = false; p.snufferMark = false; m.stats.invalidateStats(p);
+    const dark0 = P.torchRange(p), darkHere = L.inDark(game, game.zone, p.x, p.y, p.z);
+    S.addStatus(game, p, "running:lanternMote", { t: 100 });
+    const mote = P.torchRange(p), motePow = P.torchPower(p), moteDark = L.inDark(game, game.zone, p.x, p.y, p.z);
+    p.torch = true;
+    const moteLit = P.torchRange(p);
+    S.removeStatus(game, p, "running:lanternMote"); p.torch = false;
+    if (!darkHere || dark0 > 0 || mote !== P.MOTE_RANGE || motePow < P.MOTE_POWER || moteDark || moteLit < P.MOTE_RANGE)
+      fail(`the lantern-mote: torch out ${dark0} → ${mote} tiles (power ${motePow}), in the dark ${darkHere} → ${moteDark}; lit ${moteLit}`);
+    p.torch = true;
+    const lit = P.torchRange(p);
+    p.snufferMark = true;
+    const marked = P.torchRange(p);
+    p.snufferMark = false;
+    if (Math.abs(lit - marked - 1) > 1e-9) fail(`the Snuffer's mark: a lit torch ${lit} → ${marked}, want a tile less`);
+    p.torch = false;
+    p.genotype = "plumb"; m.tonics.injectTonic(game, p, "gloam", () => 0.99);
+    const gloam = P.torchRange(p);
+    S.removeStatus(game, p, "tonic:gloam"); S.removeStatus(game, p, "tonic");
+    p.genotype = "bent"; m.tonics.injectTonic(game, p, "gloam", () => 0.99);
+    const gloamBent = P.torchRange(p);
+    S.removeStatus(game, p, "tonic:gloam"); S.removeStatus(game, p, "tonic");
+    if (gloam !== 6 || gloamBent !== 3) fail(`gloam with the torch out: ${gloam} tiles (want 6), a Bent's ${gloamBent} (want 3: half)`);
+    S.addStatus(game, p, "nightEyes", { t: 100 });   // (a little dark sight, so the dark's range isn't 0)
+    const sight = P.torchRange(p);
+    S.addStatus(game, p, "blinded", { t: 20 });
+    const blindDark = P.torchRange(p);
+    p.torch = true;
+    const blindLit = P.torchRange(p);
+    S.removeStatus(game, p, "blinded"); S.removeStatus(game, p, "nightEyes");
+    if (blindLit > 1 || !(sight > 0) || blindDark !== sight) fail(`blinded: ${blindLit} tiles with the torch lit (want 1 at most), ${blindDark} with it out (want the dark sight's ${sight})`);
+    stats.light = `the lantern-mote ${mote} tiles torch out (lit counted); a lit torch ${lit} → ${marked} with the Snuffer's mark; gloam ${gloam} (a Bent's ${gloamBent}); blinded ${blindLit} lit`;
+  });
+
+  // 3. The survey lens and grip soles (WS5 #9): on a dark floor one 3D frame with the torch out marks the map within
+  //    twice the reach with the lens (more tiles, none past twice); grip soles climb 2 blocks on the map, 1 without.
+  section("survey", () => {
+    startRun(13, m.testWorld.TEST_WORLD);
+    // A dark hall 40 × 17 (no sky, no lamps): only your torch lights it.
+    const W = m.world, z = new W.Zone({ key: "b1-survey", wx: 97, wy: 97, z: 1, type: "dungeon", level: 3, seed: 3, w: 40, d: 17, h: 8, name: "Survey Hall" });
+    for (let y = 0; y < z.d; y++) for (let x = 0; x < z.w; x++) { for (let k = 0; k < W.FLOOR_Z; k++) z.set(x, y, k, W.B.ROCK); z.set(x, y, W.FLOOR_Z + 4, W.B.ROCK); }   // (a roof: no sky light)
+    z.hasSky = false; z.edges = { n: null, s: null, e: null, w: null }; z.refresh();
+    z.spawn = { x: 2.5, y: 8.5, z: W.FLOOR_Z, yaw: 0 };
+    m.zones.enterZone(game, z.seal(), { how: "start" });
+    const p = game.player, R = m.render3d;
+    Object.assign(p, { x: 2.5, y: 8.5, z: W.FLOOR_Z, yaw: 0, pitch: 0 });
+    R.setDynamicResolution(false);
+    p.status = {}; p.mutations = {}; p.torch = true; m.stats.invalidateStats(p);
+    const reach = m.player.torchRange(p);
+    const frame = () => { z.seen.fill(0); game.effects = []; game.cam = null; game.fov = 75; game.view = "3d"; game.mode = "explore"; game.paused = false; Object.assign(p, { yaw: 0, pitch: 0 }); R.render3d(game); };
+    const far = () => { let n = 0, max = 0; for (let i = 0; i < z.w * z.d; i++) if (z.seen[i]) { n++; max = Math.max(max, Math.hypot((i % z.w) + 0.5 - p.x, Math.floor(i / z.w) + 0.5 - p.y)); } return { n, max }; };
+    frame(); const plain = far();
+    p.body.implants.head = { kind: "implant", id: "surveyLens" }; m.stats.invalidateStats(p);
+    frame(); const lens = far();
+    p.body.implants.head = null; m.stats.invalidateStats(p);
+    if (!(lens.n > plain.n) || !(lens.max > reach + 1.5) || lens.max > 2 * reach + 2 || plain.max > reach + 2)
+      fail(`the survey lens: a 3D frame marked ${plain.n} tiles to ${plain.max.toFixed(1)} without it, ${lens.n} to ${lens.max.toFixed(1)} with it (the torch's reach ${reach})`);
+    stats.survey = `one 3D frame on a dark floor: ${plain.n} tiles to ${plain.max.toFixed(1)} without the lens, ${lens.n} to ${lens.max.toFixed(1)} with it (reach ${reach})`;
+    // Grip soles: a 2-block step on the map.
+    game.view = "map"; game.mode = "map";
+    const tx = Math.floor(p.x), ty = Math.floor(p.y);
+    let dir = null;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const x = tx + dx, y = ty + dy;
+      if (!z.solid(x, y, p.z) && z.stand[x + y * z.w] === p.z && !z.creatures.some((c) => Math.floor(c.x) === x && Math.floor(c.y) === y)) { dir = [dx, dy]; break; }
+    }
+    if (!dir) { fail("grip soles: no open tile beside you"); return; }
+    const [x, y] = [tx + dir[0], ty + dir[1]];
+    for (let k = 0; k < 2; k++) z.set(x, y, p.z + k, m.world.B.STONE);
+    z.refresh();
+    const tryStep = () => { const from = { x: p.x, y: p.y, z: p.z }; m.turns.mapStep(game, dir[0], dir[1], { force: false }); const moved = Math.floor(p.x) === x && Math.floor(p.y) === y; Object.assign(p, from); return moved; };
+    const without = tryStep();
+    p.body.implants.feet = { kind: "implant", id: "gripSoles" }; m.stats.invalidateStats(p);
+    const withSoles = tryStep();
+    p.body.implants.feet = null; m.stats.invalidateStats(p);
+    p.body.equip.arms = m.gear.makeGear("armour", "climbingHooks"); m.stats.invalidateStats(p);   // (the climbing hooks, C4 #6)
+    const withHooks = tryStep();
+    p.body.equip.arms = null; m.stats.invalidateStats(p);
+    if (!withHooks) fail("the climbing hooks: a 2-block step on the map refused");
+    for (let k = 0; k < 2; k++) z.set(x, y, p.z + k, m.world.B.AIR);
+    z.refresh();
+    if (without || !withSoles) fail(`grip soles: a 2-block step on the map ${without ? "taken" : "refused"} without them, ${withSoles ? "taken" : "refused"} with them`);
+    stats.gripSoles = "a 2-block step on the map refused without them, taken with them";
+  });
+
+  // 4. The tonics' and implants' rest (C4 #10, #14) and the missile powers (C4 #9): an overdone balm stops a potion of
+  //    healing too; Alchemist's balm heals 18 over 3 s; the balm pump injects a balm from the pack when a blow leaves you
+  //    under 40% (not above, not without the pump, not while a balm works); Glimgunner pays a glim every second shot;
+  //    Pin: a bolt's pin 3 s, 2 without.
+  section("tonics and implants", () => {
+    startRun(13, m.testWorld.TEST_WORLD);
+    const p = game.player, S = m.status, E = m.events, TN = m.tonics;
+    const reset = () => { p.status = {}; p.perks = {}; p.body.implants = Object.fromEntries(Object.keys(p.body.implants).map((k) => [k, null])); p.maxHpGain = 20; m.stats.invalidateStats(p); p.hp = 5; };   // (room to heal 18)
+    const settle = () => { for (let k = 0; k < 200; k++) S.tickStatuses(game, p, 1 / 60); };
+    reset(); m.effects.drinkPotion(game, "healing"); const potion = p.hp - 5;
+    reset(); S.addStatus(game, p, "tonic:sick", { t: 30 }); m.effects.drinkPotion(game, "healing"); const sick = p.hp - 5;
+    reset(); p.genotype = "plumb"; TN.injectTonic(game, p, "balm"); settle(); const balm = p.hp - 5;
+    reset(); p.perks = { alchemist: 1 }; TN.injectTonic(game, p, "balm"); settle(); const alch = p.hp - 5;
+    if (potion !== 12 || sick !== 0 || balm !== 12 || alch !== 18) fail(`healing: a potion ${potion}, overdone ${sick}; a balm ${balm}, with Alchemist ${alch} (want 12, 0, 12, 18)`);
+    // The balm pump.
+    const pump = (hpShare, fitted, working = false) => {
+      reset(); p.hp = Math.floor(m.stats.maxHp(p) * hpShare);
+      if (fitted) p.body.implants.back = { kind: "implant", id: "balmPump" };
+      if (working) S.addStatus(game, p, "tonic:balm", { t: 3, mag: 1 });
+      p.inv = p.inv.filter((s) => s.kind !== "tonic"); p.inv.push({ kind: "tonic", effect: "balm", count: 2 });
+      E.emit(game, "hurt", { tgt: p, src: null, dmg: 1 });
+      return p.inv.find((s) => s.kind === "tonic")?.count ?? 0;
+    };
+    const used = pump(0.3, true), above = pump(0.5, true), none = pump(0.3, false), busy = pump(0.3, true, true);
+    const sickPump = (() => { reset(); p.hp = Math.floor(m.stats.maxHp(p) * 0.3); p.body.implants.back = { kind: "implant", id: "balmPump" }; S.addStatus(game, p, "tonic:sick", { t: 30 });
+      p.inv = p.inv.filter((s) => s.kind !== "tonic"); p.inv.push({ kind: "tonic", effect: "balm", count: 2 }); E.emit(game, "hurt", { tgt: p, src: null, dmg: 1 }); return p.inv.find((s) => s.kind === "tonic")?.count ?? 0; })();
+    if (used !== 1 || above !== 2 || none !== 2 || busy !== 2 || sickPump !== 2) fail(`the balm pump: at 30% ${2 - used} used (want 1), at 50% ${2 - above}, without it ${2 - none}, a balm working ${2 - busy}, balm-sick ${2 - sickPump}`);
+    reset(); p.hp = Math.floor(m.stats.maxHp(p) * 0.3); p.body.implants.back = { kind: "implant", id: "balmPump" };
+    p.inv.push({ kind: "tonic", effect: "balm", count: 1 }); E.emit(game, "hurt", { tgt: p, src: null, dmg: 1 });
+    if (!S.hasStatus(p, "tonic:balm")) fail("the balm pump's balm doesn't work");
+    // Glimgunner.
+    const shots = (perk) => {
+      reset(); if (perk) p.perks = { glimgunner: 1 };
+      const gun = { kind: "artifact", id: "glimgun", known: true }; p.inv.push(gun);
+      m.currency.setPurse?.(p, "flask500"); p.funds = 10;
+      for (let k = 0; k < 4; k++) m.artifacts.fireArtifact(game, p, gun, null);
+      p.inv.splice(p.inv.indexOf(gun), 1);
+      return 10 - m.currency.funds(p);
+    };
+    const paid = shots(false), paidGunner = shots(true);
+    if (paid !== 4 || paidGunner !== 2) fail(`the glimgun: 4 shots paid ${paid} glim, with Glimgunner ${paidGunner} (want 4 and 2)`);
+    // Pin.
+    const pinFor = (perk) => {
+      reset(); if (perk) p.perks = { pin: 1 };
+      const c = { status: {}, x: 0, y: 0, z: 0, type: "goblin", name: "goblin" };
+      const spec = m.missiles.missileSpec(p, { kind: "missile", id: "boltBow", ench: 0 });
+      const rng = game.combatRng; game.combatRng = () => 0;
+      try { spec.onHit(game, c, {}); } finally { game.combatRng = rng; }
+      return c.status.pinned?.t;
+    };
+    const pin0 = pinFor(false), pin1 = pinFor(true);
+    if (pin0 !== 2 || pin1 !== 3) fail(`Pin: a bolt's pin ${pin0} s, with Pin ${pin1} s (want 2 and 3)`);
+    p.hp = m.stats.maxHp(p);
+    stats.tonics = `a potion ${potion}, overdone ${sick}; a balm ${balm}, Alchemist's ${alch}; the pump at 30% used 1, at 50% none; the glimgun 4 shots ${paid} glim, Glimgunner ${paidGunner}; pins ${pin0} s, ${pin1} s with Pin`;
+  });
+
+  // 5. The pack's comparison (C4 #12): the material counts (a noonsilver dagger against a copper one: +6 × 0.3 ÷ 0.7 → +3
+  //    a blow; saltsteel scale against iron scale +1 armour); the parent's gear reads as before (a longsword against a
+  //    dagger: the difference of their ranges' middles, the old line).
+  section("compare", () => {
+    startRun(13, m.testWorld.TEST_WORLD);
+    const p = game.player, G = m.gear, line = (sel) => m.inventory.compareLine(p, sel);
+    p.body.equip.hand_r = G.makeGear("weapon", "dagger", "copper"); p.body.equip.body = G.makeGear("armour", "scale", "iron"); m.stats.invalidateStats(p);
+    const silver = line(G.makeGear("weapon", "dagger", "noonsilver")), scale = line(G.makeGear("armour", "scale", "saltsteel"));
+    p.body.equip.hand_r = { kind: "weapon", id: "dagger", ench: 0, known: true };
+    const parent = line({ kind: "weapon", id: "longsword", ench: 2, known: false }), W = I.WEAPONS;
+    const old = (W.longsword.dmg[0] + W.longsword.dmg[1]) / 2 - (W.dagger.dmg[0] + W.dagger.dmg[1]) / 2;
+    if (silver !== " · +3 avg damage vs yours" || scale !== " · +1 armour vs yours" || parent !== ` · +${old} avg damage vs yours`)
+      fail(`the pack's comparison: a noonsilver dagger "${silver}", saltsteel scale "${scale}", the parent's longsword "${parent}"`);
+    stats.compare = `"${silver}", "${scale}", "${parent}"`;
+  });
+
+  // 6. The artifacts built (C4 #7): the homing pip takes you from a dungeon floor to the run's start (not with a hostile
+  //    within 7 tiles, its charge then kept); the snuffer's circle is dark with the torch lit, 6 tiles round, for 20 s;
+  //    the theodolite finds the sites of the spans around you (the real world's) and makes them known.
+  section("artifacts", () => {
+    const art = (id) => ({ kind: "artifact", id, known: true, cell: { id: "glim", charge: 2500 } });
+    startRun(13, m.testWorld.TEST_WORLD);
+    const s0 = game.run.world.start, home = `${s0.wx},${s0.wy},0`;
+    game.debug.enterZone(`${s0.wx},${s0.wy},3`, "down");
+    let p = game.player;
+    const pip = art("homingPip");
+    game.zone.creatures = game.zone.creatures.filter((c) => c.talk);
+    const foe = m.creatures.addCreature(game.zone, m.creatures.spawnCreature("goblin", Math.floor(p.x), Math.floor(p.y), p.z, { level: 3, state: "chase", rng: () => 0.5 }));
+    const refused = m.artifacts.fireArtifact(game, p, pip, null), keptCharge = pip.cell.charge, stayed = game.zone.key;
+    m.creatures.removeCreature(game.zone, foe);
+    const hows = [], offHow = m.events.on("zone:enter", (g, e) => hows.push(e.how));
+    const went = m.artifacts.fireArtifact(game, p, pip, null);
+    offHow();
+    if (hows.join() !== "travel") fail(`the homing pip arrived as ${hows.join()} (want travel: no checkpoint of its own)`);
+    if (refused || keptCharge !== 2500 || stayed === home || !went || game.zone.key !== home || pip.cell.charge !== 0)
+      fail(`the homing pip: with a goblin beside you ${refused} (charge ${keptCharge}, in ${stayed}); alone ${went}, now in ${game.zone.key} (want ${home}), charge ${pip.cell.charge}`);
+    // The snuffer, in the dark of a legacy floor with the torch lit.
+    game.debug.enterZone(`${s0.wx},${s0.wy},3`, "down");
+    p = game.player; p.torch = true;
+    const L = m.light, at = (dx) => L.inDark(game, game.zone, p.x + dx, p.y, p.z + 1);
+    const before = at(0);
+    m.artifacts.fireArtifact(game, p, art("snuffer"), null);
+    const here = at(0), five = at(5), eight = at(8);
+    game.time += 21;
+    const after = at(0);
+    if (before || !here || !five || eight || after) fail(`the snuffer: lit before ${!before}; dark here ${here}, 5 tiles off ${five}, 8 off ${eight}; 21 s on ${after}`);
+    // The theodolite, on the real world.
+    startRun(17, m.worldmap.REAL_WORLD);
+    // (standing in the span east of a site, so the site found is a neighbour's)
+    const open = (wx, wy) => game.run.world.tileAt(wx, wy)?.edges === "open" && !game.run.world.tileAt(wx, wy)?.landmark;
+    const site = [...game.run.sites.values()].find((s) => s.kind !== "landmark" && s.kind !== "village" && open(s.at.wx + 1, s.at.wy));
+    game.debug.enterZone(`${site.at.wx + 1},${site.at.wy},0`, "start");
+    p = game.player;
+    const z = game.zone, A = game.state.atlas, around = [];
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) for (const id of game.run.sitesAt?.get(`${z.wx + dx},${z.wy + dy}`) || []) { const s = game.run.sites.get(id); if (s && s.kind !== "landmark") around.push(s); }
+    for (const s of around) delete A.found[s.id];
+    m.artifacts.fireArtifact(game, p, art("theodolite"), null);
+    const found = around.filter((s) => A.found[s.id] === "theodolite").length;
+    if (!around.length || found !== around.length || A.found[site.id] !== "theodolite" || !m.discovery.isKnown(game, z.wx + 1, z.wy)) fail(`the theodolite: ${found} of the ${around.length} sites around ${z.wx},${z.wy} found; the next span known ${m.discovery.isKnown(game, z.wx + 1, z.wy)}`);
+    // The kits that wanted them (C4 #13): the Hush Novice's and the Night-warden's snuffer (3 uses), the Surveyor's
+    // theodolite (5), known and charged; no kit wants either any more.
+    const CG = m.chargen, BG = m.backgrounds.BACKGROUNDS, kits = { hushNovice: ["snuffer", 3], nightWardenOfCassin: ["snuffer", 3], surveyorOfVey: ["theodolite", 5] };
+    for (const [bg, [id, uses]] of Object.entries(kits)) {
+      const pc = CG.makeCharacter({ genotype: BG[bg].genotype, background: bg, attrs: CG.suggestSpread(BG[bg].genotype, bg), name: "Test", mode: "oneWick" });
+      const it = pc.inv.find((x) => x.kind === "artifact" && x.id === id), need = m.artifactTables.ARTIFACTS[id]?.charge;
+      if (!it || it.known !== true || !(it.cell?.charge >= uses * need) || it.cell.charge >= (uses + 1) * need || BG[bg].kit.wants.some((w) => w.includes(id)))
+        fail(`${bg}'s kit: ${id} ${JSON.stringify(it)} (want known, ${uses} uses of ${need}); wants ${JSON.stringify(BG[bg].kit.wants)}`);
+    }
+    stats.artifacts = `the homing pip home from a floor (refused with a goblin by you); the snuffer dark 5 tiles off with the torch lit, not 8, not after 20 s; the theodolite ${found} sites around ${z.wx},${z.wy}`;
+  });
+
+  // 7. Recharge and Kindle at range (C4 #9): a sun or dark cell fills from the purse only with Recharge (a heart cell
+  //    never); a cold brazier 3.5 tiles off is E's to light in 3D with Kindle at range and the torch lit, not without
+  //    the power, not with the torch out, not 5.5 tiles off.
+  section("recharge and kindle", () => {
+    startRun(13, m.testWorld.TEST_WORLD);
+    const p = game.player;
+    const fill = (id, perk) => { p.perks = perk ? { recharge: 1 } : {}; p.funds = 100; const c = { kind: "cell", id, charge: 0 }; const t = I.useItem(game, p, c); return { t, charge: c.charge, paid: 100 - m.currency.funds(p) }; };
+    const sun0 = fill("sun", false), sun1 = fill("sun", true), dark1 = fill("dark", true), heart1 = fill("heart", true), glim0 = fill("glim", false);
+    if (sun0.t || sun0.charge || !sun1.t || sun1.charge !== 2500 || sun1.paid !== 25 || dark1.charge !== 2500 || heart1.charge || glim0.charge !== 2500)
+      fail(`Recharge: a sun cell without it ${JSON.stringify(sun0)}, with it ${JSON.stringify(sun1)}; a dark cell ${JSON.stringify(dark1)}; a heart cell ${JSON.stringify(heart1)}; a glim cell without it ${JSON.stringify(glim0)}`);
+    p.perks = {};
+    // Kindle at range, in a hall.
+    const W = m.world, z = new W.Zone({ key: "b1-kindle", wx: 98, wy: 98, z: 1, type: "dungeon", level: 3, seed: 3, w: 16, d: 9, h: 8, name: "Brazier Hall" });
+    for (let y = 0; y < z.d; y++) for (let x = 0; x < z.w; x++) { for (let k = 0; k < W.FLOOR_Z; k++) z.set(x, y, k, W.B.ROCK); z.set(x, y, W.FLOOR_Z + 4, W.B.ROCK); }
+    z.hasSky = false; z.edges = { n: null, s: null, e: null, w: null };
+    z.spawn = { x: 2.5, y: 4.5, z: W.FLOOR_Z, yaw: 0 };
+    m.zones.enterZone(game, z.seal(), { how: "start" });
+    const aim = (bx) => { z.set(bx, 4, W.FLOOR_Z, W.B.BRAZIER); z.refresh(); Object.assign(p, { x: 2.5, y: 4.5, z: W.FLOOR_Z }); p.yaw = 0; p.pitch = Math.atan2(W.FLOOR_Z + 0.5 - (p.z + 1.45), bx + 0.5 - p.x); };
+    const can = (bx, perk, torch) => { aim(bx); p.perks = perk ? { kindleAtRange: 1 } : {}; p.torch = torch; const t = m.interact.lookTarget(game); z.set(bx, 4, W.FLOOR_Z, W.B.AIR); z.refresh(); return t?.label || null; };
+    const near = can(6, true, true), noPower = can(6, false, true), dark = can(6, true, false), far = can(8, true, true);
+    aim(6); p.perks = { kindleAtRange: 1 }; p.torch = true; m.interact.interact(game);
+    const lit = z.get(6, 4, W.FLOOR_Z) === W.B.BRAZIER_LIT;
+    p.perks = {};
+    if (!/light the brazier/.test(near || "") || noPower || dark || far || !lit) fail(`Kindle at range: 3.5 tiles "${near}", without the power "${noPower}", torch out "${dark}", 5.5 tiles "${far}"; E lit it ${lit}`);
+    stats.recharge = `a sun cell filled with Recharge for ${sun1.paid} glim, refused without; a brazier 3.5 tiles off lit by E with Kindle at range`;
+  });
+
+  // 8. The specials (the coordinator's condition on check-content's info rule, 2026-10-30): every C4 armour piece with no
+  //    armour, no bonus and no needs maps to a special in SPECIALS, a field the code handles; each special's test wears
+  //    the piece and asserts what the game does differently. A piece with none of them fails. Every special a piece
+  //    has is tested (the glass-scale's reflect and the hooks' climb too).
+  section("specials", () => {
+    const A = I.ARMOURS, F = m.forge, G = m.gear, St = m.stats;
+    const partOf = (p, it) => m.body.defaultPart(p, it);
+    const SPECIALS = {
+      // takes a fifth of the blows that land on you (combat.js turnedAside)
+      block: (id) => {
+        startRun(13, m.testWorld.TEST_WORLD);
+        const p = game.player, foe = m.creatures.spawnCreature("goblin", 1, 1, 2, { level: 3, rng: () => 0.5 }), St = m.stats;
+        const turned = () => { let t = 0; for (let k = 0, rng = m.rng.makeRng(41); k < 1500; k++) { const r = m.combat.resolveAttack(game, foe, p, m.combat.naturalSpec(foe), { rng }); if (r.turned) t++; p.hp = m.stats.maxHp(p); } return t; };
+        const off = turned(); const it = G.makeGear("armour", id); m.body.equip(game, p, it, partOf(p, it)); const on = turned();
+        return off === 0 && on > 150 ? null : `turned ${off} without it, ${on} with it of 1,500 blows`;
+      },
+      // turns a share of arrows (combat.js turnedAside)
+      reflect: (id) => {
+        startRun(13, m.testWorld.TEST_WORLD);
+        const p = game.player, foe = m.creatures.spawnCreature("goblin", 1, 1, 2, { level: 3, rng: () => 0.5 });
+        const turned = () => { let t = 0; for (let k = 0, rng = m.rng.makeRng(43); k < 1500; k++) { const r = m.combat.resolveAttack(game, foe, p, m.combat.naturalSpec(foe), { rng, ranged: true }); if (r.turned) t++; p.hp = m.stats.maxHp(p); } return t; };
+        const off = turned(); const it = G.makeGear("armour", id); m.body.equip(game, p, it, partOf(p, it)); const on = turned();
+        return off === 0 && on > 100 ? null : `turned ${off} arrows without it, ${on} with it of 1,500`;
+      },
+      // reputation while worn (social/reputation.js syncWornRep, on body.js's "gear")
+      wornRep: (id) => {
+        startRun(13, m.testWorld.TEST_WORLD);
+        const p = game.player, it = G.makeGear("armour", id), def = A[id], R = m.factions;
+        let want = def.wornRep;
+        if (want === "hour") {
+          const H = game.run.history?.rulers?.find((h) => h.favoured?.length && h.hated?.length);
+          if (!H) return "no Hour in the run's history to wear a mask of";
+          it.hour = H.id;
+          want = Object.fromEntries([...H.favoured.map((f) => [f, def.hourRep]), ...H.hated.filter((f) => !H.favoured.includes(f)).map((f) => [f, -def.hourRep])]);
+        }
+        const ids = Object.keys(want).filter((f) => R.FACTIONS[f]);
+        for (const f of ids) R.addRep(game, f, -R.repOf(game, f));   // (all at 0: room both ways)
+        m.body.equip(game, p, it, partOf(p, it));
+        const on = ids.filter((f) => R.repOf(game, f) !== want[f]);
+        m.body.unequip(game, p, partOf(p, it));
+        const off = ids.filter((f) => R.repOf(game, f) !== 0);
+        return ids.length && !on.length && !off.length ? null : `rep on ${on.join(", ") || "as wanted"}, off ${off.join(", ") || "back"} (${JSON.stringify(want)})`;
+      },
+      // climbs 2 blocks on the map (turns.js mapStep): checked with the hooks in section 3 (survey)
+      climb: (id) => (id === "climbingHooks" && stats.gripSoles ? null : `no map climb tested for ${id}`),
+      // Lightsick's sun doesn't reach you (progression/mutations.js veiled): at noon on the temple's open ground
+      veil: (id) => {
+        const sick = (worn) => {
+          startRun(13, m.testWorld.TEST_WORLD);
+          const p = game.player;
+          game.view = "map"; game.mode = "map"; game.pages = null; game.story.cube = true;
+          p.mutations = { lightsick: 1 }; p.status = {}; St.invalidateStats(p);
+          let sunny = false;   // (somewhere under the open sky: the start is under the temple's roof)
+          for (let y = 1; y < game.zone.d - 1 && !sunny; y++) for (let x = 1; x < game.zone.w - 1 && !sunny; x++) {
+            const z = game.zone.stand[x + y * game.zone.w];
+            if (z >= 0 && m.light.naturalLight(game, game.zone, x + 0.5, y + 0.5, z + 1.45) >= 0.9) { Object.assign(p, { x: x + 0.5, y: y + 0.5, z }); sunny = true; }
+          }
+          if (!sunny) return -1;
+          if (worn) { const it = G.makeGear("armour", id); m.body.equip(game, p, it, partOf(p, it)); }
+          m.game.step(1 / 60);   // (the watch puts the sun on, or not)
+          const h = p.hp, noRegen = m.rules.overrideRules("regen", { ...m.rules.RULES.regen, base: 1e9 });
+          try { m.time.skipTime(game, 60, { interruptible: false }); } finally { noRegen(); }
+          return h - p.hp;
+        };
+        const bare = sick(false), under = sick(true);
+        return bare > 0 && under === 0 ? null : `Lightsick at noon: lost ${bare} HP in 60 s bare, ${under} under it`;
+      },
+    };
+    const infoOnly = Object.keys(F.GEAR_ARMOURS).filter((id) => !(A[id].armour > 0) && !Object.keys(A[id].bonus || {}).length && !A[id].needs);
+    const tested = {};
+    for (const id of Object.keys(F.GEAR_ARMOURS)) {
+      const has = Object.keys(SPECIALS).filter((k) => A[id][k] !== undefined && A[id][k] !== false);
+      if (infoOnly.includes(id) && !has.length) { fail(`armour ${id}: says what it does by its info alone, and no special the code handles (${Object.keys(SPECIALS).join(", ")})`); continue; }
+      for (const k of has) {
+        if (k === "veil" && A[id].needs && /veil|Lightsick/.test(A[id].needs)) continue;
+        const why = SPECIALS[k](id);
+        if (why) fail(`armour ${id}'s ${k}: ${why}`);
+        else (tested[k] ||= []).push(id);
+      }
+    }
+    stats.specials = `${infoOnly.length} pieces by their info alone (${infoOnly.join(", ")}); tested: ${Object.entries(tested).map(([k, v]) => `${k} ${v.join("/")}`).join("; ")}`;
+  });
+
+  return { name: "items: B1's gear", ok: problems.length === 0, problems, stats };
+}
+
 // tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser).
 export async function run(env) {
   const { S, capture, resize } = await env.screen({ cols: 180, rows: 56 });
@@ -1597,5 +2040,10 @@ export async function run(env) {
     load("chargen", "progression/chargen.js"), load("backgrounds", "content/backgrounds.js"), load("missiles", "missiles.js")]);
   m.player ||= await env.src("player.js");
   m.missileTable = (await env.src("content/items/missiles.js")).MISSILES;
-  return [checkItems(m), checkGear(m)];
+  // B1's (checkB1Gear).
+  await Promise.all([load("worldmap", "content/world/worldmap.js"), load("testWorld", "content/world/test-world.js"), load("zones", "zones.js"),
+    load("common", "gen/biomes/common.js"), load("monsters", "monsters.js"), load("light", "light.js"),
+    load("render3d", "render3d.js"), load("turns", "turns.js"), load("discovery", "overworld/discovery.js"), load("factions", "factions.js")]);
+  if (env.args?.only === "b1") return [checkB1Gear(m)];   // (node tools/check-items.mjs --only b1)
+  return [checkItems(m), checkGear(m), checkB1Gear(m)];
 }

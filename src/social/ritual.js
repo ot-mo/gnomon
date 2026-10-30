@@ -569,6 +569,7 @@ on("kill", (game, { c, src, splash }) => {
   for (const f of Object.values(FACTIONS)) if (!f.hidden && !f.group) addRep(game, f.id, K.all, "oathbreaking");
   if (FACTIONS.moths && repOf(game, "moths") > K.moths) addRep(game, "moths", K.moths - repOf(game, "moths"), "oathbreaking");
   game.state.snuffer = { at: game.time || 0, until: (game.time || 0) + K.days * 24 * worldHour() };
+  game.player.snufferMark = true;   // (the torch a tile shorter for the rest of the run: player.js torchRange, B1, WS6b #3)
   delete ks.kin[key];
   game.log(`You killed ${c.name}, your flame-kin. Every lamp you pass will know it. (−120 with everyone; the Snuffer)`, [255, 110, 100]);
 });

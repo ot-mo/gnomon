@@ -153,6 +153,7 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
                           name: L?.name || site?.name || capital(terrain.name || tile.terrain) });
   zone.siteId = site?.id || null;
   zone.landmarkId = L?.id || null;
+  zone.realLoot = world.id !== "test";   // (the real world's loot, B1: items.js lootGear; read by vault legends and placeTreasure)
   zone.hasSky = true;
   zone.outdoor = true;
   zone.liquid = W.liquidOf(wx, wy);   // one liquid per span: its river's, else its biome's

@@ -1226,7 +1226,7 @@ export async function run(env) {
     const droverBuys = F.FACTIONS.drovers.buys;
     delete F.FACTIONS.drovers.buys;
     const k = named("mira", "merchant", "drovers", { near: [1, 0], name: "Dov", level: 5 });
-    k.teaches = ["swimmer", "tough", "repair"];   // (repair waits on its needs: never offered)
+    k.teaches = ["swimmer", "tough", "mod"];   // (mod waits on its needs: never offered; repair did until B1 built it)
     ritual.performRite(game, k, "tracing");
     // The run's own secrets, learned as a player would (WS7's journal since the WS7a merge: its entries say only when
     // and how you learned each; kind, reading and text are the run's): deep readings of three events, a dark one of a
@@ -1240,7 +1240,7 @@ export async function run(env) {
     const ids = rows().map((r) => r.id);
     for (const w of [`give:${A.id}`, `give:${G.id}`, "power:swimmer", "power:tough", "recruit", "best"]) if (!ids.includes(w)) fail(`the flame-kin menu lacks ${w}: ${ids.join(", ")}`);
     if (ids.includes(`give:${Bd.id}`)) fail("the Drovers (deep) want a dark reading");
-    if (ids.includes("power:repair")) fail("the flame-kin menu teaches Repair, a power still waiting on its needs");
+    if (ids.includes("power:mod")) fail("the flame-kin menu teaches Mod, a power still waiting on its needs");
     const label = rows().find((r) => r.id === `give:${A.id}`)?.label || "";
     if (!label.includes(SEC.secretText(game.run, A))) fail(`a reading's row doesn't tell its account: "${label}"`);
     const rep0 = F.repOf(game, "drovers");
@@ -1334,10 +1334,13 @@ export async function run(env) {
     events.emit(game, "kill", { c: victim, src: p() });
     if (F.repOf(game, "survey") !== before - 120 || F.repOf(game, "moths") !== -600) fail(`oathbreaking: the Survey ${before} → ${F.repOf(game, "survey")}, the Moths ${F.repOf(game, "moths")}`);
     if (!merchants.snuffed(game) || ritual.canKindle(game, stranger) === null) fail("the Snuffer can still kindle");
+    // (B1, WS6b #3: the mark on the torch, a tile shorter for the rest of the run)
+    if (!p().snufferMark) fail("oathbreaking: the Snuffer's mark isn't on you (player.snufferMark)");
     const sTalk = talk.talkTo(game, stranger).options.find((o) => /kindle/i.test(o.label))?.go();
     if (!/Snuffer/.test(sTalk?.text || "")) fail(`asking to kindle as the Snuffer: ${sTalk?.text}`);
     game.time += 7 * 24 * 60 * RULES.clock.secondsPerMinute + 1;
     if (merchants.snuffed(game)) fail("the Snuffer's mark lasts past 7 world days");
+    if (!p().snufferMark) fail("the Snuffer's mark on the torch went with the 7 days (it is for the run)");
     setup();
     const v2 = named("mira", "villager", "clatter", { near: [1, 0], name: "Hob" });
     ritual.performRite(game, v2, "tracing");
@@ -2132,6 +2135,90 @@ export async function run(env) {
   {
     const st = JSON.parse(JSON.stringify(game.state));
     for (const k of ["kindling", "snuffer", "donations", "merchants"]) if (JSON.stringify(st[k]) !== JSON.stringify(game.state[k])) fail(`state.${k} isn't plain JSON`);
+  }
+
+  // --- 18. Worn reputation (B1: C4 #2 with C2 #12; bible §3.5 "Wearables") -----------------------------------------------
+  // On and off through body.js equip/unequip and the pack's E (inventory.js): the feathered hood and the feather cloak
+  // Kites +250 each (they add up), the Assize writ Assize +100 and the Bent villages −100, an Hour mask ±200 with its
+  // Hour's favoured and hated factions; a clamp at +1000 taken back exactly; a kit's writ counted at the run's start.
+  {
+    const Bd = await m("body.js"), inv = await m("inventory.js"), GR = await m("content/items/gear.js"), CG = await m("progression/chargen.js");
+    fresh(1234);
+    const P = p(), r = (f) => F.repOf(game, f), it = (id) => GR.makeGear("armour", id);
+    const k0 = r("kites"), a0 = r("assize"), v0 = r("bentVillages");
+    const hood = it("featheredHood"), cloak = it("featherCloak"), writ = it("assizeWrit");
+    Bd.equip(game, P, hood, "head");
+    if (r("kites") - k0 !== 250) fail(`worn rep: the feathered hood on, Kites ${r("kites") - k0}, want +250`);
+    Bd.equip(game, P, cloak, Bd.defaultPart(P, cloak));
+    if (r("kites") - k0 !== 500) fail(`worn rep: hood and cloak on, Kites ${r("kites") - k0}, want +500`);
+    Bd.unequip(game, P, "head");
+    if (r("kites") - k0 !== 250) fail(`worn rep: the hood off, Kites ${r("kites") - k0}, want +250 (the cloak's)`);
+    Bd.unequip(game, P, Bd.defaultPart(P, cloak));
+    if (r("kites") !== k0 || Object.keys(game.state.wornRep || {}).length) fail(`worn rep: both off, Kites ${r("kites")} (was ${k0}), applied ${JSON.stringify(game.state.wornRep)}`);
+    // The pack's E (inventory.js equip and unequipPart), the writ on the neck.
+    P.inv.push(writ);
+    inv.equip(game, writ, P.inv.indexOf(writ));
+    const part = Object.keys(P.body.equip).find((id) => P.body.equip[id] === writ);
+    if (!part || r("assize") - a0 !== 100 || r("bentVillages") - v0 !== -100) fail(`worn rep: the writ by E (on ${part}): Assize ${r("assize") - a0}, Bent villages ${r("bentVillages") - v0}, want +100 and −100`);
+    if (part) inv.unequipPart(game, part);
+    if (r("assize") !== a0 || r("bentVillages") !== v0) fail(`worn rep: the writ off by E: Assize ${r("assize")} (was ${a0}), Bent villages ${r("bentVillages")} (was ${v0})`);
+    // A clamp: Kites at 900, the hood moves only 100, and taking it off takes back only that.
+    F.addRep(game, "kites", 900 - r("kites"));
+    Bd.equip(game, P, hood, "head");
+    const top = r("kites");
+    Bd.unequip(game, P, "head");
+    if (top !== F.REP_MAX || r("kites") !== 900) fail(`worn rep: from 900 the hood gave ${top}, off ${r("kites")} (want ${F.REP_MAX}, then 900)`);
+    // An Hour mask: its Hour's favoured +200, hated −200.
+    const H = game.run.history?.rulers?.find((h) => h.favoured?.length && h.hated?.length);
+    if (!H) fail("worn rep: the run's history has no Hour with favoured and hated factions");
+    else {
+      const mask = it("hourMask"); mask.hour = H.id;
+      const fav = H.favoured.filter((f) => F.FACTIONS[f]), hat = H.hated.filter((f) => F.FACTIONS[f] && !fav.includes(f));
+      const before = Object.fromEntries([...fav, ...hat].map((f) => [f, r(f)]));
+      Bd.equip(game, P, mask, Bd.defaultPart(P, mask));
+      const moved = Object.fromEntries([...fav, ...hat].map((f) => [f, r(f) - before[f]]));
+      if (fav.some((f) => moved[f] !== Math.min(200, F.REP_MAX - before[f])) || hat.some((f) => moved[f] !== Math.max(-200, F.REP_MIN - before[f])))
+        fail(`worn rep: ${H.name}'s mask moved ${JSON.stringify(moved)} (favoured ${fav.join(", ")}, hated ${hat.join(", ")})`);
+      Bd.unequip(game, P, Bd.defaultPart(P, mask));
+      if ([...fav, ...hat].some((f) => r(f) !== before[f])) fail("worn rep: the mask off didn't put its factions back");
+      stats.wornRepHour = `${H.name}'s mask: ${JSON.stringify(moved)}`;
+    }
+    // A kit's piece: the Aspirant of the Rule carries the writ in the pack (no rep until worn); a kit that wears one
+    // (the Aspirant's, with the writ on the neck for this test) counts from the run's start (chargen.js beginRun).
+    const BG = (await m("content/backgrounds.js")).BACKGROUNDS, bg = "aspirantOfTheRule", kit = BG[bg].kit;
+    const choices = { genotype: "plumb", background: bg, attrs: CG.suggestSpread("plumb", bg), name: "Test", mode: "oneWick" };
+    CG.beginRun(game, choices, { seed: 77 });
+    const packed = game.player.inv.find((x) => x.id === "assizeWrit"), a1 = r("assize");
+    if (!packed || Object.keys(game.state.wornRep || {}).length) fail(`worn rep: the Aspirant's writ in the pack: ${!!packed}, applied ${JSON.stringify(game.state.wornRep)}`);
+    else { inv.equip(game, packed, game.player.inv.indexOf(packed)); if (r("assize") - a1 !== 100) fail(`worn rep: the Aspirant's writ put on moved Assize ${r("assize") - a1}`); }
+    const savedKit = { equip: kit.equip, pack: kit.pack };
+    try {
+      kit.equip = { ...kit.equip, neck: it("assizeWrit") }; kit.pack = [];
+      CG.beginRun(game, choices, { seed: 77 });
+      if (game.player.body.equip.neck?.id !== "assizeWrit" || game.state.wornRep?.assize !== 100 || game.state.wornRep?.bentVillages !== -100)
+        fail(`worn rep: a kit's worn writ at the start: on the neck ${game.player.body.equip.neck?.id}, applied ${JSON.stringify(game.state.wornRep)}`);
+      else {
+        const a2 = r("assize");
+        Bd.unequip(game, game.player, "neck");
+        if (a2 - r("assize") !== 100) fail(`worn rep: a kit's worn writ off moved Assize ${r("assize") - a2}`);
+      }
+    } finally { kit.equip = savedKit.equip; kit.pack = savedKit.pack; }
+    // The folding rack's second back holds the cloak; the rack taken out (its part comes off) takes the cloak's rep back.
+    {
+      fresh(1234);
+      const IMP = await m("bodymods/implants.js"), P2 = p(), k0 = r("kites");
+      P2.genotype = "plumb"; P2.license = { grade: 10 };
+      const rack = { kind: "implant", id: "foldingRack" };
+      IMP.install(null, P2, rack, "back", { free: true });
+      const cl = it("featherCloak"), on = Bd.equip(game, P2, cl, "back_2");
+      const kOn = r("kites");
+      game.truing = { at: "cradle" };
+      const out = IMP.uninstall(game, P2, "back", { free: true });
+      game.truing = null;
+      if (!on.ok || kOn - k0 !== 250 || !out?.ok || r("kites") !== k0 || Object.keys(game.state.wornRep || {}).length)
+        fail(`worn rep and the folding rack: the cloak on back_2 ${on.ok} (+${kOn - k0}); the rack out ${out?.ok} (${out?.reason || ""}), Kites ${r("kites")} (was ${k0}), applied ${JSON.stringify(game.state.wornRep)}`);
+    }
+    stats.wornRep = `hood +250, cloak +250 (both +500), writ +100/−100 by E, a clamp at ${F.REP_MAX} taken back exactly; the Aspirant's packed writ nothing until worn, a kit's worn writ from the run's start`;
   }
 
   return { name: "social", ok: !problems.length, problems, stats };

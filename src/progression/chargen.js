@@ -35,6 +35,7 @@ import { makeBody } from "../body.js";
 import { ITEM_KINDS, addToInventory } from "../items.js";
 import { setPurse, purseCap, CURRENCY } from "../currency.js";
 import { addRep } from "../factions.js";
+import { syncWornRep } from "../social/reputation.js";
 import { quickPlayer } from "../player.js";
 import { startRun, randomSeed } from "../game.js";
 import { GENOTYPES } from "../content/genotypes.js";
@@ -223,6 +224,7 @@ export function beginRun(game, choices, { seed } = {}) {
   const village = BACKGROUNDS[choices.background].villageRep;   // the Bent villages, one pool until WS7 gives each its faction
   if (village) addRep(game, "bentVillages", village, "background");
   for (const id of Object.keys(game.player.mutations || {})) mutationRep(game, game.player, id);
+  syncWornRep(game);   // (the kit's worn pieces: the Assize writ; B1, C4 #2)
   return game.player;
 }
 

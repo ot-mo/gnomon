@@ -18,7 +18,7 @@
 // node, never to the speakers (audio.js). debug and quick: read by the title screen and the tools.
 export const GAME_ID = "gnomon";
 export const TITLE = "GNOMON";
-export const VERSION = Object.freeze({ save: 1, gen: 8, world: 1 });   // gen: world/run.js GEN_VERSION (check-config holds them equal); world bumps when the fixed map data changes
+export const VERSION = Object.freeze({ save: 1, gen: 9, world: 1 });   // gen: world/run.js GEN_VERSION (check-config holds them equal); world bumps when the fixed map data changes
 
 const on = (v) => v !== null && v !== "0" && v.toLowerCase() !== "false" && v.toLowerCase() !== "off";
 

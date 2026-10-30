@@ -18,11 +18,12 @@
 //   - the Bent get half of every number (GENOTYPES[g].tonics.effect) and a 5% chance of a bad reaction (badReaction:
 //     the overdose instead); the Plumb get the whole.
 // The statuses are named "tonic:…" so no other content's can clash with them.
-import { registerItemKind, takeOne } from "../../items.js";
+import { registerItemKind, takeOne, registerLoot } from "../../items.js";
 import { addStatus, removeStatus, hasStatus, statusOf, registerStatus } from "../../status.js";
 import { maxHp, mod } from "../../stats.js";
 import { GENOTYPES } from "../genotypes.js";
 import { RULES } from "../../rules.js";
+import { hasKey } from "../../keyset.js";
 
 const secs = (s) => Math.max(0, Math.ceil(s.t));
 const T = (id, label, def) => registerStatus(`tonic:${id}`, { color: [150, 220, 200], kind: "good", stack: "refresh", hud: (s) => `${label} ${secs(s)}s`, ...def });
@@ -65,9 +66,10 @@ const say = (game, p, text, color = [150, 220, 200]) => { if (game && p === game
 
 export const TONICS = {
   balm: {
-    name: "balm", value: 25, t: 3, status: "tonic:balm", odT: 30, info: (k) => `Heals ${12 * k} over 3 s. Overdone: no rest or balm mends you for 30 s.`,
-    needs: "the overdose's nausea, and no healing from potions either (a nauseous status: C2's brine may share it; effects.js)",
-    use: (game, p, k) => { addStatus(game, p, "tonic:balm", { t: 3, mag: k }); say(game, p, `Warmth spreads up your arm. (+${12 * k} HP over 3 s)`, [230, 90, 110]); },
+    name: "balm", value: 25, t: 3, status: "tonic:balm", odT: 30, info: (k) => `Heals ${12 * k} over 3 s (half again with Alchemist). Overdone: no rest, balm or potion mends you for 30 s.`,
+    needs: "the overdose's nausea (a nauseous status: C2's brine may share it)",
+    // (B1: Alchemist's "healing heals 18", bible §10.8, for a balm too; effects.js's potion of healing reads tonic:sick)
+    use: (game, p, k) => { const a = hasKey(p.perks, "alchemist") ? 1.5 : 1; addStatus(game, p, "tonic:balm", { t: 3, mag: k * a }); say(game, p, `Warmth spreads up your arm. (+${12 * k * a} HP over 3 s)`, [230, 90, 110]); },
     overdose: (game, p) => { addStatus(game, p, "tonic:sick", { t: 30 }); say(game, p, "The balm curdles. Neither rest nor balm will mend you for a while.", [170, 200, 110]); },
   },
   hasp: {
@@ -76,10 +78,9 @@ export const TONICS = {
     overdose: (game, p) => { addStatus(game, p, "hasted", { t: 15, stack: "refresh" }); addStatus(game, p, "tonic:crash", { t: 15 }); say(game, p, "Your heart races, and keeps racing.", [255, 200, 120]); },
   },
   gloam: {
-    name: "gloam", value: 35, t: 60, status: "tonic:gloam", odT: 20, info: (k) => `Dark sight and ${Math.round(30 * k)}% stealth for 60 s. Overdone: dazzled, your torch a flicker for 20 s.`,
-    needs: "6 tiles with the torch out (player.js torchRange caps darkSight at 4 tiles: a status's darkRange); the overdose's true blindness in any light (the blinded status does nothing to the player: torchRange, render3d.js)",
+    name: "gloam", value: 35, t: 60, status: "tonic:gloam", odT: 20, info: (k) => `See ${6 * k} tiles with the torch out and ${Math.round(30 * k)}% stealth for 60 s. Overdone: blind in any light for 20 s.`,
     use: (game, p, k) => { addStatus(game, p, "tonic:gloam", { t: 60, mag: k }); say(game, p, "The dark thins, like ink with water in it.", [150, 140, 200]); },
-    overdose: (game, p) => { addStatus(game, p, "darkened", { t: 20 }); say(game, p, "The light is a knife. Your torch shrinks to a flicker.", [120, 120, 140]); },
+    overdose: (game, p) => { addStatus(game, p, "blinded", { t: 20 }); say(game, p, "The light is a knife. In any light you see nothing past your hand.", [120, 120, 140]); },   // (player.js torchRange: B1)
   },
   ironbark: {
     name: "ironbark", value: 45, t: 60, status: "tonic:ironbark", odT: 20, info: (k) => `+${Math.floor(2 * k)} armour and STR for 60 s. Overdone: half speed for 20 s.`,
@@ -111,6 +112,8 @@ export function randomTonic(rand = Math.random) {
   for (const [effect, w] of Object.entries(TONIC_WEIGHT)) if ((pick -= w) < 0) return { kind: "tonic", effect };
   return { kind: "tonic", effect: "balm" };
 }
+
+registerLoot("tonic", randomTonic);   // (the real world's loot: items.js lootPotion, B1)
 
 // What a genotype makes of a tonic: { effect, badReaction } (content/genotypes.js; a creature or a quick start: whole).
 const reactionOf = (p) => GENOTYPES[p?.genotype]?.tonics || { effect: 1, badReaction: 0 };

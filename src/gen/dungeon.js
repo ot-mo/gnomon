@@ -29,7 +29,7 @@ import { Zone, B, FLOOR_Z, ROOM_TOP, CORRIDOR_TOP, standWith } from "../world.js
 import { makeRng, noise2, distance } from "../rng.js";
 import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../pathing.js";
 import { CREATURE_TYPES, spawnCreature, addCreature, pickCreatureType, rollElite, canTalk } from "../creatures.js";
-import { makeItem, randomPotion, randomScroll, randomEquipment, randomTreasure, randomJewel } from "../items.js";
+import { makeItem, randomScroll, randomTreasure, randomJewel, lootGear, lootPotion } from "../items.js";
 import { pickVault, stampVault, VAULTS, BOTTOM_LOOT } from "./vaults.js";
 import { DUNGEONS } from "../content/dungeons.js";
 import { planEncounters, peddlerStock, bountyTarget } from "../content/legacy/encounters.js";
@@ -86,6 +86,7 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   f.dungeonIndex = p.index ?? p.z;     // which level of its dungeon this is (1 = the top one)
   f.dungeonLevels = p.count ?? null;   // and how many levels the dungeon has
   f.final = final;
+  f.realLoot = !!p.realLoot;   // (the real world's loot, B1: items.js lootGear, lootPotion; world/zonegen.js sets it)
   f.hasBelow = !final;
   f.hasUp = p.hasUp !== false;
   f.bottom = p.bottom || null;         // { kind, id }: the hall on the last level (validation reads it)
@@ -315,8 +316,8 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   if (rng.chance(0.45) && lockable.length) {
     const r = rng.pick(lockable);
     for (const d of r.doors) { f.set(d.x, d.y, FLOOR_Z, B.LOCKED); f.set(d.x, d.y, FLOOR_Z + 1, B.LOCKED); }
-    placeItem(f, rng, r, randomPotion(rng));
-    placeItem(f, rng, r, randomTreasure(rng, depth));
+    placeItem(f, rng, r, lootPotion(rng, f.realLoot));
+    placeItem(f, rng, r, randomTreasure(rng, depth, f.realLoot));
     placeItem(f, rng, rng.pick(rooms.filter((o) => o !== r)), { kind: "key" });
     r.locked = true;
   }
@@ -339,9 +340,9 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   // Loot lying around: a few potions and scrolls, a piece of gear (sometimes two), usually a few
   // throwing knives, once in a while a strength crystal, and from floor 3 now and then a ring
   // or an amulet. Not much glim: a pile or two.
-  for (let k = rng.int(2, 3); k > 0; k--) placeItem(f, rng, rng.pick(rooms), randomPotion(rng));
+  for (let k = rng.int(2, 3); k > 0; k--) placeItem(f, rng, rng.pick(rooms), lootPotion(rng, f.realLoot));
   for (let k = rng.int(1, 2); k > 0; k--) placeItem(f, rng, rng.pick(rooms), randomScroll(rng));
-  for (let k = rng.chance(0.1) ? 2 : 1; k > 0; k--) placeItem(f, rng, rng.pick(rooms.filter((o) => o !== start)), randomEquipment(rng, depth));
+  for (let k = rng.chance(0.1) ? 2 : 1; k > 0; k--) placeItem(f, rng, rng.pick(rooms.filter((o) => o !== start)), lootGear(rng, depth, 0, f.realLoot));
   if (rng.chance(0.08)) placeItem(f, rng, rng.pick(rooms.filter((o) => o !== start)), { kind: "strength" });
   if (depth >= 3 && rng.chance(0.3)) placeItem(f, rng, rng.pick(rooms.filter((o) => o !== start)), randomJewel(rng, depth));
   if (rng.chance(0.6)) placeItem(f, rng, rng.pick(rooms), { kind: "knife", count: rng.int(2, 4) });
@@ -954,7 +955,7 @@ function addPlatform(f, rng, r, nearDoor) {
   const x0 = rng.int(r.x0 + 1, r.x1 - pw), y0 = rng.int(r.y0 + 1, r.y1 - pd);
   for (let y = y0; y < y0 + pd; y++) for (let x = x0; x < x0 + pw; x++) if (nearDoor(r, x, y)) return;
   for (let y = y0; y < y0 + pd; y++) for (let x = x0; x < x0 + pw; x++) f.set(x, y, FLOOR_Z, r.theme.floor);
-  if (rng.chance(0.4)) f.items.push(makeItem(randomPotion(rng), x0 + 0.5, y0 + 0.5, FLOOR_Z + 1));
+  if (rng.chance(0.4)) f.items.push(makeItem(lootPotion(rng, f.realLoot), x0 + 0.5, y0 + 0.5, FLOOR_Z + 1));
 }
 
 // A ledge two blocks up along one wall — too high to jump straight onto, so a crate stands
@@ -971,7 +972,7 @@ function addLedge(f, rng, r, nearDoor) {
   const [ix, iy] = [[0, 1], [0, -1], [1, 0], [-1, 0]][side];   // from the wall into the room
   const [sx, sy] = cells[Math.floor(cells.length / 2)];
   f.set(sx + ix, sy + iy, FLOOR_Z, B.CRATE);
-  if (rng.chance(0.5)) { const [x, y] = rng.pick(cells); f.items.push(makeItem(randomPotion(rng), x + 0.5, y + 0.5, FLOOR_Z + 2)); }
+  if (rng.chance(0.5)) { const [x, y] = rng.pick(cells); f.items.push(makeItem(lootPotion(rng, f.realLoot), x + 0.5, y + 0.5, FLOOR_Z + 2)); }
 }
 
 // A tall room: floating platforms climb around the walls, each a block higher than the
@@ -997,7 +998,7 @@ function addClimb(f, rng, r, nearDoor, depth) {
     }
   steps.forEach(([x, y], k) => f.set(x, y, FLOOR_Z + k, B.PLANK));   // wooden, to stand out from the walls; tops at +1 … +5
   const [tx, ty] = steps[4];
-  f.items.push(makeItem(randomTreasure(rng, depth), tx + 0.5, ty + 0.5, FLOOR_Z + 5));
+  f.items.push(makeItem(randomTreasure(rng, depth, f.realLoot), tx + 0.5, ty + 0.5, FLOOR_Z + 5));
   // A lamp on the nearest wall, up high, so you can see what's waiting.
   const [wx, wy] = [[r.x0 - 1, ty], [r.x1 + 1, ty], [tx, r.y0 - 1], [tx, r.y1 + 1]]
     .sort((a, b) => distance(a[0] - tx, a[1] - ty) - distance(b[0] - tx, b[1] - ty))[0];
@@ -1099,7 +1100,7 @@ function addLake(f, rng, r, nearDoor, depth) {
       f.set(x, y, 0, B.ROCK);
       f.set(x, y, FLOOR_Z - 1, B.GRASS);
     }
-    f.items.push(makeItem(randomTreasure(rng, depth), cx + 0.5, cy + 0.5, FLOOR_Z));
+    f.items.push(makeItem(randomTreasure(rng, depth, f.realLoot), cx + 0.5, cy + 0.5, FLOOR_Z));
     const shore = shoreFrom(r, cx, cy, dx, dy, (x, y) => isDeep(x, y) || f.get(x, y, FLOOR_Z - 1) === B.GRASS);
     if (shore && rng.chance(0.5)) {
       steppingStones(f, rng, shore, [cx - 0.5, cy - 0.5], isDeep);
@@ -1128,7 +1129,7 @@ function addBigChasm(f, rng, r, nearDoor, depth) {
     for (let y = cy - 1; y <= cy + 1; y++)
       for (let x = cx - 1; x <= cx + 1; x++)
         if (f.get(x, y, FLOOR_Z - 1) === B.PLANK || isGap(x, y)) f.set(x, y, FLOOR_Z - 1, r.theme.wall);
-    f.items.push(makeItem(randomTreasure(rng, depth), cx + 0.5, cy + 0.5, FLOOR_Z));
+    f.items.push(makeItem(randomTreasure(rng, depth, f.realLoot), cx + 0.5, cy + 0.5, FLOOR_Z));
   };
   const [dx, dy] = rng.pick([[1, 0], [-1, 0], [0, 1], [0, -1]]);
   const shore = shoreFrom(r, cx, cy, dx, dy, isGap);
@@ -1204,8 +1205,8 @@ function addSecretRoom(f, rng, rooms, start, roomAt, ringAt, corridor, blocked, 
   const spots = rng.shuffle(interior(f.secret));
   const roll = rng();
   const extra = roll < 0.1 ? { kind: rng.chance(0.5) ? "strength" : "heart" } : roll < 0.45 ? { kind: "bomb", count: 2 }
-    : roll < 0.75 ? randomPotion(rng) : randomScroll(rng);
-  for (const [k, it] of [randomTreasure(rng, depth + 1), extra, { kind: "cash", amount: rng.int(10, 20) + depth }].entries())
+    : roll < 0.75 ? lootPotion(rng, f.realLoot) : randomScroll(rng);
+  for (const [k, it] of [randomTreasure(rng, depth + 1, f.realLoot), extra, { kind: "cash", amount: rng.int(10, 20) + depth }].entries())
     if (spots[k]) f.items.push(makeItem(it, spots[k][0] + 0.5, spots[k][1] + 0.5, FLOOR_Z));
 }
 

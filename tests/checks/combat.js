@@ -49,7 +49,7 @@
 import { Zone, B, FLOOR_Z } from "../../src/world.js";
 import { enterZone, changeZone, cachedZone, zoneState } from "../../src/zones.js";
 import { spawnCreature, addCreature, CREATURE_TYPES, pickCreatureType, touchable, nearestCreature, witnessesOf, creaturesAlong } from "../../src/creatures.js";
-import { resolveAttack, rollToHit, hitChance, toHitMod, critNat, dvOf, weaponSpec, naturalSpec, playerMelee, bumpAttack, combatLine, thrownSpec } from "../../src/combat.js";
+import { resolveAttack, rollToHit, hitChance, toHitMod, critNat, dvOf, weaponSpec, naturalSpec, playerMelee, bumpAttack, combatLine, thrownSpec, GEAR as COMBAT_GEAR } from "../../src/combat.js";
 import { guardianThink } from "../../src/guardians.js";
 import { pushPlayerOut, killMonster } from "../../src/monsters.js";
 import { killXp, offerPowers, takePerk } from "../../src/leveling.js";
@@ -69,15 +69,18 @@ import { setMode } from "../../src/screens.js";
 import { updateCreatures, recruit, AI_RULES } from "../../src/ai.js";
 import { registerFaction, FACTIONS } from "../../src/factions.js";
 import { registerAbility, ABILITIES } from "../../src/abilities.js";
-import { addStatus, hasStatus, tickStatuses } from "../../src/status.js";
+import { addStatus, hasStatus, tickStatuses, statusFlag } from "../../src/status.js";
 import { snapshotZone } from "../../src/save/codec.js";
 import { memoryAdapter } from "../../src/save/store.js";
 import { saveGame, whenWritten } from "../../src/save/save.js";
-import { throwReady, throwAt, updateProjectiles, THROW_TIME, landOutside } from "../../src/throwing.js";
+import { throwReady, throwAt, updateProjectiles, THROW_TIME, landOutside, throwGravity, THROW_GRAVITY } from "../../src/throwing.js";
 import { fire, fireAt, readyLauncher, missileSpec } from "../../src/missiles.js";
 import { requestTarget, cursorTarget, lineOfFire, targetText } from "../../src/screens/target.js";
 import { mapView } from "../../src/renderMap.js";
 import { MISSILES } from "../../src/content/items/missiles.js";
+import { canEquip } from "../../src/body.js";
+import { CLASSES } from "../../src/content/items/forge.js";
+import { itemName, mendItem, MEND_TIME } from "../../src/items.js";
 import { EYE, FISTS, attackTime } from "../../src/player.js";
 import { compileWorld } from "../../src/world/worldmodel.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
@@ -1628,8 +1631,13 @@ export function realBand(game, tier, level) {
 // left out: worn for their own bonus, their enchantment is noise here). → [{ bg, seed, at: { [band level]: { snap,
 // kit } } }], 4 backgrounds × 20 seeds.
 const TYPICAL_BGS = ["aspirantOfTheRule", "forgehandOfOrrum", "droversChild", "reedcutter"];
-const TYPICAL_PREF = ["quick", "mighty", "keenEye", "tough", "ironSkin", "executioner", "regen", "crushing", "longReach",
-  "giantSlayer", "secondWind", "foldingStrike", "thickBlood"];
+// (B1, the user's "measure, then decide", 2026-10-30: ordered by measured worth, each power's tiers 5-8 mean cost a kill
+// with it preferred first, the live powers' effects counted in typicalRow: Daze 35.40%, Giant slayer 36.58, Tough 36.80,
+// Quick strikes, Mighty and Thick blood 36.83, Iron skin 36.90, High ground 36.97, Bleed and Riposte 37.08, Folding strike
+// 37.13, Disarm 37.15, Keen eye 37.17, Second wind 37.40, Cleave 37.42, Crushing 37.45, Executioner, Long reach and Dark
+// backstab 37.52, Regeneration 37.60; the old order's 36.83)
+const TYPICAL_PREF = ["daze", "giantSlayer", "tough", "quick", "mighty", "thickBlood", "ironSkin", "highGround", "bleed", "riposte",
+  "foldingStrike", "disarm", "keenEye", "secondWind", "cleave", "crushing", "executioner", "longReach", "darkBackstab", "regen"];
 const TYPICAL_SEEDS = Array.from({ length: 20 }, (_, k) => 1001 + k);
 const typicalSnap = (p) => ({ attrs: { ...p.attrs }, perks: structuredClone(p.perks), perkRank: { ...p.perkRank }, maxHpGain: p.maxHpGain });
 // Put a build on the player as it was at `level` (its body made fresh from the kit).
@@ -1642,9 +1650,9 @@ function wearTypical(p, build, level) {
   for (const [slot, it] of Object.entries(kit.armour)) p.body.equip[p.body.parts.find((q) => q.type === slot).id] = { ...it, known: true };
   invalidateStats(p);
 }
-export function typicalBuilds(game) {
+export function typicalBuilds(game, pref = TYPICAL_PREF, buildSeed = 0) {
   const p = game.player, out = [], last = BANDS[BANDS.length - 1].level;
-  for (const bgId of TYPICAL_BGS) for (const seed of TYPICAL_SEEDS) {
+  for (const bgId of TYPICAL_BGS) for (const seed of TYPICAL_SEEDS.map((s) => s + 20 * buildSeed)) {   // (buildSeed: another 20 builds a background)
     const bg = BACKGROUNDS[bgId], snaps = {}, keepSeed = game.seed;
     Object.assign(p, { background: bgId, genotype: bg.genotype, trees: [...bg.trees], level: 1, perks: {}, perkRank: {}, maxHpGain: 0,
                        mutations: {}, attrs: suggestSpread(bg.genotype, bgId) });
@@ -1656,7 +1664,7 @@ export function typicalBuilds(game) {
         p.level = level;
         invalidateStats(p);
         const offers = offerPowers(game, p, { level });
-        const pick = TYPICAL_PREF.find((k) => offers.includes(k)) || offers[0];
+        const pick = pref.find((k) => offers.includes(k)) || offers[0];
         if (pick) takePerk(game, pick);
         if (level % RULES.progression.level.attrPointEvery === 0) p.attrs[point++ % 2 ? "agi" : "str"]++;
         invalidateStats(p);
@@ -1711,7 +1719,9 @@ function blowsToKill(dmgs, hp, low = null, lowBelow = 0) {
   }
   return E[hp];
 }
-export function ttkTables(ctx, { blows = 1500, typicalBlows = 40 } = {}) {
+// pref: the typical build's preference (the default TYPICAL_PREF); typicalOnly: only the typical rows, with no bounds
+// held (B1's measurement of the powers' worth, 2026-10-30).
+export function ttkTables(ctx, { blows = 1500, typicalBlows = 40, pref = TYPICAL_PREF, typicalOnly = false, seed = 0, buildSeed = 0 } = {}) {
   const { game, seedRandom, restoreRandom } = ctx;
   const problems = [], stats = {};
   const expect = (ok, m) => { if (!ok) problems.push(m); return ok; };
@@ -1723,28 +1733,43 @@ export function ttkTables(ctx, { blows = 1500, typicalBlows = 40 } = {}) {
   const saved = { attrs: { ...p.attrs }, level: p.level, body: p.body, perks: p.perks, perkRank: p.perkRank, maxHpGain: p.maxHpGain, mutations: p.mutations,
                   background: p.background, genotype: p.genotype, trees: p.trees };
   const table = {};
-  const sets = [["d20", "attributes"], ["legacy", "legacy"], ["d20", "attributes", "powers"], ["d20", "attributes", "mutations"], ["d20", "attributes", "real"],
-                ["d20", "attributes", "typical"]];
+  const sets = typicalOnly ? [["d20", "attributes", "typical"]] : [["d20", "attributes"], ["legacy", "legacy"], ["d20", "attributes", "powers"], ["d20", "attributes", "mutations"],
+                ["d20", "attributes", "real"], ["d20", "attributes", "typical"]];
   // The typical build's row at a band: each build against the real world's kinds of the band, typicalBlows a side
   // (the blows to kill from their spread: blowsToKill), the means over the builds; the worst kind by its mean cost.
   let builds = null;
   const typicalRow = (tier, level) => {
-    builds ||= typicalBuilds(game);
+    builds ||= typicalBuilds(game, pref, buildSeed);
     const counts = realBand(game, tier, level), kinds = {}, rs = [];
-    game.combatRng = makeRng(level * 97 + 3);
+    game.combatRng = makeRng(level * 97 + 3 + 7919 * seed);   // (seed: another stream of dice, for the spread over seeds; 0 as before)
     for (const b of builds) {
       wearTypical(p, b, level);
       const hpMax = maxHp(p), swing = attackTime(p), regenHps = bonus(p, "regen") / 12, r = { you: 0, it: 0, cost: 0 };
       const exec = hasKey(p.perks, "executioner");
       for (const [type, n] of Object.entries(counts)) {
+        wearTypical(p, b, level);   // (fresh for each kind: a chip or a snap from the last fight doesn't carry over; B1)
         const T = CREATURE_TYPES[type], c = addCreature(z, spawnCreature(type, 5, 5, FLOOR_Z, { rng: () => 0.5, level, state: "chase" }));
         const itsHp = c.maxHp, yours = [], theirs = [], low = exec ? [] : null;
         c.hp = c.maxHp = 1e12; c.cd = Infinity;
+        c.status.pinned = { t: Infinity, mag: 1, src: null, acc: 0 };   // (held where it stands: a great blade's knockback would walk it off; B1)
+        // What the powers do in the fight (B1, the user's "measure, then decide", 2026-10-30): after each of your blows
+        // its statuses run for your swing's time, so a bleed's ticks count as your damage and a daze or a disarm lasts as
+        // long as it should; its blow while dazed is lost (and its DV is 0 meanwhile, combat.js dvOf); a disarmed one's
+        // is halved (combat.js); a long blade's Riposte parries the share of its blows your swings fall within 0.2 s of
+        // (0.2 ÷ your swing time). Cleave, High ground and Dark backstab show nothing against one creature on flat ground
+        // with your torch lit, which this model is.
+        const parry = weaponSpec(p).cls === "longBlade" && hasKey(p.perks, "riposte") ? Math.min(1, COMBAT_GEAR.riposteWindow / swing) : 0;
         for (let k = 0; k < typicalBlows; k++) {
-          yours.push(resolveAttack(game, p, c, weaponSpec(p), { view: "map" }).dmg);
+          const blow = resolveAttack(game, p, c, weaponSpec(p), { view: "map" });
+          let dealt = blow.dmg;
           if (low) { const h = c.hp; c.hp = 1e11; low.push(resolveAttack(game, p, c, weaponSpec(p), { view: "map" }).dmg); c.hp = h; }
+          const h0 = c.hp;
+          tickStatuses(game, c, swing);
+          dealt += h0 - c.hp;
+          yours.push(dealt);
           p.hp = 1e9;
-          theirs.push(resolveAttack(game, c, p, naturalSpec(c)).dmg);
+          const lost = statusFlag(c, "noAct") || (parry > 0 && blow.hit && game.combatRng() < parry);   // (a parry needs a hit)
+          theirs.push(lost ? 0 : resolveAttack(game, c, p, naturalSpec(c)).dmg);
         }
         game.effects.length = 0; run.logged.length = 0;
         z.creatures.splice(z.creatures.indexOf(c), 1);
@@ -1798,6 +1823,7 @@ export function ttkTables(ctx, { blows = 1500, typicalBlows = 40 } = {}) {
           const c = addCreature(z, spawnCreature(type, 5, 5, FLOOR_Z, { rng: () => 0.5, level, state: "chase" }));
           const itsHp = c.maxHp, T = CREATURE_TYPES[type];
           c.hp = c.maxHp = 1e12; c.cd = Infinity;
+          c.status.pinned = { t: Infinity, mag: 1, src: null, acc: 0 };   // (held where it stands, as above; B1)
           const yours = [], theirs = [];
           let thorns = 0;
           for (let b = 0; b < blows; b++) {
@@ -1828,6 +1854,7 @@ export function ttkTables(ctx, { blows = 1500, typicalBlows = 40 } = {}) {
       while (undo.length) undo.pop()();
       table[build || combat] = rows;
     }
+    if (typicalOnly) { stats.typical = table.typical.map((r) => r.costPct); return resultOf("combat: the typical build's cost a kill (measured)", [], stats); }
     // The bounds hold the typical build against the real world's creatures (the balance decision of 2026-10-30): you
     // win a fight with a creature of your level at every band, in a sane time; the first four tiers stay near the
     // parent game's numbers; tiers 5-8 cost 25-38% of your health a kill, ±3 (the parent's 25-35%). The plain fighter's
@@ -1864,6 +1891,330 @@ export function ttkTables(ctx, { blows = 1500, typicalBlows = 40 } = {}) {
   return resultOf("combat: time to kill by level band (WS8)", problems, stats);
 }
 
+// =============================================================================================================
+// B1: the real world's gear in a fight (C4 #4, #5, #6 and the powers that go with them), under d20.
+// =============================================================================================================
+// checkB1Combat(ctx) → { name: "combat: B1's gear", … }: each blow with a fixed die (ctx.rng a constant, or a seeded
+// stream for the shares), against a dummy that can't die:
+//   materials   truesteel's soak 0..AV−1; blackglass chips on a crit against AV 4 (and not AV 3, not without a crit);
+//               bone snaps 1 hit in 50 (the share over 4,000 hits), into the pack broken, not to be held, mended by
+//               Repair only; pleatmetal −3 STR needed
+//   classes     the short blade ×2 from the dark on the unaware (not lit, not on a hunter; any blade with Dark
+//               backstab); the great blade's knockback (a tile back; not into a wall, not when pinned); the lantern-
+//               flail ×2 on a shade, 1 with the torch out
+//   powers      Bleed (a short blade's crit, 3 s at 1 a second; not a long blade's), Daze (a cudgel, a quarter of the
+//               blows), Cleave (an axe: half the blow to the nearest other hostile), Disarm (an axe on an armed kind, a
+//               fifth; its blows halved), High ground (a polearm from a block up: ×1.5), Riposte (a long blade at a foe
+//               within 0.2 s of its blow: its cooldown starts again; not at 0.5 s); none without its power or class
+//   armour      the buckler blocks a fifth of the blows on you; the glass-scale turns 15% of arrows, a raised mirror
+//               shield half, both 57.5%; melee blows aren't turned by either
+//   throwing    (WS5 #8) gyro wrists: a knife flies flat in 3D (no drop over 0.5 s) and on the map (the arc's gravity 0),
+//               a bomb is still lobbed, a knife +2; the juggler's arm: 4 knives at once from 6 (in 3D fanned, on the map
+//               all at the mark), 2 from 2, 1 without it
+export function checkB1Combat(ctx) {
+  const { game } = ctx;
+  const problems = [], stats = {};
+  const expect = (ok, m) => { if (!ok) problems.push(m); return ok; };
+  const run = fresh(ctx, 91);
+  const p = game.player;
+  const field = arena("b1-gear");
+  enterZone(game, field, { how: "start" });
+  Object.assign(p, { x: 5.5, y: 5.5, z: FLOOR_Z, yaw: 0, pitch: 0, attackCd: 0 });
+  p.torch = true; p.attrs.str = 20; p.attrs.agi = 14; p.perks = {}; invalidateStats(p);
+  const wield = (id, made = "copper") => { const it = makeGear("weapon", id, made); p.body.equip.hand_r = it; p.body.equip.hand_l = WEAPONS[id].hands === 2 ? "hand_r" : null; invalidateStats(p); return it; };
+  const perk = (...ids) => { p.perks = Object.fromEntries(ids.map((k) => [k, 1])); invalidateStats(p); };
+  const fixed = (v) => () => v;
+  const hit = (tgt, rng = fixed(0.6), view = "map") => resolveAttack(game, p, tgt, weaponSpec(p), { view, rng });
+  const at = (type, x, y, level = 5, state = "chase") => dummy(field, type, x, y, level, state);
+  const clear = () => { field.creatures.length = 0; };
+  const log = run.logged, identity = {};
+  try {
+    // --- Materials ---------------------------------------------------------------------------------------------
+    clear();
+    const tank = at("goblin", 6, 5); tank.armour = 4;
+    const meanSoak = (made) => { wield("longsword", made); let s = 0, n = 0; for (let k = 0, rng = makeRng(5); k < 4000; k++) { const r = hit(tank, rng); if (r.hit) { s += r.soaked; n++; } } return s / n; };
+    const soakT = meanSoak("truesteel"), soakI = meanSoak("iron");
+    expect(Math.abs(soakI - 2) < 0.12 && Math.abs(soakT - 1.5) < 0.12,
+      `truesteel against AV 4: mean soak ${soakT.toFixed(2)} (want about 1.5: 0..3), iron ${soakI.toFixed(2)} (about 2: 0..4)`);
+    stats.truesteel = `mean soak against AV 4: truesteel ${soakT.toFixed(2)}, iron ${soakI.toFixed(2)}`;
+    const glass = wield("dagger", "blackglass");
+    hit(tank, fixed(0.6));
+    expect(glass.material === 3, `blackglass without a crit chipped to ${glass.material}`);
+    hit(tank, fixed(0.99));   // a natural 20: a crit
+    expect(glass.material === 2 && glass.chips === 1 && /^chipped /.test(itemName(game, glass)), `blackglass crit on AV 4: material ${glass.material}, chips ${glass.chips}, named "${itemName(game, glass)}"`);
+    tank.armour = 3;
+    hit(tank, fixed(0.99));
+    expect(glass.material === 2, `blackglass crit on AV 3 chipped it to ${glass.material}`);
+    tank.armour = 0;
+    // Bone: 1 in 50.
+    clear();
+    const foe = at("goblin", 6, 5);
+    let snaps = 0, landed = 0, gearEvents = 0;
+    const offGear = on("gear", () => gearEvents++);
+    const bs = makeRng(77);
+    for (let k = 0; k < 6000; k++) {
+      const it = wield("dagger", "bone");
+      const r = hit(foe, bs);
+      if (!r.hit || r.dmg <= 0) continue;
+      landed++;
+      if (it.broken) { snaps++; if (p.body.equip.hand_r === it || !p.inv.includes(it)) { expect(false, "a snapped bone dagger stayed in hand or missed the pack"); break; } p.inv.splice(p.inv.indexOf(it), 1); }
+    }
+    offGear();
+    expect(Math.abs(snaps / landed - 0.02) < 0.007 && gearEvents === snaps, `bone snapped ${snaps} times in ${landed} hits (want 1 in 50), ${gearEvents} "gear" events`);
+    const snapped = wield("dagger", "bone"); p.body.equip.hand_r = null; snapped.broken = true; p.inv.push(snapped);
+    expect(canEquip(game, p, snapped, "hand_r").reason === "broken", "a snapped dagger can be held");
+    expect(mendItem(game, p, snapped) === 0 && snapped.broken, "a snapped dagger mended without Repair");
+    perk("repair");
+    const mendT = useItem(game, p, snapped);   // (E in the pack: the "wear" action mends it, in MEND_TIME)
+    expect(mendT === MEND_TIME && !snapped.broken && canEquip(game, p, snapped, "hand_r").ok, `Repair by E took ${mendT} s (want ${MEND_TIME}), mended ${!snapped.broken}`);
+    glass.chips = 1; glass.material = 2;
+    mendItem(game, p, glass);
+    expect(glass.material === 3 && !glass.chips, `Repair left the chipped blackglass at ${glass.material}`);
+    perk();
+    stats.bone = `${snaps} snaps in ${landed} hits (${(100 * snaps / landed).toFixed(2)}%)`;
+    expect(strNeeded(makeGear("weapon", "glaive", "pleatmetal")) === WEAPONS.glaive.str - 3 && strNeeded(makeGear("weapon", "glaive", "iron")) === WEAPONS.glaive.str,
+      `pleatmetal's STR needed: ${strNeeded(makeGear("weapon", "glaive", "pleatmetal"))} against ${WEAPONS.glaive.str}`);
+
+    // --- Classes ----------------------------------------------------------------------------------------------
+    clear();
+    const sleeper = at("goblin", 6, 5, 5, "idle"), hunter = at("goblin", 5, 6, 5, "chase");
+    const dmgOf = (tgt) => { if (tgt.dummyState) tgt.state = tgt.dummyState; return hit(tgt, fixed(0.6)).dmg; };   // (a blow sets it hunting)
+    sleeper.dummyState = "idle"; hunter.dummyState = "chase";
+    wield("dagger");
+    const lit = dmgOf(sleeper);
+    p.torch = false;
+    const dark = dmgOf(sleeper), darkHunter = dmgOf(hunter);
+    wield("longsword");
+    const swordDark = dmgOf(sleeper);
+    perk("darkBackstab");
+    const swordStab = dmgOf(sleeper);
+    perk(); p.torch = true;
+    const swordLit = dmgOf(sleeper);
+    identity.shortBlade = expect(dark === 2 * lit && darkHunter === lit && swordDark === swordLit && swordStab === 2 * swordLit,
+      `from the dark: a dagger ${lit} lit, ${dark} dark on the unaware, ${darkHunter} on a hunter; a longsword ${swordLit} lit, ${swordDark} dark, ${swordStab} with Dark backstab`);
+    stats.backstab = `dagger ${lit} → ${dark} from the dark; longsword ${swordLit} → ${swordStab} with Dark backstab`;
+    // The great blade's knockback.
+    clear();
+    const shoved = at("goblin", 6, 5); shoved.status = {};
+    wield("greatsword");
+    hit(shoved);
+    identity.greatBlade = expect(Math.floor(shoved.x) === 7 && Math.floor(shoved.y) === 5, `a greatsword's blow left the goblin at ${shoved.x}, ${shoved.y} (want a tile back, 7.5, 5.5)`);
+    field.set(8, 5, FLOOR_Z, B.STONE); field.set(8, 5, FLOOR_Z + 1, B.STONE); field.refresh();
+    Object.assign(p, { x: 6.5 });
+    hit(shoved);
+    expect(Math.floor(shoved.x) === 7, `knocked into a wall the goblin moved to ${shoved.x}`);
+    field.set(8, 5, FLOOR_Z, B.AIR); field.set(8, 5, FLOOR_Z + 1, B.AIR); field.refresh();
+    const pinned = at("goblin", 5, 6);
+    Object.assign(p, { x: 5.5 });
+    hit(pinned);
+    expect(Math.floor(pinned.y) === 6, "a pinned goblin was knocked back");
+    wield("longsword"); Object.assign(shoved, { x: 6.5, y: 5.5, tx: 6, ty: 5 });
+    hit(shoved);
+    expect(Math.floor(shoved.x) === 6, "a longsword knocked the goblin back");
+    // A bat keeps its hover; over a chasm a bat isn't knocked out of the fight; a diagonal shove doesn't clip a corner.
+    clear();
+    wield("greatsword");
+    const bat = at("bat", 6, 5); bat.status = {};
+    const batZ = bat.z;
+    hit(bat);
+    const flew = Math.floor(bat.x) === 7 && Math.abs(bat.z - batZ) < 1e-9;
+    field.set(8, 5, FLOOR_Z - 1, B.AIR); field.set(8, 5, FLOOR_Z - 2, B.AIR); field.refresh();
+    const chasm = field.stand[8 + 5 * field.w] < 0;
+    Object.assign(p, { x: 6.5 });
+    hit(bat);
+    const stays = field.creatures.includes(bat) && Math.floor(bat.x) === 7;
+    field.set(8, 5, FLOOR_Z - 1, B.GRASS); field.set(8, 5, FLOOR_Z - 2, B.ROCK); field.refresh();
+    clear();
+    Object.assign(p, { x: 5.5, y: 5.5 });
+    const corner = at("goblin", 6, 6); corner.status = {};
+    field.set(7, 6, FLOOR_Z, B.STONE); field.set(7, 6, FLOOR_Z + 1, B.STONE); field.refresh();
+    hit(corner);
+    const clipped = Math.floor(corner.x) === 7 && Math.floor(corner.y) === 7;
+    field.set(7, 6, FLOOR_Z, B.AIR); field.set(7, 6, FLOOR_Z + 1, B.AIR); field.refresh();
+    expect(flew && chasm && stays && !clipped, `knockback: a bat knocked a tile at its height ${flew}; over a chasm (${chasm}) it stays in the fight ${stays}; a diagonal shove past a wall's corner ${clipped ? "clipped it" : "stopped"}`);
+    // The lantern-flail.
+    clear();
+    const shade = at("shade", 6, 5), gob = at("goblin", 5, 6);
+    shade.status.pinned = gob.status.pinned;
+    wield("lanternFlail");
+    const fs = dmgOf(shade), fg = dmgOf(gob);
+    p.torch = false;
+    const fOut = dmgOf(gob);
+    p.torch = true;
+    identity.flail = expect(fs === 2 * fg && fOut === 1, `the lantern-flail: ${fs} on a shade, ${fg} on a goblin, ${fOut} with the torch out (want ×2, and 1)`);
+    stats.flail = `${fg} on a goblin, ${fs} on a shade, ${fOut} with the torch out`;
+
+    // --- Powers ----------------------------------------------------------------------------------------------
+    clear();
+    const t1 = at("goblin", 6, 5);
+    wield("dagger");
+    hit(t1, fixed(0.99));
+    expect(!hasStatus(t1, "bleeding"), "a dagger's crit bled without Bleed");
+    perk("bleed");
+    hit(t1, fixed(0.6));
+    expect(!hasStatus(t1, "bleeding"), "Bleed: a dagger's blow without a crit bled");
+    hit(t1, fixed(0.99));
+    const hp0 = t1.hp;
+    identity.shortBleed = expect(hasStatus(t1, "bleeding") && Math.abs(t1.status.bleeding.t - 3) < 1e-9, `Bleed: a dagger's crit, bleeding ${JSON.stringify(t1.status.bleeding)}`);
+    tickStatuses(game, t1, 3.01);
+    expect(hp0 - t1.hp === 3 && !hasStatus(t1, "bleeding"), `bleeding 3 s took ${hp0 - t1.hp} (want 3), still ${hasStatus(t1, "bleeding")}`);
+    wield("longsword");
+    hit(t1, fixed(0.99));
+    expect(!hasStatus(t1, "bleeding"), "Bleed: a longsword's crit bled");
+    // Daze: a quarter of a cudgel's blows.
+    const share = (setup, test, n = 4000, seed = 31) => { const rng = makeRng(seed); let k = 0, yes = 0; for (; k < n; k++) { setup(); const r = hit(t1, rng); if (r.hit && r.dmg > 0) { if (test()) yes++; } else k--; if (k > 3 * n) break; } return yes / n; };
+    wield("mace"); perk("daze");
+    t1.status = { pinned: t1.status.pinned };
+    const dz = share(() => { delete t1.status.stunned; }, () => hasStatus(t1, "stunned"));
+    identity.cudgel = expect(Math.abs(dz - 0.25) < 0.03, `Daze: ${(dz * 100).toFixed(1)}% of a mace's blows dazed (want 25%)`);
+    hit(t1); const dazeT = t1.status.stunned?.t;
+    perk();
+    const dz0 = share(() => { delete t1.status.stunned; }, () => hasStatus(t1, "stunned"), 400);
+    wield("longsword"); perk("daze");
+    const dzSword = share(() => { delete t1.status.stunned; }, () => hasStatus(t1, "stunned"), 400);
+    expect(dz0 === 0 && dzSword === 0 && (dazeT === undefined || dazeT <= 1 + 1e-9), `Daze without the power ${dz0}, with a longsword ${dzSword}, a daze ${dazeT} s`);
+    stats.daze = `${(dz * 100).toFixed(1)}% of 4,000 mace blows`;
+    // Disarm: a fifth of an axe's blows on an armed kind; its blows halved.
+    wield("waraxe"); perk("disarm");
+    const dr = share(() => { delete t1.status.disarmed; }, () => hasStatus(t1, "disarmed"));
+    identity.axeDisarm = expect(Math.abs(dr - 0.2) < 0.03, `Disarm: ${(dr * 100).toFixed(1)}% of an axe's blows disarmed a goblin (want 20%)`);
+    const rat = at("rat", 4, 5);
+    let ratDis = 0;
+    for (let k = 0, rng = makeRng(8); k < 400; k++) { delete rat.status.disarmed; hit(rat, rng); if (hasStatus(rat, "disarmed")) ratDis++; }
+    expect(ratDis === 0, `Disarm: a rat dropped its weapon ${ratDis} times`);
+    const blow = (c) => { const D = []; for (let k = 0, rng = makeRng(12); k < 2000; k++) { const r = resolveAttack(game, c, p, naturalSpec(c), { rng }); if (r.hit) D.push(r.dmg + (r.soaked || 0)); p.hp = maxHp(p); } return D.reduce((a, b) => a + b, 0) / D.length; };
+    p.status = {};
+    delete t1.status.disarmed;
+    const armedMean = blow(t1);
+    addStatus(game, t1, "disarmed", { t: 10 });
+    const disMean = blow(t1);
+    expect(disMean < armedMean * 0.6 && disMean > armedMean * 0.35, `a disarmed goblin's blows: ${disMean.toFixed(2)} against ${armedMean.toFixed(2)} (want about half)`);
+    stats.disarm = `${(dr * 100).toFixed(1)}% of 4,000 axe blows; its blows ${armedMean.toFixed(2)} → ${disMean.toFixed(2)}`;
+    // Cleave: half to the nearest other hostile within 1.5 tiles of you.
+    clear();
+    const c1 = at("goblin", 6, 5), c2 = at("goblin", 5, 6), far = at("goblin", 8, 8);
+    wield("waraxe"); perk("cleave");
+    const h2 = c2.hp, hf = far.hp, r1 = hit(c1);
+    identity.axe = expect(h2 - c2.hp === Math.floor(r1.dmg / 2) && hf === far.hp, `Cleave: a ${r1.dmg} blow gave the goblin beside you ${h2 - c2.hp} (want ${Math.floor(r1.dmg / 2)}), the far one ${hf - far.hp}`);
+    perk(); const h3 = c2.hp; hit(c1);
+    wield("longsword"); perk("cleave"); hit(c1);
+    expect(c2.hp === h3, "Cleave without the power, or with a longsword, still cut the second goblin");
+    // High ground: a polearm from a block up.
+    clear();
+    const low = at("goblin", 6, 5);
+    wield("spear"); perk("highGround");
+    const flat = dmgOf(low);
+    field.set(5, 5, FLOOR_Z, B.STONE); field.refresh(); Object.assign(p, { z: FLOOR_Z + 1 });
+    const up = dmgOf(low);
+    perk(); const upNo = dmgOf(low);
+    wield("longsword"); perk("highGround"); const upSword = dmgOf(low);
+    field.set(5, 5, FLOOR_Z, B.AIR); field.refresh(); Object.assign(p, { z: FLOOR_Z });
+    perk(); const flatSword = dmgOf(low);
+    identity.polearm = expect(up === Math.ceil(flat * 1.5) && upNo === flat && upSword === flatSword, `High ground: a spear ${flat} → ${up} from a block up (${upNo} without the power); a longsword ${flatSword} → ${upSword}`);
+    stats.highGround = `a spear ${flat} → ${up}`;
+    // Riposte.
+    clear();
+    const duel = at("goblin", 6, 5);
+    const cool = CREATURE_TYPES.goblin.cooldown * (duel.cdMul || 1);
+    wield("longsword"); perk("riposte");
+    duel.cd = 0.1; hit(duel);
+    const parried = duel.cd;
+    duel.cd = 0.1; hit(duel, fixed(0));   // (a natural 1: a miss parries nothing)
+    const missed = duel.cd;
+    duel.cd = 0.5; hit(duel);
+    const late = duel.cd;
+    perk(); duel.cd = 0.1; hit(duel);
+    const noPower = duel.cd;   // (a landed blow staggers it to 0.4 s at least: hurtCreature, the parent's)
+    wield("dagger"); perk("riposte"); duel.cd = 0.1; hit(duel);
+    const dagger = duel.cd;
+    identity.longBlade = expect(Math.abs(parried - cool) < 1e-9 && missed === 0.1 && late === 0.5 && noPower < cool && dagger < cool && log.some((l) => /turn the goblin's blow aside/.test(l)),
+      `Riposte: a longsword at 0.1 s left its cooldown ${parried} (want ${cool}), a miss ${missed} (want 0.1); at 0.5 s ${late}; without the power ${noPower}; a dagger ${dagger}`);
+    perk();
+
+    // --- Armour on you ---------------------------------------------------------------------------------------
+    clear();
+    const archer = at("goblin", 6, 5);
+    p.body.equip.hand_r = null;
+    const wear = (id) => { const it = makeGear("armour", id); p.body.equip[ARMOURS[id].slot === "arm" ? "arms" : ARMOURS[id].slot] = it; invalidateStats(p); return it; };
+    const turned = (ranged, n = 4000) => { let t = 0, landed = 0; for (let k = 0, rng = makeRng(99); k < n; k++) { const r = resolveAttack(game, archer, p, naturalSpec(archer), { rng, ranged }); if (r.hit) { landed++; if (r.turned) t++; } p.hp = maxHp(p); } return t / Math.max(1, landed); };
+    const none = turned(true, 400);
+    wear("buckler");
+    const buck = turned(false);
+    p.body.equip.arms = null; wear("glassScale");
+    const gsMelee = turned(false, 400), gs = turned(true);
+    addStatus(game, p, "running:mirrorShield", { t: 1e6 });
+    const both = turned(true);
+    expect(none === 0 && Math.abs(buck - 0.2) < 0.03 && gsMelee === 0 && Math.abs(gs - 0.15) < 0.03 && Math.abs(both - 0.575) < 0.03,
+      `turned aside: nothing ${none}; a buckler ${(buck * 100).toFixed(1)}% of blows (want 20); a glass-scale ${(gsMelee * 100).toFixed(1)}% of blows, ${(gs * 100).toFixed(1)}% of arrows (want 0 and 15); with a mirror shield ${(both * 100).toFixed(1)}% (want 57.5)`);
+    stats.turned = `buckler ${(buck * 100).toFixed(1)}% of blows, glass-scale ${(gs * 100).toFixed(1)}% of arrows, with the mirror shield ${(both * 100).toFixed(1)}%`;
+    p.status = {}; p.body.equip.body = null; invalidateStats(p);
+    // Every class whose identity is built (no needs: check-content's rule since B1) has it asserted above.
+    const IDENTITY = { shortBlade: identity.shortBlade && identity.shortBleed, longBlade: identity.longBlade, cudgel: identity.cudgel,
+      axe: identity.axe && identity.axeDisarm, polearm: identity.polearm, greatBlade: identity.greatBlade, flail: identity.flail };
+    for (const [id, c] of Object.entries(CLASSES)) if (!c.needs && !IDENTITY[id]) expect(false, `class ${id}: built (no needs) but its identity isn't asserted here, or failed`);
+
+    // --- Tier 8 retuned (the user's decision of 2026-10-30: from level 21, health ×0.85, damage −2; under d20) ---------
+    {
+      const D = RULES.d20, raw = (type, level) => { const t = CREATURE_TYPES[type]; return { hp: Math.round(t.hp * (1 + D.creatureHp * (level - 1))), bonus: D.creatureDmg + Math.floor((level - 1) / D.creatureDmgEvery) }; };
+      const at21 = spawnCreature("troll", 1, 1, FLOOR_Z, { rng: () => 0.5, level: 21 }), at20 = spawnCreature("troll", 1, 1, FLOOR_Z, { rng: () => 0.5, level: 20 });
+      const r21 = raw("troll", 21), r20 = raw("troll", 20);
+      const bigType = Object.keys(CREATURE_TYPES).find((k) => CREATURE_TYPES[k].guardian || CREATURE_TYPES[k].boss);
+      const big = spawnCreature(bigType, 1, 1, FLOOR_Z, { rng: () => 0.5, level: 23 }), bigHp = CREATURE_TYPES[bigType].hp;
+      expect(at21.hp === Math.round(CREATURE_TYPES.troll.hp * (1 + D.creatureHp * 20) * 0.85) && at21.bonus === r21.bonus - 2 && D.tier8From === 21 && D.tier8Hp === 0.85 && D.tier8Dmg === 2,
+        `tier 8: a level-21 troll has ${at21.hp} HP, +${at21.bonus} (want ${Math.round(CREATURE_TYPES.troll.hp * (1 + D.creatureHp * 20) * 0.85)} = ×0.85 of ${r21.hp}, +${r21.bonus - 2})`);
+      expect(at20.hp === r20.hp && at20.bonus === r20.bonus, `tier 7: a level-20 troll has ${at20.hp} HP, +${at20.bonus} (want ${r20.hp}, +${r20.bonus}: unchanged)`);
+      expect(big.hp === bigHp, `a ${bigType} at level 23 has ${big.hp} HP (want its own ${bigHp}: bosses and guardians unscaled)`);
+      // The legacy set keeps the parent's +6% and +1 per 4 at every level (golden's fixtures never reach 21: held here).
+      const undoLegacy = overrideRules("combat", "legacy");
+      let leg;
+      try { leg = spawnCreature("troll", 1, 1, FLOOR_Z, { rng: () => 0.5, level: 23 }); } finally { undoLegacy(); }
+      const legHp = Math.round(CREATURE_TYPES.troll.hp * (1 + 0.06 * 22));
+      expect(leg.hp === legHp && leg.bonus === Math.floor(22 / 4), `the legacy set: a level-23 troll has ${leg.hp} HP, +${leg.bonus} (want the parent's ${legHp}, +${Math.floor(22 / 4)})`);
+      stats.tier8 = `a level-21 troll ${at21.hp} HP +${at21.bonus} (formula ${r21.hp}, +${r21.bonus}); level 20 ${at20.hp} +${at20.bonus}; a ${bigType} at 23 ${big.hp} HP`;
+    }
+
+    // --- Throwing (WS5 #8) --------------------------------------------------------------------------------------
+    clear();
+    const fit = (part, id) => { p.body.implants[part] = id ? { kind: "implant", id } : null; invalidateStats(p); };
+    const knives = (n) => { p.inv = p.inv.filter((s) => s.kind !== "knife"); if (n) p.inv.push({ kind: "knife", count: n }); return p.inv.find((s) => s.kind === "knife"); };
+    const in3d = () => { game.view = "3d"; Object.assign(p, { x: 5.5, y: 5.5, z: FLOOR_Z, yaw: 0, pitch: 0, throwCd: 0 }); field.projectiles.length = 0; };
+    const dropOver = () => { in3d(); throwReady(game); const pr = field.projectiles[0], z0 = pr.z; updateProjectiles(game, 0.5); return z0 - pr.z; };
+    knives(6);
+    const plainDrop = dropOver(), plainPlus = thrownSpec(game).plus;
+    fit("arms", "gyroWrists");
+    const gyroDrop = dropOver(), gyroPlus = thrownSpec(game).plus;
+    expect(plainDrop > 0.5 && Math.abs(gyroDrop) < 1e-6 && gyroPlus === plainPlus + 2,
+      `gyro wrists: a knife dropped ${gyroDrop.toFixed(3)} over 0.5 s (without them ${plainDrop.toFixed(3)}), its plus ${gyroPlus} (without ${plainPlus})`);
+    expect(throwGravity(p, { kind: "bomb" }) > 0 && throwGravity(p, { kind: "knife" }) === 0 && throwGravity(p, { kind: "potion" }) === 0, "gyro wrists: the arc's gravity for a bomb, a knife and a potion");
+    const mark = at("goblin", 13, 5);
+    game.view = "map";
+    field.projectiles.length = 0;
+    const flown = throwAt(game, knives(6), { creature: mark, tile: { x: 13, y: 5 } });
+    expect(flown && (flown.g ?? THROW_GRAVITY) === 0, `gyro wrists on the map: the arc's gravity ${flown?.g}`);
+    fit("arms", null);
+    // The juggler's arm.
+    in3d(); knives(6); throwReady(game);
+    const one = field.projectiles.length;
+    fit("arms", "jugglerArm");
+    in3d(); const st = knives(6); throwReady(game);
+    const yaws = field.projectiles.map((q) => Math.atan2(q.vy, q.vx));
+    const four = field.projectiles.length, left = st.count;
+    in3d(); knives(2); throwReady(game);
+    const two = field.projectiles.length;
+    game.view = "map"; field.projectiles.length = 0;
+    const mapStack = knives(6);
+    throwAt(game, mapStack, { creature: mark, tile: { x: 13, y: 5 } });
+    const onMap = field.projectiles.length, sameMark = field.projectiles.every((q) => Math.abs(Math.atan2(q.vy, q.vx) - Math.atan2(field.projectiles[0].vy, field.projectiles[0].vx)) < 1e-9);
+    expect(one === 1 && four === 4 && left === 2 && two === 2 && new Set(yaws.map((y) => y.toFixed(4))).size === 4 && onMap === 4 && mapStack.count === 2 && sameMark,
+      `the juggler's arm: ${one} knife without it; ${four} from 6 in 3D (${left} left, ${new Set(yaws.map((y) => y.toFixed(4))).size} headings), ${two} from 2; on the map ${onMap} (${mapStack.count} left, one mark ${sameMark})`);
+    fit("arms", null); field.projectiles.length = 0;
+    stats.throwing = `gyro wrists: drop over 0.5 s ${plainDrop.toFixed(2)} → ${gyroDrop.toFixed(2)}, +${gyroPlus - plainPlus}; the juggler's arm ${four} knives in 3D, ${onMap} on the map`;
+  } catch (err) {
+    problems.push(`threw: ${err.stack?.split("\n").slice(0, 3).join(" / ")}`);
+  } finally { run.restore(); }
+  return resultOf("combat: B1's gear", problems, stats);
+}
+
 // tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser), with the
 // inputs tools/check-combat.mjs gives.
 export async function run(env) {
@@ -1871,7 +2222,7 @@ export async function run(env) {
   const { game, startRun, inputHandlers } = await env.src("game.js");
   const { keys } = await env.src("input.js");
   const ctx = { game, startRun, inputHandlers, keys, seedRandom: env.seedRandom, restoreRandom: env.restoreRandom };
-  return [checkCombat({ game, startRun, srcFiles: await env.srcFiles() }), checkTargeting(ctx), await checkAiDepth(ctx), checkArena(ctx), ttkTables(ctx)];
+  return [checkCombat({ game, startRun, srcFiles: await env.srcFiles() }), checkTargeting(ctx), await checkAiDepth(ctx), checkArena(ctx), ttkTables(ctx), checkB1Combat(ctx)];
 }
 
 // --- passTime with 60 creatures (Node only: tools/check-combat.mjs --perf) ----------------------------------------

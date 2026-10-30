@@ -231,6 +231,7 @@ export function toggleMap(game) {
   // Pressed flat: no way of turning works (Tab, or Escape on the map), and no fold power fires.
   if (statusFlag(game.player, "flat")) { game.log("You're flat: you can't turn until it passes.", [220, 220, 230]); return; }   // bible §10.2
   foldPowers(game);
+  const from = game.view;
   if (game.mode === "explore") toMapView(game);
   else if (game.mode === "map") {
     sfx("rotate", { up: true });
@@ -239,6 +240,9 @@ export function toggleMap(game) {
     game.player.vz = 0;
     setMode(game, "explore");   // locks the pointer (allowed: we're inside a key press) and unpauses
   }
+  // A turn of the world, yours (B1, WS4 #16): Cast's wake roll listens (progression/mutations.js), and anything else
+  // a turn sets off. Not the cube's first turn, a forced flat map (forceMapView) or a turn refused above.
+  if (game.view !== from) emit(game, "view:turn", { from, to: game.view });
 }
 
 // From 3D to the map: by Tab, or forced (pressed flat; that is no turn of yours, so no fold powers).

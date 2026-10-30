@@ -43,6 +43,8 @@ export function drinkPotion(game, effect) {
 
 Object.assign(DRINK, {
   healing(game, p) {
+    // An overdone balm (B1, C4 #10): no potion mends you either while it lasts (the legacy game never has the status).
+    if (p.status?.["tonic:sick"]) { game.log("Your stomach won't keep it down. (no healing while the balm sickness lasts)", [170, 200, 110]); return; }
     const heal = hasKey(p.perks, "alchemist") ? 18 : 12;
     p.hp = Math.min(maxHp(p), p.hp + heal);
     game.log(`Warmth spreads through you. (+${heal} HP)`, [230, 90, 110]);

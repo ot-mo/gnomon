@@ -28,7 +28,7 @@
 import { B, FLOOR_Z, ROOM_TOP } from "../world.js";
 import { makeRng } from "../rng.js";
 import { spawnCreature, addCreature, canTalk, CREATURE_TYPES } from "../creatures.js";
-import { makeItem, randomPotion, randomScroll, randomEquipment, randomTreasure, ITEM_KINDS } from "../items.js";
+import { makeItem, randomScroll, randomTreasure, ITEM_KINDS, lootGear, lootPotion } from "../items.js";
 import { layoutSpikes } from "../traps.js";
 import { LEGENDS, legendLooks } from "../content/creatures/legends.js";
 
@@ -668,15 +668,15 @@ const lying = (make, want) => (c) => {
   for (let n = 0; n < 20 && want && it.kind !== want; n++) it = make(c);
   c.zone.items.push(makeItem(it, c.x + 0.5, c.y + 0.5, c.z0));
 };
-registerLegend("potion", lying((c) => randomPotion(c.rng)));
+registerLegend("potion", lying((c) => lootPotion(c.rng, c.zone.realLoot)));   // (zone.realLoot: the real world's loot, B1)
 registerLegend("scroll", lying((c) => randomScroll(c.rng)));
 registerLegend("key", lying(() => ({ kind: "key" })));
 registerLegend("heart", lying(() => ({ kind: "heart" })));
 registerLegend("strength", lying(() => ({ kind: "strength" })));
 registerLegend("cash", lying((c) => ({ kind: "cash", amount: c.rng.int(10, 20) + c.zone.level })));
-registerLegend("weapon", lying((c) => randomEquipment(c.rng, c.zone.level + 1, 0.15), "weapon"));
-registerLegend("armour", lying((c) => randomEquipment(c.rng, c.zone.level + 1, 0.15), "armour"));
-registerLegend("treasure", lying((c) => randomTreasure(c.rng, c.zone.level)));
+registerLegend("weapon", lying((c) => lootGear(c.rng, c.zone.level + 1, 0.15, c.zone.realLoot), "weapon"));
+registerLegend("armour", lying((c) => lootGear(c.rng, c.zone.level + 1, 0.15, c.zone.realLoot), "armour"));
+registerLegend("treasure", lying((c) => randomTreasure(c.rng, c.zone.level, c.zone.realLoot)));
 for (const type of ["rat", "goblin", "skeleton", "flatling"])
   registerLegend(type, (c) => { floorCol(c); addCreature(c.zone, spawnCreature(type, c.x, c.y, c.z0, { rng: c.cosmetic, state: "wander", level: c.zone.level })); });
 
@@ -712,7 +712,7 @@ registerLegend("bottomLoot", (c) => {
     if (it) { it.uid = `relic:${b.artifact}`; it.relicSpawn = true; }
   }
   if (!it && b.kind === "legend") { it = BOTTOM_LOOT.bodyMod?.(c.rng, level) || null; if (it) note(c).bodyMod = true; }
-  it ||= randomTreasure(c.rng, level + 2);
+  it ||= randomTreasure(c.rng, level + 2, c.zone.realLoot);
   at(c, 0, B.ALTAR);
   c.zone.items.push(makeItem(it, c.x + 0.5, c.y + 0.5, c.z0 + 1));
 });
@@ -728,7 +728,7 @@ registerLegend("bodyMod", (c) => {
   floorCol(c);
   const it = BOTTOM_LOOT.bodyMod?.(c.rng, c.zone.level) || null;
   if (it) { note(c).bodyMod = true; c.zone.items.push(makeItem(it, c.x + 0.5, c.y + 0.5, c.z0)); }
-  else c.zone.items.push(makeItem(randomTreasure(c.rng, c.zone.level + 1), c.x + 0.5, c.y + 0.5, c.z0));
+  else c.zone.items.push(makeItem(randomTreasure(c.rng, c.zone.level + 1, c.zone.realLoot), c.x + 0.5, c.y + 0.5, c.z0));
 });
 registerLegend("cradle", (c) => { floorCol(c); at(c, 0, B.STATION); at(c, 1, B.STATION); });
 // The landmark bottoms' parts (B2, C1b #5): higher steps, the Press's pistons on their gantries, a boss's spot, the Datum

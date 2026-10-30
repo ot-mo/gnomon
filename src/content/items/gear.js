@@ -16,7 +16,7 @@
 //   TOOLS[id] = { name, glyph, color, price, info }   the "tool" kind: { kind: "tool", effect: id, count }
 //     markerChalk  E in the pack: a chalk mark on the floor where you stand, in either view: your map shows it, and in 3D
 //                  it stands where you made it (the zone's markers, screens/play.js's; at most 9 a floor). count: marks
-import { registerItemKind, takeOne, WEAPONS, ARMOURS, ELEMENTS, PROPERTIES } from "../../items.js";
+import { registerItemKind, takeOne, WEAPONS, ARMOURS, ELEMENTS, PROPERTIES, registerLoot } from "../../items.js";
 import { MATERIALS, MATERIAL_ORDER, CLASS_OF, isForged } from "./forge.js";
 import { RULES } from "../../rules.js";
 import { seededSort } from "../../rng.js";
@@ -39,7 +39,8 @@ export function useful(kind, id) {
   if (kind === "weapon") return !!WEAPONS[id];
   if (kind === "missile") return id in LAUNCHER_TIER;
   const a = ARMOURS[id];
-  return !!a && (a.armour > 0 || Object.keys(a.bonus || {}).length > 0);
+  // (B1: a reputation table while worn counts; an Hour mask's waits for whoever lays one with its Hour)
+  return !!a && (a.armour > 0 || Object.keys(a.bonus || {}).length > 0 || (!!a.wornRep && typeof a.wornRep === "object") || a.block > 0 || a.reflect > 0 || a.climb > 0);
 }
 
 // The real world's gear by the tier it first turns up at: the light classes from the start, the heavy ones later (as
@@ -84,6 +85,8 @@ export function randomGear(rand, level, luck = 0) {
   if (count) it.props = seededSort(props, () => rand() - 0.5).slice(0, count);
   return it;
 }
+
+registerLoot("gear", randomGear);   // (the real world's loot: items.js lootGear, B1)
 
 // --- Tools --------------------------------------------------------------------------------------------------------
 export const TOOLS = {

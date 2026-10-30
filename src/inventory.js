@@ -24,7 +24,7 @@ import { pushMode, popMode } from "./screens.js";
 import { emit } from "./events.js";
 import { UI, hit, at, hitLabel, list, listKey, listWheel, tabs, tabsKey, wrap } from "./ui.js";
 import { WEAPONS, ARMOURS, ELEMENTS, ITEM_KINDS, itemName, itemInfo, itemGlyph, itemAura, itemWeight, makeItem, isGear, strNeeded, takeOne,
-  registerItemAction, useItem, canUse, RELIC_COLOR } from "./items.js";
+  registerItemAction, useItem, canUse, RELIC_COLOR, mendItem } from "./items.js";
 import { drinkPotion, readScroll } from "./effects.js";
 import { RULES } from "./rules.js";
 import { armourValue, bonus, weaponReach } from "./player.js";
@@ -35,7 +35,8 @@ import { defaultPart, slotsFor, canEquip, equip as bodyEquip, unequip as bodyUne
 // What using things from the pack does (the kinds in content name these actions).
 registerItemAction("drink", (game, e, it) => { takeOne(e, it); drinkPotion(game, it.effect); return RULES.body.drinkTime; });
 registerItemAction("read", (game, e, it) => { takeOne(e, it); readScroll(game, it.effect); return RULES.body.readTime; });
-registerItemAction("wear", (game, e, it) => (equip(game, it, e.inv.indexOf(it), wearPart(game, e, it)) ? RULES.body.equipTime : 0));
+// (a broken piece is mended instead, with the Repair power: that takes its own time, items.js MEND_TIME; B1)
+registerItemAction("wear", (game, e, it) => (it.broken ? mendItem(game, e, it) : equip(game, it, e.inv.indexOf(it), wearPart(game, e, it)) ? RULES.body.equipTime : 0));
 // Where E puts gear on: the part chosen on the Equipment tab (the pack shown "for" it), else the body's default.
 const wearPart = (game, e, it) => (e === game.player && game.invFilter === "for" && slotsFor(e, it).includes(game.invFor) ? game.invFor : undefined);
 
@@ -194,6 +195,8 @@ export function equip(game, it, index, part = defaultPart(game.player, it)) {
   if (!check.ok) {
     if (check.reason === "weak") game.log(`You're not strong enough for the ${itemName(game, it)} (needs ${check.need} STR, you have ${attr(p, "str")}).`, BAD);
     else if (check.reason === "cursed") game.log(`Your cursed ${itemName(game, check.item)} won't come off! A scroll of remove curse would help.`, CURSE);
+    else if (check.reason === "broken") return mendItem(game, p, it) > 0;   // (B1: the Repair power mends it; else it says so)
+    else if (check.reason === "shell") game.log(`Your shell won't go under the ${itemName(game, it)}: nothing heavier than clothes on your back.`, BAD);
     else game.log(`You have nowhere to put the ${itemName(game, it)}.`, DIM);
     return false;
   }
@@ -352,10 +355,7 @@ export function drawInventory(game) {
   line(infoY);
   if (sel) {
     let info = itemInfo(game, sel);
-    const weapon = wielded(p), armour = wornOn(p, "body");
-    if (tab === "pack" && sel.kind === "weapon" && weapon) info += compare(WEAPONS[sel.id], WEAPONS[weapon.id], (a) => (a.dmg[0] + a.dmg[1]) / 2, "avg damage");
-    if (tab === "pack" && sel.kind === "armour" && (ARMOURS[sel.id].slot || "body") === "body")
-      info += compare(ARMOURS[sel.id], armour ? ARMOURS[armour.id] : { armour: 0 }, (a) => a.armour, "armour");
+    if (tab === "pack") info += compareLine(p, sel);
     if (isGear(sel) && !sel.known && !sel.relic) info += " · enchantment unknown until equipped";
     wrap(info, w - 4).slice(0, 2).forEach((l, k) => S.text(x0 + 2, infoY + 1 + k, l, 190, 190, 200));
   }
@@ -452,4 +452,15 @@ function drawBody(game, { x0, w, top, listH, rows }) {
 function compare(a, b, value, label) {
   const d = value(a) - value(b);
   return d === 0 ? "" : ` · ${d > 0 ? "+" : ""}${d} ${label} vs yours`;
+}
+// The pack's comparison with what you wield or wear on the body (B1, C4 #12): a weapon's average damage with its
+// material as it adds a blow (× its swing ÷ RULES.d20.swingRef, as its line shows it); body armour's armour with its
+// material. (Enchantment stays out: unknown until worn.) The parent's gear has no material: its numbers as before.
+const avgBlow = (it) => { const w = WEAPONS[it.id]; return (w.dmg[0] + w.dmg[1]) / 2 + Math.round((it.material || 0) * w.swing / RULES.d20.swingRef); };
+const bodyAv = (it) => (it ? ITEM_KINDS.armour.av({ ...it, ench: 0 }) : 0);
+export function compareLine(p, sel) {
+  const weapon = wielded(p);
+  if (sel?.kind === "weapon" && weapon) return compare(sel, weapon, avgBlow, "avg damage");
+  if (sel?.kind === "armour" && (ARMOURS[sel.id].slot || "body") === "body") return compare(sel, wornOn(p, "body"), bodyAv, "armour");
+  return "";
 }
