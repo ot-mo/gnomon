@@ -394,6 +394,35 @@ const DATUM_HALL = {
 };
 export const READING_HALLS = { datumStone: DATUM_HALL };
 
+// The true level (the Datum's floors, bible §5 D: "a door opens when you stand on the plate whose map number matches the 3D
+// height of the marked sill"; B2, C1b #10): a sill (S) `sill` blocks high, its height carved in the wall beside it, read in
+// 3D; four brass plates in the floor (a-d), numbered 1-4, read on the map; the treasure behind a gate (G). Standing on
+// the plate whose number is the sill's height opens it (src/gimmicks.js; zone.trueLevel { plates: [{ x, y, n }], answer,
+// gate, solved }). Not one of VAULTS (the legacy stack draws from those): a landmark's pool names it.
+function trueLevelPlan(rng) {
+  const sill = rng.int(1, 4);
+  return {
+    sill,
+    plan: [
+      "#############",
+      "#####*$*#####",
+      "#####GGG#####",
+      "#...........#",
+      "#...........#",
+      "#S..........#",
+      "#...........#",
+      "#..a.b.c.d..#",
+      "#...........#",
+      "######E######",
+    ],
+  };
+}
+export const LANDMARK_VAULTS = {
+  trueLevel: { id: "trueLevel", name: "The True Level", height: 5, wall: B.STONE, floorBlock: B.TILE, build: trueLevelPlan, links: [],
+    legend: { S: "trueSill", a: "plate", b: "plate", c: "plate", d: "plate" },
+    hint: "A sill stands out of the west wall, a line cut beside it, and brass plates lie in a row across the floor." },
+};
+
 // Lair halls (a lair's last level, p.bottom = { kind: "legend", id, uid, hall }): the legend in the middle of a
 // wide hall, its hoard behind it. By the hall its template asks for (content/creatures/legends.js):
 //   plain     the hall alone
@@ -502,7 +531,7 @@ export const GUARDIAN_HALLS = {
 // Any vault or hall by its id.
 export function vaultById(id) {
   return VAULTS.find((v) => v.id === id) || GUARDIAN_HALLS[id] || BOSS_HALLS[id] || RELIC_HALLS[id] || READING_HALLS[id]
-    || [...Object.values(BOSS_HALLS), ...Object.values(READING_HALLS)].find((v) => v.id === id)
+    || [...Object.values(BOSS_HALLS), ...Object.values(READING_HALLS)].find((v) => v.id === id) || LANDMARK_VAULTS[id] || null
     || Object.values(LAIR_HALLS).find((v) => v.id === id) || null;
 }
 // The hall a dungeon's bottom asks for: a guardian's, a boss's, a legend's lair (by its template's hall) or the
@@ -720,6 +749,21 @@ registerLegend("landmarkBoss", (c) => {
   addCreature(c.zone, m);
 });
 for (const n of [1, 2, 3]) registerLegend(`hour${n}`, (c) => { floorCol(c); for (let dz = 0; dz < n; dz++) at(c, dz, c.vault.wall); (c.zone.hours ||= []).push({ x: c.x, y: c.y, z: c.z0 + n }); });
+registerLegend("trueSill", (c) => {
+  floorCol(c);
+  const h = c.vault.sill || 1;
+  for (let dz = 0; dz < h; dz++) at(c, dz, c.vault.wall);
+  c.zone.set(c.x - 1, c.y, c.z0 + 1, B.MURAL);   // the mark, in the wall beside it at eye height
+  (c.zone.murals ||= []).push({ x: c.x - 1, y: c.y, z: c.z0 + 1, view: "3d", text: `THIS SILL IS ${h} BLOCK${h > 1 ? "S" : ""} UP.` });
+  (c.zone.trueLevel ||= { plates: [], answer: h, gate: [], solved: false }).answer = h;
+});
+registerLegend("plate", (c) => {
+  floorCol(c);
+  at(c, -1, B.MOSAIC_WHITE);
+  const n = "abcd".indexOf(c.ch) + 1;
+  (c.zone.murals ||= []).push({ x: c.x, y: c.y, z: c.z0 - 1, view: "map", text: `A brass plate set in the floor, numbered ${n}.` });
+  (c.zone.trueLevel ||= { plates: [], answer: 0, gate: [], solved: false }).plates.push({ x: c.x, y: c.y, n });
+});
 registerLegend("plinth2", (c) => { floorCol(c); at(c, 0, c.vault.wall); at(c, 1, c.vault.wall); });
 registerLegend("crate1", (c) => { floorCol(c); at(c, 0, B.CRATE); });
 // The stone: carved at eye height for someone standing on the plinth in front of it (2 up, eyes 2 above their feet).
@@ -793,6 +837,7 @@ export function stampVault(zone, vault, vx, vy, rng, opts = {}) {
     };
   }
 
+  if (zone.trueLevel && cells.S) zone.trueLevel.gate = (cells.G || []).flatMap(([x, y]) => [[x, y, z0], [x, y, z0 + 1]]);   // (the true level's gate)
   // Braziers: each one's number is the numeral carved in the wall straight behind it.
   if (cells.F) {
     const numerals = ["5", "6", "7", "8"].flatMap((ch) => (cells[ch] || []).map(([x]) => [x, Number(ch) - 4]));

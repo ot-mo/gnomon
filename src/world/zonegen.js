@@ -20,6 +20,9 @@ import { generateDungeonLevel } from "../gen/dungeon.js";
 import { legacyZone } from "./legacy.js";
 import { zoneSeed } from "./run.js";
 import { siteWithDungeon, dungeonParams } from "./sites.js";
+import { hashInt } from "../rng.js";
+import { hourOf } from "../clock.js";
+import { on } from "../events.js";
 
 export { siteWithDungeon, dungeonParams };   // they live in sites.js (gen/surface.js needs them too)
 
@@ -41,7 +44,7 @@ function dungeonZone(game, { wx, wy, z }) {
   const site = siteWithDungeon(run, wx, wy);
   if (!site || z === 0 || z > site.dungeon.levels || -z > (site.dungeon.up?.length || 0)) return null;
   if (site.dungeon.legacy) return legacyZone(game, { wx, wy, z }, site);
-  const zone = generateDungeonLevel(zoneSeed(run, wx, wy, z), dungeonParams(run, site, z));
+  const zone = makeLevel(run, site, z, layoutNow(game, site));
   zone.siteId = site.id;
   zone.landmarkId = site.landmarkId || null;
   if (z < 0) zone.hasAbove = !!zone.upStairs;   // a floor up: its stair up leads to z − 1 (B2, C1b #8)
@@ -49,6 +52,31 @@ function dungeonZone(game, { wx, wy, z }) {
   if (holy) zone.holy = holy;   // a landmark dungeon's holy floor (the Unlit Choir's, the Square's…: B2, C1b #3)
   return zone;
 }
+
+// A dungeon level; with a day and a night layout (the Rootfold, bible §5 P: dungeon.layouts { day: [h0, h1], night }; B2,
+// C1b #10), the one for `layout`, each from its own seed (the day's is the level's own).
+function makeLevel(run, site, z, layout = null) {
+  const seed = zoneSeed(run, site.at.wx, site.at.wy, z), p = dungeonParams(run, site, z);
+  if (layout) p.layout = layout;
+  return generateDungeonLevel(layout === "night" ? hashInt(seed, "night") : seed, p);
+}
+export function layoutNow(game, site) {
+  const L = site?.dungeon?.layouts;
+  if (!L) return null;
+  const h = hourOf(game), [a, b] = L.day;
+  return h >= a && h < b ? "day" : "night";
+}
+// Entering a floor whose layout isn't the hour's: it becomes the other layout before you're placed (the swap never happens
+// while you're on it). What was on it goes with the old layout.
+on("zone:prepare", (game, { zone }) => {
+  if (!zone?.layouts || zone.z < 1 || !game.run) return;
+  const site = siteWithDungeon(game.run, zone.wx, zone.wy), want = layoutNow(game, site);
+  if (!want || zone.layout === want) return;
+  const fresh = makeLevel(game.run, site, zone.z, want);
+  for (const k of Object.keys(fresh)) if (!["key", "wx", "wy", "z", "sealed", "dirty", "siteId", "landmarkId"].includes(k)) zone[k] = fresh[k];
+  zone.dirty = true;
+  zone.refresh();
+});
 
 ZONE_GENERATORS.surface = surfaceZone;
 ZONE_STAGED.surface = surfaceStaged;

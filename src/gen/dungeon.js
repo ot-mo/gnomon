@@ -357,6 +357,14 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   if (p.cradle) placeCradle(f, rng, rooms, ctx);
   if (p.clue || p.captive || p.prisoners || p.exit || p.culvert) placeLandmarkParts(f, rng, rooms, p, ctx);
   if (p.softFalls) f.softFalls = true;          // (screens/play.js: a fall from here lands unhurt)
+  // The gimmicks played at runtime (src/gimmicks.js; B2, C1b #10): what they need, recorded on the zone.
+  if (p.headroom) setHeadroom(f, rooms, p.headroom);
+  if (p.pressedRoom) pressRoom(f, rng, rooms, ctx, p);
+  if (p.pressPlates && f.spikes.size) f.pressPlates = true;   // (traps.js: a plate up presses you flat instead of hurting)
+  if (p.tide) f.tide = { ...p.tide, dry: [...p.tide.dry] };
+  if (p.sweep) f.sweep = { cx: W >> 1, cy: D >> 1, r: Math.max(W, D) >> 1, period: p.sweep.period, width: 0.5 };
+  if (p.darkMapping) { f.darkMapping = true; f.trail = []; }
+  if (p.layouts) { f.layouts = JSON.parse(JSON.stringify(p.layouts)); f.layout = p.layout || "day"; }
   if (p.sealedBelow) f.sealedBelow = { ...p.sealedBelow };   // (screens/play.js: the stair down shut until that beat)
   if ((p.gimmicks || []).length || p.cradle || p.clue || p.captive || p.prisoners || p.exit || p.culvert) f.refresh();
 
@@ -737,6 +745,43 @@ GIMMICKS.runeDoors = (f, rng, rooms) => {
     }
   f.runeDoors = [...cols];
 };
+
+// The lowering ceiling (the Press, bible §5 I: headroom 6, 5, 4 and 3 blocks on floors 1-4): every open column of a room or a
+// corridor gets its ceiling at FLOOR_Z + headroom: taller rooms are dug up into the rock (their walls go up with them),
+// lower ones get the rock down to it (nothing built there is touched). With 3 there's no room to jump.
+function setHeadroom(f, rooms, headroom) {
+  const top = Math.min(f.h - 1, FLOOR_Z + headroom);
+  const inRoom = (x, y) => rooms.some((r) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1);
+  const ring = (x, y) => rooms.some((r) => x >= r.x0 - 1 && x <= r.x1 + 1 && y >= r.y0 - 1 && y <= r.y1 + 1 && !(x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1));
+  for (let y = 1; y < D - 1; y++)
+    for (let x = 1; x < W - 1; x++) {
+      if (f.vault && x >= f.vault.x0 - 1 && x <= f.vault.x1 + 1 && y >= f.vault.y0 - 1 && y <= f.vault.y1 + 1) continue;   // (the hall keeps its own)
+      if (headroom > ROOM_TOP - FLOOR_Z) {
+        if (inRoom(x, y) && f.get(x, y, ROOM_TOP - 1) === B.AIR) for (let z = ROOM_TOP; z < top; z++) f.set(x, y, z, B.AIR);
+        else if (ring(x, y) && f.get(x, y, ROOM_TOP - 1)) { const w = f.get(x, y, ROOM_TOP - 1); for (let z = ROOM_TOP; z < top; z++) f.set(x, y, z, w); }
+      }
+      for (let z = FLOOR_Z + headroom; z < f.h; z++) if (f.get(x, y, z) === B.AIR && f.get(x, y, FLOOR_Z) !== B.DOOR) f.set(x, y, z, B.ROCK);   // (a tall room's too)
+    }
+  f.headroom = headroom;
+}
+// A pressed room (the Press, bible §5 I): one room whose contents exist only on the map, as a mosaic: its creatures are flat
+// (fought on the map) and its floor is laid in white mosaic, its centre tile gold. Stand on the centre and turn (Tab) and
+// it unpresses (src/gimmicks.js): they stand up into 3D. zone.pressedRoom = { x0, y0, x1, y1, cx, cy, done }.
+function pressRoom(f, rng, rooms, ctx, p) {
+  const fit = (o) => !o.locked && !hasStairs(f, o) && plainTiles(f, o, ctx).length >= 6 && f.stand[o.cx + o.cy * W] === FLOOR_Z;
+  const r = rng.shuffle(others(rooms, ctx).filter((o) => fit(o) && !o.hall))[0] || rng.shuffle(others(rooms, ctx).filter(fit))[0];
+  if (!r) return;
+  const tiles = plainTiles(f, r, ctx), spots = tiles.filter(([x, y]) => (x !== r.cx || y !== r.cy) && !occupied(f, x, y));
+  for (const [x, y] of tiles) f.set(x, y, FLOOR_Z - 1, B.MOSAIC_WHITE);
+  f.set(r.cx, r.cy, FLOOR_Z - 1, B.MOSAIC_GOLD);
+  for (const [x, y] of rng.shuffle(spots).slice(0, 2)) {
+    const m = spawnCreature(pickFrom(rng, ctx.depth, p.creatureTable), x, y, FLOOR_Z, { rng: ctx.cosmetic, state: "idle", level: ctx.depth });
+    m.vis = { ...(m.vis || {}), flat: true };
+    m.pressed = true;
+    addCreature(f, m);
+  }
+  f.pressedRoom = { x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1, cx: r.cx, cy: r.cy, done: false };
+}
 
 // offBeatDoors (the Metronome, bible §5 K: "some doors open only on the off-beat"; B2, C1b #10): every other door on the
 // level (by its place) opens only in the beat's off half (interact.js; zone.offBeatDoors, the doors' columns): on the map you

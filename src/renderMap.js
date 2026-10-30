@@ -24,6 +24,7 @@ import { resistText } from "./combat.js";
 import { liquidAt } from "./social/liquids.js";
 import { LIQUIDS } from "./content/liquids.js";
 import { PROPS } from "./content/biomes.js";
+import { drawGimmicks } from "./gimmicks.js";
 
 export const mapView = { panX: 0, panY: 0, hover: null, tx0: 0, ty0: 0, top: 2 };
 
@@ -243,6 +244,10 @@ registerMapOverlay("slam", (game, { zone, onScreen, toScreen }) => {
 // wall, as a cliff top's are 3D's, unless the prop's kind says `overWall`: the Tall Table's nests on their perches, whose
 // height the map never shows, bible §5 E; B2, C1b #13); your markers.
 const onMap = (zone, P, i) => !!P && !!zone.seen[i] && (zone.kind[i] !== KIND.WALL || !!P.overWall);
+// The landmark dungeons' gimmicks on the map: where the Dial-works' hand will be next, your track where dark-mapping holds
+// (src/gimmicks.js; B2, C1b #10).
+registerMapOverlay("landmarkGimmicks", (game, view) => drawGimmicks(game, view), { order: 15 });
+
 registerMapOverlay("items", (game, { zone, onScreen, toScreen }) => {
   for (const pr of zone.props || []) {
     const tx = Math.floor(pr.x), ty = Math.floor(pr.y), P = PROPS[pr.kind], i = tx + ty * zone.w;

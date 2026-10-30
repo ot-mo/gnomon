@@ -124,6 +124,14 @@ function landmarkDungeon(L, world) {
   const home = P.culvert && world?.landmarks.get(P.culvert.to);
   if (home) spec.culvert = { floor: P.culvert.from, key: `${home.wx},${home.wy},0` };
   if (P.opensAtBeat) spec.opensAtBeat = { ...P.opensAtBeat };
+  // The rest of the gimmicks' parameters (C1b #10): each floor's headroom (the Press's lowering ceiling), the Press's pressed
+  // rooms and (from floor 3) its press-plates, the tide of the hours, the sweeping hand, dark-mapping, a day and a night layout.
+  if (P.headroom) spec.headroom = [...P.headroom];
+  if (P.pressedRooms) spec.pressedRooms = true;
+  if (P.tide) spec.tide = { ...P.tide, dry: [...P.tide.dry] };
+  if (P.sweepingHand) spec.sweep = { ...P.sweepingHand };
+  if (P.darkMapping) spec.darkMapping = true;
+  if (P.layouts) spec.layouts = JSON.parse(JSON.stringify(P.layouts));
   if (d.planned?.murals || d.murals) spec.murals = (d.planned?.murals || d.murals).map((m) => ({ ...m }));   // its own murals' words (B2, C1b #7)
   return spec;
 }
@@ -231,6 +239,9 @@ export function dungeonParams(run, site, z) {
     ...(spec.prisoners?.floors.includes(z) ? { prisoners: 2 } : {}), ...(spec.exit?.floor === z ? { exit: { key: spec.exit.key, at: [...spec.exit.at] } } : {}),
     ...(spec.softFalls ? { softFalls: true } : {}), ...(spec.culvert?.floor === z ? { culvert: { key: spec.culvert.key } } : {}),
     ...(spec.opensAtBeat?.[z + 1] ? { sealedBelow: { beat: spec.opensAtBeat[z + 1] } } : {}),
+    ...(spec.headroom?.[z - 1] ? { headroom: spec.headroom[z - 1] } : {}), ...(spec.pressedRooms ? { pressedRoom: true, ...(z >= 3 ? { pressPlates: true } : {}) } : {}),
+    ...(spec.tide ? { tide: { ...spec.tide, dry: [...spec.tide.dry] } } : {}), ...(spec.sweep ? { sweep: { ...spec.sweep } } : {}),
+    ...(spec.darkMapping ? { darkMapping: true } : {}), ...(spec.layouts ? { layouts: JSON.parse(JSON.stringify(spec.layouts)) } : {}),
   };
 }
 

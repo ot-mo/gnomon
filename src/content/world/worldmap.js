@@ -156,10 +156,11 @@ const LANDMARK_DUNGEONS = {
                creatures: [["brineGrub", 4], ["saltrat", 3], ["rustbackScav", 2], ["flatling", 2]],
                daylight: [1], vaults: { 2: "flatLie" }, culvert: { from: 3, to: "hollowmere" }, softFalls: true,
                clue: { floor: 3, what: "a fresh sapper tunnel with an Assize plumb-seal in it (beat 1's clue)" } } },
-  datum: { theme: "deepwright", floorGimmicks: [["murals"], ["murals", "allDeep"], ["murals", "allDeep"], ["murals", "allDeep"]],
+  datum: { theme: "deepwright", floorGimmicks: [["murals"], ["murals", "allDeep"], ["murals", "allDeep"], ["murals", "allDeep"]], vaultPool: ["trueLevel"],   // (the true level's puzzle: B2, C1b #10)
     named: ["the Datum, the Gauge Room", "the Datum, the Plate Hall", "the Datum, the Long Level", "the Datum, the Stone"],
     planned: { bottom: { kind: "reading", id: "datumStone", name: "the Datum stone", plinth: 2 }, opensAtBeat: { 3: 2, 4: 2 },
-               murals: [{ text: "THIS SILL IS 3 BLOCKS UP.", map: "A brass plate set in the floor, numbered 3." }] } },
+               // (the true level's own sill and plates carry the numbers: gen/vaults.js trueLevel; these say how to read them)
+               murals: [{ text: "ALL HEIGHTS FROM THE DATUM. MEASURE THE SILL; STAND ON ITS NUMBER.", map: "The Survey's rule, in brass letters: the true plate is as high as the sill." }] } },
   rootCanals: { theme: "deepwright", gimmicks: ["lightless", "flooded", "haunted"],
     named: ["the Root Canals, the Upper Cut", "the Root Canals, the Smugglers' Run"],
     planned: { darkMapping: true, creatures: [["chandlerGuard", 3], ["lampHound", 3], ["shade", 1]],

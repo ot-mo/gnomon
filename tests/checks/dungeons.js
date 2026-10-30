@@ -199,11 +199,16 @@ function holesOutside(f, rect) {
 const ROWS = [["rat", 2, 1, 10], ["goblin", 2, 1, 15], ["orc", 1, 7, 30], ["troll", 1, 13, 30], ["wraith", 1, 10, 30]];
 // The i-th random level's seed and parameters: any theme, level 1-30, 0-3 gimmicks, any bottom on a last level,
 // sometimes a creature table, holesIn, a Cradle. test.html draws the same ones (parity).
+// The random levels draw WS10's ten gimmicks and its ten themes; the landmark dungeons' own (identicalRooms, offBeatDoors,
+// runeDoors; the "rule" theme: B2) are held on their landmarks' floors by check-sites, and kept out of this pool so the 1,000
+// levels (and test.html's signature) stay the ones they were.
+export const RANDOM_GIMMICKS = ["allDeep", "braziers", "collapsed", "flatland", "flooded", "haunted", "lightless", "murals", "oneBeat", "spikeworks"];
+const RANDOM_THEMES = () => Object.keys(DUNGEON_THEMES).filter((t) => t !== "rule").sort();
 export function randomParams(i) {
   const rng = makeRng(seedFor(9091, "random level", i));
   const level = rng.int(1, 30), count = rng.int(1, 5), z = rng.int(1, count), final = z === count;
-  const theme = rng.pick(Object.keys(DUNGEON_THEMES).sort());
-  const gimmicks = rng.shuffle(Object.keys(GIMMICKS).sort()).slice(0, rng.int(0, 3));
+  const theme = rng.pick(RANDOM_THEMES());
+  const gimmicks = rng.shuffle(RANDOM_GIMMICKS.slice()).slice(0, rng.int(0, 3));
   let bottom = null;
   if (final) {
     const kind = rng.pick(["none", "guardian", "legend", "legend", "relic", "relic"]);
@@ -323,7 +328,7 @@ export function checkRandomLevels({ count = 1000, p95Budget = 40, from = 0 } = {
   }
   for (const [id, [n, done]] of Object.entries(effect))
     if (n && done < 0.9 * n) problems.push(`gimmick ${id}: did something on ${done} of its ${n} levels (want 90%)`);
-  for (const id of Object.keys(GIMMICKS)) if (!tally.gimmicks[id]) problems.push(`gimmick ${id} never drawn`);
+  for (const id of RANDOM_GIMMICKS) if (!tally.gimmicks[id] || !GIMMICKS[id]) problems.push(`gimmick ${id} never drawn`);
   const sorted = [...times].sort((a, b) => a - b);
   const p95 = pct(sorted, 0.95);
   if (p95 > p95Budget) problems.push(`generation p95 ${p95.toFixed(1)} ms is over the ${p95Budget} ms budget`);
@@ -539,7 +544,8 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
       if (id === "datum") for (let z = 1; z <= n; z++) {
         const { f } = level(z);
         stats.murals++;
-        expect(f.murals?.some((m) => m.text === "THIS SILL IS 3 BLOCKS UP.") && f.murals.some((m) => m.text === "A brass plate set in the floor, numbered 3."), `${at} floor ${z}: not the Datum's own murals (${(f.murals || []).map((m) => m.text)})`);
+        const own = REAL_WORLD.landmarks.find((l) => l.dungeon?.id === "datum").dungeon.planned.murals[0];
+        expect(f.murals?.some((m) => m.text === own.text) && f.murals.some((m) => m.text === own.map), `${at} floor ${z}: not the Datum's own murals (${(f.murals || []).map((m) => m.text)})`);
       }
       // The bottom.
       const { p, f } = level(n), dist = reach(f), on = (x, y) => dist[x + y * f.w] >= 0, kind = p.bottom?.kind;
@@ -778,6 +784,66 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
   const home = game.run.world.landmarks.get("hollowmere");
   stats.gimmicks = { offBeatDoors: ob.length, onBeat, offBeatOpen, sealedBelow: sealedAt?.beat, sealed, opened2, soft, culvert: !!cv && game.zone.key === `${home.wx},${home.wy},0` };
   expect(ob.length && onBeat && offBeatOpen && sealedAt?.beat === 2 && sealed && opened2 && soft && stats.gimmicks.culvert, `in a game: the gimmicks ${JSON.stringify(stats.gimmicks)}`);
+  // The rest of the gimmicks (C1b #10), in a game, at the run's own floors:
+  let G2;
+  {
+  G2 = {};
+  const GM = await import("../../src/gimmicks.js"), ev = await import("../../src/events.js"), st = await import("../../src/status.js");
+  const enter = (id, z, h = null) => { const s = site(id); if (h !== null) game.time = (h - 6) * 60 + 24 * 60 * 3; game.debug.enterZone(`${s.at.wx},${s.at.wy},${z}`); return game.zone; };
+  const tick = (mode = "explore") => { game.mode = mode; ev.runUpdates(game, 0.05); };
+  // The Press: its ceilings 6, 5, 4 and 3 blocks over the floor (a room's middle), the Press-hall tall; a pressed room on every
+  // floor, its things flat until you turn on its gold centre; from floor 3 its plates press you flat for 10 s, unhurt.
+  G2.headroom = [1, 2, 3, 4].map((z) => { const f = enter("pressyard", z), r = f.rooms.find((o) => !o.hall && f.stand[o.cx + o.cy * f.w] === FLOOR_Z && !(f.vault && o.cx >= f.vault.x0 && o.cx <= f.vault.x1 && o.cy >= f.vault.y0 && o.cy <= f.vault.y1));
+    let k = FLOOR_Z; while (k < f.h && f.get(r.cx, r.cy, k) === B.AIR) k++; return k - FLOOR_Z; });
+  const pz = enter("pressyard", 2), prr = pz.pressedRoom, pressed = pz.creatures.filter((c) => c.pressed && c.vis?.flat);
+  Object.assign(P, { x: prr.cx + 0.5, y: prr.cy + 0.5, z: FLOOR_Z, onGround: true });
+  game.view = "map"; tick("map"); game.view = "3d"; tick();
+  G2.pressed = { flatBefore: pressed.length, gold: pz.get(prr.cx, prr.cy, FLOOR_Z - 1) === B.MOSAIC_GOLD, deepAfter: pressed.every((c) => !c.vis.flat), done: prr.done };
+  const p3 = enter("pressyard", 3), plate = [...p3.spikes.keys()][0];
+  if (plate !== undefined) {
+    const { spikeState, updateSpikes } = await import("../../src/traps.js");
+    for (let n = 0; n < 40 && spikeState(p3, plate, game.time) !== "up"; n++) game.time += 0.25;
+    Object.assign(P, { x: plate % p3.w + 0.5, y: Math.floor(plate / p3.w) + 0.5, z: FLOOR_Z, onGround: true, spikeBeat: undefined });
+    const hp = P.hp; st.removeStatus(game, P, "flat"); updateSpikes(game);
+    G2.pressPlate = { flat: st.hasStatus(P, "flat"), unhurt: P.hp === hp, plates1: !!enter("pressyard", 1).pressPlates };
+    st.removeStatus(game, P, "flat");
+  }
+  // The Datum: the true level's plates; the wrong one does nothing, the sill's own opens the gate.
+  const dz = enter("benchmark", 1), tl = dz.trueLevel;
+  const shut = () => tl.gate.every(([x, y, z]) => dz.get(x, y, z) === B.GATE);
+  const sillMural = (dz.murals || []).find((m) => m.view === "3d" && /SILL IS (\d)/.test(m.text));
+  const plateMurals = (dz.murals || []).filter((m) => m.view === "map" && /plate set in the floor, numbered/.test(m.text)).length;
+  const onPlate = (n) => { const q = tl.plates.find((o) => o.n === n); Object.assign(P, { x: q.x + 0.5, y: q.y + 0.5, z: FLOOR_Z }); tick("map"); };
+  const shut0 = shut(); onPlate(tl.answer === 1 ? 2 : 1); const wrong = shut(); onPlate(tl.answer);
+  G2.trueLevel = { vault: dz.vault.name, plates: tl.plates.length, plateMurals, sill: sillMural && Number(/SILL IS (\d)/.exec(sillMural.text)[1]) === tl.answer, shut0, wrongShut: wrong, open: !shut() };
+  // The Drowned Lantern's tide: dry at noon, deep at 16:00 (the datum's floor), and it rises with the clock while you're there.
+  const lvl = (f) => { const t = f.tide.base?.[0]; return t ? f.get(t[0] % f.w, Math.floor(t[0] / f.w), FLOOR_Z - 1) : null; };
+  const dry = lvl(enter("drownedLantern", 1, 12)), deep = lvl(enter("drownedLantern", 2, 16));
+  const t3 = enter("drownedLantern", 3, 12); game.clockSeen = game.time; game.time += 60 + 1; (await import("../../src/clock.js")).catchUp(game);
+  G2.tide = { noon: dry !== B.WATER_SHALLOW && dry !== B.WATER_DEEP && dry !== null, at16: deep === B.WATER_DEEP, levels: [12, 13, 15, 17, 19, 3, 10, 11].map((h) => GM.tideLevel(t3, h)).join(""), byClock: t3.tide.level === 1 && lvl(t3) === B.WATER_SHALLOW };
+  // The Dial-works' sweeping hand: a quarter of a period later it lies elsewhere; under it you are pressed flat.
+  const sw = enter("gnomon", 1), cells = (t) => { let n = 0; for (let y = 0; y < sw.d; y++) for (let x = 0; x < sw.w; x++) if (GM.underSweep(sw, x, y, t)) n++; return n; };
+  let spot = null; for (let y = 0; y < sw.d && !spot; y++) for (let x = 0; x < sw.w && !spot; x++) if (sw.stand[x + y * sw.w] === FLOOR_Z && GM.underSweep(sw, x, y, game.time)) spot = [x, y];
+  st.removeStatus(game, P, "flat");
+  if (spot) { Object.assign(P, { x: spot[0] + 0.5, y: spot[1] + 0.5, z: FLOOR_Z }); tick(); }
+  G2.sweep = { cells: cells(game.time), moved: [...Array(sw.w * sw.d).keys()].some((i) => GM.underSweep(sw, i % sw.w, Math.floor(i / sw.w), game.time) !== GM.underSweep(sw, i % sw.w, Math.floor(i / sw.w), game.time + sw.sweep.period / 4)), flat: !!spot && st.hasStatus(P, "flat") };
+  st.removeStatus(game, P, "flat");
+  // Dark-mapping in the Root Canals: three steps leave three tiles of track (none outside a dark-mapped dungeon).
+  const rc = enter("molar", 1), sx = Math.floor(rc.spawn.x), sy = Math.floor(rc.spawn.y);
+  for (const [dx, dy] of [[0, 0], [1, 0], [2, 0]]) { Object.assign(P, { x: sx + dx + 0.5, y: sy + dy + 0.5 }); tick(); }
+  G2.darkMapping = { trail: rc.trail.length, other: enter("pressyard", 1).trail === undefined };
+  // The Rootfold: entered by day its floor is the day layout; entered again at 20:00 it is the night one (another floor).
+  const day = enter("foldmother", 1, 12), dayBlocks = day.blocks.slice(), dayLayout = day.layout;
+  enter("foldmother", 0); const night = enter("foldmother", 1, 20);
+  G2.layouts = { day: dayLayout, night: night.layout, differ: night.blocks.some((b, i) => b !== dayBlocks[i]), same: night === day };
+  }
+  stats.gimmicks2 = G2;
+  expect(JSON.stringify(G2.headroom) === "[6,5,4,3]" && G2.pressed.flatBefore >= 1 && G2.pressed.gold && G2.pressed.deepAfter && G2.pressed.done
+    && G2.pressPlate?.flat && G2.pressPlate.unhurt && !G2.pressPlate.plates1
+    && G2.trueLevel.vault === "The True Level" && G2.trueLevel.plates === 4 && G2.trueLevel.plateMurals === 4 && G2.trueLevel.sill && G2.trueLevel.shut0 && G2.trueLevel.wrongShut && G2.trueLevel.open
+    && G2.tide.noon && G2.tide.at16 && G2.tide.levels === "01234440" && G2.tide.byClock && G2.sweep.cells > 20 && G2.sweep.moved && G2.sweep.flat
+    && G2.darkMapping.trail === 3 && G2.darkMapping.other && G2.layouts.day === "day" && G2.layouts.night === "night" && G2.layouts.differ,
+    `in a game: the gimmicks ${JSON.stringify(G2)}`);
   return { name: "landmark bottoms", ok: problems.length === 0, problems, stats };
 }
 
