@@ -1668,11 +1668,14 @@ export async function run(env) {
     const err = named("mira", "villager", "errata", { near: [1, 0], name: "Akli" }); face(err); game.state.rep.errata = 0;
     if (!/first/.test(ritual.riteReady(game, err, "tracing") || "") && (game.view = "map") && !/first/.test(ritual.riteReady(game, err, "tracing") || "")) fail("the Mirroring's Tracing before its Lighting");
     game.view = "3d"; face(err);
+    p().inv = [{ kind: "vial", effect: "turnwater", count: 1 }];   // (their sacrament: poured at the bond, not at the first half)
     const h1 = ritual.performRite(game, err, "lighting");
     if (!h1.ok || !h1.half || ritual.kin(game, err)) fail(`the Mirroring's Lighting: ${JSON.stringify(h1).slice(0, 90)}`);
+    if (!p().inv.some((it) => it.effect === "turnwater")) fail("the Mirroring's first half poured the sacrament");
     game.view = "map";
     const h2 = ritual.performRite(game, err, "tracing");
     if (!h2.ok || !ritual.kin(game, err)) fail(`the Mirroring's Tracing after it: ${h2.text?.slice(0, 90)}`);
+    if (p().inv.some((it) => it.effect === "turnwater") || !(h2.changes.errata >= 20)) fail(`the Mirroring's bond: the sacrament not poured, or no +20 (${JSON.stringify(h2.changes)})`);
     // The Moths and the Saltbeasts kindle only through their legend.
     setup();
     const moth = named("mira", "villager", "moths", { near: [1, 0], name: "Flutter" });

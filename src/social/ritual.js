@@ -272,12 +272,8 @@ export function performRite(game, c, rite) {
   let gift = null;
   if (N.gift === "iron") { gift = ironThing(p); takeOne(p, gift); }
   const ks = kstate(game), key = kinKey(game, c), was = ks.kin[key];
-  // The Pouring pours every time; otherwise the sacrament is poured at the bond only (later, it would earn nothing).
-  const sac = N.pour ? sacramentVial(game, c) || filledVial(p) : was ? null : sacramentVial(game, c);
-  const poured = sac?.effect ?? null;
-  if (sac) { takeOne(p, sac); addToInventory(p, { kind: "vial", effect: "" }); }
   const said = (lines) => (lines ? `"${lines[0]}"\n"${lines[1]}"\n\n` : null);
-  // The Mirroring's first half: the Lighting done, the bond waits for the Tracing.
+  // The Mirroring's first half: the Lighting done, the bond waits for the Tracing (the sacrament is poured at the bond).
   if (N.then && !was) {
     (ks.pending ||= {})[key] = N.then;
     const line = `${cap(name)} with ${c.name}: half done. Now ${RITES[N.then].name}, on the map.`;
@@ -285,6 +281,10 @@ export function performRite(game, c, rite) {
     return { ok: true, text: (said(V.words) || "") + line, changes: {}, half: true };
   }
   if (ks.pending?.[key]) delete ks.pending[key];
+  // The Pouring pours every time; otherwise the sacrament is poured at the bond only (later, it would earn nothing).
+  const sac = N.pour ? sacramentVial(game, c) || filledVial(p) : was ? null : sacramentVial(game, c);
+  const poured = sac?.effect ?? null;
+  if (sac) { takeOne(p, sac); addToInventory(p, { kind: "vial", effect: "" }); }
   const changes = {}, ego = egoFactor(game);
   // Crooked Manner (bible §13.5): the words come out as a rude gesture, and each Kindling gains its faction 20 less
   // (never below nothing: it is a smaller gain, not a cost).
