@@ -27,6 +27,7 @@ import { inDark } from "../light.js";
 import { registerDescriber } from "../renderMap.js";
 import { learnSecret, muralSecret } from "./secrets.js";
 import { knows } from "./journal.js";
+import { dialFloorReading } from "../content/world/plans/dialFloor.js";
 
 const isMosaic = (zone, x, y, z) => !!BLOCKS[zone.get?.(x, y, z)]?.mosaic;
 
@@ -81,9 +82,17 @@ export function landmarkAt(game, zone, x, y) {
 export function registerLine(game, L) {
   const lines = L?.lines;
   if (!lines) return null;
-  if (game.view === "map") return lines.flat || null;
+  if (game.view === "map") return flatLine(game, L);
   return (game.player?.torch ? lines.deep : lines.dark) || null;
 }
+// A landmark's Flat line with the run's numbers in it: the Dial Floor's pips and bearing are its history's (B2, C1b #11).
+export function flatLine(game, L) {
+  const flat = L?.lines?.flat || null;
+  if (!flat || L.id !== "dialFloor") return flat;
+  const r = dialFloorReading(game.run, L.wx, L.wy);
+  return r ? flat.replace(/Pips \d+/, `Pips ${r.pips}`).replace(/bearing [a-z-]+/, `bearing ${r.bearing}`) : flat;
+}
+
 function readLandmark(game, ev) {
   if (!ev?.open || game.view !== "3d") return;
   const line = registerLine(game, landmarkAt(game, ev.zone || game.zone, ev.x, ev.y));

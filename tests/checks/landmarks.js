@@ -55,6 +55,9 @@ import { RINGS, FOLDMOTHER_LAYOUT } from "../../src/content/world/plans/foldmoth
 import { PRESSYARD_HOUSES } from "../../src/content/world/plans/pressyard.js";
 import { TOLL_GATE } from "../../src/content/world/plans/molar.js";
 import { FOLIO_PEOPLE } from "../../src/content/world/plans/folio.js";
+import { dialFloorReading, MAX_PIPS } from "../../src/content/world/plans/dialFloor.js";
+import { flatLine } from "../../src/story/murals.js";
+const registerFlat = (run, L, r) => { const f = flatLine({ run }, L); return !!r && f.includes(`Pips ${r.pips}.`) && f.includes(`bearing ${r.bearing}`); };
 import { upFrom } from "../../src/screens/play.js";   // B2
 import { holyAt, steleAt } from "../../src/world/sites.js";
 import { LANDMARK_BUILDERS } from "../../src/gen/biomes/index.js";
@@ -339,14 +342,25 @@ const anyIn = (z, x0, y0, x1, y1, test) => { for (let y = y0; y <= y1; y++) for 
 const noLamp = (z, x0, y0, x1, y1) => !anyIn(z, x0, y0, x1, y1, (x, y) => { for (let k = 0; k < z.h; k++) if (z.get(x, y, k) === B.LAMP) return true; return false; });
 const road = (z, x, y) => z.stand[x + y * z.w] > 0 && z.get(x, y, z.stand[x + y * z.w] - 1) === B.ROAD;
 const PROMISES = {
-  dialFloor: ({ z, cell }) => {
+  dialFloor: ({ z, cell, run, L, pa }) => {
     const m = Object.fromEntries((z.murals || []).map((u) => [u.view, u]));
+    // The run's reading (B2, C1b #11): the nearest Fifth-Hour site's event in all three accounts; the arrow four gold tiles
+    // from the pin toward it, the pips its distance; the Flat line with those numbers.
+    const R = run.history.rulers[4], r = dialFloorReading(run, L.wx, L.wy), [[px, py]] = cell("P");
+    const sites = [...run.sites.values()].filter((s) => s.kind === "historic" && s.historyRef.rulerId === R.id);
+    const near = Math.min(...sites.map((s) => Math.max(Math.abs(s.at.wx - L.wx), Math.abs(s.at.wy - L.wy))));
+    const e = R.events.find((v) => v.id === r?.eventId), site = run.sites.get(r?.siteId);
+    const dx = site ? site.at.wx - L.wx : 0, dy = site ? site.at.wy - L.wy : 0, [ax, ay] = r?.dir || [0, 0];
+    const white = (() => { let n = 0; for (let y = pa.y; y < pa.y + pa.d; y++) for (let x = pa.x; x < pa.x + pa.w; x++) if (z.get(x, y, FLOOR_Z - 1) === B.MOSAIC_WHITE) n++; return n; })();
     return [
       [m.map && BLOCKS[z.get(m.map.x, m.map.y, m.map.z)]?.mosaic, "the Flat Account isn't on a mosaic tile"],
       [m["3d"] && z.get(m["3d"].x, m["3d"].y, m["3d"].z) === B.MURAL, "the Deep Inscription isn't on a carved panel"],
       [m.dark && z.get(m.dark.x, m.dark.y, m.dark.z) === B.RUNE, "the Dark Gloss isn't on a rune"],
-      [cell("a").every(([x, y]) => z.get(x, y, FLOOR_Z - 1) === B.MOSAIC_GOLD) && cell("w").length === 5 && cell("w").every(([x, y]) => z.get(x, y, FLOOR_Z - 1) === B.MOSAIC_WHITE),
-        "the arrow isn't gold or the pips aren't five white tiles"],
+      [r && site && sites.length && Math.max(Math.abs(dx), Math.abs(dy)) === near && m.map?.text === e.text.gospel && m["3d"]?.text === e.text.inscription && m.dark?.text === e.text.hostile,
+        `the accounts aren't the nearest Fifth-Hour site's event (${r?.siteId}, ${near} spans)`],
+      [r && (ax === 0 || Math.sign(dx) === ax) && (ay === 0 || Math.sign(dy) === ay) && (ax || ay) && [1, 2, 3, 4].every((k) => z.get(px + ax * k, py + ay * k, FLOOR_Z - 1) === B.MOSAIC_GOLD)
+        && r.pips === Math.min(MAX_PIPS, near) && white === r.pips && z.dialFloor?.pips === r.pips, `the arrow (${r?.dir}) or the pips (${white}, want ${r?.pips}) don't point to the site (${dx}, ${dy})`],
+      [registerFlat(run, L, r), "the Flat line doesn't carry the run's pips and bearing"],
       [cell("P").every(([x, y]) => solidUp(z, x, y, FLOOR_Z, FLOOR_Z + 4)), "the pin isn't 4 high"]];
   },
   kettleMesa: ({ z, cell, reach }) => [

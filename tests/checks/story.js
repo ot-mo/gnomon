@@ -489,7 +489,8 @@ async function registersB2(env, { fail, stats, game, startRun, REAL_WORLD, rende
     if (out[0] >= 0 && out[1] >= 0) z.seen[out[0] + out[1] * z.w] = 1;
     game.view = "map";
     const said = renderMap.describeTile(game, { x: cx, y: cy }), off = out[0] >= 0 && out[1] >= 0 ? renderMap.describeTile(game, { x: out[0], y: out[1] }) : "";
-    if (!said.endsWith(L.lines.flat) || off.includes(L.lines.flat)) fail(`registers: ${L.id} on the map: "${said}" (off its plan: "${off}")`);
+    const flat = murals.flatLine(game, L);   // (the Dial Floor's carries the run's pips and bearing)
+    if (!flat || !said.endsWith(flat) || off.includes(flat)) fail(`registers: ${L.id} on the map: "${said}" (off its plan: "${off}")`);
     game.view = "3d";
     const log = () => game.messages.at(-1)?.text;
     game.player.torch = true; game.messages = [];
@@ -507,6 +508,26 @@ async function registersB2(env, { fail, stats, game, startRun, REAL_WORLD, rende
   }
   game.view = "map";
   stats.registers = `${n} landmark zones: the Flat line on the map's inspect line, the Deep line on a 3D look, the Dark line with the torch out`;
+  // The Dial Floor (C1b #11): its three readings are the nearest Fifth-Hour site's event; read all three (the mosaic on the
+  // map, the relief in 3D in light, the rune in the dark) and that event is triangulated.
+  const df = game.run.world.landmarks.get("dialFloor");
+  game.debug.enterZone(`${df.wx},${df.wy},0`);
+  const dz = game.zone, at = (v) => (dz.murals || []).find((m) => m.view === v), ev = dz.dialFloor?.eventId;
+  const read = (v, view, torch) => {
+    const m = at(v);
+    game.view = view; game.player.torch = torch;
+    if (v !== "map") {   // (by day the rune's dark is your torch out at night; the relief's light is the sun's)
+      game.time = (v === "dark" ? 23 - 6 : 12 - 6) * 60;   // 23:00 and noon of day 1 (one world hour is 60 s)
+    }
+    events.emit(game, "inspect", { zone: dz, x: m.x, y: m.y, z: m.z, open: true });
+  };
+  if (ev && at("map") && at("3d") && at("dark")) {
+    read("map", "map", true); read("3d", "3d", true); read("dark", "3d", false);
+    const J = game.state.journal || {};
+    stats.dialFloor = `${dz.dialFloor.bearing}, ${dz.dialFloor.pips} pips to ${dz.dialFloor.siteId}; triangulated ${J.triangulated?.[ev] !== undefined}`;
+    if (J.triangulated?.[ev] === undefined) fail(`the Dial Floor: reading its three accounts didn't triangulate ${ev} (${Object.keys(J.secrets || {}).filter((k) => k.includes(ev))})`);
+  } else fail(`the Dial Floor: no run's reading (${JSON.stringify(dz.dialFloor)})`);
+  game.player.torch = true; game.view = "map";
 }
 
 async function villages7b(env, { fail, stats, test, real, json, startRun, game }) {

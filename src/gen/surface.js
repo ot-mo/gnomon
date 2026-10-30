@@ -367,7 +367,7 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
   if (planDef && planAt) {
     const prng = planDef.rng ? planDef.rng(run.seed) : makeRng(seedFor(seed, "plan"));
     let out;
-    if (planDef.stamp) out = planDef.stamp(zone, planAt.x, planAt.y, prng, { roof: planDef.roof || "none" });
+    if (planDef.stamp) out = planDef.stamp(zone, planAt.x, planAt.y, prng, { roof: planDef.roof || "none" }, { run, wx, wy });   // (the run: the Dial Floor reads its history, B2)
     else out = stampPlan(zone, planDef, planAt.x, planAt.y, prng);
     spawn = out.spawn || null;
     keyPoints.push(...out.keyPoints);

@@ -26,6 +26,7 @@ import { isKnown, knownSites, pinsAt } from "./discovery.js";
 import { isLost, lostChance } from "./lost.js";
 import { encounterChance } from "./encounters.js";
 import { stepHours, travelPath } from "./travel.js";
+import { flatLine } from "../story/murals.js";
 
 export const worldView = { x0: 0, y0: 1, viewW: 0, viewH: 0, sx0: 0, sy0: 0, w: 0, h: 0, panel: "right", keys: [] };
 export const PANEL_W = 40, STRIP_H = 6;
@@ -96,7 +97,7 @@ export function spanLines(game, wx, wy) {
   for (const s of knownSites(game, wx, wy)) line(`${s.kind === "landmark" ? initial(s.name) : SITE_MARK[s.kind] || "*"} ${s.name}`, s.kind === "landmark" ? GOLD : UI.sel);
   for (const p of pinsAt(game, wx, wy)) if (p.label) line(`! ${p.label}`, PIN);
   // A known landmark's Flat line (bible §2.1 rule 3: the map's register; B2, C1b #4).
-  for (const s of knownSites(game, wx, wy)) if (s.kind === "landmark" && world.landmarks.get(s.landmarkId)?.lines?.flat) line(world.landmarks.get(s.landmarkId).lines.flat, scale(GOLD, 0.8));
+  for (const s of knownSites(game, wx, wy)) if (s.kind === "landmark" && world.landmarks.get(s.landmarkId)?.lines?.flat) line(flatLine(game, world.landmarks.get(s.landmarkId)), scale(GOLD, 0.8));
   if (R?.line) line(R.line, UI.dim);   // (the region's one sentence for a span, bible §2.1 rule 8; last, so it never pushes a site or pin out of the strip; integrator, C1a #4)
   return out;
 }
