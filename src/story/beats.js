@@ -142,7 +142,7 @@ function takeItems(game, id, n) {
 export function choose(game, beatId, choiceId, optionId) {
   const beat = beatOf(beatId), choice = beat?.choices?.find((c) => c.id === choiceId), o = choice?.options.find((x) => x.id === optionId);
   const C = campaignOf(game);
-  if (!o || C.done[beatId] === undefined || C.choices?.[beatId]?.[choiceId] !== undefined) return null;
+  if (!o || C.done[beatId] === undefined || C.choices?.[beatId]?.[choiceId] !== undefined || !canChoose(game, o)) return null;
   ((C.choices ||= {})[beatId] ||= {})[choiceId] = optionId;
   for (const [id, n = 1] of o.takes || []) takeItems(game, id, n);
   payRep(game, o.rep);
@@ -160,9 +160,12 @@ export const isGiver = (c, beat) => !!beat?.giver && !!c?.name && words(beat.giv
 
 // The options of one choice, then `next()` (at a giver the talk ends; a beat's own page goes on to the next open choice
 // of a beat without a giver); "Not yet." leaves it for later.
+// An option that gives something away (`takes`) is there only while you carry it.
+const carrying = (game, id) => (game.player?.inv || []).filter((x) => x.id === id || x.effect === id).reduce((a, x) => a + (x.count || 1), 0);
+export const canChoose = (game, o) => (o.takes || []).every(([id, n = 1]) => carrying(game, id) >= n);
 function choiceNode(game, { beat, choice }, next = () => null) {
   return node(`${beat.title}: ${choice.label}. What will you do?`, [
-    ...choice.options.map((o) => ({ label: o.text, go: () => { choose(game, beat.id, choice.id, o.id); return next(); } })),
+    ...choice.options.filter((o) => canChoose(game, o)).map((o) => ({ label: o.text, go: () => { choose(game, beat.id, choice.id, o.id); return next(); } })),
     { label: "Not yet.", go: () => null },
   ]);
 }

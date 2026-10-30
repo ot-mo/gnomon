@@ -967,6 +967,16 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json, captu
     fail(`beat 1's choice at Maren: ${json(C.choices?.beat1)}, Survey +${rep("survey") - s0}`);
   if (T.talkTo(game, maren).options.some((o) => /^About the Assize/.test(o.label))) fail("beat 1's choice still offered once made");
   if (p.inv.some((it) => it.id === "assizeSeal")) fail("the seal is still in your pack after you gave it to Mira");
+  // Without the seal there is nothing to give or sell: no option (but "Not yet."), and choose refuses (second review).
+  {
+    const keepChoice = C.choices.beat1.seal, g0 = (await env.src("currency.js")).funds(p);
+    delete C.choices.beat1.seal;
+    const n = T.talkTo(game, maren).options.find((o) => /^About the Assize/.test(o.label))?.go();
+    const labels = (n?.options || []).map((o) => o.label).join("|");
+    if (labels !== "Not yet." || BT.choose(game, "beat1", "seal", "chandlers") || (await env.src("currency.js")).funds(p) !== g0)
+      fail(`beat 1's choice without the seal: ${labels}`);
+    C.choices.beat1.seal = keepChoice;
+  }
   // A quest item you carry already (picked up where it lies: B2 puts the seal in Kettle Mesa's tunnel) isn't given twice.
   { const one = BT.campaignItem("plumbKey"), n0 = p.inv.filter((it) => it.id === "plumbKey").length; BT.giveCampaignItems(game, [["plumbKey", 1]]);
     if (!one || p.inv.filter((it) => it.id === "plumbKey").length !== n0) fail("a second Plumb Key was given"); }
