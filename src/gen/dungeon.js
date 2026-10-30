@@ -883,7 +883,8 @@ function placeLandmarkParts(f, rng, rooms, p, ctx) {
         const cells = Array.from({ length: len + 1 }, (_, k) => [x0 + dx * k, y0 + dy * k]);
         const free = cells.every(([x, y], k) => x > 1 && y > 1 && x < W - 2 && y < D - 2 && (k === 0 ? f.get(x, y, FLOOR_Z) === r.theme.wall
           : [[0, 0], [dy, dx], [-dy, -dx]].every(([ox, oy]) => f.get(x + ox, y + oy, FLOOR_Z) === B.ROCK && f.get(x + ox, y + oy, FLOOR_Z + 1) === B.ROCK)))
-          && f.stand[x0 - dx + (y0 - dy) * W] === FLOOR_Z && dist[x0 - dx + (y0 - dy) * W] >= 0;
+          && f.stand[x0 - dx + (y0 - dy) * W] === FLOOR_Z && dist[x0 - dx + (y0 - dy) * W] >= 0
+          && f.get(x0 + dx * (len + 1), y0 + dy * (len + 1), FLOOR_Z) === B.ROCK;   // (a dead end: rock past its end too)
         if (!free) continue;
         for (const [x, y] of cells) { f.set(x, y, FLOOR_Z - 1, B.DIRT); f.set(x, y, FLOOR_Z, B.AIR); f.set(x, y, FLOOR_Z + 1, B.AIR); }
         const [ex, ey] = cells[cells.length - 1];
