@@ -479,7 +479,8 @@ export async function run(env) {
 // (not a look) logs nothing.
 async function registersB2(env, { fail, stats, game, startRun, REAL_WORLD, renderMap, events, murals }) {
   startRun(5, REAL_WORLD);
-  let n = 0;
+  let n = 0, darkAt23 = 0, darkAtNoon = 0;
+  const { inDark } = await env.src("light.js");
   for (const L of game.run.world.landmarks.values()) {
     game.debug.enterZone(`${L.wx},${L.wy},0`);
     const z = game.zone, pa = z.gen?.planAt;
@@ -496,18 +497,26 @@ async function registersB2(env, { fail, stats, game, startRun, REAL_WORLD, rende
     game.player.torch = true; game.messages = [];
     events.emit(game, "inspect", { zone: z, x: cx, y: cy, z: 3, open: true });
     const deep = game.messages.find((m) => m.text === L.lines.deep);
-    game.player.torch = false; game.messages = [];
-    events.emit(game, "inspect", { zone: z, x: cx, y: cy, z: 3, open: true });
-    const dark = game.messages.find((m) => m.text === L.lines.dark.split("\n").join(" / "));
-    game.messages = [];
+    // Torch out: the Dark line where you stand in the dark (as a rune reads), else still the Deep one: by day, and at 23:00.
+    const darkLine = L.lines.dark.split("\n").join(" / "), t0 = game.time, outAt = (h) => {
+      game.time = (h - 6) * 60; game.player.torch = false; game.messages = [];
+      events.emit(game, "inspect", { zone: z, x: cx, y: cy, z: 3, open: true });
+      const p = game.player, want = inDark(game, z, p.x, p.y, p.z + 1) ? darkLine : L.lines.deep;
+      return { ok: game.messages.some((m) => m.text === want), dark: want === darkLine };
+    };
+    const noon = outAt(12), night = outAt(23);
+    game.time = t0; game.messages = [];
     events.emit(game, "inspect", { zone: z, x: cx, y: cy, z: 3, open: false });
-    const hover = game.messages.filter((m) => m.text === L.lines.deep || m.text === dark?.text).length;   // (a mural there may read itself)
+    const hover = game.messages.filter((m) => m.text === L.lines.deep || m.text === darkLine).length;   // (a mural there may read itself)
     game.player.torch = true;
-    if (!deep || !dark || hover) fail(`registers: ${L.id} in 3D: deep ${!!deep}, dark ${!!dark}, a hover logged ${hover} (${log()})`);
+    if (!deep || !noon.ok || !night.ok || hover) fail(`registers: ${L.id} in 3D: deep ${!!deep}, torch out at noon ${noon.ok}, at 23:00 ${night.ok}, a hover logged ${hover} (${log()})`);
+    if (night.dark) darkAt23++;
+    if (noon.dark) darkAtNoon++;
     n++;
   }
   game.view = "map";
-  stats.registers = `${n} landmark zones: the Flat line on the map's inspect line, the Deep line on a 3D look, the Dark line with the torch out`;
+  stats.registers = `${n} landmark zones: the Flat line on the map's inspect line, the Deep line on a 3D look, the Dark line with the torch out in the dark (${darkAt23} of them at 23:00, ${darkAtNoon} at noon)`;
+  if (darkAt23 < n / 2 || darkAtNoon >= n / 2) fail(`registers: the Dark line read at ${darkAt23} of ${n} landmarks at 23:00 and ${darkAtNoon} at noon`);
   // The Dial Floor (C1b #11): its three readings are the nearest Fifth-Hour site's event; read all three (the mosaic on the
   // map, the relief in 3D in light, the rune in the dark) and that event is triangulated.
   const df = game.run.world.landmarks.get("dialFloor");

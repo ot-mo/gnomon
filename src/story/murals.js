@@ -83,7 +83,9 @@ export function registerLine(game, L) {
   const lines = L?.lines;
   if (!lines) return null;
   if (game.view === "map") return flatLine(game, L);
-  return (game.player?.torch ? lines.deep : lines.dark) || null;
+  // The Dark line in the dark: your torch out where no daylight or lamp reaches you (as a rune reads), else the Deep one.
+  const p = game.player, dark = !!p && !p.torch && !!game.zone && inDark(game, game.zone, p.x, p.y, p.z + 1);
+  return (dark ? lines.dark : lines.deep) || null;
 }
 // A landmark's Flat line with the run's numbers in it: the Dial Floor's pips and bearing are its history's (B2, C1b #11).
 export function flatLine(game, L) {
@@ -95,8 +97,8 @@ export function flatLine(game, L) {
 
 function readLandmark(game, ev) {
   if (!ev?.open || game.view !== "3d") return;
-  const line = registerLine(game, landmarkAt(game, ev.zone || game.zone, ev.x, ev.y));
-  if (line) game.log?.(line.split("\n").join(" / "), game.player?.torch ? [215, 205, 180] : [175, 165, 230]);
+  const L = landmarkAt(game, ev.zone || game.zone, ev.x, ev.y), line = registerLine(game, L);
+  if (line) game.log?.(line.split("\n").join(" / "), line === L?.lines?.dark ? [175, 165, 230] : [215, 205, 180]);
 }
 
 // The map's inspect line: a mosaic reads plainly from above; a relief or a rune only says it's there.
