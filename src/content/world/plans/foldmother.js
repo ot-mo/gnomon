@@ -4,8 +4,9 @@
 // (8, 8, 8 and 6 of them, each ring's turned a little against the one below, like pleats), every platform joined to the
 // next by a bridge one plank wide; under each platform of the three upper rings a house of thatch sits in the pleat
 // against the trunk (a pod, filling the two blocks between rings); and a band of root-steps winds up round them all a
-// block at a time. At dusk (18:00) the platforms fold into the trunk and the bridges vanish (her night layout, and
-// tomorrow's fold-lines drawn on the map as creases: integration request). The map shows the ground under the
+// block at a time. At dusk (18:00) the platforms fold into the trunk and the bridges vanish, and at dawn (06:00) they open
+// again; whoever is out on a branch at dusk is folded in and dropped unhurt onto the Rootfold's first floor, and at night
+// the map draws tomorrow's fold-lines as creases (zone.fold: src/gimmicks.js; B2, C1b #10). The map shows the ground under the
 // platforms, as it does under any canopy. At her foot: the knot where she speaks, Warden Lumo, the Spore Moot's
 // herbalist and a dial-stele; between two roots, the way down into the Rootfold.
 //
@@ -81,8 +82,9 @@ export const FOLDMOTHER_PLAN = {
     stampVault(zone, { name: "Foldmother", plan: FOLDMOTHER_ROWS, height: 4, wall: B.TRUNK, floorBlock: B.DIRT, links: [], legend: LEGEND,
                        stacks: STACKS }, ox, oy, makeRng(seedFor(zone.seed, "foldmother")), { roof: "none" });
     // The platforms and their bridges, ring by ring, and the pods in the pleats between one ring and the next.
+    zone.fold = { open: true, planks: [] };
     FOLDMOTHER_LAYOUT.forEach(({ height, platforms, bridges, pods }, i) => {
-      for (const [x, y] of [...platforms.flat(), ...bridges]) zone.set(ox + x, oy + y, FLOOR_Z + height - 1, B.PLANK);
+      for (const [x, y] of [...platforms.flat(), ...bridges]) { zone.set(ox + x, oy + y, FLOOR_Z + height - 1, B.PLANK); zone.fold.planks.push([ox + x, oy + y, FLOOR_Z + height - 1]); }
       for (const [x, y] of pods) for (let z = FLOOR_Z + height; z < FLOOR_Z + RINGS[i + 1] - 1; z++) zone.set(ox + x, oy + y, z, B.THATCH);
     });
     // The crown: leaves over the trunk's top.

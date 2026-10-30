@@ -13,6 +13,9 @@
 //   pressedRoom   the Press (§5 I): stand on its gold centre tile and turn (Tab), and it unpresses: its flat things stand up
 //                 into 3D (no longer flat), enemies and all.
 //   trueLevel     the Datum (§5 D): standing on the plate whose number is the sill's height opens the gate.
+//   fold          Foldmother (§5 P): her platforms and bridges (zone.fold.planks) fold away at FOLD.dusk and open at FOLD.dawn;
+//                 whoever stands on one when she closes drops unhurt onto the Rootfold's first floor; at night the map
+//                 draws tomorrow's fold-lines (the planks' columns) as creases.
 // (Press-plates: traps.js. Rune doors, off-beat doors and the Gnomon's door: interact.js. The shaft, the culvert and the
 // sealed stair: screens/play.js. Two layouts: world/zonegen.js.)
 import { on, registerUpdate } from "./events.js";
@@ -20,6 +23,7 @@ import { B, FLOOR_Z } from "./world.js";
 import { hourOf } from "./clock.js";
 import { addStatus, hasStatus } from "./status.js";
 import * as S from "./screen.js";
+import { changeZone } from "./zones.js";
 
 // --- The tide -----------------------------------------------------------------------------------------------------
 export function tideLevel(zone, hour) {
@@ -105,8 +109,27 @@ function unpress(game, zone) {
   game.log("You turn on the gold tile, and the room unpresses: what was drawn on the floor stands up into the world.", [255, 220, 140]);
 }
 
-on("zone:prepare", (game, { zone }) => followTide(game, zone));
-on("clock:hour", (game) => followTide(game, game.zone));
+// --- Foldmother's fold ----------------------------------------------------------------------------------------------
+export const FOLD = { dawn: 6, dusk: 18 };
+export const foldOpenAt = (hour) => hour >= FOLD.dawn && hour < FOLD.dusk;
+export function setFold(game, zone, open) {
+  const F = zone?.fold;
+  if (!F || F.open === open) return;
+  const p = game?.zone === zone ? game.player : null;
+  const out = p && F.planks.some(([x, y, z]) => x === Math.floor(p.x) && y === Math.floor(p.y) && Math.abs(p.z - (z + 1)) < 0.6);
+  for (const [x, y, z] of F.planks) zone.set(x, y, z, open ? B.PLANK : B.AIR);
+  F.open = open;
+  zone.refresh();
+  if (out && !open && zone.hasBelow) {
+    const r = zone.dungeonRect || { ox: 0, oy: 0 };
+    changeZone(game, `${zone.wx},${zone.wy},1`, { how: "fall", fx: p.x - r.ox, fy: p.y - r.oy, rng: Math.random },
+      "Dusk. She closes like a hand, and you are folded in with the branch, down through her roots, and set down unhurt.");
+  }
+}
+const followFold = (game, zone) => { if (zone?.fold) setFold(game, zone, foldOpenAt(hourOf(game))); };
+
+on("zone:prepare", (game, { zone }) => { followTide(game, zone); followFold(game, zone); });
+on("clock:hour", (game) => { followTide(game, game.zone); followFold(game, game.zone); });
 
 // --- The map: where the hand will be next, and your track in the dark ----------------------------------------------------
 export const SWEEP_AHEAD = 4;   // seconds: the hand's shadow this far ahead, drawn dim over the floor
@@ -117,6 +140,11 @@ export function drawGimmicks(game, { zone, onScreen, toScreen }) {
     if (!onScreen(x, y) || (x === Math.floor(game.player.x) && y === Math.floor(game.player.y))) continue;
     const [sx, sy] = toScreen(x, y);
     S.put(sx, sy, "·", 200, 170, 110);
+  }
+  if (zone.fold && !zone.fold.open) for (const [x, y] of zone.fold.planks) {   // tomorrow's creases
+    if (!zone.seen[x + y * zone.w] || !onScreen(x, y)) continue;
+    const [sx, sy] = toScreen(x, y);
+    S.put(sx, sy, "÷", 150, 120, 80);
   }
   if (zone.sweep) for (let y = 0; y < zone.d; y++) for (let x = 0; x < zone.w; x++) {
     if (!zone.seen[x + y * zone.w] || !onScreen(x, y) || !underSweep(zone, x, y, game.time + SWEEP_AHEAD) || underSweep(zone, x, y, game.time)) continue;

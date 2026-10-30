@@ -836,13 +836,27 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
   const day = enter("foldmother", 1, 12), dayBlocks = day.blocks.slice(), dayLayout = day.layout;
   enter("foldmother", 0); const night = enter("foldmother", 1, 20);
   G2.layouts = { day: dayLayout, night: night.layout, differ: night.blocks.some((b, i) => b !== dayBlocks[i]), same: night === day };
+    // Foldmother (C1b #10): open by day, folded at night; standing on a branch as 18:00 strikes drops you, unhurt, onto the
+  // Rootfold's first floor; at dawn she opens again.
+  {
+    const fz = enter("foldmother", 0, 12), F = fz.fold, planks = () => F.planks.filter(([x, y, z]) => fz.get(x, y, z) === B.PLANK).length;
+    const day = planks();
+    const pk = F.planks.find(([x, y, z]) => !fz.get(x, y, z + 1) && !fz.get(x, y, z + 2));
+    game.time = (17 - 6) * 60 + 24 * 60 * 3 + 59; game.clockSeen = game.time;
+    Object.assign(P, { x: pk[0] + 0.5, y: pk[1] + 0.5, z: pk[2] + 1, onGround: true });
+    const hp = P.hp, { catchUp } = await import("../../src/clock.js");
+    game.time += 2; catchUp(game);
+    const dropped = game.zone.key === `${fz.wx},${fz.wy},1` && P.hp === hp, night = planks();
+    game.debug.enterZone(fz.key); game.clockSeen = game.time; game.time += 12 * 60; catchUp(game);
+    G2.fold = { planks: F.planks.length, day, night, dropped, dawn: planks() };
+  }
   }
   stats.gimmicks2 = G2;
   expect(JSON.stringify(G2.headroom) === "[6,5,4,3]" && G2.pressed.flatBefore >= 1 && G2.pressed.gold && G2.pressed.deepAfter && G2.pressed.done
     && G2.pressPlate?.flat && G2.pressPlate.unhurt && !G2.pressPlate.plates1
     && G2.trueLevel.vault === "The True Level" && G2.trueLevel.plates === 4 && G2.trueLevel.plateMurals === 4 && G2.trueLevel.sill && G2.trueLevel.shut0 && G2.trueLevel.wrongShut && G2.trueLevel.open
     && G2.tide.noon && G2.tide.at16 && G2.tide.levels === "01234440" && G2.tide.byClock && G2.sweep.cells > 20 && G2.sweep.moved && G2.sweep.flat
-    && G2.darkMapping.trail === 3 && G2.darkMapping.other && G2.layouts.day === "day" && G2.layouts.night === "night" && G2.layouts.differ,
+    && G2.darkMapping.trail === 3 && G2.darkMapping.other && G2.fold.day === G2.fold.planks && G2.fold.planks > 100 && G2.fold.night === 0 && G2.fold.dropped && G2.fold.dawn === G2.fold.planks && G2.layouts.day === "day" && G2.layouts.night === "night" && G2.layouts.differ,
     `in a game: the gimmicks ${JSON.stringify(G2)}`);
   return { name: "landmark bottoms", ok: problems.length === 0, problems, stats };
 }
