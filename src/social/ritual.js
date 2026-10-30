@@ -115,7 +115,9 @@ export function canKindle(game, c) {
   if (only && legendTemplate(game, c) !== only) return `${FACTIONS[f].name} kindle only through ${FACTIONS[f].riteVariant.name.replace(/'s Lighting$/, "")}.`;
   if (snuffed(game)) return "You cast no shadow. Nobody kindles with a Snuffer.";
   if (attitude(game, c, game.player) === "hostile") return "Not with someone out for you.";
-  if (repOf(game, f) <= KINDLING.floor) return `${FACTIONS[f].name} think too little of you.`;
+  // (A beast faction kindles only through its legend, whose own leave is all it takes: the Herdmother is docile with you
+  // even while the Saltbeasts stand at −400. B3, WS10 #6.)
+  if (repOf(game, f) <= KINDLING.floor && !only) return `${FACTIONS[f].name} think too little of you.`;
   return null;
 }
 
@@ -168,7 +170,7 @@ function variantNeeds(game, c, rite) {
   if (N.hours && !(hourOf(game) >= N.hours[0] && hourOf(game) < N.hours[1])) return `At dusk, ${N.hours[0]}:00 to ${N.hours[1]}:00, before they close.`;
   if (N.then && kin(game, c)) return null;
   const pending = game.state?.kindling?.pending?.[kinKey(game, c)];
-  if (v.second && !kin(game, c) && pending !== v.second) return `${cap(RITES[v.second].name)} first, then this.`;
+  if (v.second && !kin(game, c) && pending !== rite) return `${cap(RITES[v.second].name)} first, then this.`;
   return null;
 }
 
@@ -439,7 +441,7 @@ const SPECIALS = {
     if (!hb.includes("pressing") && k !== undefined) hb[k] = "pressing";
     return "They press your palm flat to the mosaic until it leaves a print. For a day, the floor will take you when you ask.";
   } },
-  snuff: { why: (game) => mutations.canGain(null, { ...game.player, creases: 99 }, "snuff") || null, run: (game) => {
+  snuff: { why: (game) => (!MUTATIONS.snuff ? false : mutations.canGain(null, { ...game.player, creases: 99 }, "snuff") || null), run: (game) => {
     const p = game.player;
     p.creases = (p.creases || 0) + (MUTATIONS.snuff.cost ?? 0);   // (paid in reputation, not creases)
     mutations.gainMutation(game, p, "snuff");
@@ -510,8 +512,9 @@ export function ritualRows(game, c) {
   // The faction's specials (bible §3.3; content/factions.js specials without `via`), each once.
   for (const sp of FACTIONS[f].specials || []) {
     if (sp.via || !SPECIALS[sp.id] || (k.specials || {})[sp.id]) continue;
-    const no = sp.genotype && p.genotype !== sp.genotype ? `Only for the ${sp.genotype === "bent" ? "Bent" : "Plumb"}.` : SPECIALS[sp.id].why?.(game, sp);
-    if (no === false) continue;   // (its thing doesn't exist yet: not offered)
+    const why = SPECIALS[sp.id].why?.(game, sp);
+    if (why === false) continue;   // (its thing doesn't exist yet: not offered)
+    const no = sp.genotype && p.genotype !== sp.genotype ? `Only for the ${sp.genotype === "bent" ? "Bent" : "Plumb"}.` : why;
     rows.push({ id: `special:${sp.id}`, label: `${cap(sp.name)}`, n: sp.rep, why: no || null, run: () => {
       (k.specials ||= {})[sp.id] = game.time || 0;
       for (const [id, n] of Object.entries(sp.after || {})) addRep(game, id, n, "body");

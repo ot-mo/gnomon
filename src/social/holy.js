@@ -24,7 +24,7 @@ import { FACTIONS, repOf, band, REP_BANDS, membershipsOf, registerPlayerRule, ad
 import { on } from "../events.js";
 import { holyAt } from "./places.js";
 
-const GRACE = 10;   // seconds of game time between a warning and the turn
+export const GRACE = 10;   // seconds of game time between a warning and the turn
 const memo = new WeakMap();
 export function holyNow(game) {
   const p = game.player, z = game.zone;

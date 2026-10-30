@@ -230,7 +230,8 @@ export function buildVillage(ctx, site) {
 
   zone.murals = [...(zone.murals || []), ...murals];
   zone.village = { siteId: site.id, shrine: { x: sx, y: sy, z: shrineZ, view, kind }, lamp: { x: lx, y: ly, dark },
-                   perch, buildings: built.map((b) => ({ id: b.id, x0: b.x0, y0: b.y0, w: b.w, d: b.d, door: b.door, step: b.step, h: b.h })) };
+                   perch, buildings: built.map((b) => ({ id: b.id, slot: b.slot, x0: b.x0, y0: b.y0, w: b.w, d: b.d, door: b.door, step: b.step, h: b.h,
+                     ...(b.storeys ? { storeys: b.storeys } : {}), ...(b.painted ? { painted: true } : {}) })) };
 
   // 5. The cast: the leader in the hall, the trader and the leech in the next two buildings, the tinker in the
   //    workshop if there is one; everyone else on the green.

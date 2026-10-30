@@ -482,6 +482,7 @@ async function villages7b(env, { fail, stats, test, real, json, startRun, game }
   let n = 0, empty = 0, attempts = 0, maps = 0, lintels = 0, runes = 0, cast = 0, twice = 0, mortals = 0, teaching = 0;
   const codec = await env.src("save/codec.js"), POW = await env.src("content/powers.js"), facs = {};
   const times = [], perRegion = {}, realPerSeed = [];
+  const VILLAGES = (await env.src("content/villages.js")).VILLAGES, heightsSeen = { stairs: 0, raised: {}, storeys: 0, painted: 0, cisterns: 0 };   // B3 (C2 #7)
   for (const W of [test, real]) for (let seed = 1; seed <= 20; seed++) {
     const run = RUN.buildRun(seed, W);
     const want = [...run.sites.values()].filter((s) => s.kind === "village");
@@ -544,6 +545,33 @@ async function villages7b(env, { fail, stats, test, real, json, startRun, game }
       }
       const wantK = v.abandoned ? { map: 1, "3d": 1, dark: 1 } : { map: v.history.length, "3d": v.history.length, dark: v.layout.rune ? 1 : 0 };
       if (json(kinds) !== json(wantK)) fail(`${tag}: murals ${json(kinds)}, want ${json(wantK)}`);
+      // B3 (C2 #7): the heights. Each building at its style's height for its slot (bible §9.4), its floor under it and
+      // its cast standing on it, the highest floor 8 up at most and its roof within the scenery's 14; the storeys' upper
+      // floor and its stair, the page-town's painted houses, the cistern, the windowless cells.
+      {
+        const S = VILLAGES.styles[v.layout.style], solid = (x, y, zz) => !!z.get(x, y, zz) && z.get(x, y, zz) !== B.WATER_SHALLOW;
+        for (const b of z.village.buildings) {
+          const want = v.abandoned ? 0 : VS.liftOf(S, b.slot).h;
+          if (b.h !== want) fail(`${tag}: the ${b.slot} building ${b.h} up, its style ${v.layout.style} says ${want}`);
+          if (b.h > 8 || b.h + 4 > 12) fail(`${tag}: a floor ${b.h} up`);
+          const fx = b.door.x, fy = b.door.y + (b.slot === "sw" || b.slot === "se" ? 1 : -1);   // inside, behind the door
+          if (!b.painted && (!solid(fx, fy, FLOOR_Z - 1 + b.h) || z.get(fx, fy, FLOOR_Z + b.h) || z.get(fx, fy, FLOOR_Z + 1 + b.h))) fail(`${tag}: the ${b.slot} building has no floor at ${b.h}`);
+          if (b.h > 1) heightsSeen.stairs++;
+          if (b.h) heightsSeen.raised[b.h] = (heightsSeen.raised[b.h] || 0) + 1;
+          if (b.storeys) {
+            heightsSeen.storeys++;
+            if (!solid(b.x0 + 4, b.y0 + 1, FLOOR_Z + 3) || z.get(b.x0 + 3, b.y0 + 1, FLOOR_Z + 3) || !solid(b.x0 + 3, b.y0 + 1, FLOOR_Z + 2)) fail(`${tag}: the hall's upper storey or its stair`);
+          }
+          if (b.painted) {
+            heightsSeen.painted++;
+            if (z.get(b.x0, b.y0, FLOOR_Z) || !BLOCKS[z.get(b.x0, b.y0, FLOOR_Z - 1)]?.mosaic) fail(`${tag}: a page-town house that isn't paint`);
+          }
+          if (S.windows === false && !v.abandoned) for (let y = b.y0; y < b.y0 + b.d; y++) for (let x = b.x0; x < b.x0 + b.w; x++)
+            if (z.get(x, y, FLOOR_Z + 1 + b.h) === B.LAMP) fail(`${tag}: a window in the Shade's cells`);
+        }
+        if (!v.abandoned && S.cistern) { heightsSeen.cisterns++; if (z.get(z.village.lamp.x - 5, z.village.lamp.y - 1, FLOOR_Z - 1) !== B.WATER_SHALLOW) fail(`${tag}: no cistern`); }
+        for (const c of members) if (solid(c.tx, c.ty, c.z) || !solid(c.tx, c.ty, c.z - 1)) fail(`${tag}: ${c.uid} stands in a wall or on air at ${c.z - FLOOR_Z}`);
+      }
       if (n % 8 === 1) {   // the same zone twice: blocks, cast, murals
         const z2 = SUR.generateSurface(run, site.at.wx, site.at.wy);
         const sig = (zz) => json([zz.creatures.map((c) => [c.uid, c.type, c.tx, c.ty]), zz.murals, zz.village]);
@@ -579,6 +607,8 @@ async function villages7b(env, { fail, stats, test, real, json, startRun, game }
     `the run's factions villageFaction's (${Object.entries(facs).map(([k, x]) => `${x} under ${k}`).join(", ")}); ${mortals} villagers mortal through a save; ${teaching} leaders teaching a power that works today; ` +
     `${maps} mosaic, ${lintels} lintel and ${runes} rune murals on their blocks; records alike made alone and in ${pairs} pairs with another village taken away, ${twice} zones alike made twice; ` +
     `styles ${[...seen.styles].join(", ")}; shrines ${[...seen.shrines].join(", ")}; ${seen.templates.size} of 9 templates drawn`;
+  stats.heights = `buildings raised or sunk by ${json(heightsSeen.raised)}, ${heightsSeen.stairs} stairs to the green, ${heightsSeen.storeys} upper storeys, ${heightsSeen.painted} painted houses, ${heightsSeen.cisterns} cisterns; every cast member on a floor`;
+  if (!heightsSeen.storeys || !heightsSeen.painted || !heightsSeen.cisterns || !heightsSeen.raised[8] || !heightsSeen.raised[-1]) fail(`the heights: ${stats.heights}`);
 
   // In play: a village of the test world with a rune, by the inspect paths.
   let seed = 0, pick = null;

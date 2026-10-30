@@ -275,8 +275,9 @@ export function pourLiquid(game, e, id, x = Math.floor(e.x), y = Math.floor(e.y)
     zone.props.push({ x: cx + 0.5, y: cy + 0.5, z, kind: puddleKind(key), liquid: key, until: (game.time || 0) + PUDDLE.seconds,
       ...(ward ? { ward: ward.against } : {}) });
   }
-  // Poured on a creature: the turnwater turns it (bible §13.7).
+  // Poured on a creature: the turnwater turns it (bible §13.7). Poured at your own feet, you stand in it.
   const words = [`You pour out the ${liquidName(key)}.`];
+  if (cells.some(([cx, cy]) => Math.floor(e.x) === cx && Math.floor(e.y) === cy)) { const w = touchLiquid(game, e, key); if (w) words.push(w); }
   for (const c of [...zone.creatures]) if (c !== e && cells.some(([cx, cy]) => Math.floor(c.x) === cx && Math.floor(c.y) === cy)) {
     const w = creatureTouch(game, c, key);
     if (w) words.push(w);
