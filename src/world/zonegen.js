@@ -67,12 +67,16 @@ export function layoutNow(game, site) {
   return h >= a && h < b ? "day" : "night";
 }
 // Entering a floor whose layout isn't the hour's: it becomes the other layout before you're placed (the swap never happens
-// while you're on it). What was on it goes with the old layout.
-on("zone:prepare", (game, { zone }) => {
-  if (!zone?.layouts || zone.z < 1 || !game.run) return;
+// while you're on it, nor on a load: you come back where you saved, in the layout you saved in). What was on it goes with
+// the old layout; a layout you've had before comes back bare, without its creatures and loot (zone.layoutsSeen), so the
+// two can't be farmed by the clock.
+on("zone:prepare", (game, { zone, arrival }) => {
+  if (!zone?.layouts || zone.z < 1 || !game.run || arrival?.how === "load") return;
   const site = siteWithDungeon(game.run, zone.wx, zone.wy), want = layoutNow(game, site);
   if (!want || zone.layout === want) return;
-  const fresh = makeLevel(game.run, site, zone.z, want);
+  const seen = zone.layoutsSeen || [zone.layout], fresh = makeLevel(game.run, site, zone.z, want);
+  if (seen.includes(want)) { fresh.items = []; fresh.creatures = []; }
+  fresh.layoutsSeen = [...new Set([...seen, want])];
   for (const k of Object.keys(fresh)) if (!["key", "wx", "wy", "z", "sealed", "dirty", "siteId", "landmarkId"].includes(k)) zone[k] = fresh[k];
   zone.dirty = true;
   zone.refresh();

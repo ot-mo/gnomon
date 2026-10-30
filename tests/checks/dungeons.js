@@ -845,7 +845,11 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
   // The Rootfold: entered by day its floor is the day layout; entered again at 20:00 it is the night one (another floor).
   const day = enter("foldmother", 1, 12), dayBlocks = day.blocks.slice(), dayLayout = day.layout;
   enter("foldmother", 0); const night = enter("foldmother", 1, 20);
-  G2.layouts = { day: dayLayout, night: night.layout, differ: night.blocks.some((b, i) => b !== dayBlocks[i]), same: night === day };
+  const nightThings = night.items.length + night.creatures.length, nightLayout = night.layout, nightDiffers = night.blocks.some((b, i) => b !== dayBlocks[i]);
+  enter("foldmother", 0); const again = enter("foldmother", 1, 12);   // the day layout a second time: bare
+  const againThings = again.items.length + again.creatures.length;
+  game.time = (20 - 6) * 60 + 24 * 60 * 3; game.debug.enterZone(again.key, "load");   // a load at night keeps the day layout
+  G2.layouts = { day: dayLayout, night: nightLayout, differ: nightDiffers, same: night === day, nightThings, againThings, load: game.zone.layout };
     // Foldmother (C1b #10): open by day, folded at night; standing on a branch as 18:00 strikes drops you, unhurt, onto the
   // Rootfold's first floor; at dawn she opens again.
   {
@@ -866,7 +870,7 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
     && G2.pressPlate?.flat && G2.pressPlate.unhurt && !G2.pressPlate.plates1
     && G2.trueLevel.vault === "The True Level" && G2.trueLevel.plates === 4 && G2.trueLevel.plateMurals === 4 && G2.trueLevel.sill && G2.trueLevel.shut0 && G2.trueLevel.wrongShut && G2.trueLevel.open
     && G2.tide.noon && G2.tide.at16 && G2.tide.levels === "01234440" && G2.tide.byClock && G2.sweep.cells > 20 && G2.sweep.moved && G2.sweep.flat
-    && G2.darkMapping.trail === 3 && G2.darkMapping.other && G2.fold.day === G2.fold.planks && G2.fold.planks > 100 && G2.fold.night === 0 && G2.fold.dropped && G2.fold.dawn === G2.fold.planks && G2.layouts.day === "day" && G2.layouts.night === "night" && G2.layouts.differ,
+    && G2.darkMapping.trail === 3 && G2.darkMapping.other && G2.fold.day === G2.fold.planks && G2.fold.planks > 100 && G2.fold.night === 0 && G2.fold.dropped && G2.fold.dawn === G2.fold.planks && G2.layouts.day === "day" && G2.layouts.night === "night" && G2.layouts.differ && G2.layouts.nightThings > 0 && G2.layouts.againThings === 0 && G2.layouts.load === "day",
     `in a game: the gimmicks ${JSON.stringify(G2)}`);
   return { name: "landmark bottoms", ok: problems.length === 0, problems, stats };
 }
