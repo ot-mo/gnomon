@@ -1650,9 +1650,9 @@ function wearTypical(p, build, level) {
   for (const [slot, it] of Object.entries(kit.armour)) p.body.equip[p.body.parts.find((q) => q.type === slot).id] = { ...it, known: true };
   invalidateStats(p);
 }
-export function typicalBuilds(game, pref = TYPICAL_PREF) {
+export function typicalBuilds(game, pref = TYPICAL_PREF, buildSeed = 0) {
   const p = game.player, out = [], last = BANDS[BANDS.length - 1].level;
-  for (const bgId of TYPICAL_BGS) for (const seed of TYPICAL_SEEDS) {
+  for (const bgId of TYPICAL_BGS) for (const seed of TYPICAL_SEEDS.map((s) => s + 20 * buildSeed)) {   // (buildSeed: another 20 builds a background)
     const bg = BACKGROUNDS[bgId], snaps = {}, keepSeed = game.seed;
     Object.assign(p, { background: bgId, genotype: bg.genotype, trees: [...bg.trees], level: 1, perks: {}, perkRank: {}, maxHpGain: 0,
                        mutations: {}, attrs: suggestSpread(bg.genotype, bgId) });
@@ -1721,7 +1721,7 @@ function blowsToKill(dmgs, hp, low = null, lowBelow = 0) {
 }
 // pref: the typical build's preference (the default TYPICAL_PREF); typicalOnly: only the typical rows, with no bounds
 // held (B1's measurement of the powers' worth, 2026-10-30).
-export function ttkTables(ctx, { blows = 1500, typicalBlows = 40, pref = TYPICAL_PREF, typicalOnly = false } = {}) {
+export function ttkTables(ctx, { blows = 1500, typicalBlows = 40, pref = TYPICAL_PREF, typicalOnly = false, seed = 0, buildSeed = 0 } = {}) {
   const { game, seedRandom, restoreRandom } = ctx;
   const problems = [], stats = {};
   const expect = (ok, m) => { if (!ok) problems.push(m); return ok; };
@@ -1739,9 +1739,9 @@ export function ttkTables(ctx, { blows = 1500, typicalBlows = 40, pref = TYPICAL
   // (the blows to kill from their spread: blowsToKill), the means over the builds; the worst kind by its mean cost.
   let builds = null;
   const typicalRow = (tier, level) => {
-    builds ||= typicalBuilds(game, pref);
+    builds ||= typicalBuilds(game, pref, buildSeed);
     const counts = realBand(game, tier, level), kinds = {}, rs = [];
-    game.combatRng = makeRng(level * 97 + 3);
+    game.combatRng = makeRng(level * 97 + 3 + 7919 * seed);   // (seed: another stream of dice, for the spread over seeds; 0 as before)
     for (const b of builds) {
       wearTypical(p, b, level);
       const hpMax = maxHp(p), swing = attackTime(p), regenHps = bonus(p, "regen") / 12, r = { you: 0, it: 0, cost: 0 };
