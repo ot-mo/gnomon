@@ -135,7 +135,7 @@ export const PEOPLE_WORDS = {
   wisse: { role: "priest", greet: "Put it out. We'll still be here. That's the point.",
     who: "Abbess Wisse of the Lampless. I keep the Hush and teach Shadowcraft.",
     topics: [["The dark-pass?", "It lets a lit stranger into the Shade's heart without a war. I give it to whoever finds who lit the Hush."]],
-    after: { beat6: "The pass is yours. Carry it unlit." } },
+    after: { beat6: "Back from the Shade. Whatever you carried in, carry it out unlit." } },
   ghostTrader: { role: "merchant", greet: "you can only see me at night\nso the prices are night prices",
     who: "a trader. i was one before\nit kept" },
 

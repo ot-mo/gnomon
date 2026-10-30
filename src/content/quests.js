@@ -258,7 +258,7 @@ export const QUESTS = {
         routes: ["Investigate, then accuse: one clue of what happened and one of why, that agree.", "Side outright with one faith: bribe the Line Court, or break it. The other faith turns on you.",
           "Skip the pass and slip into the Shade. The Choir's monks will remember."],
         learn: "In Halfnight the accusation becomes the truth. Whoever you name lit the Hush.",
-        reward: { text: "The dark-pass, and a city in the climate you chose.", items: [["darkPass", 1]] },
+        reward: { text: "The dark-pass, if you won it, and a city in the climate you chose." },
         done: { event: "zone:enter", landmark: "unlitChoir", z: 0 },
         choices: [{ id: "accused", label: "the accused", options: [
           { id: "horary", text: "Accuse a Horary suspect.", rep: { horary: -150, lampless: 100 } },
@@ -344,6 +344,7 @@ export const QUESTS = {
         { id: "gossip", view: "talk", tag: "fear", text: "\"{name} was out in the street during the Snuffing. Nobody's out during the Snuffing. Ask anyone. Ask {name}.\"" },
       ],
       accuse: "You name {name} before the Line Court. In Halfnight that makes it so.",
+      pass: [["darkPass", 1]],   // what Abbess Wisse gives for an accusation, or for siding outright (routes 1 and 2; never route 3)
       climates: [
         { id: "concord", tags: ["faith", "grief"], rep: { horary: 200, lampless: 200 }, text: "Concord. The two faiths share the blame, and so they share the street." },
         { id: "uneasy", tags: null, rep: { horary: 100, lampless: 100 }, text: "Uneasy. Both faiths accept the verdict, and neither crosses the Line to say so." },
