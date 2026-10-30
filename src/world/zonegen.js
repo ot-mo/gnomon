@@ -19,6 +19,7 @@ import { generateSurface, surfaceSteps, buildApronBand } from "../gen/surface.js
 import { generateDungeonLevel } from "../gen/dungeon.js";
 import { legacyZone } from "./legacy.js";
 import { zoneSeed } from "./run.js";
+import { realWorld } from "../items.js";
 import { siteWithDungeon, dungeonParams } from "./sites.js";
 
 export { siteWithDungeon, dungeonParams };   // they live in sites.js (gen/surface.js needs them too)
@@ -41,7 +42,7 @@ function dungeonZone(game, { wx, wy, z }) {
   const site = siteWithDungeon(run, wx, wy);
   if (!site || z < 1 || z > site.dungeon.levels) return null;
   if (site.dungeon.legacy) return legacyZone(game, { wx, wy, z }, site);
-  const zone = generateDungeonLevel(zoneSeed(run, wx, wy, z), dungeonParams(run, site, z));
+  const zone = generateDungeonLevel(zoneSeed(run, wx, wy, z), { ...dungeonParams(run, site, z), realLoot: realWorld(run) });   // (B1, C4 #1)
   zone.siteId = site.id;
   zone.landmarkId = site.landmarkId || null;
   return zone;

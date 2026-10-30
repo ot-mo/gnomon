@@ -1552,6 +1552,104 @@ export function checkGear(m) {
   return { name: "items: C4's gear", ok: problems.length === 0, problems, stats };
 }
 
+// --- B1: gear and powers (the backlog of C4's and WS5's requests, 2026-10-30) ------------------------------------------
+// checkB1Gear(m) → { name: "items: B1's gear", ok, problems, stats }: each applied request held, written out here.
+//   1. The real world's loot (C4 #1): lootGear and lootPotion give the parent's draws exactly off the real world
+//      (the same rng, the same items) and C4's gear and tonics on it; a real-world run's dungeon floors, surface
+//      rewards, elite drops and merchants' shelves draw C4's gear (forged weapons in a material, no parent weapon) and
+//      tonics; the test world's dungeons none.
+export function checkB1Gear(m) {
+  const problems = [], stats = {};
+  const fail = (msg) => problems.push(msg);
+  const { game, startRun } = m.game, I = m.items;
+  const section = (name, fn) => { try { fn(); } catch (err) { fail(`${name}: threw ${err.stack?.split("\n").slice(0, 3).join(" / ") || err}`); } };
+  const c4Gear = (it) => (it.kind === "weapon" && !!it.made) || (it.kind === "missile" && (it.id === "sling" || !!it.made)) ||
+    (it.kind === "armour" && (!!it.made || !m.forge.FORGED.armour.includes(it.id)));
+  const isGearKind = (it) => ["weapon", "armour", "missile"].includes(it?.kind);
+
+  section("loot", () => {
+    // Off the real world: the parent's draws, draw for draw.
+    for (let k = 0; k < 300; k++) {
+      const a = m.rng.makeRng(900 + k), b = m.rng.makeRng(900 + k), depth = 1 + (k % 20);
+      const x = I.lootGear(a, depth, 0.15, false), y = I.randomEquipment(b, depth, 0.15);
+      if (JSON.stringify(x) !== JSON.stringify(y) || a() !== b()) { fail(`lootGear off the real world drew ${JSON.stringify(x)}, randomEquipment ${JSON.stringify(y)}`); break; }
+      const a2 = m.rng.makeRng(k), b2 = m.rng.makeRng(k);
+      if (JSON.stringify(I.lootPotion(a2, false)) !== JSON.stringify(I.randomPotion(b2)) || a2() !== b2()) { fail("lootPotion off the real world isn't randomPotion"); break; }
+    }
+    // On it: C4's gear and a share of tonics.
+    let forged = 0, tonics = 0, potions = 0;
+    for (let k = 0; k < 2000; k++) {
+      const it = I.lootGear(m.rng.makeRng(7000 + k), 1 + (k % 26), 0.15, true);
+      if (!c4Gear(it)) fail(`lootGear on the real world drew the parent's ${it.kind} ${it.id} (no material)`);
+      if (it.made) forged++;
+      const pt = I.lootPotion(m.rng.makeRng(k), true);
+      if (pt.kind === "tonic") tonics++; else if (pt.kind === "potion") potions++;
+      else fail(`lootPotion drew a ${pt.kind}`);
+    }
+    if (Math.abs(tonics / 2000 - I.TONIC_SHARE) > 0.04) fail(`lootPotion on the real world: ${tonics} tonics in 2000, want about ${I.TONIC_SHARE * 2000}`);
+    stats.loot = `off the real world 300 gear and potion draws equal to the parent's; on it 2000 gear draws all C4's (${forged} forged), ${tonics} tonics and ${potions} potions`;
+
+    // A real-world run: its dungeon floors; the same seed's test world.
+    const counts = { real: { gear: 0, parent: 0, tonic: 0, zones: 0 }, test: { gear: 0, parent: 0, tonic: 0, zones: 0 } };
+    for (const [name, world] of [["real", m.worldmap.REAL_WORLD], ["test", m.testWorld.TEST_WORLD]]) {
+      startRun(11, world);
+      const run = game.run, c = counts[name];
+      for (const site of run.sites.values()) {
+        if (!site.dungeon || site.dungeon.legacy || c.zones >= 30) continue;
+        for (let z = 1; z <= Math.min(2, site.dungeon.levels); z++) {
+          const zone = m.zones.ZONE_GENERATORS.dungeon(game, { wx: site.at.wx, wy: site.at.wy, z });
+          if (!zone) continue;
+          c.zones++;
+          if (!!zone.realLoot !== (name === "real")) fail(`${name} ${site.id} level ${z}: realLoot ${zone.realLoot}`);
+          for (const it of zone.items) {
+            if (it.kind === "tonic") c.tonic++;
+            if (!isGearKind(it)) continue;
+            if (c4Gear(it) && (name === "real" || it.made)) c.gear++; else c.parent++;
+          }
+        }
+      }
+    }
+    const R = counts.real, T = counts.test;
+    if (R.zones < 20 || R.parent > 0 || R.gear < 10 || R.tonic < 3) fail(`real-world dungeon floors: ${JSON.stringify(R)} (want C4's gear only, and tonics)`);
+    if (T.tonic > 0 || T.gear > 0 || T.parent < 5) fail(`test-world dungeon floors: ${JSON.stringify(T)} (want the parent's gear only, no tonics)`);
+    // Surface rewards (on and off the real world), elite drops, a merchant's shelf.
+    const sr = { gear: 0, parent: 0, tonic: 0 };
+    for (let k = 0; k < 600; k++) {
+      const it = m.common.surfaceReward(m.rng.makeRng(k), 2 + (k % 24), true);
+      if (it.kind === "tonic") sr.tonic++;
+      else if (isGearKind(it)) c4Gear(it) ? sr.gear++ : sr.parent++;
+      const t = m.common.surfaceReward(m.rng.makeRng(k), 2 + (k % 24), false);
+      if (t.kind === "tonic" || (isGearKind(t) && t.made)) { fail(`surfaceReward off the real world drew ${JSON.stringify(t)}`); break; }
+    }
+    if (sr.parent || sr.gear < 200 || sr.tonic < 10) fail(`surfaceReward on the real world: ${JSON.stringify(sr)}`);
+    startRun(11, m.worldmap.REAL_WORLD);
+    const p = game.player, zone = game.zone, drops = { gear: 0, parent: 0, tonic: 0 };
+    const rand = Math.random;
+    try {
+      let s = 1;
+      Math.random = () => (((s = (Math.imul(s ^ (s >>> 15), 0x2c1b3c6d) + 0x9e3779b9) >>> 0)) / 4294967296);
+      for (let k = 0; k < 200; k++) {
+        const c = m.creatures.addCreature(zone, m.creatures.spawnCreature("goblin", Math.floor(p.x), Math.floor(p.y), p.z, { level: 14, elite: true, rng: () => 0.5 }));
+        const before = zone.items.length;
+        m.monsters.killMonster(game, c, "", true, true);
+        for (const it of zone.items.slice(before)) {
+          if (it.kind === "tonic") drops.tonic++;
+          else if (isGearKind(it)) c4Gear(it) ? drops.gear++ : drops.parent++;
+        }
+        zone.items.length = before;
+      }
+    } finally { Math.random = rand; }
+    if (drops.parent || drops.gear < 20 || drops.tonic < 10) fail(`a real-world elite's drops: ${JSON.stringify(drops)}`);
+    const trader = { type: "villager", level: 9, talk: { state: {} }, merchant: { stock: "general" }, uid: "b1-trader" };
+    const shelf = m.merchants.restock(game, trader).map((s) => s.item);
+    if (!shelf.some((it) => it.kind === "tonic") || shelf.some((it) => isGearKind(it) && !c4Gear(it)) || !shelf.some((it) => it.made))
+      fail(`a real-world merchant's shelf: ${shelf.map((it) => `${it.kind}:${it.id || it.effect}${it.made ? `(${it.made})` : ""}`).join(", ")}`);
+    stats.lootWorld = `real dungeon floors ${JSON.stringify(R)}, test ${JSON.stringify(T)}; surface rewards ${JSON.stringify(sr)}; elite drops ${JSON.stringify(drops)}; a shelf of ${shelf.length}`;
+  });
+
+  return { name: "items: B1's gear", ok: problems.length === 0, problems, stats };
+}
+
 // tests/checks/index.js's entry point (tools/run-check.mjs in Node, test-world.html in the browser).
 export async function run(env) {
   const { S, capture, resize } = await env.screen({ cols: 180, rows: 56 });
@@ -1574,5 +1672,9 @@ export async function run(env) {
     load("chargen", "progression/chargen.js"), load("backgrounds", "content/backgrounds.js"), load("missiles", "missiles.js")]);
   m.player ||= await env.src("player.js");
   m.missileTable = (await env.src("content/items/missiles.js")).MISSILES;
-  return [checkItems(m), checkGear(m)];
+  // B1's (checkB1Gear).
+  await Promise.all([load("worldmap", "content/world/worldmap.js"), load("testWorld", "content/world/test-world.js"), load("zones", "zones.js"),
+    load("common", "gen/biomes/common.js"), load("monsters", "monsters.js")]);
+  if (env.args?.only === "b1") return [checkB1Gear(m)];   // (node tools/check-items.mjs --only b1)
+  return [checkItems(m), checkGear(m), checkB1Gear(m)];
 }

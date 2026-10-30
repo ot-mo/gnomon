@@ -23,6 +23,7 @@ import { emit } from "./events.js";
 import { seededSort } from "./rng.js";
 import { RULES } from "./rules.js";
 import { POTIONS, SCROLLS, SYLLABLES, ELEMENTS, WEAPONS, ARMOURS, PROPERTIES, RINGS, AMULETS, RELICS, RELIC_COLOR } from "./content/items/legacy.js";
+import { MATERIALS } from "./content/items/forge.js";
 export { POTIONS, POTION_COLORS, SCROLLS, ELEMENTS, WEAPONS, WEAPON_PALETTE, ARMOURS, PROPERTIES, RINGS, AMULETS, GEMS, RELICS,
   RELIC_COLOR, FLOOR_ART, makeRelic, pickRelic } from "./content/items/legacy.js";
 
@@ -86,7 +87,8 @@ export function itemBonuses(it) {
 // Strength needed to use a weapon or armour ("light" armour needs less).
 export function strNeeded(it) {
   const base = (it.kind === "weapon" ? WEAPONS : ARMOURS)[it.id].str;
-  return Math.max(0, base + (it.props || []).reduce((s, k) => s + (PROPERTIES[k].strReq || 0), 0));
+  // (B1, C4 #4: a material's own, pleatmetal's -3)
+  return Math.max(0, base + (MATERIALS[it.made]?.strReq || 0) + (it.props || []).reduce((s, k) => s + (PROPERTIES[k].strReq || 0), 0));
 }
 
 // --- How things look lying on the floor ---------------------------------------
@@ -143,6 +145,25 @@ export function randomEquipment(rand, depth, luck = 0) {
   return it;
 }
 
+// The real world's loot (B1, C4 #1): its gear is C4's classes and pieces in materials (content/items/gear.js
+// randomGear, by level) and a share of its potions are tonics (content/items/tonics.js randomTonic), which those
+// modules register here as they load (they import this one). The test world, the legacy stack under it and the
+// parent's peddler keep the parent's draws exactly (golden (b)); `real` is realWorld(game.run) or the generator's flag.
+//   realWorld(run) → bool                      a run on GNOMON's world (not the test world)
+//   lootGear(rand, depth, luck, real)          randomGear(rand, level, luck) on the real world, else randomEquipment
+//   lootPotion(rand, real)                     on the real world a tonic TONIC_SHARE of the time, else randomPotion
+//   lootTonic(rand) → { kind: "tonic", effect } | null   a tonic (a shelf's)
+//   registerLoot("gear" | "tonic", fn)        (a function, so gear.js and tonics.js can call it while this module loads)
+function loot() { return (loot.table ||= { gear: null, tonic: null }); }
+export function registerLoot(kind, fn) { loot()[kind] = fn; }
+export const TONIC_SHARE = 0.4;
+export const realWorld = (run) => !!run?.world && run.world.id !== "test";
+export const lootGear = (rand, depth, luck = 0, real = false) =>
+  (real && loot().gear ? loot().gear(rand, depth, luck) : randomEquipment(rand, depth, luck));
+export const lootTonic = (rand = Math.random) => loot().tonic?.(rand) ?? null;
+export const lootPotion = (rand = Math.random, real = false) =>
+  (real && loot().tonic && rand() < TONIC_SHARE ? loot().tonic(rand) : randomPotion(rand));
+
 // A ring or an amulet (from floor 3 on). Mostly +1; deeper, sometimes +2 or +3. 1 in 5 cursed.
 export function randomJewel(rand, depth, luck = 0) {
   const kind = rand() < 0.55 ? "ring" : "amulet";
@@ -156,13 +177,13 @@ export function randomJewel(rand, depth, luck = 0) {
 
 // Something worth risking a jump for. Crystals are the rare prize; on the deepest floors, now
 // and then a relic ("relic?": which one is chosen when you arrive, so you never find one twice).
-export function randomTreasure(rand, depth) {
+export function randomTreasure(rand, depth, real = false) {
   const R = RULES.relics;
   if (depth >= R.minLevel && depth <= R.maxLevel && rand() < R.chance) return { kind: "relic?" };
   const roll = rand();
   if (roll < 0.08) return { kind: "strength" };
   if (roll < 0.16) return { kind: "heart" };
-  if (roll < 0.5) return randomEquipment(rand, depth + 1, 0.15);
+  if (roll < 0.5) return lootGear(rand, depth + 1, 0.15, real);
   if (roll < 0.62 && depth >= 3) return randomJewel(rand, depth + 1, 0.1);
   if (roll < 0.8) return randomScroll(rand);
   return { kind: "knife", count: 3 + Math.floor(rand() * 3) };

@@ -18,7 +18,7 @@
 //   - the Bent get half of every number (GENOTYPES[g].tonics.effect) and a 5% chance of a bad reaction (badReaction:
 //     the overdose instead); the Plumb get the whole.
 // The statuses are named "tonic:…" so no other content's can clash with them.
-import { registerItemKind, takeOne } from "../../items.js";
+import { registerItemKind, takeOne, registerLoot } from "../../items.js";
 import { addStatus, removeStatus, hasStatus, statusOf, registerStatus } from "../../status.js";
 import { maxHp, mod } from "../../stats.js";
 import { GENOTYPES } from "../genotypes.js";
@@ -111,6 +111,8 @@ export function randomTonic(rand = Math.random) {
   for (const [effect, w] of Object.entries(TONIC_WEIGHT)) if ((pick -= w) < 0) return { kind: "tonic", effect };
   return { kind: "tonic", effect: "balm" };
 }
+
+registerLoot("tonic", randomTonic);   // (the real world's loot: items.js lootPotion, B1)
 
 // What a genotype makes of a tonic: { effect, badReaction } (content/genotypes.js; a creature or a quick start: whole).
 const reactionOf = (p) => GENOTYPES[p?.genotype]?.tonics || { effect: 1, badReaction: 0 };
