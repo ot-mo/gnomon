@@ -18,8 +18,7 @@
 //   cultOfSite(game, site) → id | null                the cult whose Hour's site this is
 // State: game.state.cults = { leaders: { [uid]: "dead" } } (JSON).
 import { FACTIONS, registerFaction, membershipsOf } from "../factions.js";
-import { HOUR_CULT } from "../content/factions.js";
-import { GRAMMAR } from "../content/grammar.js";
+import { cultFaction } from "./cultdef.js";
 import { on } from "../events.js";
 import { B } from "../world.js";
 import { spawnCreature, addCreature, pickCreatureType } from "../creatures.js";
@@ -30,13 +29,7 @@ import { learnSecret } from "../story/secrets.js";
 import { knows } from "../story/journal.js";
 import { cultIdOf } from "./places.js";
 
-export function cultFaction(R) {
-  const D = GRAMMAR.domains[R.domains?.[0]];
-  return { ...HOUR_CULT, id: `cult:${R.short}`, name: R.cult?.name || `the cult of ${R.name}`, color: D?.rgb || [230, 170, 60], rulerId: R.id,
-    about: HOUR_CULT.about.replace("{name}", R.name).replace("{cog}", R.epithet).replace("{ordinal}", R.ordinal),
-    likes: [...(R.favoured || []).map((f) => [f, "the Hour favoured them"]), ["horary", HOUR_CULT.likesHorary]],
-    hates: (R.hated || []).map((f) => [f, "the Hour hated them"]) };
-}
+export { cultFaction };
 
 export function ensureCult(game, id) {
   const def = game.run?.factions?.get?.(id);
