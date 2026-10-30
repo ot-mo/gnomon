@@ -66,6 +66,7 @@ export const TALL_TABLE_PLAN = {
   id: "tallTable", name: "the Tall Table", rows: TALL_TABLE_ROWS, legend: LEGEND, stacks: STACKS, ghosts: { "~": 8 },
   height: 4, wall: B.CLAY, floorBlock: B.CLAY, roof: "none",
   texts: [TALL_TABLE_STELE],
+  steles: [{ at: [10, 15], hour: 6, z: TOP + 1 }],   // on the top, its carved hour dawn
   at: [0, 0], hub: [8, 24],   // the foot of the climb
   top: TOP, climb: CLIMB, perches: PERCHES,
   stamp: (zone, ox, oy) => stampTallTable(zone, ox, oy),

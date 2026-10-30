@@ -10,6 +10,7 @@
 // the plaza round the pillar (P, its middle Q a block taller with the Mark cut in it), the towers (T), the houses
 // (# walls, h floor, D door, l a lamp in a wall), the Cradle (C), crates (x) and the stair (>). People (landmarks.js):
 //   t Teodor Quint-Vey  a Saara Tovi  e the leech  c Detail C  b the Chandler banker  d the Drover caravan-master  n Pell
+//   g the signaller (the Signal Room)  m the Map Room's surveyor
 import { B, FLOOR_Z } from "../../../world.js";
 import { makeRng, seedFor } from "../../../rng.js";
 import { stampVault } from "../../../gen/vaults.js";
@@ -35,16 +36,16 @@ G.put(32, 22, ">");                              // the way down, at the pillar'
 G.put(18, 33, "C");                              // Truing Cradle #1
 // The caravan yard (crates along the south-east wall) and who stands where.
 for (const [x, y] of [[52, 33], [53, 33], [55, 34], [57, 32], [58, 34], [56, 31]]) G.put(x, y, "x");
-G.put(44, 5, "t").put(54, 4, "a").put(8, 32, "e").put(18, 32, "c").put(45, 32, "b").put(54, 31, "d").put(36, 21, "n");
+G.put(9, 5, "g").put(20, 5, "m").put(44, 5, "t").put(54, 4, "a").put(8, 32, "e").put(18, 32, "c").put(45, 32, "b").put(54, 31, "d").put(36, 21, "n");
 export const BENCHMARK_ROWS = G.rows();
-export const BENCHMARK_PEOPLE = { t: 1, a: 1, e: 1, c: 1, b: 1, d: 1, n: 1 };
+export const BENCHMARK_PEOPLE = { t: 1, a: 1, e: 1, c: 1, b: 1, d: 1, n: 1, g: 1, m: 1 };
 
 const PEOPLE_FLOOR = Object.fromEntries(Object.keys(BENCHMARK_PEOPLE).map((ch) => [ch, "lm.person"]));
 const LEGEND = { ".": "keep", W: "lm.stack", P: "lm.stack", Q: "lm.stack", T: "lm.stack", ">": "stairs", x: "rubble", C: "cradle",
                  h: "floor", ...PEOPLE_FLOOR };
 const STACKS = { W: [B.STONE, 4], P: [B.STONE, 8], Q: [B.STONE, 9], T: [B.METAL, 8] };
 const GROUND = { ...LEGEND, "#": "keep", D: "keep", h: "keep", l: "keep", C: "keep", d: "keep", n: "keep",
-                 ...Object.fromEntries(["t", "a", "e", "c", "b"].map((ch) => [ch, "keep"])) };
+                 ...Object.fromEntries(["t", "a", "e", "c", "b", "g", "m"].map((ch) => [ch, "keep"])) };
 const HOUSE = { h: "floor", C: "cradle", ...PEOPLE_FLOOR };
 
 export function stampBenchmark(zone, ox, oy) {
@@ -72,6 +73,7 @@ export const BENCHMARK_PLAN = {
   id: "benchmark", name: "Benchmark", rows: BENCHMARK_ROWS, legend: { ...LEGEND, "#": "wall", D: "door", l: "lamp" }, stacks: STACKS,
   rubble: B.CRATE, height: 4, wall: B.STONE, floorBlock: B.TILE, roof: "none",
   texts: [BENCHMARK_MARK],
+  areas: [{ faction: "plan", rule: "holy", rect: [14, 29, 22, 35] }],   // the fitting-house: the Truing Cradles are the Plan's (FAITHS)
   at: [0, 0], hub: [32, 25],   // the plaza, south of the pillar: where the Old Rule meets itself
   stamp: (zone, ox, oy) => stampBenchmark(zone, ox, oy),
 };

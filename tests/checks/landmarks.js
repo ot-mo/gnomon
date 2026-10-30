@@ -365,6 +365,7 @@ const PROMISES = {
     [cell("H").every(([x, y]) => z.get(x, y, FLOOR_Z + 4) === B.ROCK), "a hall has no rock over it"], [cell("H").every(([x, y]) => reach[x + y * z.w] >= 0), "a hall can't be walked to"],
     [anyIn(z, pa.x, pa.y + 17, pa.x + 1, pa.y + 21, (x, y) => road(z, x, y)) && anyIn(z, pa.x + 62, pa.y + 17, pa.x + 63, pa.y + 21, (x, y) => road(z, x, y)),
       "the Old Rule doesn't run through the gullet's two mouths"],
+    [z.get(pa.x + 63, pa.y + 26, FLOOR_Z - 1) === B.METAL && reach[pa.x + 63 + (pa.y + 26) * z.w] >= 0, "the Root Canals' far mouth east of the checkpoint"],
     [[17, 18, 19, 20, 21].every((y) => z.get(pa.x + TOLL_GATE, pa.y + y, FLOOR_Z + 4) === B.STONE && z.stand[pa.x + TOLL_GATE + (pa.y + y) * z.w] === FLOOR_Z), "the toll gate's arch over the gullet, the way under it open"]],
   folio: ({ z, pa, plan, cell }) => {
     let walls = 0, mosaic = 0;
@@ -473,6 +474,8 @@ function checkC1b(seeds, expect) {
       const reach = mapReach(z);
       for (const [ok, what] of PROMISES[t.plan]({ z, pa, plan, cell, run: t.run, L, reach })) { tally.promises++; expect(ok, `${at}: ${what}`); }
       if (t.id === "tallTable" || t.id === "foldmother") tally.climbs++;
+      // Its dial-steles: a carving where each stands, with its carved hour (the Horary pray there within the hour).
+      for (const st of plan.steles || []) { tally.promises++; expect(z.get(pa.x + st.at[0], pa.y + st.at[1], FLOOR_Z + (st.z ?? 1)) === B.MURAL && st.hour >= 0 && st.hour < 24, `${at}: its dial-stele at ${st.at}`); }
       // Its dungeon: the bible's levels, its names, gimmicks (its keys' union), cradles and bottom.
       const site = siteWithDungeon(t.run, L.wx, L.wy), want = LANDMARK_INDEX.find((l) => l.id === t.id)?.dungeon;
       if (!want || t.run === runs.wards) { expect(!site || t.run === runs.wards, `${at}: a dungeon it shouldn't have`); continue; }
@@ -499,7 +502,8 @@ function checkC1b(seeds, expect) {
     }
   }
   // Holy places (C2 #5): each names a faction.
-  const holy = REAL_WORLD.landmarks.flatMap((l) => (l.holy ? (typeof l.holy === "string" ? [[l.id, l.holy]] : Object.entries(l.holy).map(([k, f]) => [`${l.id} ${k}`, f])) : []));
+  const holy = REAL_WORLD.landmarks.flatMap((l) => [...(l.holy ? (typeof l.holy === "string" ? [[l.id, l.holy]] : Object.entries(l.holy).map(([k, f]) => [`${l.id} ${k}`, f])) : []),
+    ...Object.entries(l.holyFloors || {}).map(([k, f]) => [`${l.id} floor ${k}`, f])]);
   for (const [where, f] of holy) expect(FACTIONS[f], `${where}: holy to ${f}, which is no faction`);
   return {
     c1b: `${ids.length} landmarks and Halfnight's 2 other wards on ${seeds.length} seeds: ${tally.zones} zones on their plans; ${tally.seams} seams (${tally.seamTiles} tiles) on the world function; ` +

@@ -47,6 +47,7 @@ export const FOLDMOTHER_PLAN = {
   id: "foldmother", name: "Foldmother", rows: FOLDMOTHER_ROWS, legend: LEGEND, stacks: STACKS,
   height: 4, wall: B.TRUNK, floorBlock: B.DIRT, roof: "none",
   texts: [FOLDMOTHER_STELE],
+  steles: [{ at: [CX - 12, CY - 3], hour: 18 }],   // at her foot, its carved hour dusk, when she closes
   at: [0, 0], hub: [CX, D - 3],   // south of her, on the way in
   rings: RINGS,
   stamp(zone, ox, oy) {

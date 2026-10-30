@@ -10,7 +10,7 @@
 // mouths along them. Letters:
 //   .  the ground as the world made it (the gullet included)   R  the crag (rock, 12 high)   P  a cusp of it (14)
 //   H  a hall carved into the crag (4 of room, the crag over it)   L  a Chandler lamp-post   S  the dial-stele
-//   >  the stair down into the Root Canals
+//   >  the stair down into the Root Canals    X  the canals' far mouth, a grate east of the checkpoint (planned.exit)
 // The toll gate ("Gate 1") is an arch across the gullet by the west mouth, its lintel over head height (TOLL_GATE).
 //   people, each on a hall's floor: s Mother Saffre  i the innkeeper  m the map-seller  c Assizer Castor Dell-Cassin
 //     z Zaqar Tesfu  r Rook  n Pell (days 5-6 of his round, in the market)
@@ -35,19 +35,21 @@ export const MOLAR_HALLS = [
 for (const h of MOLAR_HALLS) G.fill(...h.room, "H").put(...h.door, "H");
 for (const [x, y] of [[12, 17], [26, 21], [40, 17], [54, 21]]) G.put(x, y, "L");
 G.put(36, 25, "S").put(47, 27, ">");
+G.put(63, 26, "X");
 G.put(9, 13, "s").put(25, 12, "i").put(36, 14, "m").put(53, 13, "c").put(10, 27, "z").put(28, 25, "r").put(16, 25, "n");
 export const MOLAR_ROWS = G.rows();
 export const MOLAR_PEOPLE = { s: 1, i: 1, m: 1, c: 1, z: 1, r: 1, n: 1 };
 
 const HALLS = Object.fromEntries(["H", "S", ">", ...Object.keys(MOLAR_PEOPLE)].map((ch) => [ch, [B.ROCK, 4, CRAG]]));
-const LEGEND = { ".": "keep", R: "lm.stack", P: "lm.stack", L: "station", H: "lm.hall", S: "lm.hall", ">": "stairs",
+const LEGEND = { ".": "keep", R: "lm.stack", P: "lm.stack", L: "station", H: "lm.hall", S: "lm.hall", ">": "stairs", X: "lm.ground",
                  ...Object.fromEntries(Object.keys(MOLAR_PEOPLE).map((ch) => [ch, "lm.hall"])) };
 const STACKS = { R: [B.ROCK, CRAG], P: [B.ROCK, CUSP] };
+const GROUNDS = { X: B.METAL };
 
 export function stampMolar(zone, ox, oy) {
   const still = makeRng(seedFor(zone.seed, "molar"));
   stampVault(zone, { name: "Molar", plan: MOLAR_ROWS, height: 4, wall: B.STONE, floorBlock: B.TILE, links: [], legend: LEGEND,
-                     stacks: STACKS, halls: HALLS }, ox, oy, still, { roof: "none" });
+                     stacks: STACKS, halls: HALLS, grounds: GROUNDS }, ox, oy, still, { roof: "none" });
   // The stair's cave keeps its rock roof (the stairs legend floors the column: the crag goes back over it).
   const [[sx, sy]] = cells(MOLAR_ROWS, ">");
   for (let z = FLOOR_Z + 4; z < FLOOR_Z + CRAG; z++) zone.set(ox + sx, oy + sy, z, B.ROCK);
@@ -70,7 +72,11 @@ export const MOLAR_STELE = "THE HOUR PASSES THROUGH THE TOOTH AS THE ROAD DOES. 
 export const MOLAR_PLAN = {
   id: "molar", name: "Molar", rows: MOLAR_ROWS, legend: LEGEND, stacks: STACKS, halls: HALLS,
   height: 4, wall: B.STONE, floorBlock: B.TILE, roof: "none",
-  texts: [MOLAR_STELE],
+  texts: [MOLAR_STELE], grounds: GROUNDS,
+  // Where a faith's rule holds (C2 #5; integration request 3): the checkpoint is one of the Rule's holy places (FAITHS).
+  areas: [{ faction: "assize", rule: "holy", rect: [49, 11, 57, 15] }],
+  steles: [{ at: [36, 25], hour: 12 }],   // the dial-stele and its carved hour (the Horary pray there, within the hour)
+  farMouth: [63, 26],
   at: [0, 0], hub: [32, 19],   // the middle of the gullet
   stamp: (zone, ox, oy) => stampMolar(zone, ox, oy),
 };

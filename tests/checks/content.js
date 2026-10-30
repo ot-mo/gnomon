@@ -252,6 +252,9 @@ export function checkContent(m) {
           need(p.legend && (ch in p.legend || STRUCTURE.has(h)), `${at}: plan ${id}'s "${ch}" falls to the default legend's ${h}`);
         }
         for (const t of p.texts || []) words += say(t);
+        for (const a of p.areas || []) need(FC.FACTIONS[a.faction] && a.rect?.length === 4 && a.rect[0] >= 0 && a.rect[1] >= 0 && a.rect[2] < p.rows[0].length && a.rect[3] < p.rows.length,
+          `${at}: plan ${id}'s area for ${a.faction}`);
+        for (const st of p.steles || []) need(Number.isInteger(st.hour) && st.hour >= 0 && st.hour < 24 && p.rows[st.at[1]]?.[st.at[0]] !== undefined, `${at}: plan ${id}'s stele at ${st.at}, hour ${st.hour}`);
       }
       const ln = e.lines || {};
       need(/^[A-Z][A-Z' -]*\./.test(ln.flat || "") && ln.deep === e.description && str(ln.deep), `${at}: its Flat and Deep lines`);
@@ -268,6 +271,7 @@ export function checkContent(m) {
         words += say(b.name) + say(b.role);
       }
       for (const f of e.holy ? (typeof e.holy === "string" ? [e.holy] : Object.values(e.holy)) : []) need(FC.FACTIONS[f], `${at}: holy to ${f}, which is no faction`);
+      for (const [k, f] of Object.entries(e.holyFloors || {})) need(FC.FACTIONS[f] && Number(k) >= 1 && Number(k) <= (L.dungeon?.floors.length || 0), `${at}: floor ${k} holy to ${f}`);
       const d = L.dungeon;
       if (!d || d.legacy) continue;
       const n = d.floors.length;

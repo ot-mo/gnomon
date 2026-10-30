@@ -13,8 +13,11 @@
 //                  (content/world/temple.js "M")
 //     below        who lives in its dungeon, [{ who, name, role, floor | up }] (C3's kinds, C5's words: the dungeon's
 //                  floors are generated, so they are placed by code once their kinds exist)
-//     holy         the faction whose holy place it is (C2 #5: a neutral member hostile there below Warm, and its rule),
-//                  or { "wx,wy": factionId } span by span
+//     holy         the faction whose holy place its surface is (C2 #5: a neutral member hostile there below Warm, and
+//                  its rule), or { "wx,wy": factionId } span by span; holyFloors { floor: factionId }, its dungeon's floors
+//                  that are (the Pressyard's is its surface mosaic alone: the Press below is the Assize's works). A plan's
+//                  `areas` are finer: [{ faction, rule, rect }] in the plan (Halfnight's rows, Molar's checkpoint,
+//                  Benchmark's Cradle), and its `steles` the dial-steles with their carved hours
 //   PLANS = { [id]: plan }   (plans/*.js; gen/surface.js stamps a plan through its `stamp` or stampVault; a plan's
 //                             `texts` are its carvings' words, for check-content's count)
 import { HOLLOWMERE_PLAN } from "./plans/hollowmere.js";
@@ -93,6 +96,8 @@ export const LANDMARKS = [
       b: { who: "benchmarkBanker", name: "the Chandler banker", role: "a Chandler bank" },
       d: { who: "benchmarkDrover", name: "the caravan-master", role: "the Drovers' caravan stop" },
       n: { who: "pell", name: "Pell", role: "peddler (days 3-4 of his round)" },
+      g: { who: "benchmarkSignaller", name: "the signaller", role: "keeps the Signal Room, which shows the Hand on the world map" },
+      m: { who: "mapRoomSurveyor", name: "the Map Room's surveyor", role: "sells Location readings and shows the tier layer" },
     },
   },
   {
@@ -195,6 +200,7 @@ export const LANDMARKS = [
     below: [{ who: "gloamWarden", kind: "gloamWarden", name: "the Gloam Warden", role: "the warden of the dark floors, seen only in the dark; braziers hurt it", floor: 4 },
             { who: "noon", name: "Noon", role: "a flat ghost, only on the map and only with your torch out: a mosaic of a woman with no shadow", floor: 6 }],
     holy: "lampless",   // a lit torch inside is trespass, unless you carry the dark-pass (FAITHS.lampless; beyond C2's six)
+    holyFloors: { 1: "lampless", 2: "lampless", 3: "lampless", 4: "lampless", 5: "lampless", 6: "noonVigil" },   // floor 6: where Noon lies (FAITHS.noonVigil)
   },
   {
     id: "metronome", plan: "metronome", anchor: [12, 4], flatten: true, visibleFrom: 2,
@@ -210,6 +216,7 @@ export const LANDMARKS = [
     },
     below: [{ who: "escapement", kind: "escapement", name: "the Escapement", role: "a brass colossus with its core on its head, reached by the pendulum's gantries 5 blocks up; the map shows where it will slam", floor: 6 }],
     holy: "plan",   // bombing walls here is desecration (C2 #5)
+    holyFloors: { 1: "plan", 2: "plan", 3: "plan", 4: "plan", 5: "plan", 6: "plan" },
   },
   {
     id: "drownedLantern", plan: "drownedLantern", anchor: [0, 5], flatten: true, visibleFrom: 3,
@@ -238,6 +245,7 @@ export const LANDMARKS = [
             { who: "lio", name: "Lio", role: "a pressed prisoner in the cells (map only)", floor: 2 },
             { who: "plumbknight", kind: "plumbknight", name: "plumbknights and assizers", role: "patrols in dead-straight lines", floor: 1 }],
     holy: "assize",   // a Bent below Bright is trespass (C2 #5)
+    holyFloors: { 1: "assize", 2: "assize", 3: "assize" },
   },
   {
     id: "gnomon", plan: "gnomon", anchor: [25, 14], flatten: true, visibleFrom: 42,   // seen from every span (bible §4.12)
@@ -266,6 +274,7 @@ export const LANDMARKS = [
     below: [{ who: "speakingDoor", name: "the Speaking Door", role: "guards floor 2: it asks for the number written upon its floor", floor: 2 },
             { who: "secondHourStele", name: "a Second-Hour stele", role: "all three accounts, the Pressed's founding relic and a reading that names Vesper", floor: 3 }],
     holy: "pressed",   // the monastery and the Page (C2 #5)
+    holyFloors: { 1: "pressed", 2: "pressed", 3: "pressed" },   // the Under-Page, where their founding relic lies
   },
   {
     id: "foldmother", plan: "foldmother", anchor: [20, 5], flatten: true, visibleFrom: 3, checkpoint: true,
