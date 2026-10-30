@@ -24,10 +24,10 @@ export const dialogueIdOf = (who) => (PARENT_IDS.has(who) ? `${who}@real` : who)
 
 export const PEOPLE_WORDS = {
   // --- Hollowmere (bible §5 A) -------------------------------------------------------------------------------
-  maren: { role: "priest", greet: "You touched it. Good. It's been waiting for someone to stop admiring it.",
+  maren: { role: "priest", greet: "Three nights, and the floor still won't keep still. Neither will you, I see.",
     who: "Maren, Prioress of the Noon Vigil. I keep the temple, the key to the Keeper's Stair, and the noon.",
     topics: [["What is the Cube?", "The Vigil says it is the last face of the Hours, the one that turns. I say it hums when it's worried, and it's been humming for three nights."]],
-    after: { beat1: "An Assize seal, under my floor. Sit. The blessing won't take if you fidget." } },
+    after: { beat1: "The temple has been quiet since you went digging. I keep listening for it anyway." } },
   hallen: { role: "villager", greet: "Mind the reeds, they're somebody's supper. Noon keep you.",
     who: "Reeve Hallen. I hold the roll, the weir rights and the arguments.",
     topics: [["Your son?", "Tovi went east with the Survey a year ago. He writes when the Survey remembers to post things, which is never."]],
