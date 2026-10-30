@@ -5,12 +5,12 @@ Update this file as the last act of every session (see `CLAUDE.md`, "Handing off
 **Updated:** 2026-10-30, the integrator (local session), on `integration`. **Phases 1 and 2 are done; Phase 3 is under
 way.** all six content sessions are merged (`p3i-c1a`, `p3i-c4`, `p3i-c2`, `p3i-c3`, `p3i-c1b`, `p3i-c5`), and §8.5's last wiring merge is done
 (`p3i-wiring`): **new games start on GNOMON's real world at Hollowmere** (`?world=test` for the test world). `main` =
-`p3i-lightweapons` (the user's balance decisions of 2026-10-30 applied: creature scaling under d20, two species fixes, enchantment AV, fists, and light weapons by rule B; ttkTables' bounds on a typical build). **The backlog runs in four parts** (the user, 2026-10-30: "start everything that you can start"): B1, B2 and B3 in their worktrees from `p3i-lightweapons`, the integrator on the story (next step, below). From here on only the integrator edits this file and
+`p4i-people` (the landmark people placed, C5 #3, on `p3i-lightweapons`: the user's balance decisions of 2026-10-30 applied: creature scaling under d20, two species fixes, enchantment AV, fists, and light weapons by rule B; ttkTables' bounds on a typical build). **The backlog runs in four parts** (the user, 2026-10-30: "start everything that you can start"): B1, B2 and B3 in their worktrees from `p3i-lightweapons`, the integrator on the story (next step, below). From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p3i-lightweapons` (light weapons, rule B, on `p3i-balance`) on `integration`; before it `p3i-balance` (the balance decisions of 2026-10-30, on `p3i-c5`), the Phase 3 merges (`p3i-c5`, `p3i-c1b`, `p3i-c3`, `p3i-c2`, `p3i-c4`, `p3i-wiring`, `p3i-c1a`), `p3i-sinkholes` (C1a's request 9, on `p3i-props`), `p3i-props` (props named; C1a's, C4's and C2's base), `p2-realworld`, `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+- **Last tag:** `p4i-people` (C5 #3 with C1b #18: the landmark people placed, on `p3i-lightweapons`) on `integration`; before it `p3i-lightweapons` (light weapons, rule B, on `p3i-balance`), `p3i-balance` (the balance decisions of 2026-10-30, on `p3i-c5`), the Phase 3 merges (`p3i-c5`, `p3i-c1b`, `p3i-c3`, `p3i-c2`, `p3i-c4`, `p3i-wiring`, `p3i-c1a`), `p3i-sinkholes` (C1a's request 9, on `p3i-props`), `p3i-props` (props named; C1a's, C4's and C2's base), `p2-realworld`, `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
   `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b`, `p1-ws10`, the flip, `p1-ws2a`, `p1-ws7a`,
   `p1-ws7b`, `p1-ws2b`, `p1-ws9` and `p1-ws1`, with their integration requests; `p2-ws3` … `p2-ws9` before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
@@ -45,7 +45,7 @@ the real world the default: then `main.js`'s `?world=real` branch and its cube h
 or go with it; browser-2b part 3 and check-overworld's 7 URLs follow).
 
 **Next step:** the backlog in four parts, all from `p3i-lightweapons` (the user, 2026-10-30: "start everything that you can start"; the coordinating session split it, its rules in the side-session notes' `backlog-rules.md`):
-- **The integrator**, on `integration`: the story, C5 #3-#14 (C1b #18, who stands where, with #3), #3 first; and it merges `p4b-b1`, `p4b-b2` and `p4b-b3` as they come, as a content tag, its merges setting `GEN_VERSION`.
+- **The integrator**, on `integration`: the story, C5 #3-#14 (C1b #18, who stands where, with #3); #3 is done (`p4i-people`), next #5 and #6 (a beat's reward and choice, the quest items), then #4 (the starter chain), #9, #14 and the rest as their systems land; and it merges `p4b-b1`, `p4b-b2` and `p4b-b3` as they come, as a content tag, its merges setting `GEN_VERSION`.
 - **B1, gear and powers**: `C:\Users\Otto Mörner\Code\gnomon-wt\b1`, `ws/b1`, tag `p4b-b1`. C4 #1, #2 (with C2 #12), #4-#10, #12-#14; WS5 #8, #9, #19; WS4 #16, #19; WS6b #3; POWERS' needs but B3's.
 - **B2, landmarks and dungeons**: `gnomon-wt\b2`, `ws/b2`, tag `p4b-b2`. C1a #5; C1b #1-#17 and #19-#26 (not #18); WS10 #9. It builds the places, the integrator places the people; the bottoms (the Grub Mother, the Press-Master, the Gloam Warden, the Escapement, the Drowned Bellwether, Noon, the relics) are B2's as places and creatures, Vesper's phases, the endings and the barks the integrator's. C5 #12's Hierarch waits on B2's floors up (C1b #8), which B2 builds first.
 - **B3, peoples and villages**: `gnomon-wt\b3`, `ws/b3`, tag `p4b-b3`. C2 #3, #5-#9, #11, #13; WS10 #6; the lore powers (Hour script, Gossip, Triangulator); Oil fire, Brew, Chime; WS6b's stock and `buys`.
@@ -396,6 +396,34 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p4i-people`** (2026-10-30): C5 #3 with C1b #18, who stands where, on `p3i-lightweapons`. Each real-world landmark's
+people stand on its plan's letters as its span is made (`story/landmark-people.js`, through `world/sites.js`
+`registerPlanPeople`, called by `gen/surface.js` once the zone validates, after its wildlife; no draw from any stream, uids
+of their own, so nothing else generated moves: the reviewer compared 66 zones on 2 seeds against `3a8310d^`, blocks,
+creatures, items and uids identical). 53 a seed, each a talker under its words (`dialogueIdOf`), standing where you would
+in its column (the Tall Table's on the top). Kinds: the letter's own, a type of the same id (C3's, the parent's), else one
+of 14 new plain person types by culture in `people.js` (Folio's `folioCitizen` flat, `ghostPerson` ghostly); Ess and Tee
+the parent's Ess, Castor an assizer. Pell walks his round (Hollowmere days 1-2, Benchmark 3-4, Molar 5-6), one uid,
+synced on entering and at midnight where you stand (not over the zone you left for the world map); Castor keeps Molar's
+checkpoint once beat 1 is done; one killed stays dead. Named only where the name is its own ("the innkeeper" can't be
+kindled with); `theOf`/`TheOf` take a name that brings its article as it is; a title that says who each is; a merchant
+by its words sells (the general stock; the landmarks' own stocks are B3's). On the real world the Keeper's Stair keeps
+none of the parent's residents (Mira, Corwin, Brann, Ess, Tee, Rook, Lio: bible §3 "the original people return as
+residents") nor Brann's skull (C5 #4 puts it on floor 2), and its peddler is "a peddler" with the parent's pack; the
+test world's stack is the parent's, golden 0 mismatched. Not here: Noon (a bottom, B2's: flat and ghostly on its type is
+all the view rule needs), Lio and Tovi pressed (#12), Corner's petting (#14). `GEN_VERSION` stays 6 (buildRun is
+unchanged); a save made before keeps its visited landmark zones as saved, without their people. check-landmarks section
+6 on 5 seeds: 265 placed (15 on the top, 35 flat, 25 ghosts, 125 merchants, 195 titled, 135 without a name of their
+own), 20 come and go; Pell's round day by day; Castor; a person through a save; 12 sellers with stock; the real Stair
+without the 7 and the skull, 5 peddlers. Mutants: 28, each killed. Verification (an independent reviewer on `3a8310d`):
+four findings, each fixed with its mutants (merchants with nothing to sell, 6af06a9; everyone named and kindleable,
+142f3dd; titles that named goods or places, caedc72; Pell's round only on entering and three uids, 8e3b615); and run-all
+found the midnight sync changing the zone you'd left for the world map (2577657). Checks: `run-all` 38 of 38 at
+`3a8310d`, and 37 of 38 at the tag under load (check-overworld; alone all ten parts pass, the world-map draw 1.17-1.46 ms);
+check-perf passes in run-all; the real world's bot playthrough; browser-gate (seeds 1234 and 7), browser-2b, browser-c3,
+and a look at Hollowmere's start in the browser (its nine people there, Pell on day 1, Ottilie's words on walking into
+her on the map); audio silenced, servers stopped.
 
 **`p3i-lightweapons`** (2026-10-30): the user's light-weapon decision (rule B of
 `docs/balance/light-weapons-2026-10-30.md`, chosen in the coordinating session's chat and relayed 2026-10-30), on
