@@ -1006,10 +1006,19 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json, captu
     if (game.mode === "talk") { game.talk = null; SCR.popMode(game); }   // (Esc)
     EVs.runUpdates(game, 0.016);
     if (game.mode === "talk") fail("the beat's own page opened again at once after you left it");
+    // Not at the next zone entry half an hour on (a span walked: second review), but a world hour on.
+    const t1 = game.time, spm = (await env.src("rules.js")).RULES.clock.secondsPerMinute;
+    game.time = (game.time || 0) + 30 * spm;
     EVs.emit(game, "zone:enter", { zone: game.zone, how: "edge" });
     if (game.mode !== "map" && game.mode !== "explore") game.mode = "map";
     EVs.runUpdates(game, 0.016);
-    if (game.mode !== "talk") fail("the beat's own page didn't open again on the next zone entry");
+    if (game.mode === "talk") fail("the beat's own page opened again on the next zone entry half an hour on, not a world hour on");
+    if (game.mode === "talk") { game.talk = null; SCR.popMode(game); }
+    game.time = (t1 || 0) + 61 * spm;
+    if (game.mode !== "map" && game.mode !== "explore") game.mode = "map";
+    EVs.runUpdates(game, 0.016);
+    game.time = t1;
+    if (game.mode !== "talk") fail("the beat's own page didn't open again a world hour on");
     if (game.mode === "talk") { game.talk = null; SCR.popMode(game); }
     DLG.openTalk(game, { id: -6, type: "chandler", name: "Mother Saffre", title: "factor of Chandler House Saffre", color: [244, 210, 110], vis: {}, talk: { dialogue: "saffre", state: {}, met: true } });
     try { GM.draw(); if (!screen().includes("Mother Saffre, factor of Chandler House Saffre")) fail("a placed person's talk box isn't titled by her own name and title"); }

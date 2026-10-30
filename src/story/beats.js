@@ -25,7 +25,7 @@
 // Talk: at a giver, while its beat is open, "What's wrong?" tells its offer; once done, each open choice ("About the
 // Assize plumb-seal...") with its options, and "Not yet.". A beat with no giver (5, 7) asks on its own: once you're in
 // the world (explore or map) the talk screen opens with the beat as its speaker, every such beat's open choices one after
-// another (ownChoices); "Not yet." or Esc leaves them until you next enter a zone (registerUpdate "campaign:choice").
+// another (ownChoices); "Not yet." or Esc leaves them for a world hour (registerUpdate "campaign:choice").
 import { on, emit, registerUpdate } from "../events.js";
 import { registerTalkOptions, registerDialogue, talkTo, node, bye } from "../talk.js";
 import { openTalk } from "../dialogue.js";
@@ -44,6 +44,7 @@ import { pay } from "../currency.js";
 import { standingOf } from "../social/builders.js";
 import * as factions from "../factions.js";
 import { raiseMaxHp } from "../stats.js";
+import { RULES } from "../rules.js";
 
 const CAMPAIGN = QUESTS.campaign;
 const beatOf = (id) => CAMPAIGN.beats.find((b) => b.id === id) || null;
@@ -199,8 +200,8 @@ registerTalkOptions("datum", (game, c) => {
 });
 
 // A beat with no giver (5, 7) asks on its own: once you're in the world (explore or map), its open choices one after
-// another, every such beat's in order, the beat as the speaker. "Not yet." or Esc leaves them until you next enter a
-// zone (campaign.later).
+// another, every such beat's in order, the beat as the speaker. "Not yet." or Esc leaves them for a world hour
+// (campaign.later: the time it may ask again).
 export const ownChoices = (game) => choicesOpen(game).filter((o) => !o.beat.giver);
 function ownPage(game) {
   const open = ownChoices(game)[0];
@@ -209,10 +210,10 @@ function ownPage(game) {
   return choiceNode(game, open, () => ownPage(game));
 }
 registerDialogue("campaign:choice", (game) => ownPage(game));
+const HOUR = () => 60 * RULES.clock.secondsPerMinute;
 registerUpdate("campaign:choice", (game) => {
-  const C = game.state?.campaign, open = C && !C.later && ownChoices(game)[0];
+  const C = game.state?.campaign, open = C && !(C.later > (game.time || 0)) && ownChoices(game)[0];
   if (!open) return;
-  C.later = true;   // (asked now; after it's left, again only on the next zone:enter)
+  C.later = (game.time || 0) + HOUR();   // (asked now; after it's left, again a world hour on)
   openTalk(game, { id: -1, type: "campaign", name: open.beat.title, vis: {}, talk: { dialogue: "campaign:choice", state: {}, met: true, own: true } });
 });
-on("zone:enter", (game) => { if (game.state?.campaign) game.state.campaign.later = false; });
