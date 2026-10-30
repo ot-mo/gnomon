@@ -9,6 +9,7 @@
 //   payBeat(game, beat)   on "beat": its reward's items, maxHp (Maren's blessing: + max HP, healed by it), rep
 //                    (factions.addRep "quest"; a range, beat 9's "by the survivors", pays its low end until the siege counts
 //                    them: C5 #13), glim, reading (learnSecret) and face (campaign.faces; Noon's Face: screens/play.js)
+//   payGlim(game, n)   into your purse, the rest on the ground at your feet as cash
 //   choicesOpen(game) → [{ beat, choice }]   a done beat's choices not made yet, but those `byRoute` (recorded as the route
 //                    happens: C5 #7, #8)
 //   choose(game, beatId, choiceId, optionId) → option | null   pays it (rep, glim, items, reading) and records it:
@@ -31,7 +32,7 @@ import { ARTIFACTS } from "../content/items/artifacts.js";
 import { makeArtifact } from "../bodymods/artifacts.js";
 import { RELICS, makeRelic } from "../content/items/legacy.js";
 import { TONICS } from "../content/items/tonics.js";
-import { addToInventory, itemName } from "../items.js";
+import { addToInventory, itemName, makeItem, awayFromWalls } from "../items.js";
 import { receive } from "../currency.js";
 import { learnSecret } from "./secrets.js";
 import { campaignOf } from "./campaign.js";
@@ -78,11 +79,16 @@ const rangeLow = (v) => (Array.isArray(v) ? v[0] : v);
 function payRep(game, rep) {
   for (const [id, n] of Object.entries(rep || {})) if (rangeLow(n)) factions.addRep(game, id, rangeLow(n), "quest");
 }
-function payGlim(game, n) {
+// Glim into your purse, and what doesn't fit on the ground at your feet (as the parent's giveFunds has it).
+export function payGlim(game, n) {
   const p = game.player;
   if (!n || !p) return;
   const left = receive(game, p, n);
-  game.log?.(`You receive ${n - left} glim.${left ? ` (${left} more won't fit in your purse.)` : ""}`, [255, 215, 90]);
+  game.log?.(`You receive ${n} glim.`, [255, 215, 90]);
+  if (!left || !game.zone) return;
+  const [x, y] = awayFromWalls(game.zone, p.x, p.y, p.z);
+  game.zone.items.push({ ...makeItem({ kind: "cash", amount: left }, x, y, p.z), dropped: true });
+  game.log?.(`Your purse is full: ${left} glim goes on the ground.`, [255, 150, 120]);
 }
 
 export function payBeat(game, beat) {

@@ -1001,6 +1001,15 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json, captu
   const next = page?.options.find((o) => o.label.startsWith("Take its silence money"))?.go();
   if (C.choices?.beat5?.saffre !== "silence" || rep("chandlers") < 200) fail(`beat 5's choice: ${json(C.choices?.beat5)}`);
   if (!next?.options?.some((o) => o.label.startsWith("Unpress the village"))) fail(`after beat 5's first choice the page doesn't go on to its second: ${json(next?.options?.map((o) => o.label))}`);
+  // Glim that doesn't fit your purse goes on the ground at your feet (verification finding on 37da06f: it was lost).
+  {
+    const CUR = await env.src("currency.js"), keep = { purse: p.purse, funds: CUR.funds(p) }, z = game.zone, items0 = z.items.length;
+    CUR.pay(game, p, CUR.funds(p)); CUR.setPurse(p, 200); CUR.receive(game, p, 150);
+    BT.payGlim(game, 500);
+    const cash = z.items.slice(items0).filter((it) => it.kind === "cash").reduce((a, it) => a + it.amount, 0);
+    if (CUR.funds(p) !== 200 || cash !== 450) fail(`500 glim into a purse of 200 holding 150: ${CUR.funds(p)} in it, ${cash} on the ground`);
+    z.items.length = items0; CUR.pay(game, p, CUR.funds(p)); p.purse = keep.purse; CUR.receive(game, p, keep.funds);
+  }
   // "What's wrong?": an open beat's offer at its giver.
   const keepQ = game.quests;
   game.quests = [{ id: "beat2", template: "beat", done: false }];
