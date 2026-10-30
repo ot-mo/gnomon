@@ -156,6 +156,9 @@ export function buildVillage(ctx, site) {
     b.inside = b.inside.filter(([x, y]) => Math.abs(x - b.door.x) + Math.abs(y - b.door.y) > 1);
     // Its height (C2 #7): lifted or sunk, and steps down to the green.
     lift(zone, b, b.h, L.under, wall);
+    // A raised house's door is an open doorway: the map opens a door only at the datum's height (interact.js usableAt,
+    // P0's), so a door 1 up or more could never be walked through there (review finding 1).
+    if (b.h > 0) { zone.set(b.door.x, b.door.y, FLOOR_Z + b.h, B.AIR); zone.set(b.door.x, b.door.y, FLOOR_Z + 1 + b.h, B.AIR); }
     b.stairs = stairs(zone, b, b.h, wall, rect.x + W / 2);
     for (const [x, y] of b.stairs) mark(x, y);
     if (!v.abandoned && slot === "hall" && S.heights?.storeys) secondStorey(zone, b, rows, wall, floor, roof, rng);

@@ -563,6 +563,7 @@ async function villages7b(env, { fail, stats, test, real, json, startRun, game }
           if (b.h > 8 || b.h + 4 > 12) fail(`${tag}: a floor ${b.h} up`);
           const fx = b.door.x, fy = b.door.y + (b.slot === "sw" || b.slot === "se" ? 1 : -1);   // inside, behind the door
           if (!b.painted && (!solid(fx, fy, FLOOR_Z - 1 + b.h) || z.get(fx, fy, FLOOR_Z + b.h) || z.get(fx, fy, FLOOR_Z + 1 + b.h))) fail(`${tag}: the ${b.slot} building has no floor at ${b.h}`);
+          if (b.h > 0 && (z.get(b.door.x, b.door.y, FLOOR_Z + b.h) || z.get(b.door.x, b.door.y, FLOOR_Z + 1 + b.h))) fail(`${tag}: the ${b.slot} building ${b.h} up has a door the map can't open`);   // (B3 review 1)
           if (b.h > 1) heightsSeen.stairs++;
           if (b.h) heightsSeen.raised[b.h] = (heightsSeen.raised[b.h] || 0) + 1;
           if (b.storeys) {
