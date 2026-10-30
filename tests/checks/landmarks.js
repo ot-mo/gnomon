@@ -45,6 +45,7 @@ import { HOLLOWMERE_ROWS, HOLLOWMERE_HOUSES, HOLLOWMERE_PEOPLE } from "../../src
 import { TEMPLE_ROWS } from "../../src/content/world/temple.js";
 import { generateSurface, validateSurface, dungeonRectFor, SURFACE_RULES, worldFns } from "../../src/gen/surface.js";
 import { siteWithDungeon, dungeonParams } from "../../src/world/zonegen.js";
+import { legacyZone, RESIDENTS } from "../../src/world/legacy.js";
 import { generateDungeonLevel, validateDungeonLevel } from "../../src/gen/dungeon.js";
 import { zoneSeed } from "../../src/world/run.js";
 import { B, FLOOR_Z } from "../../src/world.js";
@@ -210,7 +211,7 @@ function checkHollowmere(seeds, expect) {
   const P = REAL_WORLD.plans.hollowmere, rows = HOLLOWMERE_ROWS;
   const cells = (ch) => rows.flatMap((r, y) => [...r].flatMap((c, x) => (c === ch ? [[x, y]] : [])));
   const tcell = (ch) => { for (let y = 0; y < TEMPLE_ROWS.length; y++) { const x = TEMPLE_ROWS[y].indexOf(ch); if (x >= 0) return [x + 2, y + 2]; } return null; };
-  let houses = 0, people = 0, seams = 0, seamTiles = 0, beds = 0, props = 0;
+  let houses = 0, people = 0, seams = 0, seamTiles = 0, beds = 0, props = 0, stair = "";
   for (const seed of seeds) {
     const run = buildRun(seed, REAL_WORLD), W = run.world, L = W.landmarks.get("hollowmere"), at = `real world seed ${seed} hollowmere`;
     expect(W.start.landmarkId === "hollowmere" && L.plan === "hollowmere" && L.wx === 5 && L.wy === 16, `${at}: not the start on its plan`);
@@ -226,6 +227,7 @@ function checkHollowmere(seeds, expect) {
            `${at}: the legacy levels' frame ${JSON.stringify(z.dungeonRect)} or a sinkhole outside the shaft`);
     expect(Math.floor(z.spawn.x) === ax && Math.floor(z.spawn.y) === ay, `${at}: you don't wake in your room (${z.spawn.x}, ${z.spawn.y})`);
     expect(siteWithDungeon(run, 5, 16)?.dungeon?.legacy && siteWithDungeon(run, 5, 16).dungeon.levels === 20, `${at}: the Keeper's Stair isn't the 20-level legacy stack`);
+    if (seed === seeds[0]) stair = keepersStair(seed, run, expect);
     // The village: houses on stilts a block up, their doors there, thatch walls on the map, a slab roof.
     for (const h of HOLLOWMERE_HOUSES) {
       const inner = [], doors = [], up = h.ground ? 0 : 1;   // (the crypt stands on the ground)
@@ -283,7 +285,29 @@ function checkHollowmere(seeds, expect) {
   }
   return `on ${seeds.length} seeds: the temple with Maren, the cube and the Keeper's Stair in the parent's frame, you in your room; ` +
     `${houses} houses on their stilts, ${people} people's places reachable, the commons lamp, ${beds} brine-bed tiles, ${props} props; ` +
-    `${seams} seams (${seamTiles} tiles) on the world function`;
+    `${seams} seams (${seamTiles} tiles) on the world function; ${stair}`;
+}
+// The Keeper's Stair on the real world (C5 #3): the parent's residents live up top, so none of them is on its 20 floors,
+// nor Brann's skull; its peddlers are "a peddler" with the parent's pack, talking as a merchant. On the test world the
+// same seed's stack still has every one of them and the skull (golden holds it block for block).
+function keepersStair(seed, run, expect) {
+  const test = buildRun(seed, TEST_WORLD), seen = { real: new Set(), test: new Set() };
+  let peddlers = 0, skulls = { real: 0, test: 0 };
+  for (let z = 1; z <= 20; z++) {
+    for (const [w, r] of [["real", run], ["test", test]]) {
+      const f = legacyZone({ seed, run: r }, { wx: 5, wy: 16, z }, w === "real" ? siteWithDungeon(run, 5, 16) : null) ||
+                legacyZone({ seed, run: r }, { wx: 0, wy: 0, z });
+      for (const c of f.creatures) if (RESIDENTS.includes(c.type)) seen[w].add(c.type);
+      skulls[w] += f.items.filter((it) => it.kind === "quest" && it.id === "skull").length;
+      if (w === "real") for (const c of f.creatures.filter((n) => n.type === "pell")) {
+        peddlers++;
+        expect(c.name === "a peddler" && c.talk.dialogue === "merchant" && c.talk.state.stock?.length > 0, `the real Keeper's Stair floor ${z}: its peddler is "${c.name}" (${c.talk.dialogue})`);
+      }
+    }
+  }
+  expect(!seen.real.size && !skulls.real, `the real Keeper's Stair holds ${[...seen.real]} and ${skulls.real} skull(s)`);
+  expect(seen.test.size === RESIDENTS.length && skulls.test === 1, `the test world's stack lost its people: ${[...seen.test]}, ${skulls.test} skull(s)`);
+  return `the Keeper's Stair on seed ${seed}: none of the ${RESIDENTS.length} residents, no skull, ${peddlers} peddlers (the test world's: all ${seen.test.size} and the skull)`;
 }
 const GROUND_SKIP = new Set([B.LEAVES, B.TRUNK]);
 // The ground a seam rule compares: the top of the terrain column (water at the datum counts), or null where a plan
