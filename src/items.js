@@ -227,6 +227,9 @@ export function makeItem(item, x, y, z) {
 // Into the pack: stackable things join a stack with the same key. Returns the stack it's in.
 export function addToInventory(e, it) {
   const { x, y, z, dropped, ...item } = it;
+  // Readhand (B1, C4 #8): an artifact is known as it comes into your hands, by any way (found, bought, given). The
+  // artifact kind's onPickup says so for one picked up; a trade or a gift hands its onPickup a copy (verification finding).
+  if (item.kind === "artifact" && e.mutations?.readhand && item.known !== true && !item.broken) item.known = true;
   const key = stackKey(item);
   if (key) {
     const n = item.count || 1;

@@ -1144,6 +1144,19 @@ export async function checkProgression(m) {
       };
       const read = touch(["readhand"]), plainTouch = touch([]);
       if (read !== true || plainTouch === true) fail(`Readhand: a fold-knife picked up is known ${read} with it, ${plainTouch} without`);
+      // ... and one bought (a trade hands onPickup a copy, then puts another in the pack).
+      const buy = (muts) => {
+        const q = bentIn(muts, { view: "map" }), MER = m.merchants;
+        q.funds = 5000;
+        const trader = { type: "villager", level: 5, talk: { state: {} }, merchant: { stock: "general" }, uid: "b1-tinker" };
+        trader.talk.state.stock = [{ item: { kind: "artifact", id: "echoBell", known: false, cell: null }, count: 1, price: 10 }];
+        trader.talk.state.stockedAt = game.time;
+        const row = MER.tradeRows(game, trader, "theirs").find((r) => r.it?.kind === "artifact");
+        MER.tradeRow(game, trader, "theirs", row);
+        return q.inv.find((x) => x.kind === "artifact" && x.id === "echoBell")?.known;
+      };
+      const bought = buy(["readhand"]), boughtPlain = buy([]);
+      if (bought !== true || boughtPlain !== false) fail(`Readhand: an echo-bell bought is known ${bought} with it, ${boughtPlain} without`);
       // Beat-deaf: a spike about to rise beside you, drawn on the map.
       const carets = (muts) => {
         const q = bentIn([], { view: "map" }), z = game.zone, tx = Math.floor(q.x) + 1, ty = Math.floor(q.y), TR = m.traps;
@@ -1480,7 +1493,7 @@ export async function run(env) {
     codec: await src("save/codec.js"), rng: await src("rng.js"), items: await src("items.js"), playerMod: await src("player.js"), body: await src("body.js"),
     implants: await src("content/items/implants.js"), mutations: await src("content/mutations.js"),
     pmut: await src("progression/mutations.js"), abilities: await src("abilities.js"), turns: await src("turns.js"), inventory: await src("inventory.js"),
-    traps: await src("traps.js"), travel: await src("overworld/travel.js"), worldmap: await src("content/world/worldmap.js"), gameMod: await src("game.js"),
+    traps: await src("traps.js"), merchants: await src("social/merchants.js"), travel: await src("overworld/travel.js"), worldmap: await src("content/world/worldmap.js"), gameMod: await src("game.js"),
     creatures: await src("creatures.js"), world: await src("world.js"), status: await src("status.js"), events: await src("events.js"),
     factions: await src("factions.js"), charsheet: await src("screens/charsheet.js"), light: await src("light.js"), time: await src("time.js"),
     content: { ...genotypes, ...backgrounds, ...powers },
