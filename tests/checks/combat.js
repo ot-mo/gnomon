@@ -2003,6 +2003,27 @@ export function checkB1Combat(ctx) {
     wield("longsword"); Object.assign(shoved, { x: 6.5, y: 5.5, tx: 6, ty: 5 });
     hit(shoved);
     expect(Math.floor(shoved.x) === 6, "a longsword knocked the goblin back");
+    // A bat keeps its hover; over a chasm a bat isn't knocked out of the fight; a diagonal shove doesn't clip a corner.
+    clear();
+    wield("greatsword");
+    const bat = at("bat", 6, 5); bat.status = {};
+    const batZ = bat.z;
+    hit(bat);
+    const flew = Math.floor(bat.x) === 7 && Math.abs(bat.z - batZ) < 1e-9;
+    field.set(8, 5, FLOOR_Z - 1, B.AIR); field.set(8, 5, FLOOR_Z - 2, B.AIR); field.refresh();
+    const chasm = field.stand[8 + 5 * field.w] < 0;
+    Object.assign(p, { x: 6.5 });
+    hit(bat);
+    const stays = field.creatures.includes(bat) && Math.floor(bat.x) === 7;
+    field.set(8, 5, FLOOR_Z - 1, B.GRASS); field.set(8, 5, FLOOR_Z - 2, B.ROCK); field.refresh();
+    clear();
+    Object.assign(p, { x: 5.5, y: 5.5 });
+    const corner = at("goblin", 6, 6); corner.status = {};
+    field.set(7, 6, FLOOR_Z, B.STONE); field.set(7, 6, FLOOR_Z + 1, B.STONE); field.refresh();
+    hit(corner);
+    const clipped = Math.floor(corner.x) === 7 && Math.floor(corner.y) === 7;
+    field.set(7, 6, FLOOR_Z, B.AIR); field.set(7, 6, FLOOR_Z + 1, B.AIR); field.refresh();
+    expect(flew && chasm && stays && !clipped, `knockback: a bat knocked a tile at its height ${flew}; over a chasm (${chasm}) it stays in the fight ${stays}; a diagonal shove past a wall's corner ${clipped ? "clipped it" : "stopped"}`);
     // The lantern-flail.
     clear();
     const shade = at("shade", 6, 5), gob = at("goblin", 5, 6);

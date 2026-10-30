@@ -403,14 +403,17 @@ function knockBack(game, p, m) {
   const z = game.zone, ax = m.x - p.x, ay = m.y - p.y;
   const dx = Math.abs(ax) >= Math.abs(ay) * 0.5 ? Math.sign(ax) : 0, dy = Math.abs(ay) >= Math.abs(ax) * 0.5 ? Math.sign(ay) : 0;
   if (!dx && !dy) return;
-  const tx = Math.floor(m.x) + dx, ty = Math.floor(m.y) + dy, zz = Math.floor(m.z + 1e-6);
+  const hover = CREATURE_TYPES[m.type]?.hover || 0, x0 = Math.floor(m.x), y0 = Math.floor(m.y);
+  const tx = x0 + dx, ty = y0 + dy, zz = Math.floor(m.z - hover + 1e-6);
   if (tx < 0 || ty < 0 || tx >= z.w || ty >= z.d) return;
-  for (let k = 0; k < Math.max(1, Math.ceil(m.h ?? 1)); k++) if (z.solid(tx, ty, zz + k)) return;   // a wall: it stands
+  const walled = (x, y) => { for (let k = 0; k < Math.max(1, Math.ceil(m.h ?? 1)); k++) if (z.solid(x, y, zz + k)) return true; return false; };
+  if (walled(tx, ty) || (dx && dy && (walled(x0 + dx, y0) || walled(x0, y0 + dy)))) return;   // a wall (or a corner): it stands
   if (z.creatures.some((o) => o !== m && Math.floor(o.x) === tx && Math.floor(o.y) === ty)) return;
   const stand = z.stand[tx + ty * z.w];
+  if (stand < 0 && hover) return;   // (a flier over a chasm keeps flying: it isn't knocked out over it)
   m.x += dx; m.y += dy; m.tx = tx; m.ty = ty; m.path = null;
   if (stand < 0) { killMonster(game, m, `Your blow sends ${theOf(m)} over the edge and into the dark.`, false); return; }
-  if (stand < m.z) m.z = stand;
+  if (stand + hover < m.z) m.z = stand + hover;   // (off a ledge it drops; a hoverer keeps its height over the ground)
   game.log(`Your blow knocks ${theOf(m)} back.`, [230, 230, 230]);
 }
 function snap(game, p, it) {
