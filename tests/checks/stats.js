@@ -30,6 +30,7 @@ import { WEAPONS, ARMOURS, RINGS, AMULETS, RELICS, PROPERTIES, itemBonuses, make
 import { PERKS, perkRank, takePerk } from "../../src/leveling.js";
 import { registerStatus, addStatus, removeStatus, STATUS_DEFS } from "../../src/status.js";
 import * as Bd from "../../src/body.js";
+import { GEAR_ARMOURS } from "../../src/content/items/forge.js";
 
 // Where the parent game's four slots are on a humanoid body (the gear catalog puts each piece there).
 const PART = { weapon: "hand_r", armour: "body", ring: "finger_r", amulet: "neck" };
@@ -67,7 +68,10 @@ function expectedCore(e, b) {
   const tou = e.attrs.tou + g("tou"), touMod = Math.floor((tou - 16) / 2);
   const maxHp = legacy ? Math.max(1, 20 + 3 * (e.level - 1) + e.maxHpGain + g("maxHp"))
                        : Math.max(1, tou + 4 + (e.level - 1) * Math.max(1, 3 + touMod) + e.maxHpGain + g("maxHp"));
-  const body = onBody(e).filter((it) => it.kind === "armour").reduce((s, it) => s + ARMOURS[it.id].armour + it.ench, 0);
+  // The balance decision of 2026-10-30 (the user's, proposal §3.3): on C4's pieces without armour (a hat, a monocle)
+  // the enchantment adds nothing to AV; the parent's pieces keep armour + enchantment.
+  const piece = (it) => (GEAR_ARMOURS[it.id] && !(ARMOURS[it.id].armour > 0) ? 0 : ARMOURS[it.id].armour + it.ench);
+  const body = onBody(e).filter((it) => it.kind === "armour").reduce((s, it) => s + piece(it), 0);
   const av = legacy ? body + g("armour") : body + g("armour") + g("av");
   return { str, maxHp, av };
 }

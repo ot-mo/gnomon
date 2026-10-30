@@ -365,7 +365,9 @@ registerItemKind("armour", gear({
   glyph: (game, it) => ["[", shines(it) ? RELIC_COLOR : it.made ? MATERIALS[it.made].color : [175, 180, 195]],
   info: armourInfo,
   details: gearDetails(armourInfo),
-  av: (it) => ARMOURS[it.id].armour + it.ench + materialAv(it),   // stats.js av() adds up what's worn (not a bonus); C4: + material
+  // (C4's pieces add their enchantment to AV only when they have armour: a +3 monocle isn't AV 3; the parent's keep
+  // its rule, a cursed -2 shirt is AV -2, as golden and check-stats hold it; the balance phase §3.3)
+  av: (it) => (GEAR_ARMOURS[it.id] && !(ARMOURS[it.id].armour > 0) ? 0 : ARMOURS[it.id].armour + it.ench) + materialAv(it),   // stats.js av() adds up what's worn (not a bonus); C4: + material
   art: FLOOR_ART.armour,
   palette(game, it) {
     if (shines(it)) return { d: [[150, 120, 50], 0.4], D: [RELIC_COLOR, 0.7] };
