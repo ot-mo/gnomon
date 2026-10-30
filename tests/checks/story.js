@@ -885,6 +885,7 @@ async function campaign7b(env, { fail, stats, real, test, json, game, startRun }
   if (json(beats) !== json([1, 2, 3, 4, 5, 6, 8, 7, 9, 10, 11]) || json(lengthen) !== json([5, 7, 9]) || open() !== "") fail(`beats ${json(beats)}, the Lengthening after ${json(lengthen)}`);
   stats.beatsPaid = await beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json });
   stats.corner = await cornerPetted(env, { fail, game, p });
+  stats.questPools = await questPools(env, { fail, real, test, RUN });
   offB(); offL();
   game.run = keep.run; game.quests = keep.quests; game.state.campaign = keep.campaign;
   stats.campaign = `11 beats as data at their landmarks' floors; the start on the real world gives beat 1 (none on the test world, whose intro stays the parent's); ` +
@@ -978,6 +979,27 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json }) {
   if (offer?.text !== B[1].offer) fail(`beat 2's offer at Quint-Vey: ${offer?.text}`);
   return `11 beats paid (the plumb-seal and Plumb Key, the plumb-bob known, +5 max HP, Survey +${rep("survey")}, Noon's Face and its turn, the Flat Account ${known ? "read" : "has no def"}; ` +
     `the unpress lens and Great Theodolite owed, the lens paid once made); ${want.split(",").length} choices open, two made at their givers, beat 5's on its own page; the offer at the giver; journal routes; ${p.inv.length - inv0} more in the pack`;
+}
+
+// Village quests by region (the integrator, C5 #9; story/questplan.js): on the real world a quest's thing or beast is
+// its village's region's (QUESTS.pools), where the region has a pool; on the test world, from the flat lists as before.
+async function questPools(env, { fail, real, test, RUN }) {
+  const { QUESTS } = await env.src("content/quests.js"), seen = { real: 0, test: 0 }, regions = new Set();
+  for (const [w, def] of [["real", real], ["test", test]])
+    for (const seed of [1, 2, 3, 4]) {
+      const run = RUN.buildRun(seed, def);
+      for (const [id, v] of run.villages) {
+        const params = v.quest?.params, key = params?.thing ? "things" : params?.beast ? "beasts" : null;
+        if (!key) continue;
+        const s = run.sites.get(id), region = run.world.tileAt(s.at.wx, s.at.wy)?.region, pool = QUESTS.pools[region]?.[key];
+        const from = w === "real" && pool?.length ? pool : QUESTS[key], val = params.thing || params.beast;
+        seen[w]++;
+        if (w === "real" && pool?.length) regions.add(region);
+        if (!from.includes(val)) fail(`${w} seed ${seed} ${v.name} (${region}): "${val}" isn't from ${w === "real" && pool ? `${region}'s pool` : "the flat lists"}`);
+      }
+    }
+  if (!seen.real || !seen.test || regions.size < 5) fail(`quest pools: ${seen.real} real, ${seen.test} test, ${regions.size} regions`);
+  return `${seen.real} real-world things and beasts from their region's pool (${regions.size} regions), ${seen.test} on the test world from the flat lists`;
 }
 
 // Corner's petting (the integrator, C5 #14; story/landmark-people.js pet): "Pet her." on Corner and nobody else; then a

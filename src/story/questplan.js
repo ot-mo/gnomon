@@ -54,13 +54,19 @@ function outward(run, site) {
   return out;
 }
 const span = (t, z = 0) => ({ key: `${t.wx},${t.wy},${z}`, wx: t.wx, wy: t.wy, z });
+// What a quest's thing or beast is drawn from (the integrator, C5 #9): on the real world the village's region's pool
+// (QUESTS.pools[region]) where it has one, else the flat lists. The test world's spans have no region with a pool, so
+// its villages keep the flat lists and don't move. One draw either way.
+function poolOf(run, site, key) {
+  const pool = QUESTS.pools?.[run.world?.tileAt?.(site.at.wx, site.at.wy)?.region]?.[key];
+  return pool?.length ? pool : QUESTS[key];
+}
 
 export function planQuest(run, site, v, template, rng) {
   const giver = v.roles.find((r) => r.role === "questGiver");
   if (!giver) return null;
   const base = { giver: giver.uid, giverName: giver.name, village: site.id, tier: v.tier, level: v.level };
   const id = `${site.id}:quest`;
-  const T = QUESTS;
   switch (template) {
     case "recover": {
       // A lair's or ruin's first level within reach (bible: "carried off to {lair}"), else a span out there.
@@ -70,7 +76,7 @@ export function planQuest(run, site, v, template, rng) {
       const spans = outward(run, site);
       if (!den && !spans.length) return null;
       const t = den ? { wx: den.at.wx, wy: den.at.wy } : rng.pick(spans);
-      return { ...base, thing: rng.pick(T.things), itemUid: `${id}:thing`, target: span(t, den ? 1 : 0),
+      return { ...base, thing: rng.pick(poolOf(run, site, "things")), itemUid: `${id}:thing`, target: span(t, den ? 1 : 0),
                place: den ? den.name : "the wilds", where: where(run, t.wx, t.wy, { skip: den?.id }) };
     }
     case "carry": {
@@ -97,7 +103,7 @@ export function planQuest(run, site, v, template, rng) {
       return { ...base, shrine: v.culture.shrine, view: sh.view, target: span(site.at), place: v.name, where: `at ${v.name}` };
     }
     case "climb":
-      return { ...base, thing: rng.pick(T.things), itemUid: `${id}:thing`, target: span(site.at), place: v.name, where: `on the green at ${v.name}` };
+      return { ...base, thing: rng.pick(poolOf(run, site, "things")), itemUid: `${id}:thing`, target: span(site.at), place: v.name, where: `on the green at ${v.name}` };
     case "find": {
       const spans = outward(run, site).filter((t) => !run.sitesAt?.has(`${t.wx},${t.wy}`));
       if (!spans.length) return null;
@@ -108,7 +114,7 @@ export function planQuest(run, site, v, template, rng) {
       const spans = outward(run, site);
       if (!spans.length) return null;
       const t = rng.pick(spans);
-      return { ...base, beast: rng.pick(T.beasts), beastUid: `${id}:beast`, beastLevel: Math.max(1, v.level + 1), target: span(t), where: where(run, t.wx, t.wy) };
+      return { ...base, beast: rng.pick(poolOf(run, site, "beasts")), beastUid: `${id}:beast`, beastLevel: Math.max(1, v.level + 1), target: span(t), where: where(run, t.wx, t.wy) };
     }
     case "rescue": {
       const spans = outward(run, site);
