@@ -1755,14 +1755,15 @@ export function ttkTables(ctx, { blows = 1500, typicalBlows = 40, pref = TYPICAL
         // with your torch lit, which this model is.
         const parry = weaponSpec(p).cls === "longBlade" && hasKey(p.perks, "riposte") ? Math.min(1, COMBAT_GEAR.riposteWindow / swing) : 0;
         for (let k = 0; k < typicalBlows; k++) {
-          let dealt = resolveAttack(game, p, c, weaponSpec(p), { view: "map" }).dmg;
+          const blow = resolveAttack(game, p, c, weaponSpec(p), { view: "map" });
+          let dealt = blow.dmg;
           if (low) { const h = c.hp; c.hp = 1e11; low.push(resolveAttack(game, p, c, weaponSpec(p), { view: "map" }).dmg); c.hp = h; }
           const h0 = c.hp;
           tickStatuses(game, c, swing);
           dealt += h0 - c.hp;
           yours.push(dealt);
           p.hp = 1e9;
-          const lost = statusFlag(c, "noAct") || (parry > 0 && game.combatRng() < parry);
+          const lost = statusFlag(c, "noAct") || (parry > 0 && blow.hit && game.combatRng() < parry);   // (a parry needs a hit)
           theirs.push(lost ? 0 : resolveAttack(game, c, p, naturalSpec(c)).dmg);
         }
         game.effects.length = 0; run.logged.length = 0;
@@ -2089,14 +2090,16 @@ export function checkB1Combat(ctx) {
     wield("longsword"); perk("riposte");
     duel.cd = 0.1; hit(duel);
     const parried = duel.cd;
+    duel.cd = 0.1; hit(duel, fixed(0));   // (a natural 1: a miss parries nothing)
+    const missed = duel.cd;
     duel.cd = 0.5; hit(duel);
     const late = duel.cd;
     perk(); duel.cd = 0.1; hit(duel);
     const noPower = duel.cd;   // (a landed blow staggers it to 0.4 s at least: hurtCreature, the parent's)
     wield("dagger"); perk("riposte"); duel.cd = 0.1; hit(duel);
     const dagger = duel.cd;
-    identity.longBlade = expect(Math.abs(parried - cool) < 1e-9 && late === 0.5 && noPower < cool && dagger < cool && log.some((l) => /turn the goblin's blow aside/.test(l)),
-      `Riposte: a longsword at 0.1 s left its cooldown ${parried} (want ${cool}); at 0.5 s ${late}; without the power ${noPower}; a dagger ${dagger}`);
+    identity.longBlade = expect(Math.abs(parried - cool) < 1e-9 && missed === 0.1 && late === 0.5 && noPower < cool && dagger < cool && log.some((l) => /turn the goblin's blow aside/.test(l)),
+      `Riposte: a longsword at 0.1 s left its cooldown ${parried} (want ${cool}), a miss ${missed} (want 0.1); at 0.5 s ${late}; without the power ${noPower}; a dagger ${dagger}`);
     perk();
 
     // --- Armour on you ---------------------------------------------------------------------------------------

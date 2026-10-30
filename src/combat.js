@@ -54,7 +54,7 @@
 //              quarter of the time), Cleave (an axe's blow: the nearest other hostile within 1.5 tiles of you
 //              takes half, soaked), Disarm (an axe on someone who talks or is a person's kind: a fifth of the
 //              time "disarmed" 10 s, its blows halved), High ground (a polearm from a block or more above: +50%),
-//              Riposte (a long blade's swing at a foe whose blow lands within 0.2 s: the blow is cancelled, its
+//              Riposte (a long blade's blow that hits a foe whose blow lands within 0.2 s: that blow is cancelled, its
 //              cooldown starts again).
 //   armour     a buckler blocks a fifth of the blows that land on you (before armour); a glass-scale turns 15% of
 //              arrows and bolts aside, a raised mirror shield half (bible §13.3, §13.4).
@@ -529,9 +529,11 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
     hitPlayer(game, att, 0, source, blocked, !!ctx.ranged, rng, 0, false);
     return;
   }
-  if (you && spec.kind === "melee") result.riposte = riposte(game, p, tgt, spec);   // (B1: a long blade's parry)
   // 2 To-hit.
   Object.assign(result, rollToHit(game, att, tgt, spec, ctx, rng));
+  // A long blade's parry (B1): your strike, landing in the 0.2 s before its blow, cancels it. Only a hit parries, so a
+  // flurry of misses can't hold a foe off for good (verification finding).
+  if (you && spec.kind === "melee" && result.hit) result.riposte = riposte(game, p, tgt, spec);
   if (!result.hit) {
     float(game, tgt, "miss", [170, 170, 180]);
     tell(game, result, spec, ctx, [170, 170, 180]);
