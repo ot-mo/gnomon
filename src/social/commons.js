@@ -128,7 +128,8 @@ export function prayAtShrine(game, zone) {
   const s = zone?.village?.shrine, siteId = zone?.village?.siteId, v = siteId && villageOf(game.run, siteId);
   if (!s || !v || v.abandoned) return null;
   const S = VILLAGES.shrines[s.kind], R = S.reward || {}, p = game.player;
-  if (!readable(game, zone, { x: s.x, y: s.y, z: s.z, view: s.view })) return { ok: false, line: S.wrong };
+  if (!readable(game, zone, { x: s.x, y: s.y, z: s.z, view: s.view }))   // (the right view in the wrong light: say that, not the view's words)
+    return { ok: false, line: s.view === "3d" && game.view === "3d" ? "Too dark to see the carving. It wants good light." : S.wrong };
   const st = cstate(game, siteId);
   if (st.prayed) return { ok: false, line: "You have prayed here today. The shrine has given what it gives in a day." };
   st.prayed = true;

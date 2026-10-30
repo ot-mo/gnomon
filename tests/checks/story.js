@@ -574,7 +574,7 @@ async function villages7b(env, { fail, stats, test, real, json, startRun, game }
             if (z.get(b.x0, b.y0, FLOOR_Z) || !BLOCKS[z.get(b.x0, b.y0, FLOOR_Z - 1)]?.mosaic) fail(`${tag}: a page-town house that isn't paint`);
           }
           if (S.windows === false && !v.abandoned) for (let y = b.y0; y < b.y0 + b.d; y++) for (let x = b.x0; x < b.x0 + b.w; x++)
-            if (z.get(x, y, FLOOR_Z + 1 + b.h) === B.LAMP) fail(`${tag}: a window in the Shade's cells`);
+            for (let zz = FLOOR_Z; zz < FLOOR_Z + 4 + b.h; zz++) if (z.get(x, y, zz) === B.LAMP) { fail(`${tag}: a window in the Shade's cells`); break; }
         }
         if (!v.abandoned && S.cistern) { heightsSeen.cisterns++; if (z.get(z.village.lamp.x - 5, z.village.lamp.y - 1, FLOOR_Z - 1) !== B.WATER_SHALLOW) fail(`${tag}: no cistern`); }
         for (const c of members) if (solid(c.tx, c.ty, c.z) || !solid(c.tx, c.ty, c.z - 1)) fail(`${tag}: ${c.uid} stands in a wall or on air at ${c.z - FLOOR_Z}`);
