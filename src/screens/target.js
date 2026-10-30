@@ -35,7 +35,7 @@ import { UI } from "../ui.js";
 import { mapView, tileAtCell, inspectAt, describeTile } from "../renderMap.js";
 import { emit } from "../events.js";
 import { aimTarget, REQUEST_RANGE, MAP_TARGET } from "../abilities.js";
-import { flightOf, THROW_AIM, THROW_RANGE, BOMB_RANGE, THROW_TIME, THROW_GRAVITY, throwSpeed, throwAt, finishFlight, ballisticFrom } from "../throwing.js";
+import { flightOf, THROW_AIM, THROW_RANGE, BOMB_RANGE, THROW_TIME, throwGravity, throwSpeed, throwAt, finishFlight, ballisticFrom } from "../throwing.js";
 import { hitChance, toHitMod, dvOf, critNat, weaponSpec, resistText, thrownSpec } from "../combat.js";
 import { canTalk, ghostHidden, ghostOffMap, isFlat, typeOf, touchable } from "../creatures.js";
 import { attitude } from "../factions.js";
@@ -128,7 +128,7 @@ THROW_AIM.aim = (game, stack) => {
     purpose: "throw", item: stack, range: bomb ? BOMB_RANGE : THROW_RANGE,
     verb: bomb ? "throw the bomb" : stack.kind === "potion" ? "throw the potion" : "throw",
     spec: stack.kind === "knife" ? thrownSpec(game) : null,
-    flight: (g, to) => ({ ...stack, ...ballisticFrom(g, to, throwSpeed(stack), THROW_GRAVITY) }),
+    flight: (g, to) => ({ ...stack, ...ballisticFrom(g, to, throwSpeed(stack), throwGravity(g.player, stack)) }),   // (gyro wrists: flat, B1)
     done(g, target) {
       if (!target) return;
       finishFlight(g, throwAt(g, stack, target), THROW_TIME);

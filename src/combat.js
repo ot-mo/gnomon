@@ -105,7 +105,7 @@ export function resistText(m) {
 // carry one. Bare hands (fists): req 0 (no to-hit cost); under d20 every blow, a fist's too, counts STR over
 // RULES.d20.strOver, scaled by its swing (`swing`: the weapon's, FISTS.swing for bare hands). Fists hit for 1-2; in gauntlets 1d4; with truesteel knuckles fitted (WS5's implant,
 // effect "knuckles"; bible §13.6) 2d4, and they crush (×2 against the brittle, as bonus crush does).
-const fitted = (e, effect) => !!e.body?.implants && e.body.parts.some((q) => IMPLANTS[e.body.implants[q.id]?.id]?.effect === effect);
+export const fitted = (e, effect) => !!e?.body?.implants && e.body.parts.some((q) => IMPLANTS[e.body.implants[q.id]?.id]?.effect === effect);
 export function weaponSpec(e) {
   const it = wielded(e), w = it && WEAPONS[it.id];
   if (!w) {
@@ -122,8 +122,9 @@ export function naturalSpec(c) {
   const t = CREATURE_TYPES[c.type];
   return { kind: "natural", dmg: t.damage, plus: c.bonus || 0, acc: t.acc || 0 };
 }
+// (B1, WS5 #8: gyro wrists' +2 for a thrown knife, beside Knife juggler's)
 export function thrownSpec(game) {
-  return { kind: "thrown", dmg: [2, 4], plus: hasKey(game.player.perks, "juggler") ? 2 : 0, acc: 0 };
+  return { kind: "thrown", dmg: [2, 4], plus: (hasKey(game.player.perks, "juggler") ? 2 : 0) + (fitted(game.player, "gyroWrists") ? 2 : 0), acc: 0 };
 }
 
 // --- The d20 numbers --------------------------------------------------------------------------------

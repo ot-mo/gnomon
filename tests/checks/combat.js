@@ -73,7 +73,7 @@ import { addStatus, hasStatus, tickStatuses } from "../../src/status.js";
 import { snapshotZone } from "../../src/save/codec.js";
 import { memoryAdapter } from "../../src/save/store.js";
 import { saveGame, whenWritten } from "../../src/save/save.js";
-import { throwReady, throwAt, updateProjectiles, THROW_TIME, landOutside } from "../../src/throwing.js";
+import { throwReady, throwAt, updateProjectiles, THROW_TIME, landOutside, throwGravity, THROW_GRAVITY } from "../../src/throwing.js";
 import { fire, fireAt, readyLauncher, missileSpec } from "../../src/missiles.js";
 import { requestTarget, cursorTarget, lineOfFire, targetText } from "../../src/screens/target.js";
 import { mapView } from "../../src/renderMap.js";
@@ -1883,6 +1883,9 @@ export function ttkTables(ctx, { blows = 1500, typicalBlows = 40 } = {}) {
 //               within 0.2 s of its blow: its cooldown starts again; not at 0.5 s); none without its power or class
 //   armour      the buckler blocks a fifth of the blows on you; the glass-scale turns 15% of arrows, a raised mirror
 //               shield half, both 57.5%; melee blows aren't turned by either
+//   throwing    (WS5 #8) gyro wrists: a knife flies flat in 3D (no drop over 0.5 s) and on the map (the arc's gravity 0),
+//               a bomb is still lobbed, a knife +2; the juggler's arm: 4 knives at once from 6 (in 3D fanned, on the map
+//               all at the mark), 2 from 2, 1 without it
 export function checkB1Combat(ctx) {
   const { game } = ctx;
   const problems = [], stats = {};
@@ -2093,6 +2096,44 @@ export function checkB1Combat(ctx) {
     expect(none === 0 && Math.abs(buck - 0.2) < 0.03 && gsMelee === 0 && Math.abs(gs - 0.15) < 0.03 && Math.abs(both - 0.575) < 0.03,
       `turned aside: nothing ${none}; a buckler ${(buck * 100).toFixed(1)}% of blows (want 20); a glass-scale ${(gsMelee * 100).toFixed(1)}% of blows, ${(gs * 100).toFixed(1)}% of arrows (want 0 and 15); with a mirror shield ${(both * 100).toFixed(1)}% (want 57.5)`);
     stats.turned = `buckler ${(buck * 100).toFixed(1)}% of blows, glass-scale ${(gs * 100).toFixed(1)}% of arrows, with the mirror shield ${(both * 100).toFixed(1)}%`;
+    p.status = {}; p.body.equip.body = null; invalidateStats(p);
+
+    // --- Throwing (WS5 #8) --------------------------------------------------------------------------------------
+    clear();
+    const fit = (part, id) => { p.body.implants[part] = id ? { kind: "implant", id } : null; invalidateStats(p); };
+    const knives = (n) => { p.inv = p.inv.filter((s) => s.kind !== "knife"); if (n) p.inv.push({ kind: "knife", count: n }); return p.inv.find((s) => s.kind === "knife"); };
+    const in3d = () => { game.view = "3d"; Object.assign(p, { x: 5.5, y: 5.5, z: FLOOR_Z, yaw: 0, pitch: 0, throwCd: 0 }); field.projectiles.length = 0; };
+    const dropOver = () => { in3d(); throwReady(game); const pr = field.projectiles[0], z0 = pr.z; updateProjectiles(game, 0.5); return z0 - pr.z; };
+    knives(6);
+    const plainDrop = dropOver(), plainPlus = thrownSpec(game).plus;
+    fit("arms", "gyroWrists");
+    const gyroDrop = dropOver(), gyroPlus = thrownSpec(game).plus;
+    expect(plainDrop > 0.5 && Math.abs(gyroDrop) < 1e-6 && gyroPlus === plainPlus + 2,
+      `gyro wrists: a knife dropped ${gyroDrop.toFixed(3)} over 0.5 s (without them ${plainDrop.toFixed(3)}), its plus ${gyroPlus} (without ${plainPlus})`);
+    expect(throwGravity(p, { kind: "bomb" }) > 0 && throwGravity(p, { kind: "knife" }) === 0 && throwGravity(p, { kind: "potion" }) === 0, "gyro wrists: the arc's gravity for a bomb, a knife and a potion");
+    const mark = at("goblin", 13, 5);
+    game.view = "map";
+    field.projectiles.length = 0;
+    const flown = throwAt(game, knives(6), { creature: mark, tile: { x: 13, y: 5 } });
+    expect(flown && (flown.g ?? THROW_GRAVITY) === 0, `gyro wrists on the map: the arc's gravity ${flown?.g}`);
+    fit("arms", null);
+    // The juggler's arm.
+    in3d(); knives(6); throwReady(game);
+    const one = field.projectiles.length;
+    fit("arms", "jugglerArm");
+    in3d(); const st = knives(6); throwReady(game);
+    const yaws = field.projectiles.map((q) => Math.atan2(q.vy, q.vx));
+    const four = field.projectiles.length, left = st.count;
+    in3d(); knives(2); throwReady(game);
+    const two = field.projectiles.length;
+    game.view = "map"; field.projectiles.length = 0;
+    const mapStack = knives(6);
+    throwAt(game, mapStack, { creature: mark, tile: { x: 13, y: 5 } });
+    const onMap = field.projectiles.length, sameMark = field.projectiles.every((q) => Math.abs(Math.atan2(q.vy, q.vx) - Math.atan2(field.projectiles[0].vy, field.projectiles[0].vx)) < 1e-9);
+    expect(one === 1 && four === 4 && left === 2 && two === 2 && new Set(yaws.map((y) => y.toFixed(4))).size === 4 && onMap === 4 && mapStack.count === 2 && sameMark,
+      `the juggler's arm: ${one} knife without it; ${four} from 6 in 3D (${left} left, ${new Set(yaws.map((y) => y.toFixed(4))).size} headings), ${two} from 2; on the map ${onMap} (${mapStack.count} left, one mark ${sameMark})`);
+    fit("arms", null); field.projectiles.length = 0;
+    stats.throwing = `gyro wrists: drop over 0.5 s ${plainDrop.toFixed(2)} → ${gyroDrop.toFixed(2)}, +${gyroPlus - plainPlus}; the juggler's arm ${four} knives in 3D, ${onMap} on the map`;
   } catch (err) {
     problems.push(`threw: ${err.stack?.split("\n").slice(0, 3).join(" / ")}`);
   } finally { run.restore(); }

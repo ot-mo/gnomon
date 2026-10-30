@@ -47,9 +47,9 @@ export const IMPLANTS = {
     info: "Soles that bite the ground. No slipping, no knockback; you stand on ledge edges." },
   knuckles: { name: "truesteel knuckles", parts: ["gloves"], grade: 2, effect: "knuckles",
     info: "Truesteel under the skin of the hands. Your fists hit for 2d4 and crush." },
-  gyroWrists: { name: "gyro wrists", parts: ["arm"], grade: 2, effect: "gyroWrists", needs: "flat throws, +2 damage (throwing.js)",
+  gyroWrists: { name: "gyro wrists", parts: ["arm"], grade: 2, effect: "gyroWrists",   // (throwing.js throwGravity, combat.js thrownSpec: B1)
     info: "Spinning weights in the wrists. Thrown things fly flat and hit for 2 more." },
-  jugglerArm: { name: "juggler's arm", parts: ["arm"], grade: 5, effect: "jugglerArm", needs: "up to four knives at once (throwing.js)",
+  jugglerArm: { name: "juggler's arm", parts: ["arm"], grade: 5, effect: "jugglerArm",   // (throwing.js volley: B1)
     info: "A second set of tendons. You throw up to four knives at once." },
   balmPump: { name: "balm pump", parts: ["back"], grade: 3, effect: "balmPump", needs: "a balm tonic from the pack injected below 40% health (content/items/tonics.js injectTonic; on the HP change)",
     info: "Holds four tonics along the spine and injects a balm when you fall below 40% health." },

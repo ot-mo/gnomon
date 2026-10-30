@@ -28,7 +28,11 @@
 //       middle, else the tile's floor (+0.3): height still decides what can be hit
 //   finishFlight(game, pr, seconds)                     the map: `seconds` pass, and then as long as it
 //       still flies
-import { damageMonster, resolveAttack, thrownSpec } from "./combat.js";
+//   throwGravity(p, it) → g                             gyro wrists (WS5 #8, B1: implant effect gyroWrists): what you
+//       throw flies flat (no drop; a bomb is still lobbed), and a knife hits for 2 more (combat.js thrownSpec)
+//   volley(p, stack) → n                                the juggler's arm (jugglerArm): a knife throw throws every knife
+//       you carry at once, up to JUGGLE (4); in 3D fanned a little, on the map all at the target
+import { damageMonster, resolveAttack, thrownSpec, fitted } from "./combat.js";
 import { touchable, touchesYou, hostilesTo, canTalk, theOf, TheOf } from "./creatures.js";
 import { POTIONS, POTION_COLORS, FLOOR_ART, itemPalette, makeItem, awayFromWalls, takeOne } from "./items.js";
 import { B, FLOOR_Z } from "./world.js";
@@ -51,6 +55,9 @@ export const THROW_RANGE = 10, BOMB_RANGE = 8;   // the map's target screen (til
 // readyStack here, doesn't load the screens through this module.
 export const THROW_AIM = { aim: null };
 const SPEED = 15, GRAVITY = 12, SPLASH = 1.8;
+export const JUGGLE = 4, FAN = 0.06;   // the juggler's arm: knives at once; their spread in 3D (radians)
+export const throwGravity = (p, it) => (fitted(p, "gyroWrists") && it?.kind !== "bomb" ? 0 : GRAVITY);
+export const volley = (p, stack) => (stack?.kind === "knife" && fitted(p, "jugglerArm") ? Math.max(1, Math.min(JUGGLE, stack.count || 1)) : 1);
 const FUSE = 2, BLAST = 2.3;
 
 // What T throws: the stack you last threw from (if you still have some), else your knives.
@@ -66,15 +73,19 @@ export function throwReady(game, stack = readyStack(game.player)) {
   if (p.throwCd > 0 || statusFlag(p, "noAct")) return false;
   if (!stack) { game.log("You have nothing to throw. (T in the inventory throws a potion.)", [170, 170, 170]); return false; }
   p.ready = { kind: stack.kind, effect: stack.effect };
-  const it = takeOne(p, stack);
-  const cp = Math.cos(p.pitch);
-  const fx = cp * Math.cos(p.yaw), fy = cp * Math.sin(p.yaw), fz = Math.sin(p.pitch);
-  const bomb = it.kind === "bomb", speed = bomb ? SPEED * 0.6 : SPEED;   // bombs are lobbed
-  game.zone.projectiles.push({
-    ...it, x: p.x + fx * 0.3, y: p.y + fy * 0.3, z: p.z + EYE - 0.2 + fz * 0.3,
-    vx: fx * speed, vy: fy * speed, vz: fz * speed + (bomb ? 3 : 1.5), life: bomb ? FUSE : 2, spin: 0,
-    fuse: bomb ? FUSE : undefined,
-  });
+  const n = volley(p, stack);
+  for (let k = 0; k < n; k++) {
+    const it = takeOne(p, stack), g = throwGravity(p, it), yaw = p.yaw + (k - (n - 1) / 2) * FAN;
+    const cp = Math.cos(p.pitch);
+    const fx = cp * Math.cos(yaw), fy = cp * Math.sin(yaw), fz = Math.sin(p.pitch);
+    const bomb = it.kind === "bomb", speed = bomb ? SPEED * 0.6 : SPEED;   // bombs are lobbed
+    game.zone.projectiles.push({
+      ...it, x: p.x + fx * 0.3, y: p.y + fy * 0.3, z: p.z + EYE - 0.2 + fz * 0.3,
+      vx: fx * speed, vy: fy * speed, vz: fz * speed + (bomb ? 3 : g ? 1.5 : 0), ...(g !== GRAVITY ? { g } : {}), life: bomb ? FUSE : 2, spin: 0,
+      fuse: bomb ? FUSE : undefined,
+    });
+  }
+  const it = stack, bomb = it.kind === "bomb";
   if (bomb) game.log("You light the fuse and throw the bomb!", [255, 170, 70]);
   p.throwCd = hasKey(p.perks, "juggler") && it.kind === "knife" ? 0.2 : 0.4;
   sfx("throw");
@@ -125,7 +136,7 @@ export function aimPoint(game, target) {
 export const throwSpeed = (it) => (it.kind === "bomb" ? SPEED * 0.6 : SPEED);
 export const THROW_GRAVITY = GRAVITY;
 const ownFrom = (p) => ({ x: p.x, y: p.y, z: p.z + EYE - 0.2 });
-export function launch(game, it, from, to, { speed = throwSpeed(it), gravity = GRAVITY, extra = {} } = {}) {
+export function launch(game, it, from, to, { speed = throwSpeed(it), gravity = throwGravity(game.player, it), extra = {} } = {}) {
   const v = ballistic(from.x, from.y, from.z, to.x, to.y, to.z, speed, gravity);
   const pr = { ...it, ...extra, x: from.x, y: from.y, z: from.z, vx: v.vx, vy: v.vy, vz: v.vz, g: gravity,
                life: v.time + 1.5, spin: 0, mine: true, fuse: it.kind === "bomb" ? FUSE : undefined };
@@ -146,11 +157,15 @@ export function throwAt(game, stack, target) {
     game.log("You light a bomb and set it down. Get away from it!", [255, 170, 70]);
     return null;
   }
+  const n = volley(p, stack);
   const it = takeOne(p, stack);
   p.yaw = Math.atan2(to.y - p.y, to.x - p.x);
   if (it.kind === "bomb") game.log("You light the fuse and throw the bomb!", [255, 170, 70]);
   sfx("throw");
-  return launch(game, it, ownFrom(p), to);
+  const first = launch(game, it, ownFrom(p), to);
+  for (let k = 1; k < n; k++) launch(game, takeOne(p, stack), ownFrom(p), to);   // (the juggler's arm: the rest at the same mark)
+  if (n > 1) game.log(`You throw ${n} knives at once.`, [220, 220, 230]);
+  return first;
 }
 // A pretend projectile for flightOf, from you at `to` (a target).
 export function ballisticFrom(game, target, speed, gravity) {
