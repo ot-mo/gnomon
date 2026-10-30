@@ -5,12 +5,12 @@ Update this file as the last act of every session (see `CLAUDE.md`, "Handing off
 **Updated:** 2026-10-30, the integrator (local session), on `integration`. **Phases 1 and 2 are done; Phase 3 is under
 way.** all six content sessions are merged (`p3i-c1a`, `p3i-c4`, `p3i-c2`, `p3i-c3`, `p3i-c1b`, `p3i-c5`), and §8.5's last wiring merge is done
 (`p3i-wiring`): **new games start on GNOMON's real world at Hollowmere** (`?world=test` for the test world). `main` =
-`p4i-beats` (C5's beats paid with their choices, barks, routes, Corner and village pools by region, on `p4i-people`, the landmark people placed, on `p3i-lightweapons`: the user's balance decisions of 2026-10-30 applied: creature scaling under d20, two species fixes, enchantment AV, fists, and light weapons by rule B; ttkTables' bounds on a typical build). **The backlog runs in four parts** (the user, 2026-10-30: "start everything that you can start"): B1, B2 and B3 in their worktrees from `p3i-lightweapons`, the integrator on the story (next step, below). From here on only the integrator edits this file and
+`p4i-b3` (B3's peoples and villages merged, on `p4i-beats`: C5's beats paid with their choices, barks, routes, Corner and village pools by region, on `p4i-people`, the landmark people placed, on `p3i-lightweapons`: the user's balance decisions of 2026-10-30 applied: creature scaling under d20, two species fixes, enchantment AV, fists, and light weapons by rule B; ttkTables' bounds on a typical build). **The backlog runs in four parts** (the user, 2026-10-30: "start everything that you can start"): B1, B2 and B3 in their worktrees from `p3i-lightweapons`, the integrator on the story (next step, below). From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p4i-beats` (C5 #5, #6, #9, #11, #13 in part, #14, on `p4i-people`) on `integration`; before it `p4i-people` (C5 #3 with C1b #18: the landmark people placed, on `p3i-lightweapons`), `p3i-lightweapons` (light weapons, rule B, on `p3i-balance`), `p3i-balance` (the balance decisions of 2026-10-30, on `p3i-c5`), the Phase 3 merges (`p3i-c5`, `p3i-c1b`, `p3i-c3`, `p3i-c2`, `p3i-c4`, `p3i-wiring`, `p3i-c1a`), `p3i-sinkholes` (C1a's request 9, on `p3i-props`), `p3i-props` (props named; C1a's, C4's and C2's base), `p2-realworld`, `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+- **Last tag:** `p4i-b3` (`p4b-b3` merged, on `p4i-beats`) on `integration`; before it `p4i-beats` (C5 #5, #6, #9, #11, #13 in part, #14, on `p4i-people`), `p4i-people` (C5 #3 with C1b #18: the landmark people placed, on `p3i-lightweapons`), `p3i-lightweapons` (light weapons, rule B, on `p3i-balance`), `p3i-balance` (the balance decisions of 2026-10-30, on `p3i-c5`), the Phase 3 merges (`p3i-c5`, `p3i-c1b`, `p3i-c3`, `p3i-c2`, `p3i-c4`, `p3i-wiring`, `p3i-c1a`), `p3i-sinkholes` (C1a's request 9, on `p3i-props`), `p3i-props` (props named; C1a's, C4's and C2's base), `p2-realworld`, `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
   `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b`, `p1-ws10`, the flip, `p1-ws2a`, `p1-ws7a`,
   `p1-ws7b`, `p1-ws2b`, `p1-ws9` and `p1-ws1`, with their integration requests; `p2-ws3` … `p2-ws9` before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
@@ -45,7 +45,7 @@ the real world the default: then `main.js`'s `?world=real` branch and its cube h
 or go with it; browser-2b part 3 and check-overworld's 7 URLs follow).
 
 **Next step:** the backlog in four parts, all from `p3i-lightweapons` (the user, 2026-10-30: "start everything that you can start"; the coordinating session split it, its rules in the side-session notes' `backlog-rules.md`):
-- **The integrator**, on `integration`: the story, C5 #3-#14 (C1b #18, who stands where, with #3); #3 is done (`p4i-people`), #5, #6, #9, #11, #14 and #13's first part (`p4i-beats`); next the merges of `p4b-b3` then `p4b-b2` (the coordinator's order; `GEN_VERSION` bumped at each that changes generation, B3's first), then #4 (the starter chain), #12 (the dungeons' people, on B2's floors), #7, #8, #10 and #13's rest; and it merges `p4b-b1`, `p4b-b2` and `p4b-b3` as they come, as a content tag, its merges setting `GEN_VERSION`.
+- **The integrator**, on `integration`: the story, C5 #3-#14 (C1b #18, who stands where, with #3); #3 is done (`p4i-people`), #5, #6, #9, #11, #14 and #13's first part (`p4i-beats`); `p4b-b3` is merged (`p4i-b3`, GEN 8); next `p4b-b2` (its `WORLD.version` 4, GEN bumped again, and the people on its places), then `p4b-b1` once its tier-8 retune is approved, then #4 (the starter chain), #12 (the dungeons' people, on B2's floors), #7, #8, #10 and #13's rest; and it merges `p4b-b1`, `p4b-b2` and `p4b-b3` as they come, as a content tag, its merges setting `GEN_VERSION`.
 - **B1, gear and powers**: `C:\Users\Otto Mörner\Code\gnomon-wt\b1`, `ws/b1`, tag `p4b-b1`. C4 #1, #2 (with C2 #12), #4-#10, #12-#14; WS5 #8, #9, #19; WS4 #16, #19; WS6b #3; POWERS' needs but B3's.
 - **B2, landmarks and dungeons**: `gnomon-wt\b2`, `ws/b2`, tag `p4b-b2`. C1a #5; C1b #1-#17 and #19-#26 (not #18); WS10 #9. It builds the places, the integrator places the people; the bottoms (the Grub Mother, the Press-Master, the Gloam Warden, the Escapement, the Drowned Bellwether, Noon, the relics) are B2's as places and creatures, Vesper's phases, the endings and the barks the integrator's. C5 #12's Hierarch waits on B2's floors up (C1b #8), which B2 builds first.
 - **B3, peoples and villages**: `gnomon-wt\b3`, `ws/b3`, tag `p4b-b3`. C2 #3, #5-#9, #11, #13; WS10 #6; the lore powers (Hour script, Gossip, Triangulator); Oil fire, Brew, Chime; WS6b's stock and `buys`.
@@ -396,6 +396,21 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p4i-b3`** (2026-10-30): `p4b-b3` (e5e4df4, B3: peoples and villages, from `p3i-lightweapons`) merged into `integration`
+on `p4i-beats`, cleanly (`world/run.js` and `tests/checks/story.js` auto-merged). What it brings is in `docs/b3.md`: the
+Kindling's faction variants, holy places, a cult per Hour, the villages' heights by style, the commons, drinking and
+puddles, the smoothers, the bank and the money's words, a legend's opinions, the lore powers with Oil fire, Brew and
+Chime (held by their `needs` until B1's retune: open items), the tinker's and surgeon's stocks. **`GEN_VERSION` 7 → 8**
+(the cults in the run's factions; every village surface). `torch.js`'s change (C2 #13, with the coordinator's approval)
+confirmed. B3's requests to others (`docs/b3.md` "Requests" 3-9) stay with their owners: B1 (the fungal limb, the Snuff,
+turnwater's shutdown), the integrator (`turns.js`'s confused steps on the map and ink's shortcut; WS3's renderer: glass
+walls seen through, umbra's hole of dark), B2 (`zone.holy`, `zone.holyAreas`, `zone.steles`), content (the Moon-Wick's
+legend template; the smoother's and burnisher's `needs` text). Checks: `run-all` **38 of 38** (212.7 s); the real
+world's bot playthrough; browser-gate (seeds 1234 and 7) and browser-2b pass; B3's `b3-browser.mjs` passes 3 of 3 on the
+merge and 2 of 2 on B3's tag with its 3D puddle capture given 30 frames after the puddle is taken away; with the 4 it
+waits it fails at random on B3's own tag too (1 of 2: the frame isn't redrawn yet), so the step's wait is the fix (the
+script is in the coordinating session's notes). Audio silenced, servers stopped.
 
 **`p4i-beats`** (2026-10-30): C5 #5, #6, #9, #11, #13 (first part) and #14 on `p4i-people`.
 - **#5, #6** (`story/beats.js`, on campaign.js's "beat" event): a done beat pays its reward, the text logged (items:
@@ -1144,7 +1159,14 @@ its §8.4 files and two P0 checks).
     tunnel (C1b #24), picking that one up must not make a second: settled at B2's merge.
   - **check-perf's refresh** read ×1.27 against `p4i-people` (p50 10.13 ms, budget 10) while B1's TTK runs loaded the
     machine; nothing since touches refresh; it passed in run-all's alone slot at the tag. Recheck on a quiet machine.
-- **More powers offered, and check-combat's typical build** (the coordinating session, relaying the user, 2026-10-30): every
+- **The power pool: "Retune tier 8"** (the user, 2026-10-30, relayed by the coordinating session). B1 traced tier 8's rise to
+  offer dilution (a build's two trees spent, the offers fill from every tree: a real cost, the base already 41.5% on
+  average over six sets of builds). B1 proposes a d20-only retune of the level-23 creatures, measured over all six sets
+  with B3's six powers offered too; the user approves the number, then B1 tags `p4b-b1`. **After B1's merge with the
+  approved retune, the integrator drops the `needs: BUILT_B3` on B3's six powers** (Hour script, Gossip, Triangulator,
+  Oil fire, Brew, Chime; `content/powers.js`, as `docs/b3.md` request 10 asks, check-social 18 turned round); not before,
+  or check-combat goes red. B1 also notes `passTime` at ×1.25 against `p3i-lightweapons` (7.6 ms, budget 12): one to watch.
+- **More powers offered, and check-combat's typical build** (superseded by the decision above) (the coordinating session, relaying the user, 2026-10-30): every
   power that goes live widens the 3 offers a level, so ttkTables' typical build gets fewer of the stat powers it prefers and
   its tier-8 cost a kill rises (B1's 8 class powers live: 43.4%; B3's 6 alone: 44.6%; the bound is 22-41%). **The user:
   "Measure, then decide."** B1 counts the live powers' worth in the TTK model and measures with and without B3's six; any
