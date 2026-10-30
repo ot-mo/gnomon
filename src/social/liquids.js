@@ -288,7 +288,7 @@ export function pourLiquid(game, e, id, x = Math.floor(e.x), y = Math.floor(e.y)
 // What a puddle does to a creature in it: turnwater turns it into another of its tier; a ward holds a ghost or a shade.
 function creatureTouch(game, c, key) {
   for (const eff of liquidDef(key)?.effects?.touch || []) {
-    if (eff.transform === "sameTier" && !c.talk && !c.boss && !c.flags?.legend) {
+    if (eff.transform === "sameTier" && !c.talk && !c.boss && !c.flags?.legend && !c.named && !c.uid) {   // (never a named one: a legend, the Hourbound)
       const tier = Math.min(8, Math.max(1, Math.ceil(((c.level || 1) + 1) / 3)));
       const rng = () => (hashInt(game.seed ?? 0, "transform", c.id, game.time || 0) % 10000) / 10000;
       let type = c.type;

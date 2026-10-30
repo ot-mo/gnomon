@@ -59,6 +59,7 @@ on("zone:enter", (game, ev) => {
   const zone = ev.zone, site = zone?.siteId && game.run?.sites?.get(zone.siteId);
   const id = cultOfSite(game, site);
   if (!id || !game.state || !ensureCult(game, id)) return;
+  for (const c of zone.creatures) if (c.hourbound) c.color = [235, 90, 235];   // (the legends' magenta: a load doesn't keep a colour)
   // Every creature of the floor joins (its own factions kept beside, at half: a goblin of the cult is still a goblin).
   for (const c of zone.creatures) if (!c.talk && !c.brain?.leader && !membershipsOf(c).some(([f]) => f === id))
     c.faction = { ...Object.fromEntries(membershipsOf(c).map(([f, w]) => [f, Math.min(0.5, w)])), [id]: 1 };

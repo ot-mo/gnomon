@@ -12,6 +12,7 @@ import { makeRng, seedFor } from "../rng.js";
 import { tierOf } from "../leveling.js";
 import { SMOOTHERS } from "../content/creatures/wildlife.js";
 import { LEGENDS } from "../content/creatures/legends.js";
+import { registerCreatureField } from "../save/codec.js";
 
 export const PACK = { near: 6, far: 10 };
 const levelOfTier = (t) => 3 * Math.min(8, t) - 1;
@@ -41,7 +42,7 @@ export function sendSmoothers(game, { zone = game.zone, size = 1, burnisher = fa
   };
   if (great) {
     const G = SMOOTHERS.great, c = spawn(G.species, levelOfTier(tier) + LEGENDS.base.levels, { name: `${G.name} ${G.epithet}` });
-    if (c) { c.maxHp = c.hp = c.hp * LEGENDS.base.hpMul; c.xp *= LEGENDS.base.xpMul; c.named = true; c.color = LEGENDS.base.color; }
+    if (c) { c.maxHp = c.hp = c.hp * LEGENDS.base.hpMul; c.xp *= LEGENDS.base.xpMul; c.named = true; c.color = LEGENDS.base.color; c.greatSmoother = true; }
   }
   for (let k = 0; k < size; k++) spawn(SMOOTHERS.pack, levelOfTier(tier));
   if (burnisher) spawn(SMOOTHERS.burnisher, levelOfTier(tier + 1));
@@ -50,3 +51,6 @@ export function sendSmoothers(game, { zone = game.zone, size = 1, burnisher = fa
 }
 
 on("smoothers", (game, ev) => { sendSmoothers(game, ev); });
+// The Great Smoother keeps the legends' magenta through a save (a creature's colour isn't saved: its mark is).
+registerCreatureField("greatSmoother");
+on("zone:enter", (game, { zone }) => { for (const c of zone?.creatures || []) if (c.greatSmoother) c.color = LEGENDS.base.color; });
