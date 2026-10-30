@@ -1806,14 +1806,10 @@ export async function run(env) {
         if (best > commons.brewCost(t)) fail(`a brewed ${t} sells for ${best} at EGO 24 and Bright, more than its ${commons.brewCost(t)} to brew`);
       }
       setEgo(16);
-      // Live since B1's merge (the user's power pool decided, 2026-10-30: "Retune tier 8"; the integrator dropped B3's
-      // markers): none of the six waits on anything, and each is offered somewhere in the levels' draws.
-      const six = ["brew", "hourScript", "gossip", "triangulator", "oilFire", "chime"], seen = new Set();
-      // (each to a player of its own tree, with no powers yet: a power held isn't offered, and offers fill from your trees first)
-      for (const k of six) if (POW[k].needs) fail(`${k}: still needs ${POW[k].needs}`);
-      for (const k of six) { const fresh = { ...p(), perks: {}, perkRank: {}, trees: [POW[k].tree] };
-        for (let level = 2; level <= 30 && !seen.has(k); level++) for (let draw = 0; draw < 4; draw++) if (leveling.offerPowers(game, fresh, { level, draw }).includes(k)) seen.add(k); }
-      if (six.some((k) => !seen.has(k))) fail(`B3's powers never offered: ${six.filter((k) => !seen.has(k))}`);
+      // Built, not offered yet (the coordinator, 2026-10-30: the pool waits on the user's decision): each holds B3's marker.
+      const PM = await m("content/powers.js");
+      for (const k of ["brew", "hourScript", "gossip", "triangulator", "oilFire", "chime"]) if (POW[k].needs !== PM.BUILT_B3) fail(`${k}: needs ${POW[k].needs}, want B3's marker`);
+      if (leveling.offerPowers(game, p(), { level: 5 }).some((k) => POW[k].needs === PM.BUILT_B3)) fail("a power B3 built is offered before the pool is balanced");
       // The shrine: the right view, once a day; the wrong view's words.
       const zone = game.zone, kind = v.culture.shrine, S2 = V.shrines[kind];
       zone.village = { siteId: site.id, shrine: { x: 5, y: 5, z: FLOOR_Z, view: S2.view, kind } };

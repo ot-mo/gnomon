@@ -24,6 +24,10 @@ export const TREES = {
   artificing: { name: "Artificing" }, pathcraft: { name: "Pathcraft" }, parley: { name: "Parley" }, hardiness: { name: "Hardiness" },
 };
 
+// Built by B3 (their effects work for whoever holds them: social/commons.js, social/powers.js, story/murals.js,
+// story/secrets.js), but not offered yet: six more live powers change every offer's draw, and the pool waits on the user's
+// decision with B1's measured powers (the coordinator, 2026-10-30; docs/b3.md "Requests"). The integrator drops these.
+export const BUILT_B3 = "offered once the pool is balanced (B3 built it; see docs/b3.md)";
 export const POWERS = {
   // --- The parent's perks (in its order: LEGACY_PERKS) ---
   swimmer:      { tree: "hardiness", name: "Swimmer",       info: "Deep water no longer drags you down: you can swim in it (slowly).", bonus: () => ({ swim: 1 }) },
@@ -75,14 +79,14 @@ export const POWERS = {
   faintRunes:   { tree: "shadowcraft", name: "Faint runes", info: "Runes show faintly while your torch is lit.", needs: "runes drawn faintly with the torch lit (materials.js, render3d.js; the dark lens's too)" },
   thriftyWick:  { tree: "glimcraft", name: "Thrifty wick",  info: "Your torch costs half as much glim.", bonus: () => ({ torchCost: -0.5 }) },
   kindleAtRange:{ tree: "glimcraft", name: "Kindle at range", info: "Light braziers from 4 tiles away in 3D (E, your torch lit)." },   // (interact.js lookTarget: B1)
-  oilFire:      { tree: "glimcraft", name: "Oil fire",      info: "Set glim puddles alight." },
+  oilFire:      { tree: "glimcraft", name: "Oil fire",      info: "Set glim puddles alight.", needs: BUILT_B3 },
   keenEyeSites: { tree: "survey",    name: "Keen Eye",      info: "You find hidden sites twice as often on the road (20%)." },   // (overworld/encounters.js reads it)
   readHeights:  { tree: "survey",    name: "Read heights",  info: "For 10 s after a look in 3D, map tiles show their height as a digit.", needs: "height digits on the map for 10 s after a look in 3D (renderMap.js; the height lens's too)" },
-  hourScript:   { tree: "lore",      name: "Hour script",   info: "You read one more account on every stele." },
-  gossip:       { tree: "lore",      name: "Gossip",        info: "One free rumour in every village." },
-  triangulator: { tree: "lore",      name: "Triangulator",  info: "Triangulating an event gives twice the XP." },
+  hourScript:   { tree: "lore",      name: "Hour script",   info: "You read one more account on every stele.", needs: BUILT_B3 },
+  gossip:       { tree: "lore",      name: "Gossip",        info: "One free rumour in every village.", needs: BUILT_B3 },
+  triangulator: { tree: "lore",      name: "Triangulator",  info: "Triangulating an event gives twice the XP.", needs: BUILT_B3 },
   staunch:      { tree: "leechcraft", name: "Staunch",      info: "You stop bleeding.", needs: "a bleeding status to stop (status.js)" },
-  brew:         { tree: "leechcraft", name: "Brew",         info: "Mix tonics at a village oven." },
+  brew:         { tree: "leechcraft", name: "Brew",         info: "Mix tonics at a village oven.", needs: BUILT_B3 },
   repair:       { tree: "artificing", name: "Repair",       info: "Mend your gear: E on a snapped weapon, a chipped edge or a broken artifact." },
   recharge:     { tree: "artificing", name: "Recharge",     info: "Refill sun and dark cells with glim too (a glim per 100 charge)." },   // (bodymods/artifacts.js fillCell: B1)
   keenFingers:  { tree: "artificing", name: "Keen fingers", info: "+3 to examine artifacts.", bonus: () => ({ examine: 3 }) },
@@ -92,7 +96,7 @@ export const POWERS = {
   homingSense:  { tree: "pathcraft", name: "Homing sense",  info: "Half the time you find your way again at once when lost." },   // (overworld/lost.js)
   warmHands:    { tree: "parley",    name: "Warm Hands",    info: "Later Kindlings go 20 further." },   // (social/ritual.js reads it)
   intimidate:   { tree: "parley",    name: "Intimidate",    info: "Make the weak think twice.", needs: "the weak thinking twice: a morale or flee check (ai.js)" },
-  chime:        { tree: "parley",    name: "Chime",         info: "Recruit by preaching.", ability: "chime" },
+  chime:        { tree: "parley",    name: "Chime",         info: "Recruit by preaching.", ability: "chime", needs: BUILT_B3 },
 };
 
 export const LEGACY_PERKS = ["swimmer", "brightTorch", "tough", "mighty", "fleet", "stealthy", "leaper", "regen", "cartographer",
