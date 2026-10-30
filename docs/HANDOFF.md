@@ -989,6 +989,14 @@ its §8.4 files and two P0 checks).
 
 ## Open items carried forward
 
+- **Balance phase: the user's decisions** (2026-10-30, given to the coordinating session in chat, the user's choices
+  verbatim from its options): **1. Fight cost: "Like the parent."** Creature scaling and gear are tuned so a typical
+  build (powers as offered, normal gear, C4's included) loses about 25-38% of its health per same-level kill at tiers
+  5-8, as in the parent game. **2. XP sources: "Mostly exploring."** Kills stay slow (~100 a level); levels come from
+  discovery, quests and villages; fighting is for loot and survival. **3. Process: "Propose, I approve."** The
+  integrator reruns WS8's TTK tables with C4's gear and proposes concrete numbers to hit those targets (creature level
+  scaling, tier gear enchantment, XP, bare hands, the wildlife's d20 numbers), and **shows the user the tables before
+  changing any number**. When: the integrator fits it around C1b, C3 and C5.
 - **Balance phase** (the user, 2026-10-27: "settle the tuning (creature scaling, kill XP) in the balance phase once
   C4's gear and WS1/WS7's XP are in"): with C4's gear and WS1's discovery XP in (WS7's quest, beat and village XP are in since `p2-ws7b`: `xpReward` 0.6,
   0.75 and 0.2 of a level), rerun
