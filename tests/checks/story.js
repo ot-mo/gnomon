@@ -1109,6 +1109,8 @@ async function beatRoutes(env, { fail, game, CAM, at, p }) {
     if (opt()) fail("Detail C still offers the reading once beat 2 is done");
     out.push("for 300 glim");
     fresh();
+    game.state.rep.plan = -1000;   // Plan Dark: it refuses you, the reading too (second review)
+    if (opt()) fail("a Detail C who refuses you (Plan Dark) still offers the reading");
     game.state.rep.plan = 400;   // Plan Warm
     const f0 = CUR.funds(p), o = opt();
     o?.go();

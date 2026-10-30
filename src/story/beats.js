@@ -188,7 +188,9 @@ registerTalkOptions("campaign", (game, c) => {
 registerTalkOptions("datum", (game, c) => {
   const rule = typeOf(c)?.rule;
   if (rule?.reads !== "datum" || !questActive(game, "beat2")) return null;
-  const free = ["liked", "loved"].includes(standingOf(game, c).band), price = free ? 0 : rule.price;
+  const band = standingOf(game, c).band;
+  if (band === "hated") return null;   // (Dark: it refuses you, the reading too)
+  const free = ["liked", "loved"].includes(band), price = free ? 0 : rule.price;
   return [{ label: `Read the Datum for me.${price ? ` (${price} glim)` : ""}`, go: () => {
     if (price && !pay(game, game.player, price)) return node("INSUFFICIENT GLIM. THE DATUM WILL WAIT. IT IS GOOD AT WAITING.", [{ label: "Back.", go: () => talkTo(game, c) }]);
     emit(game, "route", { id: "datumRead", by: c.uid ?? null });
