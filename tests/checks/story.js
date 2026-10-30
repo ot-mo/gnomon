@@ -1001,6 +1001,14 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json, captu
   const next = page?.options.find((o) => o.label.startsWith("Take its silence money"))?.go();
   if (C.choices?.beat5?.saffre !== "silence" || rep("chandlers") < 200) fail(`beat 5's choice: ${json(C.choices?.beat5)}`);
   if (!next?.options?.some((o) => o.label.startsWith("Unpress the village"))) fail(`after beat 5's first choice the page doesn't go on to its second: ${json(next?.options?.map((o) => o.label))}`);
+  // A beat is paid once, even one paid at game time 0 (verification finding on 37da06f).
+  {
+    const t0 = game.time, seals = () => p.inv.filter((it) => it.id === "assizeSeal").length, n0 = seals(), g0 = p.maxHpGain;
+    game.time = 0; delete C.paid.beat1;
+    BT.payBeat(game, B[0]); BT.payBeat(game, B[0]);
+    if (seals() - n0 !== 1 || p.maxHpGain - g0 !== 5) fail(`beat 1 paid at time 0, then again: ${seals() - n0} seals, max HP +${p.maxHpGain - g0}`);
+    game.time = t0;
+  }
   // Glim that doesn't fit your purse goes on the ground at your feet (verification finding on 37da06f: it was lost).
   {
     const CUR = await env.src("currency.js"), keep = { purse: p.purse, funds: CUR.funds(p) }, z = game.zone, items0 = z.items.length;

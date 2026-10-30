@@ -93,7 +93,7 @@ export function payGlim(game, n) {
 
 export function payBeat(game, beat) {
   const r = beat?.reward, C = campaignOf(game), p = game.player;
-  if (!r || C.paid?.[beat.id]) return;
+  if (!r || C.paid?.[beat.id] !== undefined) return;   // (paid at time 0 is paid)
   (C.paid ||= {})[beat.id] = game.time || 0;
   giveCampaignItems(game, r.items);
   if (r.maxHp && p) {
