@@ -1943,6 +1943,10 @@ export async function run(env) {
     const herd = creatures.spawnCreature("goblin", Math.floor(p().x) + 3, Math.floor(p().y), p().z, { rng: R, level: 3 }); herd.herdOf = "legend:herd"; herd.faction = { saltbeasts: 1 }; creatures.addCreature(game.zone, herd);
     game.run.legends = new Map([["legend:herd", hdef]]);
     if (hm.faction?.saltbeasts !== 1 || hm.talk) fail(`the Herdmother: ${JSON.stringify({ f: hm.faction, talk: !!hm.talk })}`);
+    // A legend that lost its c.opinions (a save from before them): the bond reads its def's.
+    { const keep = hm.opinions; delete hm.opinions;
+      if (ritual.opinionsOf(game, hm).map(([f, o]) => `${f}:${o}`).join() !== "drovers:hates") fail(`a legend's opinions from its def: ${JSON.stringify(ritual.opinionsOf(game, hm))}`);
+      hm.opinions = keep; }
     if (F.attitude(game, herd, p()) !== "hostile") fail("her herd before the Kindling");
     face(hm);
     events.emit(game, "inspect", { zone: game.zone, x: hm.tx, y: hm.ty, z: hm.z, open: true });
