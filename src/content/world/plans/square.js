@@ -32,6 +32,7 @@ export const SQUARE_PLAN = {
   id: "square", name: "the Square", rows: SQUARE_ROWS, legend: LEGEND, stacks: STACKS, halls: HALLS,
   height: 4, wall: B.STONE, floorBlock: B.TILE, roof: "none",
   at: [0, 0], hub: [21, 32],   // the forecourt, where the Straight Cut ends
+  sinkholes: false,   // nobody falls into the cells: the gate is the way in (bible §5 M)
   stamp(zone, ox, oy) {
     const still = makeRng(seedFor(zone.seed, "square"));
     stampVault(zone, { name: "the Square", plan: SQUARE_ROWS, height: 4, wall: B.STONE, floorBlock: B.TILE, links: [], legend: LEGEND,

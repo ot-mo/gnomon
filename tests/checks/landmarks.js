@@ -399,14 +399,15 @@ const PROMISES = {
     const face = C.filter(([x, y]) => x === x0 || x === x1 || y === y0 || y === y1);
     return [[plan.rows.length === plan.rows[0].length, "the clearing isn't square"], [x1 - x0 === 15 && y1 - y0 === 15 && C.every(([x, y]) => solidUp(z, x, y, FLOOR_Z, FLOOR_Z + 12)), "the cube isn't 16 × 16 × 12"],
       [face.length === 58 && cell("D").every(([x, y]) => z.get(x, y, FLOOR_Z) === B.DOOR), "the cube has a window, or its gate isn't a door"],
-      [cell("s").every(([x, y]) => z.get(x, y, FLOOR_Z) === B.TRUNK), "the stumps"],
+      [cell("s").every(([x, y]) => z.get(x, y, FLOOR_Z) === B.TRUNK), "the stumps"], [holesOf(z).length === 0, "a sinkhole into the cells, past the gate"],
       [anyIn(z, pa.x + 16, pa.y + 28, pa.x + 27, pa.y + 34, (x, y) => road(z, x, y)), "the Straight Cut doesn't reach the forecourt"]];
   },
   gnomon: ({ z }) => {
     const cx = z.w >> 1, cy = z.d >> 1;
     return [[solidUp(z, cx, cy, FLOOR_Z, FLOOR_Z + NEEDLE) && z.get(cx, cy, FLOOR_Z + NEEDLE - 1) === B.SHALE, "the needle's foot isn't 14 high at the span's middle"],
       [z.stand[cx + 2 + cy * z.w] === FLOOR_Z + 1 && z.stand[cx + 1 + cy * z.w] === FLOOR_Z + 3, "the plinth (1) and the base (3)"],
-      [z.entrance && z.entrance.x === cx && z.entrance.y > cy + 2, "the door isn't south of the plinth"]];
+      [z.entrance && z.entrance.x === cx && z.entrance.y > cy + 2, "the door isn't south of the plinth"],
+      [holesOf(z).length === 0, "a sinkhole into the Dial-works, past its door"]];
   },
   saltpage: ({ z, cell }) => [
     [["w", "r", "g", "u"].reduce((n, ch) => n + cell(ch).length, 0) === 27 * 27 && ["w", "r", "g", "u"].every((ch) => cell(ch).every(([x, y]) => BLOCKS[z.get(x, y, FLOOR_Z - 1)]?.mosaic)), "the Page isn't 27 × 27 of mosaic"],

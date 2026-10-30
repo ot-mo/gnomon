@@ -33,6 +33,7 @@ export const GNOMON_PLAN = {
   id: "gnomon", name: "the Gnomon", rows: GNOMON_ROWS, legend: LEGEND, grounds: GROUNDS, stacks: STACKS,
   height: 4, wall: B.METAL, floorBlock: B.METAL, roof: "none",
   at: [0, 0], hub: [CX, CY + 7],   // south of the door
+  sinkholes: false,   // nobody falls into the Dial-works: the door is the way in (bible §5 N)
   foot: [CX, CY], needle: NEEDLE,
   stamp(zone, ox, oy) {
     stampVault(zone, { name: "the Gnomon", plan: GNOMON_ROWS, height: 4, wall: B.METAL, floorBlock: B.METAL, links: [], legend: LEGEND,
