@@ -398,10 +398,10 @@ const PROMISES = {
   square: ({ z, cell, plan, pa }) => {
     const C = cell("C"), xs = C.map(([x]) => x), ys = C.map(([, y]) => y), [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
     const face = C.filter(([x, y]) => x === x0 || x === x1 || y === y0 || y === y1);
-    return [[plan.rows.length === plan.rows[0].length, "the clearing isn't square"], [x1 - x0 === 15 && y1 - y0 === 15 && C.every(([x, y]) => solidUp(z, x, y, FLOOR_Z, FLOOR_Z + 12)), "the cube isn't 16 × 16 × 12"],
-      [face.length === 58 && cell("D").every(([x, y]) => z.get(x, y, FLOOR_Z) === B.DOOR), "the cube has a window, or its gate isn't a door"],
+    return [[plan.rows.length === plan.rows[0].length, "the clearing isn't square"], [x1 - x0 === 11 && y1 - y0 === 11 && C.every(([x, y]) => solidUp(z, x, y, FLOOR_Z, FLOOR_Z + 12)), "the cube isn't 12 × 12 × 12"],
+      [face.length === 42 && cell("D").every(([x, y]) => z.get(x, y, FLOOR_Z) === B.DOOR), "the cube has a window, or its gate isn't a door"],
       [cell("s").every(([x, y]) => z.get(x, y, FLOOR_Z) === B.TRUNK), "the stumps"], [holesOf(z).length === 0, "a sinkhole into the cells, past the gate"],
-      [anyIn(z, pa.x + 16, pa.y + 28, pa.x + 27, pa.y + 34, (x, y) => road(z, x, y)), "the Straight Cut doesn't reach the forecourt"]];
+      [anyIn(z, pa.x + 16, pa.y + 26, pa.x + 27, pa.y + 34, (x, y) => road(z, x, y)), "the Straight Cut doesn't reach the forecourt"]];
   },
   gnomon: ({ z }) => {
     const cx = z.w >> 1, cy = z.d >> 1;

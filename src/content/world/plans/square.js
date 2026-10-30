@@ -1,14 +1,14 @@
 // The Square (bible §5 M, §15.3 M: (27, 2), the Deep Pleat, tier 6, the Assize's citadel; 5 floors, 3 down at levels
 // 19-21 and 2 up at 22-23; keys identicalRooms + ruleBanners): a clearing cut perfectly square out of the folding
 // forest, its trees felled in straight rows, the stumps left standing; in the middle a cube with no windows, stone, 12
-// blocks high. Its one gate is in the south face, where the Straight Cut arrives: behind it a gatehall cut into the cube,
+// blocks every way. Its one gate is in the south face, where the Straight Cut arrives: behind it a gatehall cut into the cube,
 // and the stair down to the cells (the floors up are integration request: the dungeon has only its floors down).
 // Plumb characters are let in at the gate; two Rule-banners stand either side of it. The Square is the Assize's holy
 // place (a Bent below Bright is trespass: C2's holy place); Truing Cradle #3 is on its first floor down.
 //
 // The plan is 44 × 44, its corner at (18, 2): the clearing, square to the tile. Letters:
 //   .  the ground as the world made it (the lanes between the stumps, and the forecourt)   s  a stump (a block high)
-//   C  the cube (stone, 12 high)   H  the gatehall (cut into the cube, 4 high under the rest of it)   D  the gate
+//   C  the cube (stone, 12 × 12 × 12)   H  the gatehall (cut into the cube, 4 high under the rest of it)   D  the gate
 //   >  the stair down    b  a Rule-banner on its pole    g  the gate's assizer
 import { B, FLOOR_Z } from "../../../world.js";
 import { makeRng, seedFor } from "../../../rng.js";
@@ -18,9 +18,9 @@ import { Grid, cells, peopleKeys, column } from "./kit.js";
 const W = 44, D = 44, CUBE = 12;
 const G = new Grid(W, D);
 for (let y = 2; y < D - 2; y += 3) for (let x = 2; x < W - 2; x += 3) G.put(x, y, "s");   // the stumps, in rows
-G.fill(14, 12, 29, 27, "C");                    // the cube, 16 × 16
-G.fill(19, 22, 24, 26, "H").put(21, 27, "D").put(22, 27, "D").put(21, 23, ">");
-G.fill(16, 28, 27, 34, ".").put(18, 29, "b").put(25, 29, "b").put(21, 30, "g");   // the forecourt
+G.fill(16, 14, 27, 25, "C");                    // the cube, 12 × 12 and 12 high
+G.fill(19, 20, 24, 24, "H").put(21, 25, "D").put(22, 25, "D").put(21, 21, ">");
+G.fill(16, 26, 27, 34, ".").put(18, 27, "b").put(25, 27, "b").put(21, 28, "g");   // the forecourt
 export const SQUARE_ROWS = G.rows();
 export const SQUARE_PEOPLE = { g: 1 };
 
