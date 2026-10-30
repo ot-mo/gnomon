@@ -25,7 +25,7 @@
 // span is dark all day, any other at night (Phase 2, WS1 #6). A step's hours pass on the span you set out
 // from (worldStep moves the journey after its skipTime).
 import { RULES } from "./rules.js";
-import { pay } from "./currency.js";
+import { pay, CURRENCY } from "./currency.js";   // B3 (C2 #13): CURRENCY.lines.empty
 import { nightSeconds } from "./clock.js";
 import { zoneIsLightless } from "./light.js";
 import { on } from "./events.js";
@@ -61,8 +61,13 @@ export function burnTorch(game, e, t0, t1, zone = game.zone) {
     e.torchBurn = Math.max(0, e.torchBurn - per);
   }
   const now = torchGutters(e);
-  if (e === game.player && now !== was)
-    game.log(now ? "Your purse is dry: the torch gutters down to a flicker." : "The torch drinks a drop of glim and flares up again.", [255, 200, 120]);
+  // B3 (C2 #13): the first time in a run it gutters, the money's own words (game.state.purseDryTold: JSON, so a save keeps
+  // it and a reload doesn't say them again); after that the short line.
+  if (e === game.player && now !== was) {
+    const first = now && game.state && !game.state.purseDryTold;
+    if (first) game.state.purseDryTold = true;
+    game.log(first ? CURRENCY.lines.empty : now ? "Your purse is dry: the torch gutters down to a flicker." : "The torch drinks a drop of glim and flares up again.", [255, 200, 120]);
+  }
 }
 
 const roadZone = (game) => (game.trip && !game.trip.viewOnly ? { hasSky: true, wx: game.trip.wx, wy: game.trip.wy } : game.zone);

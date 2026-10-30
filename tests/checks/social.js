@@ -1986,7 +1986,23 @@ export async function run(env) {
     p().funds = currency.purseCap(p()); p().inv = [{ kind: "weapon", id: "longsword", made: "iron", ench: 0, known: true, count: 1 }];
     const sale = merchants.tradeRows(game, trader, "yours")[0], said = sale && merchants.tradeRow(game, trader, "yours", sale);
     if (!said || said.ok || !said.line.includes(CUR.lines.overflow)) fail(`a sale into a full flask: ${JSON.stringify(said)?.slice(0, 120)}`);
-    out.money = "the overflow's words; Molar F: 100 in, 95 held; 50 out; noBank elsewhere";
+    // The torch on an empty purse (torch.js, the coordinator's exception for C2 #13): the money's words the first time in
+    // a run, the short line after; the mark is in game.state, so a save keeps it and a reload doesn't say them again.
+    {
+      const T = await m("torch.js"), lines = [], log0 = game.log;
+      setup(); p().funds = 0; p().torch = true; delete game.state.purseDryTold;
+      game.log = (t, c) => { lines.push(t); return log0.call(game, t, c); };
+      const dark = { hasSky: false }, per = T.glimSeconds();
+      T.burnTorch(game, p(), 0, per + 1, dark);
+      p().funds = 5; T.burnTorch(game, p(), per + 1, per + 2, dark);
+      p().funds = 0; T.burnTorch(game, p(), per + 2, 3 * per, dark);
+      const kept = JSON.parse(JSON.stringify(game.state)).purseDryTold;
+      game.log = log0;
+      const dry = lines.filter((t) => /purse is dry/i.test(t));
+      if (dry[0] !== CUR.lines.empty || dry.length !== 2 || dry[1] === CUR.lines.empty || kept !== true)
+        fail(`the torch on an empty purse: ${JSON.stringify(dry)}, kept ${kept}`);
+    }
+    out.money = "the overflow's words; Molar F: 100 in, 95 held; 50 out; noBank elsewhere; the torch's first empty-purse line the money's";
 
     // WS6b: the tinker's and the surgeon's packs.
     setup();
