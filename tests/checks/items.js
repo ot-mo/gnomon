@@ -1860,6 +1860,33 @@ export function checkB1Gear(m) {
     stats.artifacts = `the homing pip home from a floor (refused with a goblin by you); the snuffer dark 5 tiles off with the torch lit, not 8, not after 20 s; the theodolite ${found} sites around ${z.wx},${z.wy}`;
   });
 
+  // 7. Recharge and Kindle at range (C4 #9): a sun or dark cell fills from the purse only with Recharge (a heart cell
+  //    never); a cold brazier 3.5 tiles off is E's to light in 3D with Kindle at range and the torch lit, not without
+  //    the power, not with the torch out, not 5.5 tiles off.
+  section("recharge and kindle", () => {
+    startRun(13, m.testWorld.TEST_WORLD);
+    const p = game.player;
+    const fill = (id, perk) => { p.perks = perk ? { recharge: 1 } : {}; p.funds = 100; const c = { kind: "cell", id, charge: 0 }; const t = I.useItem(game, p, c); return { t, charge: c.charge, paid: 100 - m.currency.funds(p) }; };
+    const sun0 = fill("sun", false), sun1 = fill("sun", true), dark1 = fill("dark", true), heart1 = fill("heart", true), glim0 = fill("glim", false);
+    if (sun0.t || sun0.charge || !sun1.t || sun1.charge !== 2500 || sun1.paid !== 25 || dark1.charge !== 2500 || heart1.charge || glim0.charge !== 2500)
+      fail(`Recharge: a sun cell without it ${JSON.stringify(sun0)}, with it ${JSON.stringify(sun1)}; a dark cell ${JSON.stringify(dark1)}; a heart cell ${JSON.stringify(heart1)}; a glim cell without it ${JSON.stringify(glim0)}`);
+    p.perks = {};
+    // Kindle at range, in a hall.
+    const W = m.world, z = new W.Zone({ key: "b1-kindle", wx: 98, wy: 98, z: 1, type: "dungeon", level: 3, seed: 3, w: 16, d: 9, h: 8, name: "Brazier Hall" });
+    for (let y = 0; y < z.d; y++) for (let x = 0; x < z.w; x++) { for (let k = 0; k < W.FLOOR_Z; k++) z.set(x, y, k, W.B.ROCK); z.set(x, y, W.FLOOR_Z + 4, W.B.ROCK); }
+    z.hasSky = false; z.edges = { n: null, s: null, e: null, w: null };
+    z.spawn = { x: 2.5, y: 4.5, z: W.FLOOR_Z, yaw: 0 };
+    m.zones.enterZone(game, z.seal(), { how: "start" });
+    const aim = (bx) => { z.set(bx, 4, W.FLOOR_Z, W.B.BRAZIER); z.refresh(); Object.assign(p, { x: 2.5, y: 4.5, z: W.FLOOR_Z }); p.yaw = 0; p.pitch = Math.atan2(W.FLOOR_Z + 0.5 - (p.z + 1.45), bx + 0.5 - p.x); };
+    const can = (bx, perk, torch) => { aim(bx); p.perks = perk ? { kindleAtRange: 1 } : {}; p.torch = torch; const t = m.interact.lookTarget(game); z.set(bx, 4, W.FLOOR_Z, W.B.AIR); z.refresh(); return t?.label || null; };
+    const near = can(6, true, true), noPower = can(6, false, true), dark = can(6, true, false), far = can(8, true, true);
+    aim(6); p.perks = { kindleAtRange: 1 }; p.torch = true; m.interact.interact(game);
+    const lit = z.get(6, 4, W.FLOOR_Z) === W.B.BRAZIER_LIT;
+    p.perks = {};
+    if (!/light the brazier/.test(near || "") || noPower || dark || far || !lit) fail(`Kindle at range: 3.5 tiles "${near}", without the power "${noPower}", torch out "${dark}", 5.5 tiles "${far}"; E lit it ${lit}`);
+    stats.recharge = `a sun cell filled with Recharge for ${sun1.paid} glim, refused without; a brazier 3.5 tiles off lit by E with Kindle at range`;
+  });
+
   return { name: "items: B1's gear", ok: problems.length === 0, problems, stats };
 }
 

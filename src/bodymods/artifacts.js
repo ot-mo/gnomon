@@ -103,9 +103,11 @@ export function loadCell(game, p, it) {
   return true;
 }
 
+// (the Recharge power, B1, C4 #9: sun and dark cells from glim too; a heart cell never)
+const fillable = (p, def) => !!def && (def.recharge === "glim" || ((def.recharge === "sun" || def.recharge === "dark") && hasKey(p.perks, "recharge")));
 export function fillCell(game, p, cell) {
   const def = CELLS[cell?.id];
-  if (!def || def.recharge !== "glim") return 0;
+  if (!fillable(p, def)) return 0;
   const room = def.charge - cell.charge, glim = Math.min(Math.ceil(room / CHARGE_PER_GLIM), funds(p));
   if (glim <= 0 || !pay(game, p, glim)) return 0;
   cell.charge = Math.min(def.charge, cell.charge + glim * CHARGE_PER_GLIM);
@@ -461,7 +463,7 @@ registerItemKind("cell", {
   price: (it) => Math.round((CELLS[it.id]?.value || 0) * (0.25 + 0.75 * chargeOf(it) / (cellMax(it) || 1))),
   use(game, e, it) {
     const def = CELLS[it.id];
-    if (def?.recharge !== "glim") { game.log(`The ${def?.name || "cell"} can't be filled from a purse.`, [170, 170, 170]); return 0; }
+    if (!fillable(e, def)) { game.log(`The ${def?.name || "cell"} can't be filled from a purse${def?.recharge === "sun" || def?.recharge === "dark" ? " (the Recharge power could)" : ""}.`, [170, 170, 170]); return 0; }
     if (it.charge >= def.charge) { game.log(`The ${def.name} is full.`, [170, 170, 170]); return 0; }
     const glim = fillCell(game, e, it);
     if (!glim) { game.log("Your purse is dry.", [255, 150, 120]); return 0; }

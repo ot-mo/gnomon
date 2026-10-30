@@ -17,6 +17,7 @@
 // The legacy uses (lever, door, gate, brazier) are registered here, in that order, and act as they always did.
 import { castRay, hit } from "./raycast.js";
 import { BLOCKS, B, FLOOR_Z } from "./world.js";
+import { hasKey } from "./keyset.js";
 import { EYE } from "./player.js";
 import { spawnCreature, addCreature, pickCreatureType, talkersIn, ghostHidden, canTalk } from "./creatures.js";
 import { lineOfSight } from "./raycast.js";
@@ -40,12 +41,17 @@ function useOf(block) {
   return null;
 }
 
+// Kindle at range (B1, C4 #9): with the power and your torch lit, a cold brazier in your sight up to KINDLE_REACH tiles off
+// is in reach (anything else still REACH).
+export const KINDLE_REACH = 4;
 export function lookTarget(game) {
   const p = game.player;
   const person = lookPerson(game);
   if (person) return person;
   const cp = Math.cos(p.pitch);
-  if (!castRay(game.zone, p.x, p.y, p.z + EYE, cp * Math.cos(p.yaw), cp * Math.sin(p.yaw), Math.sin(p.pitch), REACH)) return null;
+  const far = hasKey(p.perks, "kindleAtRange") && p.torch;
+  if (!castRay(game.zone, p.x, p.y, p.z + EYE, cp * Math.cos(p.yaw), cp * Math.sin(p.yaw), Math.sin(p.pitch), far ? KINDLE_REACH : REACH)) return null;
+  if (hit.t > REACH && !(BLOCKS[hit.block]?.brazier && !BLOCKS[hit.block].on)) return null;
   const info = BLOCKS[hit.block];
   const target = { x: hit.x, y: hit.y, z: hit.z, block: hit.block };
   if (info.lever) return { ...target, label: info.on ? "lever (already pulled)" : "pull the lever" };

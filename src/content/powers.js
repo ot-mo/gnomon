@@ -74,7 +74,7 @@ export const POWERS = {
   darkBackstab: { tree: "shadowcraft", name: "Dark backstab", info: "Double damage against an unaware target while your torch is out, with any weapon." },
   faintRunes:   { tree: "shadowcraft", name: "Faint runes", info: "Runes show faintly while your torch is lit.", needs: "runes drawn faintly with the torch lit (materials.js, render3d.js; the dark lens's too)" },
   thriftyWick:  { tree: "glimcraft", name: "Thrifty wick",  info: "Your torch costs half as much glim.", bonus: () => ({ torchCost: -0.5 }) },
-  kindleAtRange:{ tree: "glimcraft", name: "Kindle at range", info: "Light braziers from 4 tiles away.", needs: "lighting a brazier from 4 tiles (interact.js; Kindle the mutation reaches 5 + level)" },
+  kindleAtRange:{ tree: "glimcraft", name: "Kindle at range", info: "Light braziers from 4 tiles away in 3D (E, your torch lit)." },   // (interact.js lookTarget: B1)
   oilFire:      { tree: "glimcraft", name: "Oil fire",      info: "Set glim puddles alight.", needs: "glim puddles that burn when lit (C2's glim liquid burns for 6 s if lit: social/liquids.js, status burning)" },
   keenEyeSites: { tree: "survey",    name: "Keen Eye",      info: "You find hidden sites twice as often on the road (20%)." },   // (overworld/encounters.js reads it)
   readHeights:  { tree: "survey",    name: "Read heights",  info: "For 10 s after a look in 3D, map tiles show their height as a digit.", needs: "height digits on the map for 10 s after a look in 3D (renderMap.js; the height lens's too)" },
@@ -84,7 +84,7 @@ export const POWERS = {
   staunch:      { tree: "leechcraft", name: "Staunch",      info: "You stop bleeding.", needs: "a bleeding status to stop (status.js)" },
   brew:         { tree: "leechcraft", name: "Brew",         info: "Mix tonics at a village oven.", needs: "mixing tonics at a village oven (a service: social/villages, content/items/tonics.js TONICS)" },
   repair:       { tree: "artificing", name: "Repair",       info: "Mend your gear: E on a snapped weapon, a chipped edge or a broken artifact." },
-  recharge:     { tree: "artificing", name: "Recharge",     info: "Refill cells with glim.", needs: "filling sun and dark cells from glim as well (bodymods/artifacts.js fillCell fills glim cells only)" },
+  recharge:     { tree: "artificing", name: "Recharge",     info: "Refill sun and dark cells with glim too (a glim per 100 charge)." },   // (bodymods/artifacts.js fillCell: B1)
   keenFingers:  { tree: "artificing", name: "Keen fingers", info: "+3 to examine artifacts.", bonus: () => ({ examine: 3 }) },
   mod:          { tree: "artificing", name: "Mod",          info: "Add one property to an item.", needs: "adding one property to an item (an item action over items.js PROPERTIES)" },
   pathfinder:   { tree: "pathcraft", name: "Pathfinder",    info: "You travel half again as far in an hour.", bonus: () => ({ travel: 0.5 }) },   // (overworld/travel.js)
