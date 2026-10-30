@@ -1181,16 +1181,28 @@ export async function checkProgression(m) {
         game.pages = null; game.story.cube = true;
         m.travel.enterWorldMap(game);
         let drifts = 0, moves = 0, side = 0;
+        const bad = [];
         for (let k = 0; k < 300; k++) {
           const dx = k % 2 ? -1 : 1, r = m.travel.worldStep(game, dx, 0, { confirm: true, fast: true, drop: false });
           if (!r.ok) continue;
           moves++;
-          if (r.drifted) { drifts++; if (r.to.wy !== r.from.wy) side++; }
+          if (r.drifted) {
+            drifts++; if (r.to.wy !== r.from.wy) side++;
+            const T = game.run.world.tileAt(r.to.wx, r.to.wy), came = game.trip?.came;
+            if (came && (came.dx !== r.to.wx - r.from.wx || came.dy !== r.to.wy - r.from.wy)) bad.push(`came ${JSON.stringify(came)}`);
+            if (T.tier >= m.owState.playerTier(game) + m.owState.OW().tierWarning) bad.push(`into tier ${T.tier}`);
+          }
           if (game.trip?.prompt) game.trip.prompt = null;
         }
+        if (bad.length) fail(`Sleepwalker's drifts: ${bad.slice(0, 3).join("; ")}`);
         return { drifts, moves, side };
       };
       const sw = walk(["sleepwalker"]), calm = walk([]);
+      // Every span "beyond you" (the tier warning at -10): a sleepwalker wakes before every drift, so none happens.
+      const undoWarn = m.rules.overrideRules("overworld", { ...m.rules.RULES.overworld, tierWarning: -10 });
+      let wary;
+      try { wary = walk(["sleepwalker"]); } finally { undoWarn(); }
+      if (wary.moves < 200 || wary.drifts) fail(`Sleepwalker with every span beyond you: ${wary.drifts} drifts in ${wary.moves} moves (want none)`);
       if (sw.moves < 200 || sw.drifts < 10 || sw.drifts > 0.16 * sw.moves || sw.side !== sw.drifts || calm.drifts) fail(`Sleepwalker: ${sw.drifts} drifts in ${sw.moves} moves (${sw.side} to a side; want about 1 in 10), ${calm.drifts} without it`);
       out.sleepwalker = `${sw.drifts} drifts in ${sw.moves} moves, ${calm.drifts} without`;
     }
@@ -1493,7 +1505,7 @@ export async function run(env) {
     codec: await src("save/codec.js"), rng: await src("rng.js"), items: await src("items.js"), playerMod: await src("player.js"), body: await src("body.js"),
     implants: await src("content/items/implants.js"), mutations: await src("content/mutations.js"),
     pmut: await src("progression/mutations.js"), abilities: await src("abilities.js"), turns: await src("turns.js"), inventory: await src("inventory.js"),
-    traps: await src("traps.js"), merchants: await src("social/merchants.js"), travel: await src("overworld/travel.js"), worldmap: await src("content/world/worldmap.js"), gameMod: await src("game.js"),
+    traps: await src("traps.js"), merchants: await src("social/merchants.js"), owState: await src("overworld/state.js"), travel: await src("overworld/travel.js"), worldmap: await src("content/world/worldmap.js"), gameMod: await src("game.js"),
     creatures: await src("creatures.js"), world: await src("world.js"), status: await src("status.js"), events: await src("events.js"),
     factions: await src("factions.js"), charsheet: await src("screens/charsheet.js"), light: await src("light.js"), time: await src("time.js"),
     content: { ...genotypes, ...backgrounds, ...powers },

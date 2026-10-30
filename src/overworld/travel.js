@@ -121,8 +121,9 @@ export function worldStep(game, dx, dy, { confirm = false, fast = false, drop = 
   let drifted = false;
   if (game.player.mutations?.sleepwalker && roll(game) < SLEEPWALK) {
     const sides = dx && dy ? [[dx, 0], [0, dy]] : dx ? [[dx, 1], [dx, -1]] : [[1, dy], [-1, dy]];
-    const [ex, ey] = sides[roll(game) < 0.5 ? 0 : 1];
-    if (!canStep(world, from, ex, ey)) {
+    const [ex, ey] = sides[roll(game) < 0.5 ? 0 : 1], side = world.tileAt(from.wx + ex, from.wy + ey);
+    // (never into a span the tier warning would have asked about: you wake before that; verification finding)
+    if (!canStep(world, from, ex, ey) && side && side.tier < playerTier(game) + OW().tierWarning) {
       to = { wx: from.wx + ex, wy: from.wy + ey }; t = world.tileAt(to.wx, to.wy); edge = edgeBetween(world, from, to); drifted = true;
       say(game, "You walk on half asleep, and wake a span off your way.", [200, 190, 230]);
     }
@@ -130,7 +131,7 @@ export function worldStep(game, dx, dy, { confirm = false, fast = false, drop = 
   const hours = stepHours(game, from, to, edge), flying = statusFlag(game.player, "flying");   // as you set out
   const sk = skipTime(game, hours * hourSeconds(), { interruptible: false, reason: "travel" });
   const res = { ok: true, from, to, hours, seconds: sk.elapsed, lost: false, encounter: null, site: null, dropped: false, dead: false, drifted };
-  trip.wx = to.wx; trip.wy = to.wy; trip.came = { dx, dy }; trip.moved = true; trip.cursor = null;
+  trip.wx = to.wx; trip.wy = to.wy; trip.came = { dx: to.wx - from.wx, dy: to.wy - from.wy }; trip.moved = true; trip.cursor = null;   // (the way you really came: a drift's too)
   if (game.mode === "dead") {
     res.dead = true;
     game.trip = null;
