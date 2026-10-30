@@ -688,6 +688,59 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
     stats.drawnDoor = `in ${inOk}, out ${outOk}, a drawn wall holds ${held}`;
     expect(inOk && outOk && held, `in a game: Folio's drawn door (${stats.drawnDoor})`);
   } else problems.push("in a game: Folio has no drawn door");
+  // In a game: the Unlit Choir's rune doors (C1b #26) open only with your torch out, on the map and in 3D; its floors have
+  // them, every door a rune door with its rune over it.
+  const choir = game.run.world.landmarks.get("unlitChoir");
+  game.debug.enterZone(`${choir.wx},${choir.wy},1`);
+  const cz = game.zone, rd = cz.runeDoors || [];
+  const doorsAll = []; for (let i = 0; i < cz.w * cz.d; i++) if (cz.get(i % cz.w, Math.floor(i / cz.w), FLOOR_Z) === B.DOOR) doorsAll.push(i);
+  if (rd.length) {
+    const i = rd[0], x = i % cz.w, y = Math.floor(i / cz.w);
+    const tries = [];
+    for (const [view, torch] of [["map", true], ["3d", true], ["map", false]]) {
+      game.view = view; pl.torch = torch;
+      if (cz.get(x, y, FLOOR_Z) !== B.DOOR) { cz.set(x, y, FLOOR_Z, B.DOOR); cz.set(x, y, FLOOR_Z + 1, B.DOOR); }
+      tries.push(!!useColumn(game, x, y) && cz.get(x, y, FLOOR_Z) === B.AIR);
+    }
+    pl.torch = true;
+    stats.runeDoors = `${rd.length} rune doors of ${doorsAll.length} doors on floor 1; lit on the map ${tries[0]}, lit in 3D ${tries[1]}, dark ${tries[2]}`;
+    expect(doorsAll.every((k) => rd.includes(k)) && rd.every((k) => cz.get(k % cz.w, Math.floor(k / cz.w), FLOOR_Z + 2) === B.RUNE) && JSON.stringify(tries) === "[false,false,true]",
+      `in a game: the rune doors (${stats.runeDoors})`);
+  } else problems.push("in a game: no rune doors on the Unlit Choir's floor 1");
+  // The Gnomon's door (C1b #26, #10): shut over the stair at 09:00 and 14:00, open from 11:00 to 13:00 (by the clock while
+  // you stand there); outside them the Cube turned on the threshold opens it for good for 10 max HP (asked first), the
+  // Plumb Key opens it for nothing, and with neither it stays shut.
+  const { maxHp } = await import("../../src/stats.js"), { catchUp } = await import("../../src/clock.js");
+  const gn = game.run.world.landmarks.get("gnomon"), gk = `${gn.wx},${gn.wy},0`;
+  const atHour = (h) => { game.time = (h - 6) * 60 + 24 * 60 * Math.floor((game.time + 1) / (24 * 60)); };
+  const gnomonDoor = (h, setup) => {
+    startRun(seeds[0], REAL_WORLD); game.story.cube = false; atHour(h); setup?.();
+    game.debug.enterZone(gk);
+    return game.zone.needleDoor;
+  };
+  const shut = (d) => d && d.cells.every(([x, y]) => game.zone.get(x, y, FLOOR_Z) === B.GATE);
+  const g9 = shut(gnomonDoor(9)), g12 = !shut(gnomonDoor(12)), g14 = shut(gnomonDoor(14));
+  // the clock turning while you stand there
+  const d = gnomonDoor(10);
+  const before = shut(d);
+  game.clockSeen = game.time; game.time += 60 + 1; catchUp(game);   // past 11:00
+  const opened = !shut(d);
+  game.time += 2 * 60; catchUp(game);   // past 13:00
+  const closed = shut(d);
+  // its keys, at 14:00
+  const dc = gnomonDoor(14, () => { game.story.cube = true; }), hp0 = maxHp(game.player), [cx, cy] = dc.cells[0];
+  game.view = "map";
+  const ask = useColumn(game, cx, cy), asked = shut(dc) && maxHp(game.player) === hp0;
+  game.time += 1; useColumn(game, cx, cy);
+  const cube = !shut(dc) && dc.forGood && dc.how === "cube" && maxHp(game.player) === hp0 - 10;
+  const dk = gnomonDoor(14, () => { game.player.inv.push({ kind: "quest", id: "plumbKey", name: "the Plumb Key" }); }), hk = maxHp(game.player);
+  useColumn(game, ...dk.cells[0]);
+  const key = !shut(dk) && dk.how === "plumbKey" && maxHp(game.player) === hk;
+  const dn = gnomonDoor(14);
+  useColumn(game, ...dn.cells[0]); useColumn(game, ...dn.cells[0]);
+  const none = shut(dn);
+  stats.gnomonDoor = { g9, g12, g14, clock: before && opened && closed, asked: !ask && asked, cube, key, none };
+  expect(Object.values(stats.gnomonDoor).every(Boolean), `in a game: the Gnomon's door ${JSON.stringify(stats.gnomonDoor)}`);
   return { name: "landmark bottoms", ok: problems.length === 0, problems, stats };
 }
 

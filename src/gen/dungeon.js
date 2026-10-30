@@ -722,6 +722,20 @@ GIMMICKS.braziers = (f, rng, rooms, p, ctx) => {
 };
 
 // A Truing Cradle (WS5's station) in a corner of some ordinary room.
+// runeDoors (the Unlit Choir, bible §5 J; B2, C1b #26): every door on the level (not a locked one) is a rune door: a rune
+// is cut over it (it glows in the dark), and it opens only to someone whose torch is out (interact.js; zone.runeDoors,
+// the doors' columns), in either view.
+GIMMICKS.runeDoors = (f, rng, rooms) => {
+  const cols = new Set();
+  for (const r of rooms)
+    for (const d of r.doors) {
+      if (f.get(d.x, d.y, FLOOR_Z) !== B.DOOR) continue;
+      if (f.get(d.x, d.y, FLOOR_Z + 2)) f.set(d.x, d.y, FLOOR_Z + 2, B.RUNE);
+      cols.add(d.x + d.y * W);
+    }
+  f.runeDoors = [...cols];
+};
+
 // identicalRooms (the Square, bible §5 M; B2, C1b #20): with the one-material "rule" theme every room is the same room in
 // 3D; each room's mark, three tiles of mosaic in the middle of its floor (no two rooms alike), tells them apart on the map
 // (zone.roomMarks [{ room, x, y, mark }]: the three colours, west to east).
