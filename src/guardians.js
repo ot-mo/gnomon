@@ -31,7 +31,7 @@ import { claimUid, uidWhere, zoneState } from "./zones.js";
 import { killMonster } from "./monsters.js";
 import { legendLooks } from "./content/creatures/legends.js";
 import { registerAIHook } from "./ai.js";
-import { spawnCreature, addCreature, removeCreature } from "./creatures.js";
+import { spawnCreature, addCreature, removeCreature, TheOf } from "./creatures.js";
 import { B, FLOOR_Z } from "./world.js";
 import { lightAt } from "./light.js";
 import { sfx } from "./sfx.js";
@@ -243,8 +243,8 @@ registerAIHook("legend:twicePressed", (game, m, dt) => {
   if ((m.g.t += dt) < TWICE_PRESSED) return false;
   m.g.t = 0;
   m.risen = !m.risen;
-  game.log(m.risen ? `${m.name} stands up out of the floor, suddenly deep. (Strike it in 3D.)`
-    : `${m.name} lies back down into the plane. (Strike it on the map.)`, m.color);
+  game.log(m.risen ? `${TheOf(m)} stands up out of the floor, suddenly deep. (Strike it in 3D.)`   // (TheOf: a legend by its name, a species running the hook as "The planar queen"; integrator, C3 #8)
+    : `${TheOf(m)} lies back down into the plane. (Strike it on the map.)`, m.color);
   sfx("rotate", { up: m.risen, at: m });
   return false;
 });
@@ -276,7 +276,7 @@ registerAIHook("legend:lamplessSaint", (game, m, dt) => {
       if (zone.get(x, y, FLOOR_Z) === B.BRAZIER_LIT) {
         zone.set(x, y, FLOOR_Z, B.BRAZIER);
         zone.refresh();
-        game.log(`${m.name} breathes, and a brazier goes out.`, [170, 190, 255]);
+        game.log(`${TheOf(m)} breathes, and a brazier goes out.`, [170, 190, 255]);
         return false;
       }
   return false;

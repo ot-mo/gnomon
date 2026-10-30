@@ -17,6 +17,11 @@ import { itemName, itemGlyph, itemDetails, itemBonuses, itemPrice, itemWeight, i
 import { slotsFor, wornOn, defaultPart } from "../body.js";
 import { partLabel } from "../inventory.js";
 import { CREATURE_TYPES, ELITES, canTalk } from "../creatures.js";
+import { creatureLines } from "../content/creatures/bestiary.js";
+
+// A creature's line in the register you see it in (C3's bestiary, bible §2.1: the Flat on the map, the Dark with the
+// torch out, the Deep otherwise); a type without one keeps its info (integrator, C3 #2).
+const seenAs = (game, c) => { const L = creatureLines(c.type); return L ? (game.view === "map" ? L.flat : !game.player?.torch ? L.dark : L.deep) : null; };
 import { attitude } from "../factions.js";
 import { resistText, avOf, dvOf } from "../combat.js";
 import { maxHp } from "../stats.js";
@@ -78,12 +83,12 @@ export function examineLines(game, subject) {
     const c = subject.creature, t = CREATURE_TYPES[c.type] || {};
     if (canTalk(c)) {
       add(`${c.name}${c.title || t.title ? `, ${c.title || t.title}` : ""}`, UI.title);
-      if (t.info) add(t.info);
+      if (seenAs(game, c) || t.info) add(seenAs(game, c) || t.info);
       add(`${capital(ATTITUDE[attitude(game, c, p)]?.[0] || "here")}.`, ATTITUDE[attitude(game, c, p)]?.[1]);
       return out;
     }
     add(`${capital(c.name)}, level ${c.level || 1}`, UI.title);
-    if (t.info) add(t.info);
+    if (seenAs(game, c) || t.info) add(seenAs(game, c) || t.info);
     const [word, color] = ATTITUDE[attitude(game, c, p)] || ["here", UI.text];
     add(`It's ${word}.`, color);
     const exact = implantEffect(p, "readsCreatures"), mhp = c.maxHp || t.hp || 1, av = avOf(c), dvv = dvOf(game, c);

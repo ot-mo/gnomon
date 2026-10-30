@@ -49,6 +49,8 @@ import { VILLAGERS } from "../../src/content/creatures/villagers.js";
 import { CREATURES_WAITING } from "../../src/content/creatures/waiting.js";
 import { makeRng } from "../../src/rng.js";
 import { RULES } from "../../src/rules.js";
+import { creatureLines } from "../../src/content/creatures/bestiary.js";
+import { examineLines } from "../../src/screens/examine.js";
 import { LEVEL_POOL, rowsAt } from "../../src/content/creatures/levels.js";
 import { REGIONS } from "../../src/content/world/regions.js";
 
@@ -223,6 +225,21 @@ export function checkCreatures({ game, startRun, srcFiles }) {
     }
     if (RULES.level.contentMax !== 23 || off.length) problems.push(`levels above 20: contentMax ${RULES.level.contentMax}; ${off.join("; ")}`);
     stats.above20 = `levels 21-23: 900 draws from C3's pool, none the parent's goblin`;
+  }
+  // The three registers on the examine screen (integrator, C3 #2): a creature's Flat line on the map, its Dark line
+  // with the torch out, its Deep line otherwise.
+  {
+    const type = Object.keys(BESTIARY).find((id) => CREATURE_TYPES[id] && !CREATURE_TYPES[id].talks && creatureLines(id)), L = creatureLines(type);
+    const c = spawnCreature(type, 3, 3, FLOOR_Z, { rng: () => 0.5, level: 3 });
+    const v0 = game.view, t0 = game.player.torch, seen = {};
+    try {
+      for (const [k, view, torch] of [["flat", "map", true], ["deep", "3d", true], ["dark", "3d", false]]) {
+        game.view = view; game.player.torch = torch;
+        seen[k] = examineLines(game, { creature: c }).some((l) => l.text === L[k]);
+      }
+    } finally { game.view = v0; game.player.torch = t0; }
+    if (!seen.flat || !seen.deep || !seen.dark) problems.push(`examine's registers for ${type}: ${JSON.stringify(seen)}`);
+    stats.registers = `${type}: the Flat line on the map, the Deep in 3D, the Dark with the torch out`;
   }
   // 6. C3's roster (below).
   const roster = checkRoster(game);
