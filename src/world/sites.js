@@ -91,7 +91,7 @@ export function dungeonLevelOf(spec, z) {
 }
 
 // A landmark's dungeon definition (content) as a DungeonSpec.
-function landmarkDungeon(L) {
+function landmarkDungeon(L, world) {
   const d = L.dungeon, surface = levelOfTier(L.tier);
   const spec = {
     levels: d.floors ? d.floors.length : d.levels, theme: d.theme || "legacy",
@@ -109,6 +109,15 @@ function landmarkDungeon(L) {
   if (d.floorGimmicks) spec.floorGimmicks = d.floorGimmicks.map((g) => [...g]);
   if (d.planned?.creatures) spec.creatures = JSON.parse(JSON.stringify(d.planned.creatures));   // (its own inhabitants: dungeonParams)
   if (d.planned?.vaults) spec.vaults = JSON.parse(JSON.stringify(d.planned.vaults));   // a hall on a floor that isn't the last (B2, C1b #6)
+  // Its places (B2): the clue and the captive (C1b #24: who stands there is C5's), the prisoners' cells (#20), and the far
+  // mouth up to its landmark's grate (#22: the Root Canals' floor 2 to Molar's X, east of the checkpoint).
+  const P = d.planned || {};
+  if (P.clue) spec.clue = { floor: P.clue.floor, what: P.clue.what };
+  if (P.captive) spec.captive = { floor: P.captive.floor, who: P.captive.who };
+  if (P.prisoners) spec.prisoners = { floors: [...P.prisoners.floors] };
+  if (P.theme && DUNGEONS.themes[P.theme]) spec.theme = P.theme;
+  const mouth = P.exit && world?.plans?.[world.landmarks.get(P.exit.to)?.plan]?.farMouth, to = P.exit && world?.landmarks.get(P.exit.to);
+  if (mouth && to?.anchor) spec.exit = { floor: P.exit.floor, key: `${to.wx},${to.wy},0`, at: [to.anchor[0] + mouth[0], to.anchor[1] + mouth[1]] };
   if (d.planned?.murals || d.murals) spec.murals = (d.planned?.murals || d.murals).map((m) => ({ ...m }));   // its own murals' words (B2, C1b #7)
   return spec;
 }
@@ -212,6 +221,8 @@ export function dungeonParams(run, site, z) {
     cradle: !!spec.cradle?.includes(z), murals: (final && b?.hour && hourAccounts(run, b.hour)) || (spec.murals ? spec.murals.map((m) => ({ ...m })) : null),
     name: spec.named?.[z - 1] || `${site.name}, level ${z}`,
     landings: z === 1 ? sinkholeSpots(run, site).map(([x, y]) => [x, y]) : null,
+    ...(spec.clue?.floor === z ? { clue: { ...spec.clue } } : {}), ...(spec.captive?.floor === z ? { captive: { ...spec.captive } } : {}),
+    ...(spec.prisoners?.floors.includes(z) ? { prisoners: 2 } : {}), ...(spec.exit?.floor === z ? { exit: { key: spec.exit.key, at: [...spec.exit.at] } } : {}),
   };
 }
 
@@ -382,7 +393,7 @@ export function placeSites(run) {
       landmarkId: L.id, checkpoint: L.checkpoint,
       surface: { builder: "landmark", rect: L.rect ? { ...L.rect } : null, params: { plan: L.plan, anchor: L.anchor } },
     };
-    if (L.dungeon) site.dungeon = landmarkDungeon(L);
+    if (L.dungeon) site.dungeon = landmarkDungeon(L, world);
     if (site.dungeon?.bottom.kind === "legend") site.legend = landmarkLegend(site);
     addSite(run, site);
   }

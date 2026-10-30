@@ -30,6 +30,7 @@ import { arrivalPoint } from "../../src/zones.js";
 import { buildRun, zoneSeed } from "../../src/world/run.js";
 import { compileWorld, tierOfLevel } from "../../src/world/worldmodel.js";
 import { generateSurface, validateSurface } from "../../src/gen/surface.js";
+import { BLOCKS } from "../../src/blocks.js";
 import { TEST_WORLD } from "../../src/content/world/test-world.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
 import { DUNGEONS } from "../../src/content/dungeons.js";
@@ -587,6 +588,36 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
         expect(st && f.stand[st.x + st.y * f.w] === FLOOR_Z + 2 && on(st.x, st.y) && f.get(...st.stone) === B.MURAL && st.stone[2] === st.z + 1, `${at}: the Datum stone ${JSON.stringify(st)}`);
       }
       if (id === "metronome") expect(f.creatures.some((c) => c.guardian === "colossus"), `${at}: the Colossus's hall (the Escapement waits for its kind)`);
+      // Its places (C1b #20, #22, #24): the clue's fresh tunnel, the captive's spot, the Square's identical rooms and prisoners,
+      // the Root Canals' far mouth.
+      if (id === "kettleMesa") {
+        const { f: f3 } = level(3), c = f3.clue, d3 = reach(f3), t = c?.tunnel || [];
+        const open4 = ([x, y]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => f3.stand[x + dx + (y + dy) * f3.w] >= 0).length;
+        stats.clues = (stats.clues || 0) + (c ? 1 : 0);
+        expect(c && /plumb-seal/.test(c.what) && t.length >= 5 && t.length <= 7 && t.every(([x, y]) => f3.get(x, y, FLOOR_Z - 1) === B.DIRT && d3[x + y * f3.w] >= 0)
+          && c.x === t[t.length - 1][0] && c.y === t[t.length - 1][1] && open4([c.x, c.y]) === 1, `${at} floor 3: the sapper tunnel and its clue ${JSON.stringify(c && { x: c.x, y: c.y, len: t.length })}`);
+      }
+      if (id === "press") {
+        const { f: f3 } = level(3), d3 = reach(f3), c = f3.captive;
+        expect(c?.who === "toviHallen" && d3[c.x + c.y * f3.w] >= 0 && f3.stand[c.x + c.y * f3.w] === FLOOR_Z, `${at} floor 3: Tovi Hallen's place ${JSON.stringify(c)}`);
+        for (const z of [1, 2, 4, 5]) expect(!level(z).f.captive, `${at} floor ${z}: a captive's place on the wrong floor`);
+      }
+      if (id === "square") for (let z = 1; z <= n; z++) {
+        const { f: fz } = z === n ? { f } : level(z), marks = fz.roomMarks || [], dz = reach(fz);
+        stats.squareRooms = (stats.squareRooms || 0) + fz.rooms.length;
+        expect(new Set(fz.rooms.map((r) => `${r.theme.wall},${r.theme.floor}`)).size === 1 && marks.length >= fz.rooms.length - 1 && new Set(marks.map((m) => m.mark.join())).size === marks.length
+          && marks.every((m) => m.mark.every((c, d) => BLOCKS[fz.get(m.x + d, m.y, FLOOR_Z - 1)]?.mosaic)), `${at} floor ${z}: ${fz.rooms.length} rooms, ${marks.length} marks, materials ${new Set(fz.rooms.map((r) => `${r.theme.wall},${r.theme.floor}`)).size}`);
+        const pr = fz.prisoners || [];
+        stats.prisoners = (stats.prisoners || 0) + pr.length;
+        expect(z === 1 ? !pr.length : pr.length === 2 && pr.every((q) => dz[q.x + q.y * fz.w] >= 0 && fz.get(...q.wheel) === B.LEVER && fz.links.get(fz.index(...q.wheel))?.action === "unpress"),
+          `${at} floor ${z}: prisoners ${JSON.stringify(pr)}`);
+      }
+      if (id === "rootCanals") {
+        const e = f.exit, surf = generateSurface(run, s.at.wx, s.at.wy), sr = reach(surf);
+        expect(e && f.get(e.x, e.y, FLOOR_Z - 1) === B.STAIRS_UP && on(e.x, e.y) && e.key === `${s.at.wx},${s.at.wy},0` && surf.get(e.at[0], e.at[1], FLOOR_Z - 1) === B.METAL
+          && sr[e.at[0] + e.at[1] * surf.w] >= 0 && e.at[0] > surf.gen.planAt.x + 57, `${at} floor 2: the far mouth ${JSON.stringify(e)} (out on the grate east of the checkpoint)`);
+        expect(!level(1).f.exit, `${at} floor 1: a far mouth on the wrong floor`);
+      }
     }
   }
   // The founding relic is one no Hour site holds, the mask first (a made-up history where the mask is a site's).
@@ -613,6 +644,31 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
     stats.wardenGate = `${shut} gate blocks shut, ${open ? "open" : "still shut"} after its death`;
     expect(shut > 0 && open, `in a game: the Gloam Warden's gate (${stats.wardenGate})`);
   } else problems.push(`in a game: no Gloam Warden's hall on ${hallKey}`);
+  // In a game: a press-wheel turns only in 3D, and frees its prisoner (C1b #20); the far mouth comes out on Molar's grate (#22).
+  const { useColumn } = await import("../../src/interact.js"), { on } = await import("../../src/events.js"), { checkFloorEvents } = await import("../../src/screens/play.js");
+  const sq = [...game.run.sites.values()].find((s) => s.landmarkId === "square");
+  game.debug.enterZone(`${sq.at.wx},${sq.at.wy},2`);
+  const q = game.zone.prisoners?.[0], freed = [];
+  const off = on("prisoner:freed", (g, ev) => freed.push(ev.k));
+  if (q) {
+    game.view = "map";
+    const onMap = useColumn(game, q.wheel[0], q.wheel[1]);
+    const mapFreed = q.freed;
+    game.view = "3d";
+    const in3d = useColumn(game, q.wheel[0], q.wheel[1]);
+    stats.wheel = `map: ${onMap ? "turned" : "refused"}, 3D: ${in3d ? "turned" : "refused"}, freed ${q.freed}, events ${freed}`;
+    expect(!onMap && !mapFreed && in3d && q.freed && freed.join() === "0" && game.zone.get(...q.wheel) === B.LEVER_ON, `in a game: the press-wheel (${stats.wheel})`);
+  } else problems.push("in a game: no prisoner on the Square's floor 2");
+  off?.();
+  const mo = [...game.run.sites.values()].find((s) => s.landmarkId === "molar");
+  game.debug.enterZone(`${mo.at.wx},${mo.at.wy},2`);
+  const ex = game.zone.exit, pl = game.player;
+  if (ex) {
+    Object.assign(pl, { x: ex.x + 0.5, y: ex.y + 0.5, z: FLOOR_Z, onGround: true, vz: 0 });
+    checkFloorEvents(game);
+    stats.farMouth = `${game.zone.key} at (${Math.floor(pl.x)}, ${Math.floor(pl.y)}), the grate (${ex.at})`;
+    expect(game.zone.key === ex.key && Math.abs(pl.x - ex.at[0] - 0.5) + Math.abs(pl.y - ex.at[1] - 0.5) <= 2, `in a game: up the far mouth to ${stats.farMouth}`);
+  } else problems.push("in a game: no far mouth on the Root Canals' floor 2");
   return { name: "landmark bottoms", ok: problems.length === 0, problems, stats };
 }
 

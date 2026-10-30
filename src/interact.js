@@ -115,6 +115,11 @@ function useBlock(game, x, y, z) {
 registerUse("lever", (game, x, y, z) => {
   const { zone } = game, info = BLOCKS[zone.get(x, y, z)];
   if (info.on) { game.log("The lever won't move back.", [170, 170, 170]); return false; }
+  // A press-wheel (the Square's cells, B2): it takes your weight, in 3D; from above it is only a spoked circle.
+  if (zone.links.get(zone.index(x, y, z))?.action === "unpress" && game.view === "map") {
+    game.log("A press-wheel, drawn as a spoked circle on the wall. It would take your weight to turn it: in 3D.", [170, 170, 190]);
+    return false;
+  }
   zone.set(x, y, z, B.LEVER_ON);
   game.log("You pull the lever. *clunk*", [220, 220, 220]);
   const link = zone.links.get(zone.index(x, y, z));
@@ -161,6 +166,11 @@ function runLink(game, link) {
     const lio = talkersIn(zone).find((n) => n.type === "lio");
     if (lio) lio.talk.state.free = true;
     game.log("Somewhere on this floor, bars grind down into the stone. A distant voice: \"Yes! YES!\"", [160, 220, 255]);
+  } else if (link.action === "unpress") {   // a press-wheel (the Square's cells: gen/dungeon.js placeLandmarkParts, B2)
+    const q = zone.prisoners?.[link.prisoner];
+    if (q) q.freed = true;
+    game.log("The wheel turns with a long groan. On the floor of the cell, something drawn takes a breath and starts to stand up.", [160, 220, 255]);
+    emit(game, "prisoner:freed", { zone, prisoner: q, k: link.prisoner });
   } else if (link.action === "dud") {
     game.log(link.msg || "The lever clanks. Nothing happens.", [170, 170, 170]);
   } else if (link.action === "part") {

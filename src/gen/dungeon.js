@@ -355,7 +355,8 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   if (f.flags.lightless) GIMMICKS.lightless(f);
   if (f.beat) GIMMICKS.oneBeat(f);
   if (p.cradle) placeCradle(f, rng, rooms, ctx);
-  if ((p.gimmicks || []).length || p.cradle) f.refresh();
+  if (p.clue || p.captive || p.prisoners || p.exit) placeLandmarkParts(f, rng, rooms, p, ctx);
+  if ((p.gimmicks || []).length || p.cradle || p.clue || p.captive || p.prisoners || p.exit) f.refresh();
 
   // --- 11. The people of this level (the site plans who's where; for the legacy stack, content/legacy/encounters.js planEncounters).
   placeEncounters(f, rng, cosmetic, rooms, start, depth, p.encounters || []);
@@ -721,6 +722,104 @@ GIMMICKS.braziers = (f, rng, rooms, p, ctx) => {
 };
 
 // A Truing Cradle (WS5's station) in a corner of some ordinary room.
+// identicalRooms (the Square, bible §5 M; B2, C1b #20): with the one-material "rule" theme every room is the same room in
+// 3D; each room's mark, three tiles of mosaic in the middle of its floor (no two rooms alike), tells them apart on the map
+// (zone.roomMarks [{ room, x, y, mark }]: the three colours, west to east).
+const MARK_TILES = [B.MOSAIC_RED, B.MOSAIC_BLUE, B.MOSAIC_GOLD, B.MOSAIC_WHITE];
+GIMMICKS.identicalRooms = (f, rng, rooms, p, ctx) => {
+  const used = new Set();
+  f.roomMarks = [];
+  for (const r of rooms) {
+    const spots = plainTiles(f, r, ctx).filter(([x, y]) => [0, 1, 2].every((d) => f.stand[x + d + y * W] === FLOOR_Z && f.get(x + d, y, FLOOR_Z - 1) === r.theme.floor
+      && !nearTile(f.stairs, x + d, y) && !nearTile(f.upStairs, x + d, y)));
+    if (!spots.length) continue;
+    const [x, y] = spots.reduce((b, s) => (Math.abs(s[0] + 1 - r.cx) + Math.abs(s[1] - r.cy) < Math.abs(b[0] + 1 - r.cx) + Math.abs(b[1] - r.cy) ? s : b));
+    let mark;
+    do mark = [0, 1, 2].map(() => rng.int(0, 3)); while (used.has(mark.join()) && used.size < 64);
+    used.add(mark.join());
+    mark.forEach((m, d) => f.set(x + d, y, FLOOR_Z - 1, MARK_TILES[m]));
+    f.roomMarks.push({ room: r.id, x, y, mark });
+  }
+};
+
+// A landmark dungeon's places (B2; world/sites.js dungeonParams), each recorded on the zone for whoever stands there or
+// uses it (C5's words, the integrator's placing, C1b #18):
+//   p.clue      a fresh sapper tunnel dug out of a room's wall, a dead end 4-6 long, the clue at its end (zone.clue
+//               { x, y, what }: Kettle Mesa's floor 3, the Assize plumb-seal, beat 1; C1b #24)
+//   p.captive   a spot in the room farthest from the stairs up (zone.captive { x, y, who }: the Press's floor 3, Tovi
+//               Hallen, beat 5; C1b #24)
+//   p.prisoners that many cells (zone.prisoners [{ x, y, wheel: [x, y, z], freed }]: the Square's floors 2-3): a pressed
+//               prisoner's place on the floor (flat: talked to on the map) and its press-wheel in the cell's wall, a lever
+//               that turns only in 3D (interact.js, link "unpress"; C1b #20)
+//   p.exit      a second stair up in the room farthest from the first, out at { key, at } (zone.exit: the Root Canals'
+//               floor 2, up through Molar's grate east of the checkpoint; screens/play.js; C1b #22)
+function placeLandmarkParts(f, rng, rooms, p, ctx) {
+  f.refresh();
+  const from = f.upStairs || { x: ctx.start.cx, y: ctx.start.cy };
+  const dist = reachable(standWith(f, "open"), W, D, from.x, from.y, PLAYER_STEP_UP, PLAYER_DROP);
+  const vaultRoom = (r) => f.vault && r.x0 <= f.vault.x1 + 1 && r.x1 >= f.vault.x0 - 1 && r.y0 <= f.vault.y1 + 1 && r.y1 >= f.vault.y0 - 1;
+  const usable = rooms.filter((r) => r !== ctx.start && !r.locked && !hasStairs(f, r) && !vaultRoom(r));
+  const far = (list) => list.map((r) => ({ r, d: Math.max(-1, ...plainTiles(f, r, ctx).map(([x, y]) => dist[x + y * W])) }))
+    .filter((o) => o.d >= 0).sort((a, b) => b.d - a.d).map((o) => o.r);
+  const taken = new Set();
+  const spotIn = (r) => {
+    const ok = plainTiles(f, r, ctx).filter(([x, y]) => dist[x + y * W] >= 0 && !occupied(f, x, y) && !taken.has(x + y * W) && !isStairs(f, x, y));
+    if (!ok.length) return null;
+    const s = ok.reduce((b, o) => (Math.abs(o[0] - r.cx) + Math.abs(o[1] - r.cy) < Math.abs(b[0] - r.cx) + Math.abs(b[1] - r.cy) ? o : b));
+    taken.add(s[0] + s[1] * W);
+    return s;
+  };
+  const order = far(usable);
+  if (p.exit) {
+    for (const r of order) {
+      const s = spotIn(r);
+      if (!s) continue;
+      f.set(s[0], s[1], FLOOR_Z - 1, B.STAIRS_UP);
+      f.exit = { x: s[0], y: s[1], key: p.exit.key, at: [...p.exit.at] };
+      break;
+    }
+  }
+  if (p.captive) for (const r of order) {
+    const s = spotIn(r);
+    if (s) { f.captive = { x: s[0], y: s[1], who: p.captive.who }; break; }
+  }
+  if (p.clue) {
+    // The tunnel: straight out of a room's wall into the rock, its tiles all rock around (a fresh dig, nothing else's).
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    outer: for (const r of rng.shuffle(order.slice())) {
+      for (const [dx, dy] of rng.shuffle(dirs.slice())) {
+        const len = rng.int(4, 6), x0 = dx > 0 ? r.x1 + 1 : dx < 0 ? r.x0 - 1 : r.cx, y0 = dy > 0 ? r.y1 + 1 : dy < 0 ? r.y0 - 1 : r.cy;
+        const cells = Array.from({ length: len + 1 }, (_, k) => [x0 + dx * k, y0 + dy * k]);
+        const free = cells.every(([x, y], k) => x > 1 && y > 1 && x < W - 2 && y < D - 2 && (k === 0 ? f.get(x, y, FLOOR_Z) === r.theme.wall
+          : [[0, 0], [dy, dx], [-dy, -dx]].every(([ox, oy]) => f.get(x + ox, y + oy, FLOOR_Z) === B.ROCK && f.get(x + ox, y + oy, FLOOR_Z + 1) === B.ROCK)))
+          && f.stand[x0 - dx + (y0 - dy) * W] === FLOOR_Z && dist[x0 - dx + (y0 - dy) * W] >= 0;
+        if (!free) continue;
+        for (const [x, y] of cells) { f.set(x, y, FLOOR_Z - 1, B.DIRT); f.set(x, y, FLOOR_Z, B.AIR); f.set(x, y, FLOOR_Z + 1, B.AIR); }
+        const [ex, ey] = cells[cells.length - 1];
+        f.clue = { x: ex, y: ey, what: p.clue.what, tunnel: cells.map(([x, y]) => [x, y]) };
+        break outer;
+      }
+    }
+  }
+  if (p.prisoners) {
+    f.prisoners = [];
+    for (const r of order) {
+      if (f.prisoners.length >= p.prisoners) break;
+      if (r.hall) continue;
+      const s = spotIn(r);
+      if (!s) continue;
+      // Its wheel: the wall tile beside the room nearest the prisoner, at hand height (the lever block).
+      const wall = carvable(f, r).filter(([x, y]) => f.get(x, y, FLOOR_Z + 1) === r.theme.wall)
+        .sort((a, b) => Math.abs(a[0] - s[0]) + Math.abs(a[1] - s[1]) - (Math.abs(b[0] - s[0]) + Math.abs(b[1] - s[1])))[0];
+      if (!wall) { taken.delete(s[0] + s[1] * W); continue; }
+      f.set(wall[0], wall[1], FLOOR_Z + 1, B.LEVER);
+      const k = f.prisoners.length;
+      f.prisoners.push({ x: s[0], y: s[1], wheel: [wall[0], wall[1], FLOOR_Z + 1], freed: false });
+      f.links.set(f.index(wall[0], wall[1], FLOOR_Z + 1), { action: "unpress", prisoner: k, cells: [[s[0], s[1]]] });   // (cells: the cell it frees)
+    }
+  }
+}
+
 function placeCradle(f, rng, rooms, ctx) {
   for (const r of rng.shuffle(others(rooms, ctx).filter((o) => !o.hall && !o.locked))) {
     const corners = [[r.x0, r.y0], [r.x1, r.y0], [r.x0, r.y1], [r.x1, r.y1]].filter(([x, y]) => f.stand[x + y * W] === FLOOR_Z &&
@@ -1179,6 +1278,10 @@ export function validateDungeonLevel(f, p = {}) {
   }
   for (const m of f.creatures) if (!canTalk(m) && f.stand[m.tx + m.ty * w] < 0) problems.push(`${m.type} stuck in a wall`);
   if (f.leverRecord && !f.leverRecordAt) problems.push("the Rune Lever room's record is missing");
+  // A landmark's places (B2): each where you can reach it; a prisoner's wheel from a floor beside it.
+  for (const [what, s] of [["the clue", f.clue], ["the captive", f.captive], ["the far mouth", f.exit]]) if (s && !at(noLocked, s.x, s.y)) problems.push(`${what} unreachable`);
+  if ((p.clue && !f.clue) || (p.captive && !f.captive) || (p.exit && !f.exit) || (p.prisoners && (f.prisoners?.length || 0) < p.prisoners)) problems.push("a landmark place missing");
+  for (const q of f.prisoners || []) if (!at(noLocked, q.x, q.y) || ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => at(noLocked, q.wheel[0] + dx, q.wheel[1] + dy))) problems.push("a prisoner's cell or wheel unreachable");
   // A fall from a sinkhole lands right under it (level 1 of a site: world/sites.js sinkholeSpots).
   for (const [x, y] of p.landings ?? f.landings ?? []) {
     const g = f.get(x, y, FLOOR_Z - 1);

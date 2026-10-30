@@ -84,6 +84,11 @@ export function checkFloorEvents(game) {
   }
   if (!p.onGround) return false;
   const under = zone.get(Math.floor(p.x), Math.floor(p.y), Math.round(p.z) - 1);
+  const ex = zone.exit, fx = Math.floor(p.x), fy = Math.floor(p.y);
+  if (under === B.STAIRS_UP && ex && ex.x === fx && ex.y === fy) {   // a second way up, out somewhere else (the Root Canals' far mouth: B2, C1b #22)
+    changeFloor(game, ex.key, "teleport", "You climb the smugglers' stair and push up through an iron grate...", ex.at[0] + 0.5, ex.at[1] + 0.5);
+    return true;
+  }
   const below = under === B.STAIRS ? zoneBelow(game, zone) : null, above = under === B.STAIRS_UP ? upFrom(game, zone) : null;
   if (below) { changeFloor(game, below, "down", "You descend the stairs..."); return true; }
   if (above) { changeFloor(game, above, "up", "You climb the stairs back up..."); return true; }

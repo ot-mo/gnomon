@@ -187,7 +187,7 @@ const LANDMARK_DUNGEONS = {
     planned: { bottom: { kind: "relic", id: "noonglass", name: "the Noonglass", dryOnlyAtNoon: true },
                legend: { floor: 5, id: "drownedBellwether", name: "the Drowned Bellwether" }, tide: { dry: [11, 13], rise: 1, every: 2, max: 4 },
                creatures: [["glassCrab", 3], ["mirrorEel", 2], ["slagSalamander", 2]] } },
-  square: { theme: "deepwright", gimmicks: ["murals"], cradle: [1],
+  square: { theme: "deepwright", gimmicks: ["murals", "identicalRooms"], cradle: [1],   // (planned.theme "rule": B2, C1b #20)
     named: ["the Square, the Hall Below", "the Square, the Cells", "the Square, the Deep Cells"],
     planned: { up: ["the Square, the Rule Floor", "the Square, the Hierarch's Floor"], identicalRooms: true, ruleBanners: true, freeFittings: true,
                theme: "rule",   // one material: every room the same in 3D
@@ -229,7 +229,7 @@ export const GIMMICK_KEYS = {
   theDark: { gimmicks: ["lightless", "haunted", "braziers"], code: "the doors rune doors; the Unlit seen only with your torch out" },
   oneBeat: { gimmicks: ["spikeworks", "oneBeat"], code: "doors on the off-beat; machines acting on the beat" },
   tideOfHours: { gimmicks: ["flooded"], code: "dry 11:00-13:00, the water up a block every 2 hours to 4; the waterline on the map" },
-  identicalRooms: { gimmicks: ["murals"], code: "a lattice of identical rooms of one material; patrols' straight traces on the map; pressed prisoners talked to and freed on the map by turning their press-wheels in 3D; the floors up" },
+  identicalRooms: { gimmicks: ["murals", "identicalRooms"], code: "a lattice of identical rooms (built: one material, each room's mark in the floor, the prisoners' places and press-wheels, the floors up); patrols' straight traces on the map" },
   ruleBanners: { gimmicks: [], code: "banners that make a 12-tile Trued zone" },
   sweepingHand: { gimmicks: ["allDeep", "spikeworks", "oneBeat", "flatland"], code: "the inner hand's shadow, a turn every 40 s, pressing flat what it covers" },
   answerInFloor: { gimmicks: ["murals"], vaults: ["mosaicHall", "speakingDoor"] },
