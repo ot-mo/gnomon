@@ -144,7 +144,7 @@ export function checkLandmarks({ seeds = [1, 7, 42, 1234, 31337], tiles = 500 } 
 
   // The real world's landmarks.
   let realZones = 0, realRetried = 0;
-  const people = { placed: 0, top: 0, flat: 0, ghosts: 0, later: 0, merchants: 0, unnamed: 0 };
+  const people = { placed: 0, top: 0, flat: 0, ghosts: 0, later: 0, merchants: 0, unnamed: 0, titled: 0 };
   for (const seed of seeds) {
     const run = buildRun(seed, REAL_WORLD), world = run.world;
     for (const L of world.landmarks.values())
@@ -161,7 +161,7 @@ export function checkLandmarks({ seeds = [1, 7, 42, 1234, 31337], tiles = 500 } 
         peopleOfSpan(z, L, world.plans[L.spanPlans?.[`${wx},${wy}`] || L.plan], at, expect, people);
       }
   }
-  stats.people = `${people.placed} placed (${people.top} on the Tall Table's top, ${people.flat} flat, ${people.ghosts} ghosts, ${people.merchants} merchants, ${people.unnamed} without a name of their own), ` +
+  stats.people = `${people.placed} placed (${people.top} on the Tall Table's top, ${people.flat} flat, ${people.ghosts} ghosts, ${people.merchants} merchants, ${people.unnamed} without a name of their own, ${people.titled} titled), ` +
     `${people.later} come and go, on ${seeds.length} seeds; ${checkPresence(seeds[0], expect)}`;
 
   // C1a: Hollowmere on its plan (section 4 of the header), on every seed.
@@ -319,6 +319,13 @@ function peopleOfSpan(z, L, plan, at, expect, tally) {
     if (L.id === "tallTable") { tally.top++; expect(c.z === FLOOR_Z + TABLE_TOP, `${at}: ${p.who} stands at ${c.z}, not on the top (${FLOOR_Z + TABLE_TOP})`); }
     expect(c.type === kind && c.name === p.letter.name && c.landmark === L.id && c.who === p.who && c.z === z.stand[i] && z.stand[i] >= FLOOR_Z,
            `${at}: ${p.who} is ${c.type} "${c.name}" at ${c.z} (stand ${z.stand[i]})`);
+    // A culture's or a kind's person has a title, and it says who they are: not what they do or sell ("sells the feather
+    // cloak", "lets the Plumb in"), nor a thing or a place ("ink and brine", "the inn", "readings").
+    if (kind !== p.who) {
+      tally.titled++;
+      expect(c.title && !/^(sells|teaches|lets|keeps|shows|works|gives|buys|reads)( |$)|^(the inn|the Margin|readings|merchant|healer|a Chandler bank|ink and brine)$|[:;(]/.test(c.title),
+             `${at}: "${c.name}, ${c.title}" (its title)`);
+    }
     // Named where the name is its own ("Mira"); "the leech" isn't, can't be kindled with, and the log takes it as it is.
     const own = !/^(a|an|the) /.test(c.name);
     expect(!!c.named === own, `${at}: "${c.name}" ${own ? "isn't" : "is"} named`);

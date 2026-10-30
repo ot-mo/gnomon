@@ -35,9 +35,16 @@ import { registerCreatureField } from "../save/codec.js";
 // Who has no type of their own and no culture type: Ess and Tee are the parent's Ess (Tee at her side, in her words);
 // Castor is an assizer of the Assize.
 const KINDS = { essAndTee: "ess", castor: "assizer" };
-// A title where the role's first clause doesn't read as one.
-const TITLES = { castor: "the Assize's checkpoint at Molar", benchmarkSignaller: "keeper of the Signal Room", mapRoomSurveyor: "Location readings and the tier layer",
-                 bramwyn: "keeper of the Pressing rite", sporeHerbalist: "tonics and fungal limbs" };
+// A title where the role's first clause names what someone sells or where they stand, not who they are.
+const TITLES = {
+  essAndTee: "envoys of Folio", benchmarkLeech: "the station's healer", benchmarkBanker: "of the Chandler bank", benchmarkDrover: "of the Drovers' caravan stop",
+  benchmarkSignaller: "keeper of the Signal Room", mapRoomSurveyor: "of the Survey", featherTrader: "a Kite trader", overlookKite: "a seller of views",
+  castor: "keeper of the Assize's checkpoint", molarInnkeeper: "keeper of Molar's inn", molarMapSeller: "a seller of readings", doubleEll: "a merchant of Folio",
+  marginKeeper: "keeper of the Margin", folioSurvey: "a teacher of Folio", folioLore: "a teacher of Folio", ilyendra: "Primate of the Horary",
+  halfnightBanker: "of the Chandler bank", horaryTrader: "a seller of Hour readings", lamplessTrader: "a seller of the Lampless' readings",
+  wisse: "Abbess of the Lampless", ghostTrader: "of the ghost market", gateAssizer: "keeper of the Square's gate", bramwyn: "keeper of the Pressing rite",
+  inkSeller: "of Saltpage", pressedLibrarian: "keeper of the Pressed's library", sporeHerbalist: "of the Spore Moot",
+};
 
 export const PRESENCE = {
   pell: { round: [6, { hollowmere: [1, 2], benchmark: [3, 4], molar: [5, 6] }] },
@@ -74,14 +81,15 @@ export function present(game, who, landmarkId) {
   return game.state?.campaign?.done?.[p.after] !== undefined;
 }
 
-// A culture's or a kind's title: its role up to the first colon, semicolon or bracket.
+// A culture's or a kind's title (Ess and Tee's too, who borrow the parent's Ess): TITLES, else its role up to the first
+// colon, semicolon or bracket.
 const titleOf = (who, role) => TITLES[who] ?? String(role || "").split(/[:;(]/)[0].trim();
 
 function spec(zone, landmark, p) {
   const kind = kindOf(p.who, p.letter);
   if (!kind) return null;
   const s = zone.stand?.[p.x + p.y * zone.w];
-  const own = kind === p.who || kind === "ess";
+  const own = kind === p.who;
   return { uid: p.uid, who: p.who, kind, landmark: landmark.id, x: p.x, y: p.y, z: s >= 0 ? s : null, level: zone.level,
            name: p.letter.name, title: own ? null : titleOf(p.who, p.letter.role) };
 }
