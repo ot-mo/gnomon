@@ -1690,6 +1690,53 @@ export function checkB1Gear(m) {
     stats.light = `the lantern-mote ${mote} tiles torch out (lit counted); a lit torch ${lit} → ${marked} with the Snuffer's mark; gloam ${gloam} (a Bent's ${gloamBent}); blinded ${blindLit} lit`;
   });
 
+  // 3. The survey lens and grip soles (WS5 #9): on a dark floor one 3D frame with the torch out marks the map within
+  //    twice the reach with the lens (more tiles, none past twice); grip soles climb 2 blocks on the map, 1 without.
+  section("survey", () => {
+    startRun(13, m.testWorld.TEST_WORLD);
+    // A dark hall 40 × 17 (no sky, no lamps): only your torch lights it.
+    const W = m.world, z = new W.Zone({ key: "b1-survey", wx: 97, wy: 97, z: 1, type: "dungeon", level: 3, seed: 3, w: 40, d: 17, h: 8, name: "Survey Hall" });
+    for (let y = 0; y < z.d; y++) for (let x = 0; x < z.w; x++) { for (let k = 0; k < W.FLOOR_Z; k++) z.set(x, y, k, W.B.ROCK); z.set(x, y, W.FLOOR_Z + 4, W.B.ROCK); }   // (a roof: no sky light)
+    z.hasSky = false; z.edges = { n: null, s: null, e: null, w: null }; z.refresh();
+    z.spawn = { x: 2.5, y: 8.5, z: W.FLOOR_Z, yaw: 0 };
+    m.zones.enterZone(game, z.seal(), { how: "start" });
+    const p = game.player, R = m.render3d;
+    Object.assign(p, { x: 2.5, y: 8.5, z: W.FLOOR_Z, yaw: 0, pitch: 0 });
+    R.setDynamicResolution(false);
+    p.status = {}; p.mutations = {}; p.torch = true; m.stats.invalidateStats(p);
+    const reach = m.player.torchRange(p);
+    const frame = () => { z.seen.fill(0); game.effects = []; game.cam = null; game.fov = 75; game.view = "3d"; game.mode = "explore"; game.paused = false; Object.assign(p, { yaw: 0, pitch: 0 }); R.render3d(game); };
+    const far = () => { let n = 0, max = 0; for (let i = 0; i < z.w * z.d; i++) if (z.seen[i]) { n++; max = Math.max(max, Math.hypot((i % z.w) + 0.5 - p.x, Math.floor(i / z.w) + 0.5 - p.y)); } return { n, max }; };
+    frame(); const plain = far();
+    p.body.implants.head = { kind: "implant", id: "surveyLens" }; m.stats.invalidateStats(p);
+    frame(); const lens = far();
+    p.body.implants.head = null; m.stats.invalidateStats(p);
+    if (!(lens.n > plain.n) || !(lens.max > reach + 1.5) || lens.max > 2 * reach + 2 || plain.max > reach + 2)
+      fail(`the survey lens: a 3D frame marked ${plain.n} tiles to ${plain.max.toFixed(1)} without it, ${lens.n} to ${lens.max.toFixed(1)} with it (the torch's reach ${reach})`);
+    stats.survey = `one 3D frame on a dark floor: ${plain.n} tiles to ${plain.max.toFixed(1)} without the lens, ${lens.n} to ${lens.max.toFixed(1)} with it (reach ${reach})`;
+    // Grip soles: a 2-block step on the map.
+    game.view = "map"; game.mode = "map";
+    const tx = Math.floor(p.x), ty = Math.floor(p.y);
+    let dir = null;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const x = tx + dx, y = ty + dy;
+      if (!z.solid(x, y, p.z) && z.stand[x + y * z.w] === p.z && !z.creatures.some((c) => Math.floor(c.x) === x && Math.floor(c.y) === y)) { dir = [dx, dy]; break; }
+    }
+    if (!dir) { fail("grip soles: no open tile beside you"); return; }
+    const [x, y] = [tx + dir[0], ty + dir[1]];
+    for (let k = 0; k < 2; k++) z.set(x, y, p.z + k, m.world.B.STONE);
+    z.refresh();
+    const tryStep = () => { const from = { x: p.x, y: p.y, z: p.z }; m.turns.mapStep(game, dir[0], dir[1], { force: false }); const moved = Math.floor(p.x) === x && Math.floor(p.y) === y; Object.assign(p, from); return moved; };
+    const without = tryStep();
+    p.body.implants.feet = { kind: "implant", id: "gripSoles" }; m.stats.invalidateStats(p);
+    const withSoles = tryStep();
+    p.body.implants.feet = null; m.stats.invalidateStats(p);
+    for (let k = 0; k < 2; k++) z.set(x, y, p.z + k, m.world.B.AIR);
+    z.refresh();
+    if (without || !withSoles) fail(`grip soles: a 2-block step on the map ${without ? "taken" : "refused"} without them, ${withSoles ? "taken" : "refused"} with them`);
+    stats.gripSoles = "a 2-block step on the map refused without them, taken with them";
+  });
+
   return { name: "items: B1's gear", ok: problems.length === 0, problems, stats };
 }
 
@@ -1717,7 +1764,8 @@ export async function run(env) {
   m.missileTable = (await env.src("content/items/missiles.js")).MISSILES;
   // B1's (checkB1Gear).
   await Promise.all([load("worldmap", "content/world/worldmap.js"), load("testWorld", "content/world/test-world.js"), load("zones", "zones.js"),
-    load("common", "gen/biomes/common.js"), load("monsters", "monsters.js"), load("light", "light.js")]);
+    load("common", "gen/biomes/common.js"), load("monsters", "monsters.js"), load("light", "light.js"),
+    load("render3d", "render3d.js"), load("turns", "turns.js")]);
   if (env.args?.only === "b1") return [checkB1Gear(m)];   // (node tools/check-items.mjs --only b1)
   return [checkItems(m), checkGear(m), checkB1Gear(m)];
 }

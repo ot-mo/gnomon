@@ -65,8 +65,7 @@ import { colossusCore } from "./guardians.js";
 import { EYE, FISTS, attackTime, armourValue, weaponReach } from "./player.js";
 import { sfx } from "./sfx.js";
 import { attr, maxHp, mod, bonus, invalidateStats } from "./stats.js";
-import { wielded, worn } from "./body.js";
-import { IMPLANTS } from "./content/items/implants.js";
+import { wielded, worn, fittedEffect } from "./body.js";
 import { addStatus, hasStatus, statusFlag, cooldownLeft, startCooldown, registerStatus, dvOf as playerDv } from "./status.js";
 import { RULES } from "./rules.js";
 import { emit } from "./events.js";
@@ -105,7 +104,7 @@ export function resistText(m) {
 // carry one. Bare hands (fists): req 0 (no to-hit cost); under d20 every blow, a fist's too, counts STR over
 // RULES.d20.strOver, scaled by its swing (`swing`: the weapon's, FISTS.swing for bare hands). Fists hit for 1-2; in gauntlets 1d4; with truesteel knuckles fitted (WS5's implant,
 // effect "knuckles"; bible §13.6) 2d4, and they crush (×2 against the brittle, as bonus crush does).
-export const fitted = (e, effect) => !!e?.body?.implants && e.body.parts.some((q) => IMPLANTS[e.body.implants[q.id]?.id]?.effect === effect);
+export const fitted = fittedEffect;   // (body.js; B1)
 export function weaponSpec(e) {
   const it = wielded(e), w = it && WEAPONS[it.id];
   if (!w) {

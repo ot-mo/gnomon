@@ -18,6 +18,8 @@
 //   carried(e) → item[]                      worn, the belt, then the pack: everything you have
 //   swapBelt(game, e) → { ok, time, reason } R: the weapon in hand and the one on the belt change places
 //   addPart(e, part), removePart(e, partId) → item[]   extra limbs from mutations (WS4); what it held comes off
+//   fittedEffect(e, effect) → bool          an implant fitted in one of e's parts names that effect (IMPLANTS[id].effect;
+//                                            bodymods/implants.js implantEffect's question, for modules that load before it)
 // Events: "gear" { e } after equip, unequip and removePart changed what e wears (B1: social/reputation.js
 // syncWornRep follows it for worn reputation). Not sent without a game (character creation).
 //
@@ -33,8 +35,10 @@ import { ITEM_KINDS } from "./items.js";
 import { attr, invalidateStats, clampHp } from "./stats.js";
 import { RULES } from "./rules.js";
 import { emit } from "./events.js";
+import { IMPLANTS } from "./content/items/implants.js";
 
 export const BODY_PLANS = {};
+export const fittedEffect = (e, effect) => !!e?.body?.implants && e.body.parts.some((q) => IMPLANTS[e.body.implants[q.id]?.id]?.effect === effect);
 export function registerBodyPlan(id, parts) {
   if (BODY_PLANS[id]) throw new Error(`registerBodyPlan: ${id} already exists`);
   const ids = new Set();

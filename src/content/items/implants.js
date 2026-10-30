@@ -25,7 +25,7 @@ export const IMPLANTS = {
     info: "A smoked lens that drinks the dark. With your torch out you still see a little way." },
   plumbEar: { name: "plumb-line ear", parts: ["head"], grade: 2, effect: "plumbEar",
     info: "A weighted thread in the inner ear. Pits and chasms within 6 tiles mark themselves on your map." },
-  surveyLens: { name: "survey lens", parts: ["head"], grade: 3, effect: "surveyLens", needs: "3D filling the map at twice the range; a minimap in 3D (render3d.js, turns.js)",
+  surveyLens: { name: "survey lens", parts: ["head"], grade: 3, effect: "surveyLens", needs: "a minimap in the corner of 3D (render3d.js, hud.js)",   // (the double reach: render3d.js, B1)
     info: "The Survey's own lens. What you see in 3D goes onto your map from twice as far." },
   lampCrown: { name: "lamp crown", parts: ["head"], grade: 2, bonus: { torch: 1 / 3 },   // +2 tiles on the torch's 6
     info: "A ring of oil-lit wicks set in the scalp. Your torch reaches further, and your hands stay free." },
@@ -43,7 +43,7 @@ export const IMPLANTS = {
     info: "Pulls you back to somewhere you have been on this floor (every 100 s)." },
   springTendons: { name: "spring tendons", parts: ["feet"], grade: 2, bonus: { jump: 1 },
     info: "Coiled wire in the heel. You jump a block higher." },
-  gripSoles: { name: "grip soles", parts: ["feet"], grade: 2, effect: "gripSoles", needs: "no slipping or knockback; ledge edges and the map's 2-block climb (WS8, turns.js)",
+  gripSoles: { name: "grip soles", parts: ["feet"], grade: 2, effect: "gripSoles", needs: "no slipping or knockback (nothing knocks you or slips you yet: C3's headbutts, glim's slip); ledge edges in 3D",   // (the map's 2-block climb: turns.js, B1)
     info: "Soles that bite the ground. No slipping, no knockback; you stand on ledge edges." },
   knuckles: { name: "truesteel knuckles", parts: ["gloves"], grade: 2, effect: "knuckles",
     info: "Truesteel under the skin of the hands. Your fists hit for 2d4 and crush." },

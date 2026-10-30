@@ -31,6 +31,8 @@ import { itemSprite } from "./items.js";
 import { PROPS } from "./content/biomes.js";
 import { projectileSprites } from "./throwing.js";
 import { EYE, torchRange, torchPower } from "./player.js";
+import { fittedEffect } from "./body.js";
+export const SURVEY_LENS = 2;
 import { FLOOR_Z, B, BLOCKS } from "./world.js";
 import { liquidColor } from "./renderMap.js";
 import { neighbourAddr, cachedZone } from "./zones.js";
@@ -486,7 +488,8 @@ export function render3d(game) {
   if (depth.length !== S.cols * S.rows) depth = new Float32Array(S.cols * S.rows);
   torch.power = torchPower(player, game.time);
   torch.range = torchRange(player);
-  const seeRange = torch.range;
+  // What 3D marks on your map: the lit, and within your torch's reach; twice that with the survey lens (B1, WS5 #9).
+  const seeRange = torch.range * (fittedEffect(player, "surveyLens") ? SURVEY_LENS : 1);
   frameLook(game, zone);
   // Runes glow and ghost planks show only in the dark (light.js inDark). Without sky that's your torch
   // alone, decided once for the frame; under the sky it's asked at each ghost block or rune a ray meets.
