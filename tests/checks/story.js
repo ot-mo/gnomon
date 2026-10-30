@@ -884,6 +884,7 @@ async function campaign7b(env, { fail, stats, real, test, json, game, startRun }
   if (q10?.reward?.xp !== Math.round(CAM.BEAT_XP(B[9].band[0]) * 1.5)) fail(`beat 10's early bonus: ${q10?.reward?.xp}`);
   if (json(beats) !== json([1, 2, 3, 4, 5, 6, 8, 7, 9, 10, 11]) || json(lengthen) !== json([5, 7, 9]) || open() !== "") fail(`beats ${json(beats)}, the Lengthening after ${json(lengthen)}`);
   stats.beatsPaid = await beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json });
+  stats.corner = await cornerPetted(env, { fail, game, p });
   offB(); offL();
   game.run = keep.run; game.quests = keep.quests; game.state.campaign = keep.campaign;
   stats.campaign = `11 beats as data at their landmarks' floors; the start on the real world gives beat 1 (none on the test world, whose intro stays the parent's); ` +
@@ -977,6 +978,28 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json }) {
   if (offer?.text !== B[1].offer) fail(`beat 2's offer at Quint-Vey: ${offer?.text}`);
   return `11 beats paid (the plumb-seal and Plumb Key, the plumb-bob known, +5 max HP, Survey +${rep("survey")}, Noon's Face and its turn, the Flat Account ${known ? "read" : "has no def"}; ` +
     `the unpress lens and Great Theodolite owed, the lens paid once made); ${want.split(",").length} choices open, two made at their givers, beat 5's on its own page; the offer at the giver; journal routes; ${p.inv.length - inv0} more in the pack`;
+}
+
+// Corner's petting (the integrator, C5 #14; story/landmark-people.js pet): "Pet her." on Corner and nobody else; then a
+// world day of +10% XP from every source, and nothing after it.
+async function cornerPetted(env, { fail, game, p }) {
+  const T = await env.src("talk.js"), LV = await env.src("leveling.js"), { RULES } = await env.src("rules.js");
+  const cat = { id: -3, type: "corner", name: "Corner", vis: {}, talk: { dialogue: "corner", state: {}, met: true } };
+  const other = { id: -4, type: "hallen", name: "Reeve Hallen", vis: {}, talk: { dialogue: "hallen", state: {}, met: true } };
+  if (T.talkTo(game, other).options.some((o) => o.label === "Pet her.")) fail("Reeve Hallen can be petted");
+  const opt = T.talkTo(game, cat).options.find((o) => o.label === "Pet her.");
+  const keep = { time: game.time, xp: p.xp, level: p.level, boost: game.state.xpBoost };
+  const gained = (n) => { p.level = 30; p.xp = 0; LV.gainXp(game, n, { source: "quest" }); return p.xp; };
+  const plain = gained(1000);
+  opt?.go();
+  const boosted = gained(1000);
+  game.time += 23 * 60 * RULES.clock.secondsPerMinute;
+  const late = gained(1000);
+  game.time += 2 * 60 * RULES.clock.secondsPerMinute;
+  const after = gained(1000);
+  Object.assign(game, { time: keep.time }); Object.assign(p, { xp: keep.xp, level: keep.level }); game.state.xpBoost = keep.boost;
+  if (!opt || boosted !== Math.round(plain * 1.1) || late !== boosted || after !== plain) fail(`Corner's petting: ${plain} XP, petted ${boosted}, 23 h on ${late}, 25 h on ${after}`);
+  return `"Pet her." on Corner alone: 1000 XP as ${plain}, ${boosted} petted, ${late} 23 hours on, ${after} after the day`;
 }
 
 // --- 10. The peoples' content (C2) ----------------------------------------------------------------------------------

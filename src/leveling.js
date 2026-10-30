@@ -16,7 +16,8 @@
 //                                        legendaries × 10; 2 tiers below your tier 25%, 3 or more nothing
 //   xpReward(kind, level) → n            the other sources: RULES.progression.xp.rewards[kind] × lvlXP(level)
 //   gainXp(game, amount, { source = "kill" })   Pilgrim (state.mode "pilgrim"): kills give nothing, every other
-//                                        source 2.2 times as much; then the levels it buys
+//                                        source 2.2 times as much; then a boost while it lasts (state.xpBoost =
+//                                        { until, mul, from }: Corner's petting, +10% for a world day); then the levels it buys
 //   offerPerks(p, milestone)             the legacy set's offer (Math.random)
 //   offerPowers(game, p, { level, milestone, draw }) → ids   the attribute set's: 3 (4 at INT 18+), a major among
 //                                        them at a milestone; seeded by (seed, level, draw)
@@ -73,8 +74,9 @@ export function modeXp(game, amount, source = "kill") {
 }
 
 export function gainXp(game, amount, { source = "kill" } = {}) {
-  const p = game.player;
-  p.xp += modeXp(game, amount, source);
+  const p = game.player, boost = game.state?.xpBoost;
+  const n = modeXp(game, amount, source);
+  p.xp += boost && boost.until > (game.time || 0) ? Math.round(n * (1 + boost.mul)) : n;   // (whole XP: the HUD shows it as it is)
   while (p.xp >= xpToNext(p.level)) {
     p.xp -= xpToNext(p.level);
     if (RULES.stats !== "legacy") { levelUp(game, p); continue; }

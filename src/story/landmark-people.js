@@ -18,6 +18,8 @@
 //                            away as present() says (one of them keeps one uid wherever he stands, "landmark:<who>")
 //   personKilled(game, uid)  on "kill": a landmark person's uid recorded dead (game.state.landmarkPeople.dead)
 //   PERSON_FIELDS            what a save keeps of a placed person beyond a creature's own (registerCreatureField)
+//   pet(game, c)             Corner's petting (C5 #14; her type's rule.pet): +10% XP for a world day (state.xpBoost,
+//                            leveling.js gainXp), her talk option "Pet her."
 //
 // The view rules are the types': Folio's people and Ess and Tee are flat (met only on the map); Brann, thol and the ghost
 // trader ghostly (seen and talked to only in the dark: your torch out, and under the sky only at night). A placed person:
@@ -30,6 +32,8 @@ import { registerPlanPeople } from "../world/sites.js";
 import { dialogueIdOf, PEOPLE_WORDS } from "../content/people-words.js";
 import { PEOPLE } from "../content/creatures/people.js";
 import { dayNumber } from "../clock.js";
+import { RULES } from "../rules.js";
+import { registerTalkOptions, node, bye } from "../talk.js";
 import { on } from "../events.js";
 import { registerCreatureField } from "../save/codec.js";
 
@@ -144,3 +148,13 @@ on("zone:enter", (game, { zone }) => syncPeople(game, zone));
 // stays as you left it until you come back (overworld/travel.js; check-overworld's walk holds it).
 on("clock:midnight", (game) => { if (!game.trip) syncPeople(game, game.zone); });
 on("kill", (game, { uid }) => personKilled(game, uid));
+
+// Corner's petting: her type's rule.pet { xp, hours }, a boost from now for that many world hours (again: from now).
+export function pet(game, c) {
+  const r = CREATURE_TYPES[c?.type]?.rule?.pet;
+  if (!r || !game.state) return false;
+  game.state.xpBoost = { until: (game.time || 0) + r.hours * 60 * RULES.clock.secondsPerMinute, mul: r.xp, from: c.type };
+  game.log?.(`${c.name} leans into your hand and purrs. (+${Math.round(r.xp * 100)}% XP for a day)`, [255, 220, 160]);
+  return true;
+}
+registerTalkOptions("pet", (game, c) => (CREATURE_TYPES[c?.type]?.rule?.pet ? [{ label: "Pet her.", go: () => { pet(game, c); return node("Corner allows it, for now.", [bye()]); } }] : null));
