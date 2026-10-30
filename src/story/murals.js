@@ -18,7 +18,7 @@
 //   landmarkAt(game, zone, x, y) → landmark | null   the landmark whose plan the tile is part of (its surface zone, the
 //                                       plan's footprint: zone.gen.planAt)
 //   registerLine(game, L) → the line the view you're in reads: Flat on the map, Deep in 3D, Dark in 3D with your torch out
-// The describer "landmark" puts the Flat line on the map's inspect line over the plan; a look in 3D at it (WS8's L:
+// The describer "murals" ends with the Flat line on the map's inspect line over the plan; a look in 3D at it (WS8's L:
 // inspect open) logs the Deep line, or the Dark one with your torch out. (The world map's panel shows the Flat line too:
 // overworld/renderWorld.js spanLines.)
 import { on } from "../events.js";
@@ -100,11 +100,11 @@ function readLandmark(game, ev) {
 }
 
 // The map's inspect line: a mosaic reads plainly from above; a relief or a rune only says it's there.
-registerDescriber("landmark", (game, tile, { zone }) => (game.view === "map" ? registerLine(game, landmarkAt(game, zone, tile.x, tile.y)) : null), { order: 60 });
-
+// (The landmark's Flat line ends this describer's part: P0's check-hud holds the describers' list.)
 registerDescriber("murals", (game, tile, { zone }) => {
   const ms = muralsAt(zone, tile.x, tile.y);
-  if (!ms.length) return null;
-  return ms.map((m) => (m.view === "map" ? `A mosaic: "${m.text}"` : m.view === "3d" ? "A carved relief (read it in 3D)." : null))
-    .filter(Boolean).join(" ") || null;
+  const said = ms.map((m) => (m.view === "map" ? `A mosaic: "${m.text}"` : m.view === "3d" ? "A carved relief (read it in 3D)." : null)).filter(Boolean);
+  const flat = game.view === "map" ? registerLine(game, landmarkAt(game, zone, tile.x, tile.y)) : null;
+  if (flat) said.push(flat);
+  return said.join(" ") || null;
 }, { order: 40 });
