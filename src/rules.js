@@ -35,10 +35,12 @@ const CORE = {
   // light-weapons-2026-10-30.md, rule B; until then fistReq 10 for bare hands and the weapon's requirement otherwise).
   // Creatures (creatures.js spawnCreature, not bosses or guardians): health × (1 + creatureHp × (level − 1)), damage +
   // creatureDmg + floor((level − 1) / creatureDmgEvery); the legacy set keeps the parent's +6% and +1 per 4. (The
-  // balance phase, approved by the user 2026-10-30: docs/balance/proposal-2026-10-30.md §3.1.)
+  // balance phase, approved by the user 2026-10-30: docs/balance/proposal-2026-10-30.md §3.1.) // B1: from tier8From
+  // (tier 8: level 21 up) their health × tier8Hp and their damage − tier8Dmg (the user's decision of 2026-10-30, "Retune
+  // tier 8", HP ×0.85 and damage −2, measured in the coordinator's b1-ttk-measured.md: a typical kill at tier 8 ~38%).
   d20: { die: 20, crit: 2, critPerAgi: 0.02, minCritNat: 2, highGround: 1, highGroundZ: 1, aimed: 3,
          creatureDv: 5, dvPerLevels: 4, hitPerLevels: 3, reqPenalty: 2, reqPenaltyMax: 6, strOver: 10, swingRef: 0.7,
-         creatureHp: 0.18, creatureDmg: 3, creatureDmgEvery: 1.5 },
+         creatureHp: 0.18, creatureDmg: 3, creatureDmgEvery: 1.5, tier8From: 21, tier8Hp: 0.85, tier8Dmg: 2 },   // B1
 
   // Attributes (bible §10.6): modifier = floor((score − center) / 2); everyone has `base` until WS4.
   attr: { list: ["str", "agi", "tou", "int", "wil", "ego"], base: 16, center: 16 },

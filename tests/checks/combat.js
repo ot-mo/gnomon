@@ -2153,6 +2153,26 @@ export function checkB1Combat(ctx) {
       axe: identity.axe && identity.axeDisarm, polearm: identity.polearm, greatBlade: identity.greatBlade, flail: identity.flail };
     for (const [id, c] of Object.entries(CLASSES)) if (!c.needs && !IDENTITY[id]) expect(false, `class ${id}: built (no needs) but its identity isn't asserted here, or failed`);
 
+    // --- Tier 8 retuned (the user's decision of 2026-10-30: from level 21, health ×0.85, damage −2; under d20) ---------
+    {
+      const D = RULES.d20, raw = (type, level) => { const t = CREATURE_TYPES[type]; return { hp: Math.round(t.hp * (1 + D.creatureHp * (level - 1))), bonus: D.creatureDmg + Math.floor((level - 1) / D.creatureDmgEvery) }; };
+      const at21 = spawnCreature("troll", 1, 1, FLOOR_Z, { rng: () => 0.5, level: 21 }), at20 = spawnCreature("troll", 1, 1, FLOOR_Z, { rng: () => 0.5, level: 20 });
+      const r21 = raw("troll", 21), r20 = raw("troll", 20);
+      const bigType = Object.keys(CREATURE_TYPES).find((k) => CREATURE_TYPES[k].guardian || CREATURE_TYPES[k].boss);
+      const big = spawnCreature(bigType, 1, 1, FLOOR_Z, { rng: () => 0.5, level: 23 }), bigHp = CREATURE_TYPES[bigType].hp;
+      expect(at21.hp === Math.round(CREATURE_TYPES.troll.hp * (1 + D.creatureHp * 20) * 0.85) && at21.bonus === r21.bonus - 2 && D.tier8From === 21 && D.tier8Hp === 0.85 && D.tier8Dmg === 2,
+        `tier 8: a level-21 troll has ${at21.hp} HP, +${at21.bonus} (want ${Math.round(CREATURE_TYPES.troll.hp * (1 + D.creatureHp * 20) * 0.85)} = ×0.85 of ${r21.hp}, +${r21.bonus - 2})`);
+      expect(at20.hp === r20.hp && at20.bonus === r20.bonus, `tier 7: a level-20 troll has ${at20.hp} HP, +${at20.bonus} (want ${r20.hp}, +${r20.bonus}: unchanged)`);
+      expect(big.hp === bigHp, `a ${bigType} at level 23 has ${big.hp} HP (want its own ${bigHp}: bosses and guardians unscaled)`);
+      // The legacy set keeps the parent's +6% and +1 per 4 at every level (golden's fixtures never reach 21: held here).
+      const undoLegacy = overrideRules("combat", "legacy");
+      let leg;
+      try { leg = spawnCreature("troll", 1, 1, FLOOR_Z, { rng: () => 0.5, level: 23 }); } finally { undoLegacy(); }
+      const legHp = Math.round(CREATURE_TYPES.troll.hp * (1 + 0.06 * 22));
+      expect(leg.hp === legHp && leg.bonus === Math.floor(22 / 4), `the legacy set: a level-23 troll has ${leg.hp} HP, +${leg.bonus} (want the parent's ${legHp}, +${Math.floor(22 / 4)})`);
+      stats.tier8 = `a level-21 troll ${at21.hp} HP +${at21.bonus} (formula ${r21.hp}, +${r21.bonus}); level 20 ${at20.hp} +${at20.bonus}; a ${bigType} at 23 ${big.hp} HP`;
+    }
+
     // --- Throwing (WS5 #8) --------------------------------------------------------------------------------------
     clear();
     const fit = (part, id) => { p.body.implants[part] = id ? { kind: "implant", id } : null; invalidateStats(p); };
