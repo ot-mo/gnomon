@@ -10,7 +10,9 @@
 //   beginCampaign(game) → bool       the start (on "zone:enter" with how "start", off the test world): beat 1 as a quest
 //                                    (template "beat", id = the beat's id) and a note of the starter chain
 //   beatReady(game, beat) → bool     its `after` beats done (any one; all with needsAll)
-//   beatMatches(m, type, ev) → bool  a matcher { event, landmark?, z?, id?, uid? } against a bus event
+//   beatMatches(m, type, ev) → bool  a matcher { event, landmark?, z?, id?, uid? } against a bus event; or a list of
+//                                    them, any one (a beat's routes: C5 #13); event "route" { id } is a route's own
+//                                    (story/beats.js: Detail C's reading of the Datum, beat 2)
 //   BEAT_XP(level)                   WS4's xpReward("beat", level) when it exists, else 0.75 of a level's XP at the band's
 //                                    floor; × 1.5 for a beat begun below its band (bible §11 "the early bonus")
 // Events: "beat" { id, n } when one is done; "lengthen" { n } when the Lengthening advances (after beat 5, the first of
@@ -39,9 +41,10 @@ export function campaignOf(game) {
 }
 
 export function beatMatches(m, type, ev) {
+  if (Array.isArray(m)) return m.some((x) => beatMatches(x, type, ev));
   if (!m || m.event !== type) return false;
   if (type === "zone:enter") return ev?.zone?.landmarkId === m.landmark && (m.z === undefined || ev.zone.z === m.z);
-  if (type === "secret") return ev?.id === m.id;
+  if (type === "secret" || type === "route") return ev?.id === m.id;
   if (type === "kill") return (ev?.uid ?? ev?.c?.uid) === m.uid;
   if (type === "quest:done") return ev?.q?.id === m.id;
   return false;
@@ -57,7 +60,7 @@ const beatOf = (id) => CAMPAIGN.beats.find((b) => b.id === id) || null;
 const doneBy = (type) => (game, q, ev) => (beatMatches(beatOf(q.id)?.done, type, ev) ? "done" : null);
 registerQuest("beat", {
   start: "open",
-  stages: { open: { on: { "zone:enter": doneBy("zone:enter"), secret: doneBy("secret"), kill: doneBy("kill"), "quest:done": doneBy("quest:done") } } },
+  stages: { open: { on: { "zone:enter": doneBy("zone:enter"), secret: doneBy("secret"), kill: doneBy("kill"), "quest:done": doneBy("quest:done"), route: doneBy("route") } } },
   onComplete: (game, q) => beatDone(game, beatOf(q.id), q),
 });
 

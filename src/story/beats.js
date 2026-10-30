@@ -16,11 +16,14 @@
 //                    Chimers: the world map's encounter table reads it once their band exists, a request)
 //   isGiver(c, beat) → bool   the talker the beat's `giver` names: every word of it in the talker's name ("Surveyor-
 //                    General Quint-Vey" is Surveyor-General Teodor Quint-Vey)
+// Routes (C5 #13): a beat's `done` may list matchers, any one finishing it (story/campaign.js beatMatches); the routes'
+// own events are "route" { id }. Beat 2's second: Detail C reads the Datum (its type's rule { reads: "datum", price }),
+// for 300 glim, free at Plan Warm or better, while beat 2 is open: "datumRead".
 // Talk: at a giver, while its beat is open, "What's wrong?" tells its offer; once done, each open choice ("About the
 // Assize plumb-seal...") with its options. A beat with no giver (5, 7) asks on its own: once you're back in the world
 // (explore or map) the talk screen opens with the beat as its speaker (registerUpdate "campaign:choice").
 import { on, emit, registerUpdate } from "../events.js";
-import { registerTalkOptions, registerDialogue, talkTo, node } from "../talk.js";
+import { registerTalkOptions, registerDialogue, talkTo, node, bye } from "../talk.js";
 import { openTalk } from "../dialogue.js";
 import { QUESTS } from "../content/quests.js";
 import { ARTIFACTS } from "../content/items/artifacts.js";
@@ -31,6 +34,10 @@ import { addToInventory, itemName } from "../items.js";
 import { receive } from "../currency.js";
 import { learnSecret } from "./secrets.js";
 import { campaignOf } from "./campaign.js";
+import { questActive } from "./quests.js";
+import { typeOf } from "../creatures.js";
+import { pay } from "../currency.js";
+import { standingOf } from "../social/builders.js";
 import * as factions from "../factions.js";
 
 const CAMPAIGN = QUESTS.campaign;
@@ -145,6 +152,18 @@ registerTalkOptions("campaign", (game, c) => {
     out.push({ label: `About ${open.choice.label}...`, go: () => choiceNode(game, open, null) });
   }
   return out.length ? out : null;
+});
+
+// Beat 2's second route: Detail C's reading of the Datum.
+registerTalkOptions("datum", (game, c) => {
+  const rule = typeOf(c)?.rule;
+  if (rule?.reads !== "datum" || !questActive(game, "beat2")) return null;
+  const free = ["liked", "loved"].includes(standingOf(game, c).band), price = free ? 0 : rule.price;
+  return [{ label: `Read the Datum for me.${price ? ` (${price} glim)` : ""}`, go: () => {
+    if (price && !pay(game, game.player, price)) return node("INSUFFICIENT GLIM. THE DATUM WILL WAIT. IT IS GOOD AT WAITING.", [{ label: "Back.", go: () => talkTo(game, c) }]);
+    emit(game, "route", { id: "datumRead", by: c.uid ?? null });
+    return node(`THE DATUM IS READ.${price ? ` ${price} GLIM RECEIVED.` : " NO CHARGE. THE PLAN REMEMBERS ITS FRIENDS."}`, [bye()]);
+  } }];
 });
 
 // A beat with no giver asks on its own, once you're back in the world.

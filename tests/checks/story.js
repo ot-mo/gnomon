@@ -824,10 +824,14 @@ async function campaign7b(env, { fail, stats, real, test, json, game, startRun }
   if (B.length !== 11 || B.some((b, k) => b.n !== k + 1) || new Set(B.map((b) => b.id)).size !== 11) fail(`the beats: ${B.map((b) => b.id)}`);
   for (const b of B) {
     if (b.after.some((id) => !B.find((x) => x.id === id && x.n < b.n))) fail(`${b.id}: after ${b.after}`);
-    const L = real.landmarks.get(b.done.landmark || b.landmark);
-    if (!L) fail(`${b.id}: no landmark ${b.done.landmark}`);
-    else if (b.done.event === "zone:enter" && b.done.z > 0 && !(L.dungeon && b.done.z <= (L.dungeon.floors?.length || L.dungeon.levels)))
-      fail(`${b.id}: ${L.id} has no floor ${b.done.z}`);
+    // (a beat's `done` may be a list of matchers, any one finishing it: its routes, C5 #13)
+    for (const m of [b.done].flat()) {
+      const L = real.landmarks.get(m.landmark || b.landmark);
+      if (!L) fail(`${b.id}: no landmark ${m.landmark}`);
+      else if (m.event === "zone:enter" && m.z > 0 && !(L.dungeon && m.z <= (L.dungeon.floors?.length || L.dungeon.levels)))
+        fail(`${b.id}: ${L.id} has no floor ${m.z}`);
+      if (!["zone:enter", "secret", "kill", "quest:done", "route"].includes(m.event)) fail(`${b.id}: a matcher on "${m.event}", which no beat listens for`);
+    }
   }
   if (json(B[6].after) !== json(["beat6"]) || json(B[7].after) !== json(["beat6"]) || !B[8].needsAll || json(B[8].after) !== json(["beat7", "beat8"])) fail("beats 7-9's order");
   if (!CAM.CAMPAIGN.intro.length || CAM.CAMPAIGN.starter.length !== 5) fail("the intro or the starter chain");
@@ -870,7 +874,7 @@ async function campaign7b(env, { fail, stats, real, test, json, game, startRun }
   at("kettleMesa", 2);
   if (open() !== "beat1") fail("beat 1 finished on the wrong floor");
   const p = game.player, lv = p.level, gain0 = p.maxHpGain || 0, inv0 = p.inv.length, rep0 = { ...(game.state.rep || {}) };
-  const finish = (b) => (b.done.event === "secret" ? events.emit(game, "secret", { id: b.done.id, kind: "history" }) : at(b.done.landmark, b.done.z));
+  const finish = (b) => { const m = [b.done].flat()[0]; return m.event === "secret" ? events.emit(game, "secret", { id: m.id, kind: "history" }) : at(m.landmark, m.z); };
   for (const b of B.slice(0, 6)) finish(b);
   if (open() !== "beat7,beat8") fail(`after beat 6: ${open()}`);
   finish(B[7]);
@@ -886,6 +890,7 @@ async function campaign7b(env, { fail, stats, real, test, json, game, startRun }
   stats.beatsPaid = await beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json });
   stats.corner = await cornerPetted(env, { fail, game, p });
   stats.questPools = await questPools(env, { fail, real, test, RUN });
+  stats.routes = await beatRoutes(env, { fail, game, CAM, at, p });
   offB(); offL();
   game.run = keep.run; game.quests = keep.quests; game.state.campaign = keep.campaign;
   stats.campaign = `11 beats as data at their landmarks' floors; the start on the real world gives beat 1 (none on the test world, whose intro stays the parent's); ` +
@@ -969,7 +974,7 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json }) {
   }
   const page = T.talkTo(game, { id: -1, type: "campaign", name: B[4].title, vis: {}, talk: { dialogue: "campaign:choice", state: { beat: "beat5" }, met: true } });
   if (!page || page.options.length < 2 || !page.options.some((o) => o.label === "Expose House Saffre.")) fail(`beat 5's own page: ${json(page?.options?.map((o) => o.label))}`);
-  page.options.find((o) => o.label.startsWith("Take its silence money")).go();
+  page?.options.find((o) => o.label.startsWith("Take its silence money"))?.go();
   if (C.choices?.beat5?.saffre !== "silence" || rep("chandlers") < 200) fail(`beat 5's choice: ${json(C.choices?.beat5)}`);
   // "What's wrong?": an open beat's offer at its giver.
   const keepQ = game.quests;
@@ -979,6 +984,43 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json }) {
   if (offer?.text !== B[1].offer) fail(`beat 2's offer at Quint-Vey: ${offer?.text}`);
   return `11 beats paid (the plumb-seal and Plumb Key, the plumb-bob known, +5 max HP, Survey +${rep("survey")}, Noon's Face and its turn, the Flat Account ${known ? "read" : "has no def"}; ` +
     `the unpress lens and Great Theodolite owed, the lens paid once made); ${want.split(",").length} choices open, two made at their givers, beat 5's on its own page; the offer at the giver; journal routes; ${p.inv.length - inv0} more in the pack`;
+}
+
+// A beat's routes (the integrator, C5 #13; campaign.js beatMatches on a list, story/beats.js): beat 2 finishes on the
+// Datum's floor 4 or by Detail C's reading, "Read the Datum for me. (300 glim)" while beat 2 is open, which takes 300
+// glim (none without them, and the beat stays open) and is free at Plan Warm; nobody else offers it.
+async function beatRoutes(env, { fail, game, CAM, at, p }) {
+  const T = await env.src("talk.js"), CUR = await env.src("currency.js");
+  const keep = { quests: game.quests, campaign: game.state.campaign, rep: game.state.rep };
+  const detail = { id: -5, type: "detailC", name: "Detail C", vis: {}, talk: { dialogue: "detailC", state: {}, met: true } };
+  const opt = () => T.talkTo(game, detail).options.find((o) => /^Read the Datum for me/.test(o.label));
+  const open = (id) => game.quests.some((q) => q.id === id && !q.done);
+  const fresh = () => { game.quests = []; delete game.state.campaign; game.state.rep = { ...(keep.rep || {}), plan: 0 }; CAM.beginCampaign(game); at("kettleMesa", 3); };
+  const out = [];
+  try {
+    fresh();
+    if (opt()?.label !== "Read the Datum for me. (300 glim)") fail(`Detail C's option with beat 2 open: ${opt()?.label}`);
+    CUR.pay(game, p, CUR.funds(p));   // an empty purse: no reading
+    opt()?.go();
+    if (!open("beat2")) fail("Detail C read the Datum for nothing, without the glim");
+    CUR.receive(game, p, 300);
+    const before = CUR.funds(p);
+    opt()?.go();
+    if (open("beat2") || before - CUR.funds(p) !== 300 || game.state.campaign.done.beat2 === undefined) fail(`beat 2 by Detail C: open ${open("beat2")}, paid ${before - CUR.funds(p)}`);
+    if (opt()) fail("Detail C still offers the reading once beat 2 is done");
+    out.push("for 300 glim");
+    fresh();
+    game.state.rep.plan = 400;   // Plan Warm
+    const f0 = CUR.funds(p), o = opt();
+    o?.go();
+    if (o?.label !== "Read the Datum for me." || open("beat2") || CUR.funds(p) !== f0) fail(`at Plan Warm: ${o?.label}, open ${open("beat2")}`);
+    out.push("free at Plan Warm");
+    if (T.talkTo(game, { ...detail, type: "ottilie", name: "Old Ottilie", talk: { dialogue: "ottilie", state: {}, met: true } }).options.some((x) => /Datum/.test(x.label)))
+      fail("Ottilie offers the Datum's reading");
+  } finally {
+    game.quests = keep.quests; game.state.campaign = keep.campaign; game.state.rep = keep.rep;
+  }
+  return `beat 2 by Detail C's reading (${out.join(", ")}), not without the glim, nobody else's`;
 }
 
 // Village quests by region (the integrator, C5 #9; story/questplan.js): on the real world a quest's thing or beast is

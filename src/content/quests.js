@@ -211,7 +211,7 @@ export const QUESTS = {
           "As a Plumb of Vey, read the Deepwright script on floor 3's door and walk through."],
         learn: "The verdict: \"The noon Hand has grown by a finger's width, and most of it this month.\"",
         reward: { text: "The plumb-bob, and the Datum's two lower floors with their cache.", items: [["plumbBob", 1]] },
-        done: { event: "zone:enter", landmark: "benchmark", z: 4 },
+        done: [{ event: "zone:enter", landmark: "benchmark", z: 4 }, { event: "route", id: "datumRead" }],   // route 2: Detail C's reading (C5 #13)
         choices: [{ id: "reading", label: "the Datum reading", options: [
           { id: "survey", text: "Keep the reading inside the Survey.", rep: { survey: 100 } },
           { id: "horary", text: "Sell it to the Horary. (The Seventh-Chimers will learn your name.)", rep: { horary: 150, survey: -100 }, ambush: "seventhChimers" }] }] },
