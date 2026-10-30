@@ -1871,7 +1871,7 @@ export async function run(env) {
     tick(holy.GRACE + 0.1);
     if (F.attitude(game, singer, p()) !== "hostile") fail("at Warm, the torch still lit after the warning: not turned");
     p().genotype = "plumb"; game.state.rep.lampless = 700; game.state.trespass = {};
-    tick(holy.GRACE + 1);
+    tick(0.1); tick(holy.GRACE + 1);
     if (F.attitude(game, singer, p()) === "hostile") fail("a Plumb with the dark-pass turned on");
     delete game.zone.holy;
     setup(); game.zone.holy = "horary";

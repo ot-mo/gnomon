@@ -483,6 +483,13 @@ async function villages7b(env, { fail, stats, test, real, json, startRun, game }
   const codec = await env.src("save/codec.js"), POW = await env.src("content/powers.js"), facs = {};
   const times = [], perRegion = {}, realPerSeed = [];
   const VILLAGES = (await env.src("content/villages.js")).VILLAGES, heightsSeen = { stairs: 0, raised: {}, storeys: 0, painted: 0, cisterns: 0 };   // B3 (C2 #7)
+  // Bible §9.4's heights, slot by slot (hall, nw, ne, sw, se), as B3 stamps them: stilts 1; sunk 1; the ledges' three
+  // levels 3 apart; the canopy's pods 6 and 8 up; the cliff's market at the top, 8 up, the next 4.
+  const HEIGHTS = { reed: [1, 1, 1, 1, 1], turf: [-1, -1, -1, -1, -1], ledge: [0, 3, 6, 0, 0], bark: [0, 6, 8, 0, 0], cave: [0, 8, 4, 0, 0],
+    salt: [0, 0, 0, 0, 0], page: [0, 0, 0, 0, 0], cell: [0, 0, 0, 0, 0], storey: [0, 0, 0, 0, 0], glass: [0, 0, 0, 0, 0] };
+  for (const [style, hs] of Object.entries(HEIGHTS)) ["hall", "nw", "ne", "sw", "se"].forEach((slot, k) => {
+    if (VS.liftOf(VILLAGES.styles[style], slot).h !== hs[k]) fail(`villages: style ${style}'s ${slot} building ${VS.liftOf(VILLAGES.styles[style], slot).h} up, bible §9.4 as stamped ${hs[k]}`);
+  });
   for (const W of [test, real]) for (let seed = 1; seed <= 20; seed++) {
     const run = RUN.buildRun(seed, W);
     const want = [...run.sites.values()].filter((s) => s.kind === "village");
