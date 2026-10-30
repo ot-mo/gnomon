@@ -130,7 +130,15 @@ export function fallThrough(game) {
 // Drop from (x, y) in `zone` to the level below (a hole, deep water, a potion of descent). Under a
 // surface zone the levels sit at its dungeonRect (TECH_DESIGN §5.5), so the point moves by that
 // offset; dungeon levels line up 1:1 (their offset is 0).
+// A floor sealed below (the Datum's, until its beat: B2) holds: you stay, on solid ground. A fall from a floor up (the
+// Square's, z < 0) lands by the stair up of the zone below, inside the citadel (its levels don't line up with the surface).
 function fallTo(game, below, zone, x, y, message) {
+  if (zone.sealedBelow && !beatOpen(game, zone.sealedBelow.beat)) {
+    game.log("The floor gives, then holds: the Survey's brass seals everything below this one.", [200, 190, 150]);
+    enterZone(game, zone, { how: "fall", fx: x, fy: y, rng: Math.random });
+    return;
+  }
+  if (zone.z < 0) { changeFloor(game, below, "down", message); return; }
   const { ox, oy } = dungeonOffset(game, zone);
   changeFloor(game, below, "fall", message, x - ox, y - oy);
 }

@@ -787,6 +787,8 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
   game.debug.enterZone(dk2);
   const onStairs = () => { const st = game.zone.stairs; Object.assign(P, { x: st.x + 0.5, y: st.y + 0.5, z: FLOOR_Z, onGround: true, vz: 0 }); checkFloorEvents(game); return game.zone.key; };
   const sealedAt = game.zone.sealedBelow, sealed = onStairs() === dk2;
+  game.fallThrough();   // a potion of descent: the seal holds too
+  const sealedFall = game.zone.key === dk2;
   const { campaignOf } = await import("../../src/story/campaign.js");
   campaignOf(game).done.beat1 = game.time;
   const opened2 = onStairs() === `${dat.at.wx},${dat.at.wy},3`;
@@ -799,8 +801,14 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
   const cv = game.zone.culvert;
   if (cv) { Object.assign(P, { x: cv.x + 0.5, y: cv.y + 0.5, z: -2 }); checkFloorEvents(game); }
   const home = game.run.world.landmarks.get("hollowmere");
-  stats.gimmicks = { offBeatDoors: ob.length, onBeat, offBeatOpen, sealedBelow: sealedAt?.beat, sealed, opened2, soft, culvert: !!cv && game.zone.key === `${home.wx},${home.wy},0` };
-  expect(ob.length && onBeat && offBeatOpen && sealedAt?.beat === 2 && sealed && opened2 && soft && stats.gimmicks.culvert, `in a game: the gimmicks ${JSON.stringify(stats.gimmicks)}`);
+  const culvertHome = !!cv && game.zone.key === `${home.wx},${home.wy},0`;
+  // A fall from the Square's floor up lands inside the citadel, by the stair up of the zone below (not out of line with it).
+  const sqz = site("square");
+  game.debug.enterZone(`${sqz.at.wx},${sqz.at.wy},-1`);
+  game.fallThrough();
+  const sqs = game.zone.upStairs, upFall = game.zone.key === `${sqz.at.wx},${sqz.at.wy},0` && sqs && Math.abs(P.x - sqs.x - 0.5) + Math.abs(P.y - sqs.y - 0.5) <= 3;
+  stats.gimmicks = { offBeatDoors: ob.length, onBeat, offBeatOpen, sealedBelow: sealedAt?.beat, sealed, sealedFall, opened2, soft, culvert: culvertHome, upFall };
+  expect(ob.length && onBeat && offBeatOpen && sealedAt?.beat === 2 && sealed && sealedFall && opened2 && soft && stats.gimmicks.culvert && upFall, `in a game: the gimmicks ${JSON.stringify(stats.gimmicks)}`);
   // The rest of the gimmicks (C1b #10), in a game, at the run's own floors:
   let G2;
   {

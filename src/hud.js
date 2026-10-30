@@ -70,7 +70,7 @@ export function drawDead(game) {
   const at = overlay([
     ["YOU DIED", [255, 80, 80]],
     ["", null],
-    [`Killed by ${game.deathCause} ${game.zone.type === "dungeon" ? `on depth ${game.zone.dungeonIndex}` : `in ${game.zone.name}`}.`, [220, 220, 220]],
+    [`Killed by ${game.deathCause} ${game.zone.type === "dungeon" ? (game.zone.z < 0 ? `on floor ${-game.zone.z} up` : `on depth ${game.zone.dungeonIndex}`) : `in ${game.zone.name}`}.`, [220, 220, 220]],
     [`Seed ${game.seed}`, [140, 140, 140]],
     ["", null],
     ["Press R to start a new run", [255, 255, 255]],

@@ -50,7 +50,7 @@ const timeLabel = (t) => { const m = Math.floor((t || 0) / 60); return m >= 60 ?
 function drawRecap(game) {
   const r = recapOf(game), p = game.player, w = Math.min(S.cols - 2, 84);
   const lines = [];
-  const where = game.zone ? (game.zone.type === "dungeon" ? `on depth ${game.zone.dungeonIndex}` : `in ${game.zone.name}`) : "";
+  const where = game.zone ? (game.zone.type === "dungeon" ? (game.zone.z < 0 ? `on floor ${-game.zone.z} up` : `on depth ${game.zone.dungeonIndex}`) : `in ${game.zone.name}`) : "";   // (a floor up: the Square's, B2)
   lines.push([`Killed by ${r.cause} ${where}.`, [220, 220, 220]]);
   lines.push([`Level ${p?.level ?? 1} · ${timeLabel(game.time)} of game time · seed ${game.seed} · ${RUN_MODES[r.mode].name}`, [160, 230, 255]]);
   lines.push(["", null]);
