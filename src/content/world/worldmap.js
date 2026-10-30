@@ -184,7 +184,7 @@ const LANDMARK_DUNGEONS = {
     named: ["the Dial-works, the Great Wheel", "the Dial-works, the Train", "the Dial-works, the Fusee", "the Dial-works, the Mainspring",
             "the Dial-works, the Escape Wheel", "the Dial-works, the Pallets", "the Dial-works, the Hand's Root", "the Noon Socket"],
     planned: { bottom: { kind: "boss", id: "vesper", name: "Vesper" }, sweepingHand: { period: 40 }, door: { hours: [11, 13] } } },
-  underPage: { theme: "salt", gimmicks: ["murals"], vaultPool: ["mosaicHall", "speakingDoor"],
+  underPage: { theme: "salt", gimmicks: ["murals"], vaultPool: ["mosaicHall"],   // (the Speaking Door is floor 2's alone: planned.vaults)
     named: ["the Under-Page, the First Leaf", "the Under-Page, the Speaking Door", "the Under-Page, the Founding"],
     planned: { bottom: { kind: "relic", id: "pressedFounding", name: "the Pressed's founding relic", with: "a Second-Hour stele with all three accounts; a reading that names Vesper" },
                vaults: { 2: "speakingDoor" } } },
