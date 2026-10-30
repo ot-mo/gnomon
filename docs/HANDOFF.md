@@ -5,12 +5,12 @@ Update this file as the last act of every session (see `CLAUDE.md`, "Handing off
 **Updated:** 2026-10-30, the integrator (local session), on `integration`. **Phases 1 and 2 are done; Phase 3 is under
 way.** all six content sessions are merged (`p3i-c1a`, `p3i-c4`, `p3i-c2`, `p3i-c3`, `p3i-c1b`, `p3i-c5`), and §8.5's last wiring merge is done
 (`p3i-wiring`): **new games start on GNOMON's real world at Hollowmere** (`?world=test` for the test world). `main` =
-`p4i-people` (the landmark people placed, C5 #3, on `p3i-lightweapons`: the user's balance decisions of 2026-10-30 applied: creature scaling under d20, two species fixes, enchantment AV, fists, and light weapons by rule B; ttkTables' bounds on a typical build). **The backlog runs in four parts** (the user, 2026-10-30: "start everything that you can start"): B1, B2 and B3 in their worktrees from `p3i-lightweapons`, the integrator on the story (next step, below). From here on only the integrator edits this file and
+`p4i-beats` (C5's beats paid with their choices, barks, routes, Corner and village pools by region, on `p4i-people`, the landmark people placed, on `p3i-lightweapons`: the user's balance decisions of 2026-10-30 applied: creature scaling under d20, two species fixes, enchantment AV, fists, and light weapons by rule B; ttkTables' bounds on a typical build). **The backlog runs in four parts** (the user, 2026-10-30: "start everything that you can start"): B1, B2 and B3 in their worktrees from `p3i-lightweapons`, the integrator on the story (next step, below). From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p4i-people` (C5 #3 with C1b #18: the landmark people placed, on `p3i-lightweapons`) on `integration`; before it `p3i-lightweapons` (light weapons, rule B, on `p3i-balance`), `p3i-balance` (the balance decisions of 2026-10-30, on `p3i-c5`), the Phase 3 merges (`p3i-c5`, `p3i-c1b`, `p3i-c3`, `p3i-c2`, `p3i-c4`, `p3i-wiring`, `p3i-c1a`), `p3i-sinkholes` (C1a's request 9, on `p3i-props`), `p3i-props` (props named; C1a's, C4's and C2's base), `p2-realworld`, `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+- **Last tag:** `p4i-beats` (C5 #5, #6, #9, #11, #13 in part, #14, on `p4i-people`) on `integration`; before it `p4i-people` (C5 #3 with C1b #18: the landmark people placed, on `p3i-lightweapons`), `p3i-lightweapons` (light weapons, rule B, on `p3i-balance`), `p3i-balance` (the balance decisions of 2026-10-30, on `p3i-c5`), the Phase 3 merges (`p3i-c5`, `p3i-c1b`, `p3i-c3`, `p3i-c2`, `p3i-c4`, `p3i-wiring`, `p3i-c1a`), `p3i-sinkholes` (C1a's request 9, on `p3i-props`), `p3i-props` (props named; C1a's, C4's and C2's base), `p2-realworld`, `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
   `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b`, `p1-ws10`, the flip, `p1-ws2a`, `p1-ws7a`,
   `p1-ws7b`, `p1-ws2b`, `p1-ws9` and `p1-ws1`, with their integration requests; `p2-ws3` … `p2-ws9` before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
@@ -45,7 +45,7 @@ the real world the default: then `main.js`'s `?world=real` branch and its cube h
 or go with it; browser-2b part 3 and check-overworld's 7 URLs follow).
 
 **Next step:** the backlog in four parts, all from `p3i-lightweapons` (the user, 2026-10-30: "start everything that you can start"; the coordinating session split it, its rules in the side-session notes' `backlog-rules.md`):
-- **The integrator**, on `integration`: the story, C5 #3-#14 (C1b #18, who stands where, with #3); #3 is done (`p4i-people`), next #5 and #6 (a beat's reward and choice, the quest items), then #4 (the starter chain), #9, #14 and the rest as their systems land; and it merges `p4b-b1`, `p4b-b2` and `p4b-b3` as they come, as a content tag, its merges setting `GEN_VERSION`.
+- **The integrator**, on `integration`: the story, C5 #3-#14 (C1b #18, who stands where, with #3); #3 is done (`p4i-people`), #5, #6, #9, #11, #14 and #13's first part (`p4i-beats`); next the merges of `p4b-b3` then `p4b-b2` (the coordinator's order; `GEN_VERSION` bumped at each that changes generation, B3's first), then #4 (the starter chain), #12 (the dungeons' people, on B2's floors), #7, #8, #10 and #13's rest; and it merges `p4b-b1`, `p4b-b2` and `p4b-b3` as they come, as a content tag, its merges setting `GEN_VERSION`.
 - **B1, gear and powers**: `C:\Users\Otto Mörner\Code\gnomon-wt\b1`, `ws/b1`, tag `p4b-b1`. C4 #1, #2 (with C2 #12), #4-#10, #12-#14; WS5 #8, #9, #19; WS4 #16, #19; WS6b #3; POWERS' needs but B3's.
 - **B2, landmarks and dungeons**: `gnomon-wt\b2`, `ws/b2`, tag `p4b-b2`. C1a #5; C1b #1-#17 and #19-#26 (not #18); WS10 #9. It builds the places, the integrator places the people; the bottoms (the Grub Mother, the Press-Master, the Gloam Warden, the Escapement, the Drowned Bellwether, Noon, the relics) are B2's as places and creatures, Vesper's phases, the endings and the barks the integrator's. C5 #12's Hierarch waits on B2's floors up (C1b #8), which B2 builds first.
 - **B3, peoples and villages**: `gnomon-wt\b3`, `ws/b3`, tag `p4b-b3`. C2 #3, #5-#9, #11, #13; WS10 #6; the lore powers (Hour script, Gossip, Triangulator); Oil fire, Brew, Chime; WS6b's stock and `buys`.
@@ -396,6 +396,41 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p4i-beats`** (2026-10-30): C5 #5, #6, #9, #11, #13 (first part) and #14 on `p4i-people`.
+- **#5, #6** (`story/beats.js`, on campaign.js's "beat" event): a done beat pays its reward, the text logged (items:
+  `QUESTS.campaign.questItems` as quest items, C4's artifacts made and known, the parent's relics, tonics; one not made
+  yet, the unpress lens and the Great Theodolite, owed and paid on a zone:enter once it can be; Maren's +5 max HP through
+  `raiseMaxHp`; rep through `factions.addRep` "quest", beat 9's range at its low end until the siege counts survivors;
+  glim, what doesn't fit on the ground; a reading; Noon's Face, `screens/play.js`: a turn leaves you untouchable 1 s, every 8
+  s at most). Choices: every done beat's but those by route (6, 8: #7, #8) as "About ..." at the giver (each word of its
+  giver in the talker's name), paying rep, glim, items, a reading, taking what an option gives away (beat 1's seal, only
+  while you carry it), recording `campaign.choices`, the alliance and the ambush; beats 5 and 7, with no giver, ask on a
+  page of their own that opens once you're in the world, every waiting choice in order, "Not yet." or Esc for a world
+  hour. "What's wrong?" at the giver tells an open beat's offer; a giverless beat's offer is logged as it begins; the
+  journal shows a beat's routes under its goal. The talk box now names its speaker by the speaker's own name, title and
+  colour (a placed person, a village's named people; the beat's page has no type: that was the freeze, below).
+- **#9** (`story/questplan.js`): a real-world village quest's thing or beast from its region's pool, one draw as before; the
+  test world's spans have no region with a pool. **`GEN_VERSION` 6 → 7.**
+- **#11** (`story/barks.js`): a creature's bark (by `who`, else its type) once, when it notices you (`ai.js` emits
+  "creature:notice") or wakes as a guardian; the Lich King's line for the Lich alone. The bottoms' barks (the Grub Mother,
+  the Press-Master) want B2 to set their `who`.
+- **#13, first part**: a beat's `done` may be a list of matchers; "route" { id } is a route's event; beat 2 finishes by
+  Detail C's reading too (300 glim, free at Plan Warm, refused at Plan Dark). Left: beat 1's other routes (Brann's
+  undercroft wall, Ess and Tee's walk: their places), beats 9 and 10's stand-ins (the siege; the Hierarch's Key).
+- **#14**: "Pet her." on Corner, +10% XP for a world day (`state.xpBoost`, `leveling.js gainXp`, whole XP).
+- **Verification**: an independent reviewer on `37da06f` (nine findings) and another on `72a61ff` (four), each fixed in
+  its own commit with mutants: the game froze after beats 5 and 7 (`drawTalk` read the page's missing type: 9b016ec);
+  the page couldn't be left and only one beat could wait (d7a1a49); glim that didn't fit was lost (2089113); a beat paid
+  at time 0 paid twice (99dc832); the seal stayed after you gave it away, and quest items could come twice (d3132c6);
+  reward text, a giverless offer, `raiseMaxHp` (72a61ff); an option paying without the seal (0a3f676); "Which way am I?"
+  on the beat's page (d38f073); Detail C reading at Plan Dark (25ac68e); "Not yet." back at every span (2af1fcd). Left
+  as open items: the Shame reading, the Seventh-Chimers, beat 10's giver, the seal in B2's tunnel. Mutants: 76, each
+  killed.
+- **Checks**: `run-all` 37 of 38 under load (check-overworld's world-map draw, 3.07-3.09 ms; alone all ten parts pass,
+  the draw 1.04-2.31 ms), check-perf passing in run-all's alone slot; against `p4i-people`, surface generation ×1.05 (and
+  refresh ×1.27 with B1's runs loading the machine: an open item); golden, screen frames and legacy fights unchanged; the
+  real world's bot playthrough; browser-gate (seeds 1234, 7) and browser-2b pass (audio silenced, servers stopped).
 
 **`p4i-people`** (2026-10-30): C5 #3 with C1b #18, who stands where, on `p3i-lightweapons`. Each real-world landmark's
 people stand on its plan's letters as its span is made (`story/landmark-people.js`, through `world/sites.js`
@@ -1096,6 +1131,19 @@ its §8.4 files and two P0 checks).
 
 ## Open items carried forward
 
+- **Left of the story work at `p4i-beats`** (2026-10-30), for whoever owns each:
+  - **Beat 5's Shame reading** (`"shame:saffre"`, the silence option's "You keep a Shame reading."): no secret of that kind
+    exists (`story/secrets.js` defines none), so the option pays its rep and glim and the reading silently doesn't come.
+    Between owners (C2's readings, B3's peoples, or the integrator's story): for the coordinator.
+  - **Beat 2's Seventh-Chimers ambush**: recorded (`campaign.ambushes`), but no encounter band of them exists, and they
+    must waylay you even when the Horary like you (bible §7: they serve Vesper). An encounter band and a faction or rule:
+    between owners (C3's creatures and WS1's tables, or the integrator): for the coordinator.
+  - **Beat 10's giver**, the Hierarch, stands only in the Square's `below` (two floors up, C1b #8, B2's): her choice and
+    offer wait for C5 #12, the integrator's, once B2's floors up are merged.
+  - **Beat 1's seal**: the reward gives it on reaching Kettle Mesa's floor 3; when B2 lays the seal in the floor's sapper
+    tunnel (C1b #24), picking that one up must not make a second: settled at B2's merge.
+  - **check-perf's refresh** read ×1.27 against `p4i-people` (p50 10.13 ms, budget 10) while B1's TTK runs loaded the
+    machine; nothing since touches refresh; it passed in run-all's alone slot at the tag. Recheck on a quiet machine.
 - **More powers offered, and check-combat's typical build** (the coordinating session, relaying the user, 2026-10-30): every
   power that goes live widens the 3 offers a level, so ttkTables' typical build gets fewer of the stat powers it prefers and
   its tier-8 cost a kill rises (B1's 8 class powers live: 43.4%; B3's 6 alone: 44.6%; the bound is 22-41%). **The user:
