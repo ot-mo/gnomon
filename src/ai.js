@@ -65,7 +65,7 @@ import { attitude } from "./factions.js";
 import { distance } from "./rng.js";
 import { killMonster } from "./monsters.js";
 import { resolveAttack, naturalSpec } from "./combat.js";
-import { on } from "./events.js";
+import { on, emit } from "./events.js";
 import { zoneState } from "./zones.js";
 import { ABILITIES, abilitiesOf, activate } from "./abilities.js";
 
@@ -352,9 +352,10 @@ function perceive(game, m, t) {
   if (m.state === "flee") { keepFleeing(game, m, seen); return; }
   if (seen) {
     if (m.state !== "chase" && dist < 14) {
-      if (t.boss) game.log("The Lich King rises from its throne. \"Another one comes to die.\"", t.color);
+      if (m.type === "lich") game.log("The Lich King rises from its throne. \"Another one comes to die.\"", t.color);
       else if (t.guardian) { /* guardians.js announces itself */ }
-      else game.log(`A${/^[aeiou]/.test(m.name) ? "n" : ""} ${m.name} notices you!`, m.color);
+      else if (!t.boss) game.log(`A${/^[aeiou]/.test(m.name) ? "n" : ""} ${m.name} notices you!`, m.color);
+      emit(game, "creature:notice", { c: m });   // (story/barks.js: what it says, if it has words: C5 #11)
     }
     m.state = "chase";
     m.lost = 0;

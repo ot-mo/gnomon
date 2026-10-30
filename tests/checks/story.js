@@ -891,6 +891,7 @@ async function campaign7b(env, { fail, stats, real, test, json, game, startRun }
   stats.corner = await cornerPetted(env, { fail, game, p });
   stats.questPools = await questPools(env, { fail, real, test, RUN });
   stats.routes = await beatRoutes(env, { fail, game, CAM, at, p });
+  stats.barks = await barks(env, { fail, game, p });
   offB(); offL();
   game.run = keep.run; game.quests = keep.quests; game.state.campaign = keep.campaign;
   stats.campaign = `11 beats as data at their landmarks' floors; the start on the real world gives beat 1 (none on the test world, whose intro stays the parent's); ` +
@@ -984,6 +985,34 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json }) {
   if (offer?.text !== B[1].offer) fail(`beat 2's offer at Quint-Vey: ${offer?.text}`);
   return `11 beats paid (the plumb-seal and Plumb Key, the plumb-bob known, +5 max HP, Survey +${rep("survey")}, Noon's Face and its turn, the Flat Account ${known ? "read" : "has no def"}; ` +
     `the unpress lens and Great Theodolite owed, the lens paid once made); ${want.split(",").length} choices open, two made at their givers, beat 5's on its own page; the offer at the giver; journal routes; ${p.inv.length - inv0} more in the pack`;
+}
+
+// Barks (the integrator, C5 #11; story/barks.js): a plumbknight's line when it first notices you, once; the Escapement's
+// when it wakes as a guardian; the Grub Mother's by its `who` (a legend of the brine-grubs); nothing from one without
+// words. And ai.js does say so: a goblin next to you, awake, emits "creature:notice".
+async function barks(env, { fail, game, p }) {
+  const EV = await env.src("events.js"), { PEOPLE_WORDS } = await env.src("content/people-words.js"), AI = await env.src("ai.js");
+  const CR = await env.src("creatures.js"), W = PEOPLE_WORDS, last = () => game.messages.at(-1)?.text;
+  const knight = { type: "plumbknight", color: [150, 160, 176] };
+  EV.emit(game, "creature:notice", { c: knight });
+  const said = last();
+  game.log("(between the barks)", [1, 2, 3]);   // (the log folds a line said twice in a row into one)
+  EV.emit(game, "creature:notice", { c: knight });
+  if (said !== W.plumbknight.bark || last() !== "(between the barks)") fail(`the plumbknight's bark: "${said}", then "${last()}"`);
+  EV.emit(game, "guardian:wake", { c: { type: "escapement" } });
+  if (last() !== W.escapement.bark) fail(`the Escapement's bark: "${last()}"`);
+  EV.emit(game, "creature:notice", { c: { type: "brineGrub", who: "grubMother" } });
+  if (last() !== W.grubMother.bark) fail(`the Grub Mother's bark: "${last()}"`);
+  const n1 = game.messages.length;
+  EV.emit(game, "creature:notice", { c: { type: "goblin" } });
+  if (game.messages.length !== n1) fail(`a goblin barked: "${last()}"`);
+  // ai.js: a goblin awake beside you notices you.
+  const z = game.zone, heard = [], off = EV.on("creature:notice", (g, e) => heard.push(e.c));
+  const gob = CR.addCreature(z, CR.spawnCreature("goblin", Math.floor(p.x) + 2, Math.floor(p.y), p.z, { rng: () => 0.5, level: 1 }));
+  try { for (let k = 0; k < 8 && !heard.includes(gob); k++) AI.updateCreatures(game, 0.25); }
+  finally { off(); CR.removeCreature(z, gob); }
+  if (!heard.includes(gob)) fail("ai.js: a goblin beside you never emitted creature:notice");
+  return `the plumbknight's on noticing you (once), the Escapement's on waking, the Grub Mother's by its who, none for a goblin; ai.js emits the notice`;
 }
 
 // A beat's routes (the integrator, C5 #13; campaign.js beatMatches on a list, story/beats.js): beat 2 finishes on the

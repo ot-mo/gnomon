@@ -22,8 +22,9 @@ import "../content/creatures/villagers.js";
 import { registerSiteBuilder } from "../world/sites.js";
 import { buildVillage } from "./village-site.js";
 import "./villagequests.js";
-import "./landmark-people.js";
-import "./beats.js";   // a beat's reward and choice, the campaign's things (C5 #5, #6)   // who stands on the landmark plans' letters (C5 #3)
+import "./landmark-people.js";   // who stands on the landmark plans' letters (C5 #3)
+import "./beats.js";   // a beat's reward and choice, the campaign's things (C5 #5, #6, #13)
+import "./barks.js";   // the barks of those who don't talk (C5 #11)
 export { generateHistory } from "./history.js";
 export { generateVillage } from "./villages.js";
 export { startQuest } from "./quests.js";
