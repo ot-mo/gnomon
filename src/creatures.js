@@ -154,9 +154,11 @@ export const ghostOffMap = (game, c) => isGhostly(c) && (!c.talk?.met || (!!game
 // A creature's blow (attacker not the player) reaches any creature that isn't a talker.
 // Pressed flat yourself (status.js "flat", bible §10.2) you exist only in the Plane: you touch flat
 // things and nothing else, and only flat things touch you (touchesYou).
-// How the log names a creature: "the goblin", but a named one (a legend, c.named) by its name alone.
-export const theOf = (c) => (c?.named ? c.name : `the ${c?.name}`);
-export const TheOf = (c) => (c?.named ? c.name : `The ${c?.name}`);
+// How the log names a creature: "the goblin", but a named one (a legend, c.named) by its name alone, and one whose name
+// brings its own article ("the leech", "a ghost trader": the landmark people) as it is, capitalised to start a sentence.
+const ARTICLE = /^(a|an|the) /;
+export const theOf = (c) => (c?.named || ARTICLE.test(c?.name) ? c.name : `the ${c?.name}`);
+export const TheOf = (c) => (c?.named ? c.name : ARTICLE.test(c?.name) ? c.name[0].toUpperCase() + c.name.slice(1) : `The ${c?.name}`);
 export function touchable(game, target, attacker = game.player, { blade = false } = {}) {
   if ((canTalk(target) && !(target.hp > 0)) || target.brain?.arriving > 0) return false;   // (people: only a mortal one; arriving: still on its way in, ai.js)
   if (attacker !== game.player) return true;

@@ -20,7 +20,7 @@
 //
 // The view rules are the types': Folio's people and Ess and Tee are flat (met only on the map); Brann, thol and the ghost
 // trader ghostly (seen and talked to only in the dark: your torch out, and under the sky only at night). A placed person:
-// uid "landmark:<id>:<letter>[:<n>]", its letter's name, named (the log says "Mira", "the leech"), level the span's,
+// uid "landmark:<id>:<letter>[:<n>]", its letter's name, named where that is a name of its own ("Mira", not "the leech"), level the span's,
 // c.landmark and c.who; where its type is a culture's or a creature's kind, its title is its role's first clause; a
 // merchant by its words (PEOPLE_WORDS role) with a stock to sell.
 // A person killed is gone for good: one PRESENCE brings back is not brought back (game.state.landmarkPeople.dead).
@@ -89,7 +89,7 @@ function spec(zone, landmark, p) {
 function spawnPerson(sp) {
   const c = spawnCreature(sp.kind, sp.x, sp.y, sp.z, { uid: sp.uid, name: sp.name, level: sp.level,
     talk: { dialogue: dialogueIdOf(sp.who), state: {} } });
-  c.named = { epithet: "", history: null };
+  if (!/^(a|an|the) /.test(sp.name)) c.named = { epithet: "", history: null };   // a name of its own (social/ritual.js: who can be kindled)
   c.landmark = sp.landmark;
   c.who = sp.who;
   if (sp.title) c.title = sp.title;
