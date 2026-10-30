@@ -5,7 +5,7 @@ Update this file as the last act of every session (see `CLAUDE.md`, "Handing off
 **Updated:** 2026-10-30, the integrator (local session), on `integration`. **Phases 1 and 2 are done; Phase 3 is under
 way.** C1a, C4, C2, C3 and C1b are merged (`p3i-c1a`, `p3i-c4`, `p3i-c2`, `p3i-c3`, `p3i-c1b`), and §8.5's last wiring merge is done
 (`p3i-wiring`): **new games start on GNOMON's real world at Hollowmere** (`?world=test` for the test world). `main` =
-`p3i-c1b`. Nothing is running; C5 is next, on the user's word. From here on only the integrator edits this file and
+`p3i-c1b`. C5 is running (the user, 2026-10-30: "Start C5"). From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
@@ -44,7 +44,7 @@ Hollowmere, holding the cube (it has none to find yet); without the flag nothing
 the real world the default: then `main.js`'s `?world=real` branch and its cube hook go (`config.js` `WORLD` can stay
 or go with it; browser-2b part 3 and check-overworld's 7 URLs follow).
 
-**Next step:** C5 (quests, the campaign, the landmark people's words), the last content session: its worktree from `p3i-c1b`, on the user's word (C1b, C2 and C3 are merged, as the plan asks); the balance proposal (the user's decisions, 2026-10-30, under "Open items") fits around them. Before: **C1b and C3 were started** (the user, 2026-10-29: "start C1b (in the c1 worktree, merging p3i-c2 first)
+**Next step:** C5 (quests, the campaign, the landmark people's words), the last content session, is started in `gnomon-wtc5` on `ws/c5` from `p3i-c1b` (the user, 2026-10-30: "Start C5"); the integrator merges its tag when it comes; the balance proposal (the user's decisions, 2026-10-30, under "Open items") fits around them. Before: **C1b and C3 were started** (the user, 2026-10-29: "start C1b (in the c1 worktree, merging p3i-c2 first)
 and C3 (a new c3 worktree from p3i-c2)"); the integrator merges their tags as they come, then C5 starts on the user's
 word. Meanwhile:
 - **C1b and C3** (the Phase 3 plan's table), started: their worktrees from `p3i-c2` (`c1` again for C1b, on `ws/c1`; a new `c3` on
@@ -131,7 +131,7 @@ single piece of authoring.
 | 3 | **C2 Peoples** (started 2026-10-29) | `content/factions.js villages.js grammar.js currency.js liquids.js` | nothing (it names regions by the bible's ids; checked against C1a's at the merge) | `c2`, `ws/c2` |
 | 4 | **C1b The landmarks** (started 2026-10-29, from `p3i-c2`) | new `content/world/landmarks.js` and `content/world/plans/*.js` (the other 15 plans, the Gnomon's foot among them), the landmark dungeons' data in `worldmap.js`'s landmark index | C1a merged | `c1`, `ws/c1` |
 | 5 | **C3 Creatures** (started 2026-10-29, from `p3i-c2`) | `content/creatures/*` (the parent's `creatures/legacy.js` tables stay: golden), `content/encounters.js`, `content/dungeons.js` | C1a merged (creatures and encounters by region) | `c3`, `ws/c3` |
-| 6 | **C5 Story** | `content/quests.js` (the quest texts, the campaign's 11 beats, the starter chain), the landmark people's dialogue (C1b places them; C5 writes their words), the intro on a real-world run | C1b, C2 and C3 merged (it reads their ids) | `c5`, `ws/c5` |
+| 6 | **C5 Story** (started 2026-10-30, from `p3i-c1b`) | `content/quests.js` (the quest texts, the campaign's 11 beats, the starter chain), the landmark people's dialogue (C1b places them; C5 writes their words), the intro on a real-world run | C1b, C2 and C3 merged (it reads their ids) | `c5`, `ws/c5` |
 
 **Order:** C1a, C4 and C2 start together. When C1a tags, the integrator merges it, then does §8.5's **last wiring
 merge** (new games on the real world: title → create → Hollowmere → the first village; `main.js`'s `?world=real` and
