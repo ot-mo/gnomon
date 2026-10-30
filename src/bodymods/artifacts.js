@@ -285,7 +285,7 @@ const EFFECTS = {
       return false;
     }
     game.log("The pip leans west, then pulls, and the world folds you home.", [200, 160, 255]);
-    changeZone(game, zoneKey(s.wx, s.wy, 0), { how: "start" });
+    changeZone(game, zoneKey(s.wx, s.wy, 0), { how: "travel" });   // (at the anchor; "start" would be a checkpoint save: verification finding)
     return true;
   },
   snuffer(game, p) {

@@ -1841,7 +1841,10 @@ export function checkB1Gear(m) {
     const foe = m.creatures.addCreature(game.zone, m.creatures.spawnCreature("goblin", Math.floor(p.x), Math.floor(p.y), p.z, { level: 3, state: "chase", rng: () => 0.5 }));
     const refused = m.artifacts.fireArtifact(game, p, pip, null), keptCharge = pip.cell.charge, stayed = game.zone.key;
     m.creatures.removeCreature(game.zone, foe);
+    const hows = [], offHow = m.events.on("zone:enter", (g, e) => hows.push(e.how));
     const went = m.artifacts.fireArtifact(game, p, pip, null);
+    offHow();
+    if (hows.join() !== "travel") fail(`the homing pip arrived as ${hows.join()} (want travel: no checkpoint of its own)`);
     if (refused || keptCharge !== 2500 || stayed === home || !went || game.zone.key !== home || pip.cell.charge !== 0)
       fail(`the homing pip: with a goblin beside you ${refused} (charge ${keptCharge}, in ${stayed}); alone ${went}, now in ${game.zone.key} (want ${home}), charge ${pip.cell.charge}`);
     // The snuffer, in the dark of a legacy floor with the torch lit.
