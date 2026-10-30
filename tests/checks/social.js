@@ -1123,6 +1123,9 @@ export async function run(env) {
     game.view = "map";
     if (!ritual.riteReady(game, ghost, "tracing")) fail("the Unlit take the Tracing");
     game.view = "3d"; p().torch = false;
+    // B3 (C2 #3): the Unlit's Snuffing is the Pouring, which wants a vial of anything to pour.
+    if (!/poured/.test(ritual.riteReady(game, ghost, "snuffing") || "")) fail("the Pouring without a vial to pour");
+    items.addToInventory(p(), { kind: "vial", effect: "brine" });
     if (ritual.riteReady(game, ghost, "snuffing")) fail(`the Unlit refuse the Snuffing in the dark: ${ritual.riteReady(game, ghost, "snuffing")}`);
     p().torch = true;
 

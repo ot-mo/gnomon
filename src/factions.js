@@ -134,6 +134,29 @@ export function bandToward(game, c) {
   return b;
 }
 
+// Rules content adds to how a creature regards you (B3): holy places and their trespass (C2 #5, social/holy.js), a
+// legend's opinions and a Herdmother's herd (WS10 #6, social/legends.js). Each rule(game, a, said) → an attitude that
+// replaces `said` (the band × temperament answer, or the parent game's), or null; the first that answers wins. They
+// run for every creature that looks at you, so each must cost a lookup or two when it has nothing to say.
+const PLAYER_RULES = [];
+export function registerPlayerRule(id, rule) {
+  const k = PLAYER_RULES.findIndex((r) => r.id === id);
+  if (k >= 0) PLAYER_RULES[k] = { id, rule }; else PLAYER_RULES.push({ id, rule });
+}
+const ruled = (game, a, said) => {
+  for (const { rule } of PLAYER_RULES) { const v = rule(game, a, said); if (v) return v; }
+  return said;
+};
+// A legend's opinions of another creature's factions (bible §12.13; c.opinions [[faction, "loves" | "hates", why]],
+// gen/vaults.js spawnLegend): it sides with what it loves and goes for what it hates.
+function legendFeeling(a, b) {
+  if (!a.flags?.legend || !Array.isArray(a.opinions)) return null;
+  const theirs = membershipsOf(b);
+  for (const [f, feel] of a.opinions) if (theirs.some(([id]) => id === f))
+    return feel === "loves" ? "friendly" : feel === "hates" ? (unstrikable(b) ? "neutral" : "hostile") : null;
+  return null;
+}
+
 // depth: how many leaders deep the question has gone; a chain longer than MAX_DEPTH (a cycle of leaders, which
 // only a bug makes) answers neutral instead of recursing for ever.
 const MAX_DEPTH = 6;
@@ -163,10 +186,12 @@ export function attitude(game, a, b, depth = 0) {
 
   const mine = membershipsOf(a);
   if (b === player) {
-    if (!mine.length) return a.talk ? "neutral" : "hostile";   // the parent game: people are neutral, every monster is out for you
-    const said = TOWARD_PLAYER[bandToward(game, a)][temperOf(a, mine)] || "neutral";
+    if (!mine.length) return PLAYER_RULES.length ? ruled(game, a, a.talk ? "neutral" : "hostile") : a.talk ? "neutral" : "hostile";   // the parent game: people are neutral, every monster is out for you
+    const said = ruled(game, a, TOWARD_PLAYER[bandToward(game, a)][temperOf(a, mine)] || "neutral");
     return said === "hostile" && unstrikable(a) ? "wary" : said;   // people who can't fight keep away instead
   }
+  const felt = legendFeeling(a, b);
+  if (felt) return felt;
   // Creature against creature: a shared faction is friendly; otherwise the relations decide.
   if (!mine.length) return "neutral";
   const theirs = membershipsOf(b);

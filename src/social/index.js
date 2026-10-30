@@ -24,3 +24,6 @@ export { openTrade, priceOf, restock } from "./merchants.js";
 export { openRitual, performRite, canKindle } from "./ritual.js";
 export { voiceFor } from "./voices.js";
 export { liquidAt, drinkLiquid } from "./liquids.js";
+export { holyAt, stelesNear, landmarkHere } from "./places.js";
+export { holyNow, trespassed, darkPass } from "./holy.js";
+import "./legends.js";
