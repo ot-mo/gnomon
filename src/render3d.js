@@ -625,7 +625,7 @@ function castFrame(game, zone, info, seen, holes, seeRange, time, half) {
         depth[i] = hit.t;
       } else {
         depth[i] = Infinity;
-        if (dz >= 0 && outdoor) density = shadeSky(dx, dy, dz, time);   // (a level ray, dz 0, meets the horizon's colour)
+        if ((dz >= 0 || glareOn) && outdoor) density = shadeSky(dx, dy, Math.max(0, dz), time);   // (a level ray, dz 0, meets the horizon's colour; in the noon glare nothing past its reach shows, not even the far land)
         else if (outdoor && dz < 0 && hit.out !== 2) density = shadeHorizon(dx, dy, dz, hit.missT, time);
         else outR = outG = outB = 0;        // looking into a bottomless pit, or into the far dark
       }
