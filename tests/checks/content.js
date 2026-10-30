@@ -290,6 +290,25 @@ export function checkContent(m) {
       need(!hit, `landmarks: "${hit}" uses ${name}, a name bible §15.10 keeps out of this world`);
     }
     stats.c1b = `${WM.LANDMARK_INDEX.length} landmarks with their entries and ${Object.keys(LM.PLANS).length} plans, ${letters} people placed by letter; the area's text ${words} words`;
+    // 1d. C5's words for the landmarks' people (content/people-words.js): everyone C1b placed by a letter or put below
+    // has words (the Noonglass is a relic, C4's text); a talker has a role conversation to follow its words, a creature
+    // that doesn't talk a bark, never both; and the area (C1b's registers and names, with these) within bible §15.9's
+    // 4,000 words, Hollowmere's people included (the row names all 16 landmarks' NPCs).
+    if (m.c5) {
+      const { PEOPLE_WORDS: PW } = m.c5.quests, ROLES = ["villager", "priest", "guard", "wanderer", "merchant"];
+      const sayAll = (o) => (typeof o === "string" ? say(o) : Array.isArray(o) ? o.reduce((n, x) => n + sayAll(x), 0) : o && typeof o === "object" ? Object.values(o).reduce((n, x) => n + sayAll(x), 0) : 0);
+      const placed = new Set(LM.LANDMARKS.flatMap((e) => [...Object.values(e.letters || {}), ...(e.below || [])].map((w) => w.who)));
+      placed.delete("noonglass");
+      for (const who of placed) need(PW[who], `landmark people: no words for ${who}`);
+      let people = 0;
+      for (const [who, w] of Object.entries(PW)) {
+        need(!!w.role !== !!w.bark && (!w.role || (ROLES.includes(w.role) && str(w.greet) && w.greet.split("\n").length <= 2)),
+          `landmark people: ${who}'s role ${w.role}, greeting or bark`);
+        people += sayAll({ g: w.greet, w: w.who, t: w.topics, a: w.after, b: w.bark });
+      }
+      need(words + people <= 4000, `landmark people: the landmarks' area ${words} + their people's words ${people} = ${words + people}, over §15.9's 4,000`);
+      stats.c5 = `${placed.size} landmark people with words (${Object.keys(PW).length} entries with C3's road people); the people's words ${people}, the area with C1b's ${words + people} of 4,000`;
+    }
   }
 
   // Statuses.
@@ -482,6 +501,8 @@ export const MUTATIONS = [
   ["a monster without hp", (m) => { const t = m.creatures.CREATURE_TYPES.goblin, old = t.hp; delete t.hp; return () => { t.hp = old; }; }, /creature goblin: hp undefined/],
   ["a held weapon's pivot outside (0, 1)", (m) => { const h = m.items.WEAPONS.dagger.held, old = h.pivot; h.pivot = 1.2; return () => { h.pivot = old; }; }, /held dagger: pivot 1.2/],
   ["an elite without info", (m) => { const e = m.creatures.ELITES.swift, old = e.info; delete e.info; return () => { e.info = old; }; }, /elite swift/],
+  ["a landmark person without words (C5)", (m) => { const W = m.c5.quests.PEOPLE_WORDS, old = W.kay; delete W.kay; return () => { W.kay = old; }; }, /landmark people: no words for kay/],
+  ["the landmarks' people over their words (C5)", (m) => { const w = m.c5.quests.PEOPLE_WORDS.kay, old = w.who; w.who = "word ".repeat(600); return () => { w.who = old; }; }, /over §15.9's 4,000/],
   ["a material off its rung (C4)", (m) => { const d = m.c4.forge.MATERIALS.iron, old = d.tier; d.tier = 5; return () => { d.tier = old; }; }, /materials: tiers 1, 2, 5/],
   ["a worn piece for no faction (C4)", (m) => { const a = m.items.ARMOURS.featheredHood, old = a.wornRep; a.wornRep = { kytes: 250 }; return () => { a.wornRep = old; }; }, /armour featheredHood: reputation kytes/],
   ["a landmark's dark line punctuated (C1b)", (m) => { const e = m.c1b.landmarks.LANDMARKS.find((l) => l.id === "molar"), old = e.lines.dark; e.lines.dark = "So are we."; return () => { e.lines.dark = old; }; }, /landmark molar: its Dark line/],
@@ -520,6 +541,8 @@ export async function contentModules(src) {
     "content/items/missiles.js"].map((p) => src(p)));
   // C1b's landmarks (section 1c).
   const [landmarks, dungeon, factions] = await Promise.all(["content/world/landmarks.js", "gen/dungeon.js", "content/factions.js"].map((p) => src(p)));
+  // C5's words (section 1c's 1d).
+  const quests = await src("content/quests.js");
   game.startRun(4242);
   game.game.pages = null;
   return {
@@ -528,7 +551,7 @@ export async function contentModules(src) {
     worlds: [{ id: "test", def: testWorld.TEST_WORLD }, { id: "real", def: worldmap.REAL_WORLD }],
     templeLegends: temple.TEMPLE_LEGENDS, interact, blocks: world.BLOCKS,
     body, c4: { forge, gear, tonics, artifacts, mutations, backgrounds, implants, missiles },
-    c1b: { landmarks, worldmap, dungeon, factions },
+    c1b: { landmarks, worldmap, dungeon, factions }, c5: { quests },
   };
 }
 

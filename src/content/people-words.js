@@ -39,7 +39,7 @@ export const PEOPLE_WORDS = {
     who: "Brother Tamsin, of the Horary. I sell where the dial-steles stand, and I buy any Hour reading you bring me.",
     topics: [["The Horary?", "We hold that the hours are meant to turn. The Vigil holds that noon should stay. We are very polite about it in Hollowmere."]] },
   brann: { role: "wanderer", greet: "you can see me\nthen your torch is out",
-    who: "brann. i went down the stair a long time ago and some of me came back.",
+    who: "brann\ni went down the stair a long time ago\nsome of me came back",
     topics: [["The Hush Stair?", "it crosses the teeth at night\nput your lamp out on the first step\nthe steps are there if you don't look for them"]] },
   ottilie: { role: "merchant", greet: "If it's broken, put it there. If it's yours, say so first.",
     who: "Old Ottilie. I mend things, I fill cells, and I look at artifacts for ten glim a twist of the brain.",
@@ -53,8 +53,7 @@ export const PEOPLE_WORDS = {
   essAndTee: { role: "wanderer", greet: "You're standing on my cousin. No, the other foot. Thank you.",
     who: "Ess, and this is Tee. We're envoys of Folio, which is a town, which is a drawing. We're very official.",
     topics: [["Directions?", "Easy from here. Everything is easy from here. You should try it."]] },
-  corner: { role: "villager", greet: "Corner considers you, then the space beside you, and settles for the space.",
-    who: "Corner, the temple cat. She is not taking questions." },
+  corner: { role: "villager", greet: "Corner considers you, then the space beside you, and settles for the space." },   // a cat: no questions
 
   // --- Benchmark (§5 D) --------------------------------------------------------------------------------------
   quintVey: { role: "villager", greet: "Stand where you are. Thank you. You were the only thing in the room not level.",

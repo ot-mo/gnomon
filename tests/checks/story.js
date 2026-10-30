@@ -26,6 +26,8 @@
 //    place's title show the marked place on the world map, to look only, and Esc comes back to the journal.
 // 10. The peoples' content (C2): the village pools, founders, styles and names, and the grammar's lists and accounts,
 //    held to bible §2.3, §8 and §9; the budgeted areas' words counted (its own comment, at the end).
+// 11. The story's content (C5): the campaign's beats, starter chain, mystery, finale, endings and epilogue held to bible
+//    §10.5 and §11, and the landmark people's words in play (its own comment, at the end).
 import * as names from "./names.js";
 
 const NAME = "story (history, grammar, secrets, murals, gossip, journal; villages, quests, campaign)";
@@ -457,6 +459,7 @@ export async function run(env) {
   await quests7b(env, { fail, stats, test, json, startRun, game });
   await campaign7b(env, { fail, stats, real, test, json, game, startRun });
   await peoplesC2(env, { fail, stats });   // C2
+  await storyC5(env, { fail, stats, json, game });   // C5
   return { name: NAME, ok: problems.length === 0, problems, stats };
 }
 
@@ -986,4 +989,134 @@ async function peoplesC2(env, { fail, stats }) {
     `grammar: 10 domains × 6/6/6/6 and 4 relic powers, ${accounts} accounts (16 types, every variant × 3), Noon 18; ` +
     `words: history grammar ${lists + acc + noon} (lists ${lists}, accounts ${acc}, Noon ${noon}; §15.9 2,400), faction and faith lines ${fl + faith} ` +
     `(factions ${fl}, faiths ${faith}; §15.9 1,200), village pools ${pools} (§15.9 1,000 with the quest templates)`;
+}
+
+// --- 11. The story's content (C5) -----------------------------------------------------------------------------------
+// The campaign's data held to bible §11 and §10.5 (the figures are the bible's own, written out here, so the data can't
+// agree with itself and still be wrong): every beat an offer, at least two routes, what it teaches and its reward; every
+// beat but the last its reputation choice, each option's factions registered, its glim and its items real (C4's, the
+// parent's relics, or the campaign's questItems); the starter chain's five steps with their words and rewards; the
+// mystery's four suspects, its clues in the four places (map, dark, 3D, talk) with the four tags once each, and the
+// climates of §11.6's table; Vesper's three phases (flat, dark, deep), never a `boss`; the four endings and what they
+// need; the epilogue in each faction's account (flat: a ledger, capitals first; deep: capitals; dark: lower case, no
+// punctuation); the region pools on regions with villages; the test world's lists as WS7 left them (its draws don't
+// move). Then the people in play: each talks under dialogueIdOf(who) with its greeting, its "Who are you?", every node
+// to the contract (social/builders.js walkDialogue), a merchant's shop kept, the greeting after a beat; C3's people by
+// their own type; the parent's people (Mira) still the parent's. Words within §15.9: the main quest, the mystery and
+// the endings 2,500; the starter chain and Hollowmere's pages 800 (the landmarks' people: check-content's 1d).
+async function storyC5(env, { fail, stats, json, game }) {
+  const { QUESTS, PEOPLE_WORDS: PW, dialogueIdOf } = await env.src("content/quests.js");
+  const F = await env.src("factions.js"), { REGIONS } = await env.src("content/world/regions.js");
+  const { ARTIFACTS, ARTIFACTS_WAITING } = await env.src("content/items/artifacts.js"), { TONICS } = await env.src("content/items/tonics.js");
+  const { RELICS } = await env.src("content/items/legacy.js");
+  const creatures = await env.src("creatures.js"), talk = await env.src("talk.js"), builders = await env.src("social/builders.js");
+  const C = QUESTS.campaign, str = (s) => typeof s === "string" && s.trim().length > 0;
+  const words = (t) => (typeof t === "string" ? t.split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w)).length : 0);
+  const all = (o) => (typeof o === "string" ? words(o) : Array.isArray(o) ? o.reduce((n, x) => n + all(x), 0) : o && typeof o === "object" ? Object.values(o).reduce((n, x) => n + all(x), 0) : 0);
+  const repOk = (rep, at) => { for (const f of Object.keys(rep || {})) if (!F.FACTIONS[f]) fail(`C5 ${at}: reputation with ${f}, no faction`); };
+  const itemsOk = (items, at) => { for (const [id, n] of items || []) if (!(ARTIFACTS[id] || ARTIFACTS_WAITING[id] || TONICS[id] || RELICS[id] || C.questItems[id]) || !(n >= 1)) fail(`C5 ${at}: item ${id} × ${n}`); };
+  const dark = (t) => /^[a-z' {}\n]+$/.test(t);
+
+  // The beats (bible §11).
+  const BIBLE = {   // each beat's options' reputation and glim, in order
+    beat1: [[{ survey: 100 }], [{ chandlers: 100, survey: -50 }, 120]], beat2: [[{ survey: 100 }], [{ horary: 150, survey: -100 }]],
+    beat3: [[{ assize: 150, drovers: -150 }], [{ drovers: 100, hollowmere: 50, assize: -150 }]], beat4: [[{ flatfolk: 100 }], [{ pressed: 100, flatfolk: -50 }]],
+    beat5: [[{ chandlers: -300, hollowmere: 100, lampless: 100 }], [{ chandlers: 200 }, 500], [{ pressed: -150, hollowmere: 50 }], [{ pressed: 100 }]],
+    beat6: [[{ horary: -150, lampless: 100 }], [{ lampless: -150, horary: 100 }], [{}]],
+    beat7: [[{ noonVigil: 200, lampless: -100 }], [{ lampless: 150, noonVigil: -100 }], [{}]], beat8: [[{ plan: -400 }], [{ plan: 100 }], [{ plan: 200 }]],
+    beat9: [[{ survey: 200 }], [{ hollowmere: 200, bentVillages: 200 }]],
+    beat10: [[{ assize: -400, bentVillages: 200 }], [{ assize: 300 }], [{ assize: 600, survey: -300, hollowmere: -300 }]],
+  };
+  for (const b of C.beats) {
+    const at = `beat ${b.n}`;
+    if (!str(b.offer) || !str(b.goal) || !str(b.learn) || !str(b.reward?.text) || !(b.routes?.length >= 2) || !b.routes.every(str)) fail(`C5 ${at}: its offer, goal, routes, lesson or reward`);
+    itemsOk(b.reward?.items, at); repOk(b.reward?.rep, at);
+    const opts = (b.choices || []).flatMap((c) => (str(c.label) && c.options.length >= 2 ? c.options : [{ bad: true }]));
+    for (const o of opts) { if (o.bad || !str(o.text)) fail(`C5 ${at}: a choice without two options and words`); repOk(o.rep, at); itemsOk(o.items, at); }
+    const want = BIBLE[b.id] || [];
+    if (json(opts.map((o) => [o.rep || {}, ...(o.glim ? [o.glim] : [])])) !== json(want)) fail(`C5 ${at}: its choices ${json(opts.map((o) => [o.rep, o.glim]))}, the bible's ${json(want)}`);
+  }
+  const R = Object.fromEntries(C.beats.map((b) => [b.id, b.reward]));
+  if (R.beat1.maxHp !== 5 || json(R.beat2.items) !== json([["plumbBob", 1]]) || json(R.beat5.items) !== json([["unpressLens", 1]]) ||
+      R.beat7.face !== "noon" || json(R.beat9.items) !== json([["greatTheodolite", 1]]) || json(R.beat10.items) !== json([["plumbKey", 1]]))
+    fail("C5: a beat's reward isn't the bible's (Maren's +5, the plumb-bob, the unpress lens, Noon's Face, the Great Theodolite, the Plumb Key)");
+  // The starter chain (bible §10.5).
+  const S = Object.fromEntries(C.starter.map((s) => [s.id, s]));
+  if (json(C.starter.map((s) => s.id)) !== json(["turning", "grubs", "blankCorner", "skull", "dialFloor"]) || C.starter.some((s) => !str(s.text) || !str(s.done) || (s.giver && !str(s.offer))))
+    fail("C5: the starter chain's five steps and their words");
+  for (const s of C.starter) { repOk(s.rewards?.rep, s.id); itemsOk(s.rewards?.items, s.id); }
+  if (S.grubs.rewards.rep?.hollowmere !== 100 || json(S.grubs.rewards.items) !== json([["balm", 3]]) || S.grubs.rewards.power !== "pathcraft" ||
+      S.blankCorner.rewards.glim !== 50 || json(S.blankCorner.rewards.items) !== json([["homingPip", 1]]) || RELICS[S.skull.rewards.items?.[0]?.[0]]?.name !== "Brann's Lantern" ||
+      S.dialFloor.rewards.plumb?.trueMarks !== 1 || S.dialFloor.rewards.bent?.creases !== 2)
+    fail("C5: a starter step's reward isn't the bible's");
+  if (!str(C.wake) || /Maren is waiting/.test(C.wake) || C.intro.length < 2) fail("C5: the intro pages or the wake line");
+  // The mystery (bible §11.6).
+  const M = C.mystery, TAGS = ["faith", "fear", "grief", "trade"];
+  if (M.suspects.length !== 4 || M.suspects.some((s) => !F.FACTIONS[s.faction] || !s.names?.length || !s.motive?.text?.includes("{name}")) ||
+      json(M.suspects.map((s) => s.motive.tag).sort()) !== json(TAGS))
+    fail("C5: the mystery's four suspects and their motives, one of each tag");
+  if (json(M.circumstances.map((c) => c.view).sort()) !== json(["3d", "dark", "map", "talk"]) || json(M.circumstances.map((c) => c.tag).sort()) !== json(TAGS) ||
+      M.circumstances.some((c) => !c.text.includes("{name}") || (c.view === "dark" && !dark(c.text))))
+    fail("C5: the mystery's clues: one in each place, each tag once, each naming its suspect (the ghost's in the Dark voice)");
+  const cl = Object.fromEntries(M.climates.map((c) => [c.id, c]));
+  if (json(cl.concord?.tags) !== json(["faith", "grief"]) || json(cl.riven?.tags) !== json(["trade", "fear"]) || cl.uneasy?.tags !== null ||
+      json([cl.concord.rep, cl.uneasy.rep, cl.riven.rep]) !== json([{ horary: 200, lampless: 200 }, { horary: 100, lampless: 100 }, { horary: 50, lampless: 50 }]) || !cl.riven.closes)
+    fail("C5: the climates aren't §11.6's table");
+  // The finale and the endings (bible §11.11, §11.12).
+  if (json(C.vesper.phases.map((p) => p.id)) !== json(["flat", "dark", "deep"]) || C.vesper.phases.some((p) => !str(p.how) || !dark(p.says)) || /"boss"/.test(json(C.vesper)))
+    fail("C5: Vesper's three phases (flat, dark, deep; her words in the Dark voice; never `boss`)");
+  const E = Object.fromEntries(C.endings.map((e) => [e.id, e]));
+  if (json(C.endings.map((e) => e.id)) !== json(["holdNoon", "seventhHour", "wholeNoon", "pressing"]) || C.endings.some((e) => !str(e.text) || !str(e.act)) ||
+      json(E.seventhHour.requires.items) !== json(["hourHand"]) || !E.wholeNoon.requires.items.includes("noonglass") || !E.seventhHour.legacy)
+    fail("C5: the four endings and what they need");
+  for (const [f, pg] of Object.entries(C.epilogue)) {
+    const rule = { flat: (t) => /^[A-Z][A-Z' ]*\./.test(t), deep: (t) => !/[a-z]/.test(t), dark }[pg.account];
+    if (!F.FACTIONS[f] || !rule || !["low", "mid", "high"].every((k) => str(pg[k]) && rule(pg[k]))) fail(`C5: the epilogue's ${f} page (${pg.account})`);
+  }
+  // The pools (bible §9.6): the real world's regions with villages; the test world's lists unchanged.
+  for (const [r, p] of Object.entries(QUESTS.pools)) if (!REGIONS[r] || !(p.things?.length >= 3) || !(p.beasts?.length >= 2)) fail(`C5: the pool for ${r}`);
+  for (const [r, def] of Object.entries(REGIONS)) if (def.villages > 0 && !QUESTS.pools[r]) fail(`C5: ${r} has villages and no pool`);
+  if (QUESTS.things.length !== 10 || QUESTS.beasts.length !== 6 || Object.keys(QUESTS.templates).length !== 9) fail("C5: the test world's lists moved");
+  if (Object.keys(QUESTS.waitingTemplates).sort().join() !== "count,kindle,unpress,walkShadow") fail("C5: bible §9.6's four waiting templates");
+
+  // The people in play.
+  const keep = { rep: game.state.rep, campaign: game.state.campaign };
+  game.state.rep = {}; delete game.state.campaign;
+  const placed = [];
+  const meet = (type, dialogue) => { const c = creatures.spawnCreature(type, 3, 3, 0, { level: 5, ...(dialogue ? { talk: { dialogue } } : {}) }); creatures.addCreature(game.zone, c); placed.push(c); return c; };
+  let people = 0, nodes = 0;
+  for (const [who, w] of Object.entries(PW)) {
+    if (!w.role) continue;
+    people++;
+    const c = meet("tamsin", dialogueIdOf(who)), root = talk.talkTo(game, c);
+    if (root?.text !== w.greet) { fail(`C5 ${who}: greets "${root?.text}"`); continue; }
+    if (w.who && root.options.find((o) => o.label === "Who are you?")?.go()?.text !== w.who) fail(`C5 ${who}: "Who are you?"`);
+    for (const [label, text] of w.topics || []) if (root.options.find((o) => o.label === label)?.go()?.text !== text) fail(`C5 ${who}: "${label}"`);
+    if (w.role === "merchant" && !root.options.some((o) => o.label === "Show me what you have.")) fail(`C5 ${who}: a merchant without the shop`);
+    const walk = builders.walkDialogue(game, c);
+    nodes += walk.nodes;
+    for (const pr of walk.problems) fail(`C5 ${who}: ${pr}`);
+    for (const [beat, text] of Object.entries(w.after || {})) {
+      game.state.campaign = { done: { [beat]: 1 } };
+      if (talk.talkTo(game, c).text !== text) fail(`C5 ${who}: the greeting after ${beat}`);
+      delete game.state.campaign;
+    }
+  }
+  if (meet("hallen").talk.dialogue !== "hallen" || talk.talkTo(game, placed.at(-1)).text !== PW.hallen.greet) fail("C5: Reeve Hallen by her own type");
+  if (!talk.talkTo(game, meet("ottilie")).options.some((o) => o.label === "Show me what you have.")) fail("C5: Old Ottilie by her own type, without her shop");
+  for (const id of ["maren", "pell", "mira", "brann", "corwin", "rook", "lio"]) if (dialogueIdOf(id) === id) fail(`C5: ${id}'s words would replace the parent's`);
+  if (talk.talkTo(game, meet("mira")).text === PW.mira.greet) fail("C5: the parent's Mira talks with the real world's words");
+  for (const c of placed) creatures.removeCreature(game.zone, c);
+  game.state.rep = keep.rep; if (keep.campaign) game.state.campaign = keep.campaign;
+
+  // Words (bible §15.9).
+  const main = C.beats.reduce((n, b) => n + all([b.title, b.goal, b.offer, b.routes, b.learn, b.reward.text, b.defences || {}, (b.choices || []).map((c) => [c.label, c.options.map((o) => o.text)])]), 0) +
+    all(M.title) + all(M.accuse) + all(M.suspects.map((s) => [s.role, s.names, s.motive.text])) + all(M.circumstances.map((c) => c.text)) + all(M.climates.map((c) => [c.text, c.closes || ""])) +
+    all(C.vesper.phases.map((p) => [p.says, p.how])) + all(C.vesper.dies) + all(C.endings.map((e) => [e.title, e.act, e.text])) + all(Object.values(C.epilogue).map((p) => [p.low, p.mid, p.high]));
+  const starter = all(C.intro) + all(C.wake) + all(C.starter.map((s) => [s.title, s.offer || "", s.text, s.done]));
+  if (main > 2500) fail(`C5: the main quest, the mystery and the endings ${main} words, over §15.9's 2,500`);
+  if (starter > 800) fail(`C5: the starter chain and Hollowmere's pages ${starter} words, over §15.9's 800`);
+  stats.storyC5 = `11 beats, every one routes, a lesson and a reward, 10 choices with the bible's figures; the starter chain's 5 steps; the mystery's 4 suspects, 4 clues, 3 climates; ` +
+    `Vesper's 3 phases; 4 endings; ${Object.keys(C.epilogue).length} epilogue pages × 3; pools for ${Object.keys(QUESTS.pools).length} regions; ${people} people talked to (${nodes} nodes walked); ` +
+    `words: main quest ${main} (2,500), starter chain ${starter} (800)`;
 }

@@ -339,7 +339,7 @@ export const QUESTS = {
       ],
       circumstances: [
         { id: "footprints", view: "map", tag: "trade", text: "Glim footprints cross the Line from the south side to the Hush's door and back. The heel is worn the way {name}'s is." },
-        { id: "witness", view: "dark", tag: "grief", text: "a ghost by the hush door / it says {name} came at the second hour / and cried / and struck the flint" },
+        { id: "witness", view: "dark", tag: "grief", text: "a ghost by the hush door\nit says {name} came at the second hour\nand cried\nand struck the flint" },
         { id: "lamp", view: "3d", tag: "faith", text: "A shuttered lamp on a ledge above the Hush, 3 blocks up, still warm. Its wick is trimmed the way {name} trims them." },
         { id: "gossip", view: "talk", tag: "fear", text: "\"{name} was out in the street during the Snuffing. Nobody's out during the Snuffing. Ask anyone. Ask {name}.\"" },
       ],
