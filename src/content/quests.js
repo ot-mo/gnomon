@@ -158,7 +158,7 @@ export const QUESTS = {
         done: "The world turns, and you see it from inside for the first time: tall, lit and heavy. Tab turns it back.",
         rewards: { tab: true } },
       { id: "grubs", title: "Grubs in the Kettle", giver: "Reeve Hallen", goal: "Kill the Grub Mother on Kettle Mesa's floor 3, then come home through the culvert.", teaches: "map vs 3D, falling, the loop home", reward: "Hollowmere +100, 3 balms, a free Pathcraft power",
-        offer: "Something is eating the glimseed from underneath. I'd go myself, but I'm the Reeve, and the Reeve stays where the shouting can find her. The holes lead back to Kettle Mesa, two spans north. Kill whatever is mothering them.",
+        offer: "Something is eating the glimseed from underneath. I'd go myself, but I'm the Reeve, and the Reeve stays where the shouting can find her. The holes lead back to Kettle Mesa, two spans north-east. Kill whatever is mothering them.",
         text: "Reeve Hallen wants the Grub Mother dead, on Kettle Mesa's third floor. Step off a ledge in 3D and you drop one floor, unhurt; the culvert at the bottom runs home to the temple well.",
         done: "Dead? Then the glimseed is ours again. Take the balms, and let me show you how a Reeve walks a road.",
         rewards: { rep: { hollowmere: 100 }, items: [["balm", 3]], power: "pathcraft" } },
