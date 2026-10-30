@@ -65,7 +65,7 @@ export function stampMolar(zone, ox, oy) {
   return { spawn: null, keyPoints: peopleKeys(MOLAR_ROWS, MOLAR_PEOPLE, ox, oy) };
 }
 // The dial-stele's carving (a relief, read in 3D).
-export const MOLAR_STELE = "THE TOLL IS FORTY. THE HOUR IS LATER THAN YOU THINK. BOTH ARE PAID AT THE GATE.";
+export const MOLAR_STELE = "THE HOUR PASSES THROUGH THE TOOTH AS THE ROAD DOES. IT PAYS NOTHING, AND IT IS NEVER TURNED BACK.";
 
 export const MOLAR_PLAN = {
   id: "molar", name: "Molar", rows: MOLAR_ROWS, legend: LEGEND, stacks: STACKS, halls: HALLS,

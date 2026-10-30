@@ -106,7 +106,7 @@ export const LANDMARKS = [
     letters: {   // on the top, 12 blocks up: reached only by the climb in 3D (bible §5 E)
       K: { who: "kreeva", name: "Kreeva Old-Wing", role: "the Kite elder (legendary); teaches Tumbling" },
       T: { who: "featherTrader", name: "the feather-trader", role: "sells the feather cloak (+250 Kites)" },
-      O: { who: "overlook", name: "the overlook", role: "buy the Kites' view reading: every span within 6 on the world map" },
+      O: { who: "overlookKite", name: "the Kite at the overlook", role: "sells the Kites' view reading: every span within 6, on the world map" },
     },
   },
   {
@@ -175,7 +175,8 @@ export const LANDMARKS = [
       dark: "they are still walking\nthe floor is very tight",
     },
     letters: {},
-    below: [{ who: "pressMaster", name: "Press-Master Sevrin Marr-Orrum", role: "the Press's master, fought with the Press itself: break its three pistons on their gantries (3-5 up) while you watch the beat on the map", floor: 5 },
+    below: [{ who: "pressMaster", name: "Press-Master Sevrin Marr-Orrum", role: "the Press's master, who fights beside the Press: its three pistons stand on gantries 3 to 5 blocks up, and they keep the beat", floor: 5 },
+            { who: "toviHallen", name: "Tovi Hallen", role: "a Survey engineer, the Reeve's son, pressed flat; he knows how the Press is stopped", floor: 3 },
             { who: "assizeEngineer", name: "Assize engineers", role: "with press-hounds, mosaic golems, pressed captives and errata at the margins", floor: 1 }],
     holy: "pressed",   // the Pressyard's surface mosaic (FAITHS.pressed; beyond C2's six)
   },
@@ -191,7 +192,7 @@ export const LANDMARKS = [
       t: { who: "thol", name: "thol", role: "the choirmaster ghost (seen only with your torch out)" },
       c: { who: "lamplessChanter", kind: "lamplessChanter", name: "a Lampless chanter", role: "keeps the song" },
     },
-    below: [{ who: "gloamWarden", kind: "gloamWarden", name: "the Gloam Warden", role: "a mini-boss: the parent game's Gloom Warden, now a legendary template", floor: 4 },
+    below: [{ who: "gloamWarden", kind: "gloamWarden", name: "the Gloam Warden", role: "the warden of the dark floors, seen only in the dark; braziers hurt it", floor: 4 },
             { who: "noon", name: "Noon", role: "a flat ghost, only on the map and only with your torch out: a mosaic of a woman with no shadow", floor: 6 }],
     holy: "lampless",   // a lit torch inside is trespass, unless you carry the dark-pass (FAITHS.lampless; beyond C2's six)
   },
@@ -207,7 +208,7 @@ export const LANDMARKS = [
       s: { who: "sectionNine", name: "Section Nine", role: "Chief Draughtsman (legendary automaton)" },
       d: { who: "draughtsman", kind: "draughtsman", name: "a draughtsman", role: "of the Plan" },
     },
-    below: [{ who: "escapement", kind: "escapement", name: "the Escapement", role: "the boss, on the Colossus pattern: its core on its head, so climb the pendulum's gantries (up to 5 up); its slams telegraphed on the map", floor: 6 }],
+    below: [{ who: "escapement", kind: "escapement", name: "the Escapement", role: "a brass colossus with its core on its head, reached by the pendulum's gantries 5 blocks up; the map shows where it will slam", floor: 6 }],
     holy: "plan",   // bombing walls here is desecration (C2 #5)
   },
   {
@@ -233,7 +234,7 @@ export const LANDMARKS = [
     letters: {   // the gate (bible §5 M: Plumb characters are let in at the gate)
       g: { who: "gateAssizer", kind: "assizer", name: "the gate's assizer", role: "lets the Plumb in" },
     },
-    below: [{ who: "strade", name: "Hierarch Aurel Strade-Orrum", role: "the Assize's head (beat 10)", up: 2 },
+    below: [{ who: "strade", name: "Hierarch Aurel Strade-Orrum", role: "the Assize's head", up: 2 },
             { who: "lio", name: "Lio", role: "a pressed prisoner in the cells (map only)", floor: 2 },
             { who: "plumbknight", kind: "plumbknight", name: "plumbknights and assizers", role: "patrols in dead-straight lines", floor: 1 }],
     holy: "assize",   // a Bent below Bright is trespass (C2 #5)
@@ -258,7 +259,7 @@ export const LANDMARKS = [
       dark: "the page is a city\nthe city is reading you back",
     },
     letters: {   // bible §5 O
-      b: { who: "bramwyn", name: "Father Bramwyn the Flattened", role: "the Pressing rite: once a floor, turn flat for 3 s, for a world day (free at Pressed +250, else -100)" },
+      b: { who: "bramwyn", name: "Father Bramwyn the Flattened", role: "the Pressing rite: for a world day, once a floor, you may turn flat for 3 s (free at Pressed ≥ +250, else −100 with the Pressed)" },
       i: { who: "inkSeller", name: "the ink-and-brine seller", role: "ink and brine" },
       y: { who: "pressedLibrarian", name: "the librarian", role: "the Pressed's library of flat readings" },
     },

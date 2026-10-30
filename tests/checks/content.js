@@ -239,6 +239,8 @@ export function checkContent(m) {
     const STRUCTURE = new Set(["wall", "door", "locked", "gate", "lamp", "rune", "stairs", "chasm", "floor", "step1", "step2", "step3", "ghostPlanks", "brazier", "lever"]);
     const wordsOf = (t) => (typeof t === "string" ? t.split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w)).length : 0);
     let words = 0, letters = 0;
+    const texts = [];   // every string the area authors, for the names bible §15.10 retires
+    const say = (t) => { if (typeof t === "string") texts.push(t); return wordsOf(t); };
     for (const L of WM.LANDMARK_INDEX) {
       const e = LM.LANDMARKS.find((l) => l.id === L.id), at = `landmark ${L.id}`;
       if (!need(e, `${at}: no entry in landmarks.js`)) continue;
@@ -249,21 +251,21 @@ export function checkContent(m) {
           const h = p.legend?.[ch] ?? V.DEFAULT_LEGEND[ch] ?? "floor";
           need(p.legend && (ch in p.legend || STRUCTURE.has(h)), `${at}: plan ${id}'s "${ch}" falls to the default legend's ${h}`);
         }
-        for (const t of p.texts || []) words += wordsOf(t);
+        for (const t of p.texts || []) words += say(t);
       }
       const ln = e.lines || {};
       need(/^[A-Z][A-Z' -]*\./.test(ln.flat || "") && ln.deep === e.description && str(ln.deep), `${at}: its Flat and Deep lines`);
       need(/^[a-z ]+(\n[a-z ]+)*$/.test(ln.dark || ""), `${at}: its Dark line (lower case, no punctuation but line breaks)`);
-      words += wordsOf(ln.flat) + wordsOf(ln.deep) + wordsOf(ln.dark);
+      words += say(ln.flat) + say(ln.deep) + say(ln.dark);
       for (const [ch, who] of Object.entries(e.letters || {})) {
         letters++;
         need(str(who.who) && str(who.name) && str(who.role) && plans.some(([, p]) => p?.rows.some((r) => r.includes(ch))), `${at}: letter ${ch} (${who.name}) stands nowhere in its plans`);
-        words += wordsOf(who.name) + wordsOf(who.role);
+        words += say(who.name) + say(who.role);
       }
       for (const b of e.below || []) {
         need(str(b.who) && str(b.name) && str(b.role) && (Number.isInteger(b.floor) ? b.floor >= 1 && b.floor <= (L.dungeon?.floors.length || 0) : b.up >= 1 && b.up <= (L.dungeon?.up?.length || 0)),
           `${at}: ${b.name} on floor ${b.floor ?? `up ${b.up}`}, which its dungeon hasn't`);
-        words += wordsOf(b.name) + wordsOf(b.role);
+        words += say(b.name) + say(b.role);
       }
       for (const f of e.holy ? (typeof e.holy === "string" ? [e.holy] : Object.values(e.holy)) : []) need(FC.FACTIONS[f], `${at}: holy to ${f}, which is no faction`);
       const d = L.dungeon;
@@ -275,7 +277,13 @@ export function checkContent(m) {
       need(DG.DUNGEON_THEMES[d.theme], `${at}: theme ${d.theme}`);
       need((d.cradle || []).every((z) => Number.isInteger(z) && z >= 1 && z <= n), `${at}: a cradle off its floors`);
       need((d.vaultPool || []).every((v) => V.vaultById(Array.isArray(v) ? v[0] : v)), `${at}: a vault it can't draw`);
-      words += d.named.reduce((k, t) => k + wordsOf(t), 0);
+      words += d.named.reduce((k, t) => k + say(t), 0);
+      for (const m of d.planned?.murals || []) words += say(m.text) + say(m.map);
+    }
+    // Bible §15.10 "Names settled": names not used in this world (check-names holds §15.11's).
+    for (const name of ["Hackles", "Platen", "Roller", "Reticule", "Diptarch", "Hydrarch", "Seepborn", "Clearborn", "Gleam", "Brightness", "the Unlit Stair", "the Seam"]) {
+      const re = new RegExp(`\\b${name}\\b`, "i"), hit = texts.find((t) => re.test(t));
+      need(!hit, `landmarks: "${hit}" uses ${name}, a name bible §15.10 keeps out of this world`);
     }
     stats.c1b = `${WM.LANDMARK_INDEX.length} landmarks with their entries and ${Object.keys(LM.PLANS).length} plans, ${letters} people placed by letter; the area's text ${words} words`;
   }
