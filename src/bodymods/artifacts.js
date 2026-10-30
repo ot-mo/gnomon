@@ -31,7 +31,9 @@ import { requestTarget } from "../abilities.js";
 import { mapUseTime } from "../turns.js";
 import { applyDamage, elementVs } from "../combat.js";
 import { touchable, ghostHidden, theOf, TheOf } from "../creatures.js";
-import { arrivalPoint } from "../zones.js";
+import { arrivalPoint, changeZone, zoneKey } from "../zones.js";
+import { attitude } from "../factions.js";
+import { findSite, reveal } from "../overworld/discovery.js";
 import { nightSeconds } from "../clock.js";
 import { zoneIsLightless } from "../light.js";
 import { KIND, FLOOR_Z } from "../world.js";
@@ -270,7 +272,41 @@ function blink(game, p, fx, fy) {
   return true;
 }
 
+// B1 (C4 #7): the homing pip, the snuffer, the theodolite.
+export const HOME_CLEAR = 7, SNUFF_R = 6, SNUFF_T = 20;
 const EFFECTS = {
+  homingPip(game, p) {
+    const s = game.run?.world?.start;
+    if (!s) return false;
+    if (game.zone.creatures.some((m) => attitude(game, m, p) === "hostile" && Math.hypot(m.x - p.x, m.y - p.y) <= HOME_CLEAR)) {
+      game.log(`The pip won't settle: something hostile within ${HOME_CLEAR} tiles.`, [255, 150, 120]);
+      return false;
+    }
+    game.log("The pip leans west, then pulls, and the world folds you home.", [200, 160, 255]);
+    changeZone(game, zoneKey(s.wx, s.wy, 0), { how: "start" });
+    return true;
+  },
+  snuffer(game, p) {
+    const z = game.zone;
+    z.snuffs = (z.snuffs || []).filter((d) => d.until > game.time);
+    z.snuffs.push({ x: p.x, y: p.y, r: SNUFF_R, until: game.time + SNUFF_T });
+    game.log(`You tip the snuffer. The dark pours out ${SNUFF_R} tiles round, torch or no.`, [150, 140, 190]);
+    return true;
+  },
+  theodolite(game, p) {
+    const z = game.zone;
+    if (!game.run?.sites) return false;
+    let found = 0;
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++)
+        for (const id of game.run.sitesAt?.get(`${z.wx + dx},${z.wy + dy}`) || []) {
+          const site = game.run.sites.get(id);
+          if (site && site.kind !== "landmark" && findSite(game, site, "theodolite")) found++;
+        }
+    reveal(game, z.wx, z.wy, 1);
+    game.log(found ? `Through the brass eye: ${found} site${found > 1 ? "s" : ""} in the spans around you go onto your world map.` : "Through the brass eye: nothing in the spans around you that you didn't know of.", [220, 200, 140]);
+    return true;
+  },
   plumbBob(game, p) {
     const n = holesNear(game.zone, p.x, p.y, 3);
     game.log(n ? `The bob swings and points true down. ${n} hidden drop${n > 1 ? "s" : ""} near you go${n > 1 ? "" : "es"} onto your map.` : "The bob hangs still and points true down. No pits within 3 tiles.", [200, 190, 255]);

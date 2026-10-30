@@ -1212,7 +1212,8 @@ export function checkGear(m) {
     for (const [it, price, name] of want) {
       if (I.itemPrice(it) !== price || I.itemName(game, it) !== name) fail(`${name}: ${I.itemName(game, it)} at ${I.itemPrice(it)}, want ${name} at ${price}`);
     }
-    if (ARC.ARTIFACTS_WAITING.homingPip.value !== 300) fail(`the homing pip's value ${ARC.ARTIFACTS_WAITING.homingPip.value}, want 300`);
+    const pip = ARC.ARTIFACTS.homingPip || ARC.ARTIFACTS_WAITING.homingPip;   // (live since B1)
+    if (pip.value !== 300) fail(`the homing pip's value ${pip.value}, want 300`);
     // Up the ladder, worth more at every rung.
     const ladder = LADDER.map(([mat]) => I.itemPrice(GR.makeGear("weapon", "longsword", mat)));
     if (ladder.some((v, k) => k && v <= ladder[k - 1])) fail(`a longsword's price up the ladder: ${ladder.join(", ")}`);
@@ -1807,6 +1808,58 @@ export function checkB1Gear(m) {
     stats.compare = `"${silver}", "${scale}", "${parent}"`;
   });
 
+  // 6. The artifacts built (C4 #7): the homing pip takes you from a dungeon floor to the run's start (not with a hostile
+  //    within 7 tiles, its charge then kept); the snuffer's circle is dark with the torch lit, 6 tiles round, for 20 s;
+  //    the theodolite finds the sites of the spans around you (the real world's) and makes them known.
+  section("artifacts", () => {
+    const art = (id) => ({ kind: "artifact", id, known: true, cell: { id: "glim", charge: 2500 } });
+    startRun(13, m.testWorld.TEST_WORLD);
+    const s0 = game.run.world.start, home = `${s0.wx},${s0.wy},0`;
+    game.debug.enterZone(`${s0.wx},${s0.wy},3`, "down");
+    let p = game.player;
+    const pip = art("homingPip");
+    game.zone.creatures = game.zone.creatures.filter((c) => c.talk);
+    const foe = m.creatures.addCreature(game.zone, m.creatures.spawnCreature("goblin", Math.floor(p.x), Math.floor(p.y), p.z, { level: 3, state: "chase", rng: () => 0.5 }));
+    const refused = m.artifacts.fireArtifact(game, p, pip, null), keptCharge = pip.cell.charge, stayed = game.zone.key;
+    m.creatures.removeCreature(game.zone, foe);
+    const went = m.artifacts.fireArtifact(game, p, pip, null);
+    if (refused || keptCharge !== 2500 || stayed === home || !went || game.zone.key !== home || pip.cell.charge !== 0)
+      fail(`the homing pip: with a goblin beside you ${refused} (charge ${keptCharge}, in ${stayed}); alone ${went}, now in ${game.zone.key} (want ${home}), charge ${pip.cell.charge}`);
+    // The snuffer, in the dark of a legacy floor with the torch lit.
+    game.debug.enterZone(`${s0.wx},${s0.wy},3`, "down");
+    p = game.player; p.torch = true;
+    const L = m.light, at = (dx) => L.inDark(game, game.zone, p.x + dx, p.y, p.z + 1);
+    const before = at(0);
+    m.artifacts.fireArtifact(game, p, art("snuffer"), null);
+    const here = at(0), five = at(5), eight = at(8);
+    game.time += 21;
+    const after = at(0);
+    if (before || !here || !five || eight || after) fail(`the snuffer: lit before ${!before}; dark here ${here}, 5 tiles off ${five}, 8 off ${eight}; 21 s on ${after}`);
+    // The theodolite, on the real world.
+    startRun(17, m.worldmap.REAL_WORLD);
+    // (standing in the span east of a site, so the site found is a neighbour's)
+    const open = (wx, wy) => game.run.world.tileAt(wx, wy)?.edges === "open" && !game.run.world.tileAt(wx, wy)?.landmark;
+    const site = [...game.run.sites.values()].find((s) => s.kind !== "landmark" && s.kind !== "village" && open(s.at.wx + 1, s.at.wy));
+    game.debug.enterZone(`${site.at.wx + 1},${site.at.wy},0`, "start");
+    p = game.player;
+    const z = game.zone, A = game.state.atlas, around = [];
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) for (const id of game.run.sitesAt?.get(`${z.wx + dx},${z.wy + dy}`) || []) { const s = game.run.sites.get(id); if (s && s.kind !== "landmark") around.push(s); }
+    for (const s of around) delete A.found[s.id];
+    m.artifacts.fireArtifact(game, p, art("theodolite"), null);
+    const found = around.filter((s) => A.found[s.id] === "theodolite").length;
+    if (!around.length || found !== around.length || A.found[site.id] !== "theodolite" || !m.discovery.isKnown(game, z.wx + 1, z.wy)) fail(`the theodolite: ${found} of the ${around.length} sites around ${z.wx},${z.wy} found; the next span known ${m.discovery.isKnown(game, z.wx + 1, z.wy)}`);
+    // The kits that wanted them (C4 #13): the Hush Novice's and the Night-warden's snuffer (3 uses), the Surveyor's
+    // theodolite (5), known and charged; no kit wants either any more.
+    const CG = m.chargen, BG = m.backgrounds.BACKGROUNDS, kits = { hushNovice: ["snuffer", 3], nightWardenOfCassin: ["snuffer", 3], surveyorOfVey: ["theodolite", 5] };
+    for (const [bg, [id, uses]] of Object.entries(kits)) {
+      const pc = CG.makeCharacter({ genotype: BG[bg].genotype, background: bg, attrs: CG.suggestSpread(BG[bg].genotype, bg), name: "Test", mode: "oneWick" });
+      const it = pc.inv.find((x) => x.kind === "artifact" && x.id === id), need = m.artifactTables.ARTIFACTS[id]?.charge;
+      if (!it || it.known !== true || !(it.cell?.charge >= uses * need) || it.cell.charge >= (uses + 1) * need || BG[bg].kit.wants.some((w) => w.includes(id)))
+        fail(`${bg}'s kit: ${id} ${JSON.stringify(it)} (want known, ${uses} uses of ${need}); wants ${JSON.stringify(BG[bg].kit.wants)}`);
+    }
+    stats.artifacts = `the homing pip home from a floor (refused with a goblin by you); the snuffer dark 5 tiles off with the torch lit, not 8, not after 20 s; the theodolite ${found} sites around ${z.wx},${z.wy}`;
+  });
+
   return { name: "items: B1's gear", ok: problems.length === 0, problems, stats };
 }
 
@@ -1835,7 +1888,7 @@ export async function run(env) {
   // B1's (checkB1Gear).
   await Promise.all([load("worldmap", "content/world/worldmap.js"), load("testWorld", "content/world/test-world.js"), load("zones", "zones.js"),
     load("common", "gen/biomes/common.js"), load("monsters", "monsters.js"), load("light", "light.js"),
-    load("render3d", "render3d.js"), load("turns", "turns.js")]);
+    load("render3d", "render3d.js"), load("turns", "turns.js"), load("discovery", "overworld/discovery.js")]);
   if (env.args?.only === "b1") return [checkB1Gear(m)];   // (node tools/check-items.mjs --only b1)
   return [checkItems(m), checkGear(m), checkB1Gear(m)];
 }
