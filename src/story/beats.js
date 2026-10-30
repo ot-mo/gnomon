@@ -20,8 +20,9 @@
 // own events are "route" { id }. Beat 2's second: Detail C reads the Datum (its type's rule { reads: "datum", price }),
 // for 300 glim, free at Plan Warm or better, while beat 2 is open: "datumRead".
 // Talk: at a giver, while its beat is open, "What's wrong?" tells its offer; once done, each open choice ("About the
-// Assize plumb-seal...") with its options. A beat with no giver (5, 7) asks on its own: once you're back in the world
-// (explore or map) the talk screen opens with the beat as its speaker (registerUpdate "campaign:choice").
+// Assize plumb-seal...") with its options, and "Not yet.". A beat with no giver (5, 7) asks on its own: once you're in
+// the world (explore or map) the talk screen opens with the beat as its speaker, every such beat's open choices one after
+// another (ownChoices); "Not yet." or Esc leaves them until you next enter a zone (registerUpdate "campaign:choice").
 import { on, emit, registerUpdate } from "../events.js";
 import { registerTalkOptions, registerDialogue, talkTo, node, bye } from "../talk.js";
 import { openTalk } from "../dialogue.js";
@@ -101,7 +102,6 @@ export function payBeat(game, beat) {
     C.faces.push(r.face);
     game.log?.(`The Cube has a sixth face now. ${r.text}`, [190, 220, 255]);
   }
-  if (beat.choices?.some((c) => !c.byRoute) && !beat.giver) C.asking = beat.id;
 }
 on("beat", (game, { id }) => payBeat(game, beatOf(id)));
 
@@ -132,11 +132,12 @@ export function choose(game, beatId, choiceId, optionId) {
 const words = (s) => String(s || "").split(/\s+/).filter(Boolean);
 export const isGiver = (c, beat) => !!beat?.giver && !!c?.name && words(beat.giver).every((w) => words(c.name).includes(w));
 
-// The options of one choice, then back to where you were (`back`: the talker's root, or nothing for a beat's own page).
-function choiceNode(game, { beat, choice }, back) {
+// The options of one choice, then `next()` (at a giver the talk ends; a beat's own page goes on to the next open choice
+// of a beat without a giver); "Not yet." leaves it for later.
+function choiceNode(game, { beat, choice }, next = () => null) {
   return node(`${beat.title}: ${choice.label}. What will you do?`, [
-    ...choice.options.map((o) => ({ label: o.text, go: () => { choose(game, beat.id, choice.id, o.id); return back ? back() : null; } })),
-    ...(back ? [{ label: "Not yet.", go: () => back() }] : []),
+    ...choice.options.map((o) => ({ label: o.text, go: () => { choose(game, beat.id, choice.id, o.id); return next(); } })),
+    { label: "Not yet.", go: () => null },
   ]);
 }
 
@@ -149,7 +150,7 @@ registerTalkOptions("campaign", (game, c) => {
   }
   for (const open of choicesOpen(game)) {
     if (!isGiver(c, open.beat)) continue;
-    out.push({ label: `About ${open.choice.label}...`, go: () => choiceNode(game, open, null) });
+    out.push({ label: `About ${open.choice.label}...`, go: () => choiceNode(game, open) });
   }
   return out.length ? out : null;
 });
@@ -166,15 +167,21 @@ registerTalkOptions("datum", (game, c) => {
   } }];
 });
 
-// A beat with no giver asks on its own, once you're back in the world.
-registerDialogue("campaign:choice", (game, c) => {
-  const open = choicesOpen(game).find((o) => o.beat.id === c.talk.state.beat);
-  return open ? choiceNode(game, open, null) : null;
-});
+// A beat with no giver (5, 7) asks on its own: once you're in the world (explore or map), its open choices one after
+// another, every such beat's in order, the beat as the speaker. "Not yet." or Esc leaves them until you next enter a
+// zone (campaign.later).
+export const ownChoices = (game) => choicesOpen(game).filter((o) => !o.beat.giver);
+function ownPage(game) {
+  const open = ownChoices(game)[0];
+  if (!open) return null;
+  if (game.talk?.npc?.type === "campaign") game.talk.npc.name = open.beat.title;   // (the next beat's page by its title)
+  return choiceNode(game, open, () => ownPage(game));
+}
+registerDialogue("campaign:choice", (game) => ownPage(game));
 registerUpdate("campaign:choice", (game) => {
-  const C = game.state?.campaign;
-  if (!C?.asking) return;
-  const beat = beatOf(C.asking), open = choicesOpen(game).find((o) => o.beat.id === C.asking);
-  if (!open) { C.asking = null; return; }
-  openTalk(game, { id: -1, type: "campaign", name: beat.title, vis: {}, talk: { dialogue: "campaign:choice", state: { beat: beat.id }, met: true } });
+  const C = game.state?.campaign, open = C && !C.later && ownChoices(game)[0];
+  if (!open) return;
+  C.later = true;   // (asked now; after it's left, again only on the next zone:enter)
+  openTalk(game, { id: -1, type: "campaign", name: open.beat.title, vis: {}, talk: { dialogue: "campaign:choice", state: {}, met: true } });
 });
+on("zone:enter", (game) => { if (game.state?.campaign) game.state.campaign.later = false; });

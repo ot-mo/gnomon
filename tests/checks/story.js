@@ -962,19 +962,31 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json, captu
   // (Benchmark's leech shares only "the" with beat 4's giver, Kay of the Long Line: not enough.)
   if (T.talkTo(game, talker("the leech", "benchmarkLeech")).options.some((o) => /^About /.test(o.label))) fail("the leech is offered a choice that isn't hers");
   // A beat with no giver (5, 7) asks on its own: the beat as the speaker, its choice and nothing else to leave by.
-  if (C.asking !== "beat7") fail(`asking: ${C.asking}`);
-  // ...and once you're in the world, the talk screen opens on its own with the beat as the speaker.
+  // Both beats without a giver wait, in order (verification finding on 37da06f: one overwrote the other).
+  const own = BT.ownChoices(game).map((o) => `${o.beat.id}.${o.choice.id}`).join();
+  if (own !== "beat5.saffre,beat5.village,beat7.noon") fail(`the beats' own choices: ${own}`);
+  // ...and once you're in the world, the talk screen opens on its own with the first of them, which you can leave
+  // ("Not yet.", or Esc): then not again until you next enter a zone (verification finding: it reopened every frame).
   {
     const EVs = await env.src("events.js"), SCR = await env.src("screens.js"), mode0 = game.mode;
     if (game.mode !== "map" && game.mode !== "explore") game.mode = "map";
+    C.later = false;
     EVs.runUpdates(game, 0.016);
-    const t = game.talk, asked = game.mode === "talk" && t?.npc?.name === B[6].title && t.node?.options?.some((o) => o.label === "Promise Noon to hold the noon.");
+    const t = game.talk, asked = game.mode === "talk" && t?.npc?.name === B[4].title && t.node?.options?.some((o) => o.label === "Expose House Saffre.")
+      && t.node.options.some((o) => o.label === "Not yet.");
     // ...and the frame draws: the box titled by the beat (it has no creature type; verification finding on 37da06f, the
     // game froze here), and a placed person's box by its own name and title, not its type's ("a Chandler").
     const GM = await env.src("game.js"), DLG = await env.src("dialogue.js"), screen = () => (capture.chars || []).join("");
     let drawn = null;
-    try { GM.draw(); drawn = screen(); } catch (e) { fail(`drawing beat 7's own page threw: ${e.message}`); }
-    if (drawn !== null && !drawn.includes(B[6].title)) fail("beat 7's page doesn't show the beat's title");
+    try { GM.draw(); drawn = screen(); } catch (e) { fail(`drawing beat 5's own page threw: ${e.message}`); }
+    if (drawn !== null && !drawn.includes(B[4].title)) fail("beat 5's page doesn't show the beat's title");
+    if (game.mode === "talk") { game.talk = null; SCR.popMode(game); }   // (Esc)
+    EVs.runUpdates(game, 0.016);
+    if (game.mode === "talk") fail("the beat's own page opened again at once after you left it");
+    EVs.emit(game, "zone:enter", { zone: game.zone, how: "edge" });
+    if (game.mode !== "map" && game.mode !== "explore") game.mode = "map";
+    EVs.runUpdates(game, 0.016);
+    if (game.mode !== "talk") fail("the beat's own page didn't open again on the next zone entry");
     if (game.mode === "talk") { game.talk = null; SCR.popMode(game); }
     DLG.openTalk(game, { id: -6, type: "chandler", name: "Mother Saffre", title: "factor of Chandler House Saffre", color: [244, 210, 110], vis: {}, talk: { dialogue: "saffre", state: {}, met: true } });
     try { GM.draw(); if (!screen().includes("Mother Saffre, factor of Chandler House Saffre")) fail("a placed person's talk box isn't titled by her own name and title"); }
@@ -982,12 +994,13 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json, captu
     if (game.mode === "talk") { game.talk = null; SCR.popMode(game); }
     if (game.mode === "talk") { game.talk = null; SCR.popMode(game); }
     game.mode = mode0;
-    if (!asked) fail(`beat 7's choice didn't open on its own (mode ${game.mode}, ${t?.npc?.name})`);
+    if (!asked) fail(`beat 5's choice didn't open on its own (mode ${game.mode}, ${t?.npc?.name})`);
   }
-  const page = T.talkTo(game, { id: -1, type: "campaign", name: B[4].title, vis: {}, talk: { dialogue: "campaign:choice", state: { beat: "beat5" }, met: true } });
-  if (!page || page.options.length < 2 || !page.options.some((o) => o.label === "Expose House Saffre.")) fail(`beat 5's own page: ${json(page?.options?.map((o) => o.label))}`);
-  page?.options.find((o) => o.label.startsWith("Take its silence money"))?.go();
+  const page = T.talkTo(game, { id: -1, type: "campaign", name: B[4].title, vis: {}, talk: { dialogue: "campaign:choice", state: {}, met: true } });
+  if (!page || page.options.length < 3 || !page.options.some((o) => o.label === "Expose House Saffre.")) fail(`beat 5's own page: ${json(page?.options?.map((o) => o.label))}`);
+  const next = page?.options.find((o) => o.label.startsWith("Take its silence money"))?.go();
   if (C.choices?.beat5?.saffre !== "silence" || rep("chandlers") < 200) fail(`beat 5's choice: ${json(C.choices?.beat5)}`);
+  if (!next?.options?.some((o) => o.label.startsWith("Unpress the village"))) fail(`after beat 5's first choice the page doesn't go on to its second: ${json(next?.options?.map((o) => o.label))}`);
   // "What's wrong?": an open beat's offer at its giver.
   const keepQ = game.quests;
   game.quests = [{ id: "beat2", template: "beat", done: false }];
