@@ -355,8 +355,10 @@ function buildLevel(rng, cosmetic, seed, p, theme, simple) {
   if (f.flags.lightless) GIMMICKS.lightless(f);
   if (f.beat) GIMMICKS.oneBeat(f);
   if (p.cradle) placeCradle(f, rng, rooms, ctx);
-  if (p.clue || p.captive || p.prisoners || p.exit) placeLandmarkParts(f, rng, rooms, p, ctx);
-  if ((p.gimmicks || []).length || p.cradle || p.clue || p.captive || p.prisoners || p.exit) f.refresh();
+  if (p.clue || p.captive || p.prisoners || p.exit || p.culvert) placeLandmarkParts(f, rng, rooms, p, ctx);
+  if (p.softFalls) f.softFalls = true;          // (screens/play.js: a fall from here lands unhurt)
+  if (p.sealedBelow) f.sealedBelow = { ...p.sealedBelow };   // (screens/play.js: the stair down shut until that beat)
+  if ((p.gimmicks || []).length || p.cradle || p.clue || p.captive || p.prisoners || p.exit || p.culvert) f.refresh();
 
   // --- 11. The people of this level (the site plans who's where; for the legacy stack, content/legacy/encounters.js planEncounters).
   placeEncounters(f, rng, cosmetic, rooms, start, depth, p.encounters || []);
@@ -736,6 +738,15 @@ GIMMICKS.runeDoors = (f, rng, rooms) => {
   f.runeDoors = [...cols];
 };
 
+// offBeatDoors (the Metronome, bible §5 K: "some doors open only on the off-beat"; B2, C1b #10): every other door on the
+// level (by its place) opens only in the beat's off half (interact.js; zone.offBeatDoors, the doors' columns): on the map you
+// wait for it, in 3D you time it. Needs oneBeat's zone.beat (the level's one beat), which it reads at use.
+GIMMICKS.offBeatDoors = (f, rng, rooms) => {
+  const cols = new Set();
+  for (const r of rooms) for (const d of r.doors) if (f.get(d.x, d.y, FLOOR_Z) === B.DOOR && (d.x + d.y) % 2 === 0) cols.add(d.x + d.y * W);
+  f.offBeatDoors = [...cols];
+};
+
 // identicalRooms (the Square, bible §5 M; B2, C1b #20): with the one-material "rule" theme every room is the same room in
 // 3D; each room's mark, three tiles of mosaic in the middle of its floor (no two rooms alike), tells them apart on the map
 // (zone.roomMarks [{ room, x, y, mark }]: the three colours, west to east).
@@ -790,6 +801,17 @@ function placeLandmarkParts(f, rng, rooms, p, ctx) {
       if (!s) continue;
       f.set(s[0], s[1], FLOOR_Z - 1, B.STAIRS_UP);
       f.exit = { x: s[0], y: s[1], key: p.exit.key, at: [...p.exit.at] };
+      break;
+    }
+  }
+  if (p.culvert) {   // a 2 × 2 pool of deep water in the farthest room: dive in and the current takes you home
+    for (const r of order) {
+      const ok = plainTiles(f, r, ctx).filter(([x, y]) => [[0, 0], [1, 0], [0, 1], [1, 1]].every(([a, b]) => plainTiles(f, r, ctx).some(([u, v]) => u === x + a && v === y + b)
+        && !occupied(f, x + a, y + b)) && [[-1, 0], [2, 0], [0, -1], [0, 2], [-1, 1], [2, 1], [1, -1], [1, 2]].some(([a, b]) => dist[x + a + (y + b) * W] >= 0 && f.stand[x + a + (y + b) * W] === FLOOR_Z));
+      if (!ok.length) continue;
+      const [x, y] = ok[Math.floor(ok.length / 2)];
+      for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { f.set(x + a, y + b, FLOOR_Z - 1, B.WATER_DEEP); taken.add(x + a + (y + b) * W); }
+      f.culvert = { x, y, w: 2, d: 2, key: p.culvert.key };
       break;
     }
   }
@@ -1253,7 +1275,8 @@ export function validateDungeonLevel(f, p = {}) {
       if (!g || !at(all, g.x, g.y)) problems.push("guardian missing or unreachable");
     }
     if (f.stairs) problems.push("stairs down on the last floor");
-    const hole = (x, y) => !f.get(x, y, 0) || f.get(x, y, 0) === B.WATER_DEEP || f.get(x, y, FLOOR_Z - 1) === B.WATER_DEEP;
+    const culvert = (x, y) => f.culvert && x >= f.culvert.x && y >= f.culvert.y && x < f.culvert.x + f.culvert.w && y < f.culvert.y + f.culvert.d;
+    const hole = (x, y) => !culvert(x, y) && (!f.get(x, y, 0) || f.get(x, y, 0) === B.WATER_DEEP || f.get(x, y, FLOOR_Z - 1) === B.WATER_DEEP);   // (the culvert's pool leads home)
     outer: for (let y = 0; y < d; y++) for (let x = 0; x < w; x++) if (hole(x, y)) { problems.push("a hole on the last floor"); break outer; }
   } else if (!f.stairs) problems.push("no stairs");
   else if (f.guardianHall) {   // the stairs wait behind the guardian's gate: the gate must be reachable (a landmark's own
@@ -1294,7 +1317,8 @@ export function validateDungeonLevel(f, p = {}) {
   if (f.leverRecord && !f.leverRecordAt) problems.push("the Rune Lever room's record is missing");
   // A landmark's places (B2): each where you can reach it; a prisoner's wheel from a floor beside it.
   for (const [what, s] of [["the clue", f.clue], ["the captive", f.captive], ["the far mouth", f.exit]]) if (s && !at(noLocked, s.x, s.y)) problems.push(`${what} unreachable`);
-  if ((p.clue && !f.clue) || (p.captive && !f.captive) || (p.exit && !f.exit) || (p.prisoners && (f.prisoners?.length || 0) < p.prisoners)) problems.push("a landmark place missing");
+  if ((p.clue && !f.clue) || (p.captive && !f.captive) || (p.exit && !f.exit) || (p.culvert && !f.culvert) || (p.prisoners && (f.prisoners?.length || 0) < p.prisoners)) problems.push("a landmark place missing");
+  if (f.culvert && ![[-1, 0], [2, 0], [0, -1], [0, 2], [-1, 1], [2, 1], [1, -1], [1, 2]].some(([a, b]) => at(noLocked, f.culvert.x + a, f.culvert.y + b))) problems.push("the culvert unreachable");
   for (const q of f.prisoners || []) if (!at(noLocked, q.x, q.y) || ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => at(noLocked, q.wheel[0] + dx, q.wheel[1] + dy))) problems.push("a prisoner's cell or wheel unreachable");
   // A fall from a sinkhole lands right under it (level 1 of a site: world/sites.js sinkholeSpots).
   for (const [x, y] of p.landings ?? f.landings ?? []) {

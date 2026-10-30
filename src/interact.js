@@ -22,6 +22,7 @@ import { spawnCreature, addCreature, pickCreatureType, talkersIn, ghostHidden, c
 import { lineOfSight } from "./raycast.js";
 import { emit, on } from "./events.js";
 import { raiseMaxHp, maxHp } from "./stats.js";
+import { TICK } from "./traps.js";
 import { hourOf } from "./clock.js";
 
 const REACH = 2.0;   // the rune-lever puzzle relies on this: you must step onto the trap floor to reach
@@ -134,6 +135,10 @@ registerUse("door", (game, x, y, z) => {
     game.log("A rune is cut over this door, and it won't open to a lit torch. Put your torch out (F).", [175, 165, 230]);
     return false;
   }
+  if (zone.offBeatDoors?.includes(x + y * zone.w) && !offBeat(game, zone)) {   // the Metronome's (dungeon.js offBeatDoors, B2)
+    game.log("The door is held shut on the beat. It gives on the off-beat: wait for it.", [200, 190, 150]);
+    return false;
+  }
   if (info.locked) {
     if (player.keys <= 0) { game.log("It's locked. You need a key.", [240, 200, 80]); return false; }
     player.keys--;
@@ -194,6 +199,14 @@ registerUse("brazier", (game, x, y, z) => {
   brazierLit(game, x, y);
   return true;
 });
+
+// The off half of a level's one beat (zone.beat { period, phase }: traps.js's ticks): an off-beat door opens then.
+export function offBeat(game, zone) {
+  const b = zone.beat;
+  if (!b) return true;
+  const k = (((Math.floor((game.time || 0) / TICK) - b.phase) % b.period) + b.period) % b.period;
+  return k >= b.period / 2;
+}
 
 // What a lever does:
 //   open   – removes the gate (or whatever) at `cells`

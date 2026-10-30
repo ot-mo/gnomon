@@ -118,6 +118,12 @@ function landmarkDungeon(L, world) {
   if (P.theme && DUNGEONS.themes[P.theme]) spec.theme = P.theme;
   const mouth = P.exit && world?.plans?.[world.landmarks.get(P.exit.to)?.plan]?.farMouth, to = P.exit && world?.landmarks.get(P.exit.to);
   if (mouth && to?.anchor) spec.exit = { floor: P.exit.floor, key: `${to.wx},${to.wy},0`, at: [to.anchor[0] + mouth[0], to.anchor[1] + mouth[1]] };
+  // The gimmicks' places (B2, C1b #10): falls down Kettle Mesa's shaft land unhurt, and its last floor's culvert carries you
+  // up into Hollowmere's temple; the Datum's floors that open at a beat (the stair down to them sealed until then).
+  if (P.softFalls) spec.softFalls = true;
+  const home = P.culvert && world?.landmarks.get(P.culvert.to);
+  if (home) spec.culvert = { floor: P.culvert.from, key: `${home.wx},${home.wy},0` };
+  if (P.opensAtBeat) spec.opensAtBeat = { ...P.opensAtBeat };
   if (d.planned?.murals || d.murals) spec.murals = (d.planned?.murals || d.murals).map((m) => ({ ...m }));   // its own murals' words (B2, C1b #7)
   return spec;
 }
@@ -223,6 +229,8 @@ export function dungeonParams(run, site, z) {
     landings: z === 1 ? sinkholeSpots(run, site).map(([x, y]) => [x, y]) : null,
     ...(spec.clue?.floor === z ? { clue: { ...spec.clue } } : {}), ...(spec.captive?.floor === z ? { captive: { ...spec.captive } } : {}),
     ...(spec.prisoners?.floors.includes(z) ? { prisoners: 2 } : {}), ...(spec.exit?.floor === z ? { exit: { key: spec.exit.key, at: [...spec.exit.at] } } : {}),
+    ...(spec.softFalls ? { softFalls: true } : {}), ...(spec.culvert?.floor === z ? { culvert: { key: spec.culvert.key } } : {}),
+    ...(spec.opensAtBeat?.[z + 1] ? { sealedBelow: { beat: spec.opensAtBeat[z + 1] } } : {}),
   };
 }
 

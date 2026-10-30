@@ -741,6 +741,43 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
   const none = shut(dn);
   stats.gnomonDoor = { g9, g12, g14, clock: before && opened && closed, asked: !ask && asked, cube, key, none };
   expect(Object.values(stats.gnomonDoor).every(Boolean), `in a game: the Gnomon's door ${JSON.stringify(stats.gnomonDoor)}`);
+  // The gimmicks' code (C1b #10), in a game:
+  //   the Metronome's off-beat doors: a door held on the beat, open on the off-beat;
+  //   the Datum's floor 2: its stair down sealed until beat 2 is reached (beat 1 done), then it takes you to floor 3;
+  //   Kettle Mesa: a fall down its shaft lands a floor down unhurt; its last floor's culvert carries you up into Hollowmere.
+  startRun(seeds[0], REAL_WORLD);
+  const P = game.player, site = (id) => [...game.run.sites.values()].find((s) => s.landmarkId === id), { offBeat } = await import("../../src/interact.js");
+  const met = site("metronome");
+  game.debug.enterZone(`${met.at.wx},${met.at.wy},1`);
+  const mz = game.zone, ob = mz.offBeatDoors || [];
+  let onBeat = null, offBeatOpen = null;
+  if (ob.length && mz.beat) {
+    const k = ob[0], dx = k % mz.w, dy = Math.floor(k / mz.w);
+    game.view = "map"; P.torch = true;
+    game.time = Math.ceil(game.time / 2) * 2;   // a beat's start: the on half
+    for (let n = 0; n < 16 && offBeat(game, mz); n++) game.time += 0.5;
+    onBeat = !useColumn(game, dx, dy) && mz.get(dx, dy, FLOOR_Z) === B.DOOR;
+    for (let n = 0; n < 16 && !offBeat(game, mz); n++) game.time += 0.5;
+    offBeatOpen = !!useColumn(game, dx, dy) && mz.get(dx, dy, FLOOR_Z) === B.AIR;
+  }
+  const dat = site("benchmark"), dk2 = `${dat.at.wx},${dat.at.wy},2`;
+  game.debug.enterZone(dk2);
+  const onStairs = () => { const st = game.zone.stairs; Object.assign(P, { x: st.x + 0.5, y: st.y + 0.5, z: FLOOR_Z, onGround: true, vz: 0 }); checkFloorEvents(game); return game.zone.key; };
+  const sealedAt = game.zone.sealedBelow, sealed = onStairs() === dk2;
+  const { campaignOf } = await import("../../src/story/campaign.js");
+  campaignOf(game).done.beat1 = game.time;
+  const opened2 = onStairs() === `${dat.at.wx},${dat.at.wy},3`;
+  const kt = site("kettleMesa");
+  game.debug.enterZone(`${kt.at.wx},${kt.at.wy},1`);
+  const hpBefore = P.hp;
+  P.z = -2; checkFloorEvents(game);
+  const soft = game.zone.key === `${kt.at.wx},${kt.at.wy},2` && P.hp === hpBefore;
+  game.debug.enterZone(`${kt.at.wx},${kt.at.wy},3`);
+  const cv = game.zone.culvert;
+  if (cv) { Object.assign(P, { x: cv.x + 0.5, y: cv.y + 0.5, z: -2 }); checkFloorEvents(game); }
+  const home = game.run.world.landmarks.get("hollowmere");
+  stats.gimmicks = { offBeatDoors: ob.length, onBeat, offBeatOpen, sealedBelow: sealedAt?.beat, sealed, opened2, soft, culvert: !!cv && game.zone.key === `${home.wx},${home.wy},0` };
+  expect(ob.length && onBeat && offBeatOpen && sealedAt?.beat === 2 && sealed && opened2 && soft && stats.gimmicks.culvert, `in a game: the gimmicks ${JSON.stringify(stats.gimmicks)}`);
   return { name: "landmark bottoms", ok: problems.length === 0, problems, stats };
 }
 

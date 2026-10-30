@@ -19,6 +19,8 @@ import { keys, isLocked, lockPointer } from "../input.js";
 import { registerScreen, setMode, pushMode } from "../screens.js";
 import { bind, globalKey, dispatchKey } from "../keys.js";
 import { at, hitLabel } from "../ui.js";
+import { QUESTS } from "../content/quests.js";
+import { beatReady } from "../story/campaign.js";
 import { changeZone, enterZone, zoneBelow, zoneAbove, dungeonOffset, tryWalkOff, ZONE_RULES } from "../zones.js";
 import { clampPitch, updatePlayer, takeImpact, hasFeatherFall, bonus, bodyCollides, RADIUS } from "../player.js";
 import { pushPlayerOut } from "../monsters.js";
@@ -68,6 +70,11 @@ export function checkFloorEvents(game) {
   const p = game.player, zone = game.zone;
   if (p.z < -1.5) {
     const x = p.x, y = p.y, below = zoneBelow(game, zone);
+    const cv = zone.culvert;
+    if (cv && x >= cv.x && y >= cv.y && x < cv.x + cv.w && y < cv.y + cv.d) {   // the culvert (Kettle Mesa's last floor, B2, C1b #10)
+      changeFloor(game, cv.key, "up", "The current takes you down, along and up, and leaves you in the temple's well, unhurt.");
+      return true;
+    }
     if (!below) {   // nothing below this zone (no valid level has a hole there): back onto solid ground
       enterZone(game, zone, { how: "fall", fx: x, fy: y, rng: Math.random });
       return true;
@@ -76,6 +83,8 @@ export function checkFloorEvents(game) {
       fallTo(game, below, zone, x, y, "You sink beneath the dark water and are swept down to the floor below.");
     } else if (hasFeatherFall(p)) {
       fallTo(game, below, zone, x, y, "You fall through the dark... and drift down gently.");
+    } else if (zone.softFalls) {   // Kettle Mesa's shaft: exactly one floor, onto brine-moss (B2, C1b #10)
+      fallTo(game, below, zone, x, y, "You drop down the shaft and land in a bed of brine-moss, unhurt.");
     } else {
       fallTo(game, below, zone, x, y, "You fall through the dark and land hard.");
       game.hurtPlayer(2 + Math.floor(Math.random() * 3), "the fall");
@@ -90,9 +99,20 @@ export function checkFloorEvents(game) {
     return true;
   }
   const below = under === B.STAIRS ? zoneBelow(game, zone) : null, above = under === B.STAIRS_UP ? upFrom(game, zone) : null;
+  if (below && zone.sealedBelow && !beatOpen(game, zone.sealedBelow.beat)) {   // the Datum's lower floors (B2, C1b #10)
+    if (game.sealedTold !== zone.key) game.log("The stair down is sealed with the Survey's brass. It will open at the Datum's beat.", [200, 190, 150]);
+    game.sealedTold = zone.key;
+    return false;
+  }
   if (below) { changeFloor(game, below, "down", "You descend the stairs..."); return true; }
   if (above) { changeFloor(game, above, "up", "You climb the stairs back up..."); return true; }
   return false;
+}
+
+// Whether the campaign has reached beat n (it is begun: the beats before it are done; bible §5 D, "floors 3-4 open at beat 2").
+export function beatOpen(game, n) {
+  const beat = QUESTS.campaign.beats.find((b) => b.n === n);
+  return !beat || beatReady(game, beat);
 }
 
 // The zone a stair up leads to: the level above (zoneAbove), or, from a zone with floors over it (zone.hasAbove: the
