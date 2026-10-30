@@ -45,6 +45,8 @@ function dungeonZone(game, { wx, wy, z }) {
   zone.siteId = site.id;
   zone.landmarkId = site.landmarkId || null;
   if (z < 0) zone.hasAbove = !!zone.upStairs;   // a floor up: its stair up leads to z − 1 (B2, C1b #8)
+  const holy = site.landmarkId ? run.world.landmarks.get(site.landmarkId)?.holyFloors?.[z] : null;
+  if (holy) zone.holy = holy;   // a landmark dungeon's holy floor (the Unlit Choir's, the Square's…: B2, C1b #3)
   return zone;
 }
 

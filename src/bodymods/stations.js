@@ -21,6 +21,7 @@ import { ARTIFACTS, CELLS } from "../content/items/artifacts.js";
 import { canInstall, install, uninstall, socketsFor, installedImplants, fittingFee, withTruing, isPlumb, partWord } from "./implants.js";
 import { identify, cellOf, cellMax, CHARGE_PER_GLIM } from "./artifacts.js";
 import { openTruing } from "../screens/equipment.js";
+import { repOf } from "../factions.js";
 
 export const CRADLE = B.STATION;
 
@@ -29,9 +30,15 @@ export function useCradle(game, x, y, z) {
     game.log("A Truing Cradle: straps, gauges and a plumb-line over a padded frame. It is cut to a Plumb's measure, not yours.", [150, 210, 230]);
     return false;
   }
-  openTruing(game, { at: "cradle", x, y, z });
+  const free = squareFree(game);
+  if (free) game.log("The assizer at the Cradle waves your purse away: the Rule fits its own for nothing.", [150, 210, 230]);
+  openTruing(game, { at: "cradle", x, y, z, ...(free ? { waive: true } : {}) });
   return true;
 }
+// Truing Cradle #3, on the Square's first floor down, fits a Plumb for free at Assize Warm or better (bible §5 M: +250;
+// WS5 #20's other half, B2, C1b #9).
+export const squareFree = (game) => game.zone?.landmarkId === "square" && game.zone.z === 1 && repOf(game, "assize") >= REP_WARM;
+const REP_WARM = 250;
 registerUse(CRADLE, useCradle, { label: (game) => (isPlumb(game.player) ? "lie down in the Truing Cradle" : "a Truing Cradle") });
 
 // --- Services -------------------------------------------------------------------------------------------------

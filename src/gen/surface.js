@@ -382,6 +382,17 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
   if (zone.stairs) { zone.entrance = { ...zone.stairs }; if (!entranceGated) keyPoints.push({ ...zone.stairs }); }
   // A landmark with floors up (the Square's: dungeon.up) has a stair up in its plan: the zone above is z = −1 (B2, C1b #8).
   if (zone.upStairs && site?.dungeon?.up?.length) zone.hasAbove = true;
+  // Its holy places and dial-steles, in zone coordinates (B2, C1b #3, #21; world/sites.js holyAt, steleAt): the faith whose
+  // holy place the span is (the landmark's `holy`, or the span's own: Halfnight's wards), its plan's finer areas, and its
+  // steles with their carved hours.
+  if (L) {
+    const holy = typeof L.holy === "string" ? L.holy : L.holy?.[`${wx},${wy}`] ?? null;
+    if (holy) zone.holy = holy;
+    if (planAt && planDef.areas?.length)
+      zone.holyAreas = planDef.areas.map((a) => ({ faction: a.faction, rule: a.rule, x0: planAt.x + a.rect[0], y0: planAt.y + a.rect[1], x1: planAt.x + a.rect[2], y1: planAt.y + a.rect[3] }));
+    if (planAt && planDef.steles?.length)
+      zone.steles = planDef.steles.map((st) => ({ x: planAt.x + st.at[0], y: planAt.y + st.at[1], z: FLOOR_Z + (st.z ?? 1), hour: st.hour }));
+  }
   // Plan walls and roofs are scenery: nobody walks on them, and the map draws them as walls
   // (zone.planWalls: also a wall lower than a dungeon room's, which computeKinds alone would call floor), as it
   // draws the dressing's posts, outcrops and spires (ctx.walls).

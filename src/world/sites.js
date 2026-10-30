@@ -259,6 +259,23 @@ function landmarkLegend(site) {
            mutations: [], opinions: [], hook: tpl.hook || null, hall: tpl.hall, siteId: site.id, roams: false };
 }
 
+// --- Holy places and dial-steles (B2, C1b #3, #21: the data C2's attitude and steleHour read) --------------------------
+// holyAt(zone, x, y) → { faction, rule } | null: whose holy place the tile is, finest first: a plan's area (Halfnight's
+// north row "noTorch", the West Ward's Hour-house "torchLit", Molar's checkpoint and Benchmark's fitting-house "holy"), else
+// the zone's own (a landmark's surface or span: zone.holy, rule "holy"; a landmark dungeon's holy floor the same). The
+// rules: "holy" (the faith's own trespass, bible §6), "noTorch" (a lit torch is trespass), "torchLit" (a torch out is).
+export function holyAt(zone, x, y) {
+  const a = (zone?.holyAreas || []).find((r) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1);
+  if (a) return { faction: a.faction, rule: a.rule };
+  return zone?.holy ? { faction: zone.holy, rule: "holy" } : null;
+}
+// steleAt(zone, x, y) → the carved hour (0-23) of the dial-stele on that tile, else null (the Tall Table's, Molar's,
+// Foldmother's: zone.steles).
+export function steleAt(zone, x, y) {
+  const st = (zone?.steles || []).find((s) => s.x === x && s.y === y);
+  return st ? st.hour : null;
+}
+
 // --- Legends (bible §12.13) ------------------------------------------------------------------------------
 // A name in the Hours' phonology: an onset, a middle (sometimes two) and a final, 3 to 9 letters, none of bible
 // §15.11's terms in it.

@@ -8,7 +8,7 @@
 //                    content/biomes.js DEFAULT_BIOME: plain dressing, no wildlife (its "flats" and "sea" share the
 //                    real world's ids but not their builders)
 //   builderFor(world, tile) → builder   the real one when the span's terrain is the real world's, else the test's
-//   LANDMARK_BUILDERS                   gen/biomes/landmarks.js (a landmark with no plan yet: the Gnomon's foot)
+//   LANDMARK_BUILDERS                   gen/biomes/landmarks.js (a landmark with no plan: none now, every one has a plan)
 // Importing this module registers the wildlife (content/creatures/wildlife.js) and WS2's legend handlers.
 import { registerCreatures } from "../../creatures.js";
 import { WILDLIFE } from "../../content/creatures/wildlife.js";
