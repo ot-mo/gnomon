@@ -8,8 +8,8 @@
 //   the oven           the village leader's talk option: cook a dish you learned in the Kindling (game.state.dishes;
 //                      social/ritual.js's "Learn the village dish" row) at the hall, once a world day: the status "fed"
 //                      for a world day, its bonus the dish's (VILLAGES.dishBook[dish].bonus)
-//   Brew (the power)   the same oven mixes a tonic: a vial of a liquid and 10 glim make the tonic that liquid is the base
-//                      of (BREWS), once a world day in each village
+//   Brew (the power)   the same oven mixes a tonic: a vial of a liquid and three quarters of the tonic's worth in glim make
+//                      the tonic that liquid is the base of (BREWS), once a world day in each village
 //   the shrine         L on the village's shrine in its view (VILLAGES.shrines[kind].view: social/murals.js readable), once
 //                      a world day: its `reward` (a tale learned as a reading, a heal, a status); in the wrong view its
 //                      `wrong` words. The pray quest (story/villagequests.js) still finishes on the same look
@@ -33,7 +33,10 @@ import { learnSecret, secretsOf } from "../story/secrets.js";
 import { knows } from "../story/journal.js";
 import { sameLiquid } from "./liquids.js";
 
-export const COMMONS = { extraTakes: 4, brew: { glim: 10 } };
+// Brew's fire costs three quarters of the tonic's worth: the most any trader pays for one (sell × 0.3 + 0.35 at EGO 24 +
+// 0.1 at Bright: stats.js priceMul), so a brewed tonic saves you buying one and never sells at a profit (review 4).
+export const COMMONS = { extraTakes: 4, brew: { share: 0.75 } };
+export const brewCost = (tonic) => Math.ceil(COMMONS.brew.share * (TONICS[tonic]?.value || 0));
 // Which tonic a liquid is the base of (DECISIONS "Liquids": the base of tonics; bible §13.7-13.8).
 export const BREWS = { freshWater: "balm", sunwine: "hasp", umbra: "gloam", sap: "ironbark", ink: "foldSap", clearGlim: "clearwit" };
 
@@ -95,13 +98,14 @@ export function brewTonic(game, siteId, vial) {
   if (!hasKey(p.perks, "brew")) return { ok: false, line: "You don't know how to brew." };
   if (!id) return { ok: false, line: "Nothing brews from that." };
   if (st.brewed) return { ok: false, line: "The oven is still cooling from the last brew. Tomorrow." };
-  if (funds(p) < COMMONS.brew.glim) return { ok: false, line: `The fire wants ${formatPrice(COMMONS.brew.glim)} of glim.` };
-  pay(game, p, COMMONS.brew.glim);
+  const cost = brewCost(BREWS[id]);
+  if (funds(p) < cost) return { ok: false, line: `The fire wants ${formatPrice(cost)}.` };
+  pay(game, p, cost);
   takeOne(p, vial);
   addToInventory(p, { kind: "vial", effect: "" });
   addToInventory(p, { kind: "tonic", effect: BREWS[id], count: 1 });
   st.brewed = BREWS[id];
-  return { ok: true, line: `You brew ${TONICS[BREWS[id]].name} over the oven's coals. (−${formatPrice(COMMONS.brew.glim)})` };
+  return { ok: true, line: `You brew ${TONICS[BREWS[id]].name} over the oven's coals. (−${formatPrice(cost)})` };
 }
 registerTalkOptions("oven", (game, c) => {
   const v = villageHere(game, c);

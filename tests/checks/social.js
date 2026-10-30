@@ -1780,11 +1780,18 @@ export async function run(env) {
       if (!status.hasStatus(p(), "fed") || Math.abs(stats6.bonus(p(), bk) - bv) > 1e-9 && stats6.bonus(p(), bk) < bv) fail(`fed by ${dish}: ${bk} ${stats6.bonus(p(), bk)} (want ${bv})`);
       if (commons.cookDish(game, site.id, dish).ok) fail("the oven twice in a day");
       for (const [d, B2] of Object.entries(V.dishBook)) for (const k of Object.keys(B2.bonus)) if (!stats6.BONUS_KEYS.includes(k)) fail(`the dish ${d}'s bonus ${k} isn't a bonus key`);
-      // Brew: a vial and 10 glim, a tonic, once a day.
+      // Brew: a vial and three quarters of the tonic's worth, a tonic, once a day; no trader pays more for it (review 4).
       p().perks = {}; keyset.addKey(p().perks, "brew");
-      p().funds = 30; p().inv = [{ kind: "vial", effect: "sap", count: 1 }];
+      const cost = commons.brewCost("ironbark");
+      p().funds = cost + 10; p().inv = [{ kind: "vial", effect: "sap", count: 1 }];
       const brew = commons.brewTonic(game, site.id, p().inv[0]);
-      if (!brew.ok || p().funds !== 20 || !p().inv.some((it) => it.kind === "tonic" && it.effect === "ironbark")) fail(`Brew: ${brew.line} ${JSON.stringify(p().inv)}`);
+      if (!brew.ok || p().funds !== 10 || !p().inv.some((it) => it.kind === "tonic" && it.effect === "ironbark")) fail(`Brew: ${brew.line} ${JSON.stringify(p().inv)}`);
+      setEgo(24); game.state.rep[v.factionId] = 700;
+      for (const t of Object.values(commons.BREWS)) {
+        const best = merchants.priceOf(game, { kind: "tonic", effect: t, count: 1 }, leader, "sell");
+        if (best > commons.brewCost(t)) fail(`a brewed ${t} sells for ${best} at EGO 24 and Bright, more than its ${commons.brewCost(t)} to brew`);
+      }
+      setEgo(16);
       if (POW.brew.needs || POW.hourScript.needs || POW.gossip.needs || POW.triangulator.needs || POW.oilFire.needs || POW.chime.needs) fail("a power B3 built still has its needs");
       // The shrine: the right view, once a day; the wrong view's words.
       const zone = game.zone, kind = v.culture.shrine, S2 = V.shrines[kind];
