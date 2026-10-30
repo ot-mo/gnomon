@@ -150,7 +150,7 @@ export const PEOPLE_WORDS = {
   sectionNine: { role: "villager", greet: "SECTION NINE. SPEAK ON THE BEAT.",
     who: "CHIEF DRAUGHTSMAN OF THE PLAN. I DRAW WHAT IS TO BE BUILT, AND THEN IT IS.",
     topics: [["The hand?", "THE HAND IS DRAWN TO THE ASSIZE'S SHEET. THE SHEET IS APPROVED. AN APPROVED SHEET CAN BE SHOWN TO BE WRONG ONLY BY A TRUER LEVEL."]],
-    after: { beat8: "THE DRAWING IS AMENDED. THE BEAT CONTINUES." } },
+  },
   draughtsman: { role: "villager", greet: "Revision noted. Please stand outside the drawing.",
     who: "A draughtsman of the Plan. We walk the lines first so the walls know where to go." },
 
