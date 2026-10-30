@@ -1631,8 +1631,13 @@ export function realBand(game, tier, level) {
 // left out: worn for their own bonus, their enchantment is noise here). → [{ bg, seed, at: { [band level]: { snap,
 // kit } } }], 4 backgrounds × 20 seeds.
 const TYPICAL_BGS = ["aspirantOfTheRule", "forgehandOfOrrum", "droversChild", "reedcutter"];
-const TYPICAL_PREF = ["quick", "mighty", "keenEye", "tough", "ironSkin", "executioner", "regen", "crushing", "longReach",
-  "giantSlayer", "secondWind", "foldingStrike", "thickBlood"];
+// (B1, the user's "measure, then decide", 2026-10-30: ordered by measured worth, each power's tiers 5-8 mean cost a kill
+// with it preferred first, the live powers' effects counted in typicalRow: Daze 35.40%, Giant slayer 36.58, Tough 36.80,
+// Quick strikes, Mighty and Thick blood 36.83, Iron skin 36.90, High ground 36.97, Bleed and Riposte 37.08, Folding strike
+// 37.13, Disarm 37.15, Keen eye 37.17, Second wind 37.40, Cleave 37.42, Crushing 37.45, Executioner, Long reach and Dark
+// backstab 37.52, Regeneration 37.60; the old order's 36.83)
+const TYPICAL_PREF = ["daze", "giantSlayer", "tough", "quick", "mighty", "thickBlood", "ironSkin", "highGround", "bleed", "riposte",
+  "foldingStrike", "disarm", "keenEye", "secondWind", "cleave", "crushing", "executioner", "longReach", "darkBackstab", "regen"];
 const TYPICAL_SEEDS = Array.from({ length: 20 }, (_, k) => 1001 + k);
 const typicalSnap = (p) => ({ attrs: { ...p.attrs }, perks: structuredClone(p.perks), perkRank: { ...p.perkRank }, maxHpGain: p.maxHpGain });
 // Put a build on the player as it was at `level` (its body made fresh from the kit).
