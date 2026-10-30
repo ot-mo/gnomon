@@ -35,7 +35,8 @@ import { defaultPart, slotsFor, canEquip, equip as bodyEquip, unequip as bodyUne
 // What using things from the pack does (the kinds in content name these actions).
 registerItemAction("drink", (game, e, it) => { takeOne(e, it); drinkPotion(game, it.effect); return RULES.body.drinkTime; });
 registerItemAction("read", (game, e, it) => { takeOne(e, it); readScroll(game, it.effect); return RULES.body.readTime; });
-registerItemAction("wear", (game, e, it) => (equip(game, it, e.inv.indexOf(it), wearPart(game, e, it)) ? RULES.body.equipTime : 0));
+// (a broken piece is mended instead, with the Repair power: that takes its own time, items.js MEND_TIME; B1)
+registerItemAction("wear", (game, e, it) => (it.broken ? mendItem(game, e, it) : equip(game, it, e.inv.indexOf(it), wearPart(game, e, it)) ? RULES.body.equipTime : 0));
 // Where E puts gear on: the part chosen on the Equipment tab (the pack shown "for" it), else the body's default.
 const wearPart = (game, e, it) => (e === game.player && game.invFilter === "for" && slotsFor(e, it).includes(game.invFor) ? game.invFor : undefined);
 

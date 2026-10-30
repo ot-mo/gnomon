@@ -80,7 +80,7 @@ import { mapView } from "../../src/renderMap.js";
 import { MISSILES } from "../../src/content/items/missiles.js";
 import { canEquip } from "../../src/body.js";
 import { CLASSES } from "../../src/content/items/forge.js";
-import { itemName, mendItem } from "../../src/items.js";
+import { itemName, mendItem, MEND_TIME } from "../../src/items.js";
 import { EYE, FISTS, attackTime } from "../../src/player.js";
 import { compileWorld } from "../../src/world/worldmodel.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
@@ -1958,7 +1958,8 @@ export function checkB1Combat(ctx) {
     expect(canEquip(game, p, snapped, "hand_r").reason === "broken", "a snapped dagger can be held");
     expect(mendItem(game, p, snapped) === 0 && snapped.broken, "a snapped dagger mended without Repair");
     perk("repair");
-    expect(mendItem(game, p, snapped) > 0 && !snapped.broken && canEquip(game, p, snapped, "hand_r").ok, "Repair didn't mend the snapped dagger");
+    const mendT = useItem(game, p, snapped);   // (E in the pack: the "wear" action mends it, in MEND_TIME)
+    expect(mendT === MEND_TIME && !snapped.broken && canEquip(game, p, snapped, "hand_r").ok, `Repair by E took ${mendT} s (want ${MEND_TIME}), mended ${!snapped.broken}`);
     glass.chips = 1; glass.material = 2;
     mendItem(game, p, glass);
     expect(glass.material === 3 && !glass.chips, `Repair left the chipped blackglass at ${glass.material}`);
