@@ -303,13 +303,14 @@ const FLAT_PEOPLE = new Set([...Object.values(REAL_WORLD.landmarks.find((l) => l
 const GHOST_PEOPLE = new Set(["brann", "thol", "ghostTrader"]);
 function peopleOfSpan(z, L, plan, at, expect, tally) {
   if (!plan || !z.gen?.planAt) return;
-  const later = new Map((z.landmarkPeople || []).map((s) => [s.uid, s])), ids = new Set(dialogueIds());
+  const ids = new Set(dialogueIds());
   for (const p of peopleOn(L, plan, z.gen.planAt)) {
     const kind = kindOf(p.who, p.letter), i = p.x + p.y * z.w, here = z.creatures.filter((c) => c.tx === p.x && c.ty === p.y);
     expect(kind, `${at}: ${p.who} (letter ${p.ch}) has no kind`);
     if (PRESENCE[p.who]) {
       tally.later++;
-      expect(!here.length && later.get(p.uid)?.z === z.stand[i] && later.get(p.uid)?.kind === kind, `${at}: ${p.who} should come and go (zone.landmarkPeople), not stand there`);
+      const s = (z.landmarkPeople || []).find((l) => l.x === p.x && l.y === p.y);
+      expect(!here.length && s?.z === z.stand[i] && s.kind === kind && s.uid === `landmark:${p.who}`, `${at}: ${p.who} should come and go (zone.landmarkPeople, as landmark:${p.who}), not stand there`);
       continue;
     }
     const c = here[0];
@@ -356,6 +357,18 @@ function checkPresence(seed, expect) {
     const want = d === 1 || d === 2 || d === 7 ? "hollowmere" : d <= 4 ? "benchmark" : "molar";
     expect(here.length === 1 && here[0] === want, `Pell on day ${d}: at ${here.join(", ") || "none"}, not ${want}`);
   }
+  // One Pell (one uid in all three places), and he walks on at midnight while you stay.
+  const pells = Object.values(zones).flatMap((z) => z.landmarkPeople.filter((s) => s.who === "pell").map((s) => s.uid));
+  expect(pells.length === 3 && pells.every((u) => u === "landmark:pell"), `Pell's uids: ${pells}`);
+  game.time = startOf(2);
+  for (const z of Object.values(zones)) syncPeople(game, z);
+  game.zone = zones.hollowmere;
+  game.time = startOf(3);
+  emit(game, "clock:midnight", { hour: 0, day: 3 });
+  expect(!has("hollowmere", "pell"), "Pell still at Hollowmere after midnight on day 2 (you stayed)");
+  game.time = startOf(7);
+  for (const z of Object.values(zones)) syncPeople(game, z);
+  game.zone = null;
   expect(!has("molar", "castor"), "Castor at Molar before beat 2");
   game.state.campaign = { done: { beat1: 100 } };
   syncPeople(game, zones.molar);

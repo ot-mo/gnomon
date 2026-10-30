@@ -14,7 +14,8 @@
 //                   each at Hollowmere, Benchmark and Molar); { after: beatId } there once that beat is done (Castor's
 //                   checkpoint, from beat 2)
 //   present(game, who, landmarkId) → bool
-//   syncPeople(game, zone)   on zone:enter: each of zone.landmarkPeople added or taken away as present() says
+//   syncPeople(game, zone)   on zone:enter, and at midnight where you are: each of zone.landmarkPeople added or taken
+//                            away as present() says (one of them keeps one uid wherever he stands, "landmark:<who>")
 //   personKilled(game, uid)  on "kill": a landmark person's uid recorded dead (game.state.landmarkPeople.dead)
 //   PERSON_FIELDS            what a save keeps of a placed person beyond a creature's own (registerCreatureField)
 //
@@ -90,7 +91,9 @@ function spec(zone, landmark, p) {
   if (!kind) return null;
   const s = zone.stand?.[p.x + p.y * zone.w];
   const own = kind === p.who;
-  return { uid: p.uid, who: p.who, kind, landmark: landmark.id, x: p.x, y: p.y, z: s >= 0 ? s : null, level: zone.level,
+  // One who comes and goes is one person wherever he stands: one uid (Pell's three places), so a kill is a kill everywhere.
+  const uid = PRESENCE[p.who] ? `landmark:${p.who}` : p.uid;
+  return { uid, who: p.who, kind, landmark: landmark.id, x: p.x, y: p.y, z: s >= 0 ? s : null, level: zone.level,
            name: p.letter.name, title: own ? null : titleOf(p.who, p.letter.role) };
 }
 
@@ -137,4 +140,5 @@ export function personKilled(game, uid) {
   ((game.state.landmarkPeople ||= {}).dead ||= {})[uid] = true;
 }
 on("zone:enter", (game, { zone }) => syncPeople(game, zone));
+on("clock:midnight", (game) => syncPeople(game, game.zone));   // a new day where you stand: Pell packs up and walks on
 on("kill", (game, { uid }) => personKilled(game, uid));
