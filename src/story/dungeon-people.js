@@ -14,7 +14,8 @@
 //   the bottoms' `who` (their barks, story/barks.js): a `below` entry's creature found by its kind or name (the Grub
 //     Mother, a legend of the brine-grubs; the Gloam Warden; the Speaking Door, the parent's door)
 //   PRESSED   who lies flat until freed: Lio, Tovi Hallen, the prisoners (vis.flat, kept by a save)
-import { CREATURE_TYPES, addCreature } from "../creatures.js";
+import { addCreature } from "../creatures.js";
+import { distance } from "../rng.js";
 import { FLOOR_Z } from "../world.js";
 import { registerDungeonPeople } from "../world/sites.js";
 import { spawnLandmarkPerson, kindOf } from "./landmark-people.js";
@@ -41,7 +42,7 @@ function place(zone, L, entry, x, y, uid) {
 function farthestRoom(zone) {
   const from = zone.stairs || zone.spawn || { x: zone.w / 2, y: zone.d / 2 };
   const rooms = (zone.rooms || []).filter((r) => r.cx !== undefined);
-  rooms.sort((a, b) => Math.hypot(b.cx - from.x, b.cy - from.y) - Math.hypot(a.cx - from.x, a.cy - from.y));
+  rooms.sort((a, b) => distance(b.cx - from.x, b.cy - from.y) - distance(a.cx - from.x, a.cy - from.y));   // (rng.js distance: the same bits on every engine)
   for (const r of rooms)
     for (let d = 0; d < 4; d++)
       for (let y = r.cy - d; y <= r.cy + d; y++)
