@@ -1019,7 +1019,13 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json, captu
     game.mode = mode0;
     if (!asked) fail(`beat 5's choice didn't open on its own (mode ${game.mode}, ${t?.npc?.name})`);
   }
-  const page = T.talkTo(game, { id: -1, type: "campaign", name: B[4].title, vis: {}, talk: { dialogue: "campaign:choice", state: {}, met: true } });
+  // (the page carries its own options alone: Lost, it doesn't offer "Which way am I?" with nobody there; second review)
+  const STt = await env.src("status.js");
+  STt.addStatus(game, p, "lost", { t: 999 });
+  const page = T.talkTo(game, { id: -1, type: "campaign", name: B[4].title, vis: {}, talk: { dialogue: "campaign:choice", state: {}, met: true, own: true } });
+  STt.removeStatus(game, p, "lost");
+  if (page?.options?.some((o) => !B[4].choices.flatMap((c) => c.options.map((x) => x.text)).includes(o.label) && o.label !== "Not yet."))
+    fail(`beat 5's own page carries options not its own: ${json(page.options.map((o) => o.label))}`);
   if (!page || page.options.length < 3 || !page.options.some((o) => o.label === "Expose House Saffre.")) fail(`beat 5's own page: ${json(page?.options?.map((o) => o.label))}`);
   const next = page?.options.find((o) => o.label.startsWith("Take its silence money"))?.go();
   if (C.choices?.beat5?.saffre !== "silence" || rep("chandlers") < 200) fail(`beat 5's choice: ${json(C.choices?.beat5)}`);

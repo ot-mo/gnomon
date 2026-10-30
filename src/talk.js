@@ -12,7 +12,8 @@
 //                         done?(game, c, target, price) → log line })
 //                        something a merchant does for money (Pell's list; WS5 surgery, WS6b identification).
 //   servicesFor(game, c) → [{ id, target }]   c.merchant.services (or its type's), each filtered by available()
-//   talkTo(game, c) → node                     dispatches on c.talk.dialogue, then appends registered options
+//   talkTo(game, c) → node                     dispatches on c.talk.dialogue, then appends registered options (not to one
+//                                              whose talk.own is set: story/beats.js's page of a beat)
 //   node(text, options), bye(label)           the node contract: { text, options: [{ label, go }] }; go()
 //                                              returns the next node, null to end, or { shop: tab }
 import { typeOf } from "./creatures.js";
@@ -55,7 +56,7 @@ export function talkTo(game, c) {
   c.talk.met = true;
   const say = DIALOGUES.get(c.talk.dialogue);
   const root = say ? say(game, c, { first }) : node("...", [bye()]);
-  if (!root || !TALK_OPTIONS.size) return root;
+  if (!root || !TALK_OPTIONS.size || c.talk.own) return root;   // (talk.own: nothing but its own: a campaign beat's page)
   const extra = [...TALK_OPTIONS.values()].sort((a, b) => b.priority - a.priority || a.order - b.order)
     .flatMap(({ fn }) => fn(game, c) || []);
   if (extra.length) {

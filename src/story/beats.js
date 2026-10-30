@@ -211,6 +211,6 @@ registerUpdate("campaign:choice", (game) => {
   const C = game.state?.campaign, open = C && !C.later && ownChoices(game)[0];
   if (!open) return;
   C.later = true;   // (asked now; after it's left, again only on the next zone:enter)
-  openTalk(game, { id: -1, type: "campaign", name: open.beat.title, vis: {}, talk: { dialogue: "campaign:choice", state: {}, met: true } });
+  openTalk(game, { id: -1, type: "campaign", name: open.beat.title, vis: {}, talk: { dialogue: "campaign:choice", state: {}, met: true, own: true } });
 });
 on("zone:enter", (game) => { if (game.state?.campaign) game.state.campaign.later = false; });
