@@ -40,7 +40,7 @@ export const PEOPLE_WORDS = {
     topics: [["The Horary?", "We hold that the hours are meant to turn. The Vigil holds that noon should stay. We are very polite about it in Hollowmere."]] },
   brann: { role: "wanderer", greet: "you can see me\nthen your torch is out",
     who: "brann\ni went down the stair a long time ago\nsome of me came back",
-    topics: [["The Hush Stair?", "it crosses the teeth at night\nput your lamp out on the first step\nthe steps are there if you don't look for them"]] },
+    topics: [["The digging?", "i heard it three nights\nunder the undercroft\nstraight as a ruler\nbomb the east wall and see"]] },
   ottilie: { role: "merchant", greet: "If it's broken, put it there. If it's yours, say so first.",
     who: "Old Ottilie. I mend things, I fill cells, and I look at artifacts for ten glim a twist of the brain.",
     topics: [["Artifacts?", "Deepwright work, mostly. It does one thing very well and tells nobody what. The examining is what you pay for."]] },
