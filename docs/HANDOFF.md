@@ -3,9 +3,9 @@
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
 **Updated:** 2026-10-30, the integrator (local session), on `integration`. **Phases 1 and 2 are done; Phase 3 is under
-way.** C1a, C4, C2, C3 and C1b are merged (`p3i-c1a`, `p3i-c4`, `p3i-c2`, `p3i-c3`, `p3i-c1b`), and §8.5's last wiring merge is done
+way.** all six content sessions are merged (`p3i-c1a`, `p3i-c4`, `p3i-c2`, `p3i-c3`, `p3i-c1b`, `p3i-c5`), and §8.5's last wiring merge is done
 (`p3i-wiring`): **new games start on GNOMON's real world at Hollowmere** (`?world=test` for the test world). `main` =
-`p3i-c1b`. C5 is running (the user, 2026-10-30: "Start C5"). From here on only the integrator edits this file and
+`p3i-c5`. Nothing is running; the balance proposal waits on the user. From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
@@ -44,7 +44,7 @@ Hollowmere, holding the cube (it has none to find yet); without the flag nothing
 the real world the default: then `main.js`'s `?world=real` branch and its cube hook go (`config.js` `WORLD` can stay
 or go with it; browser-2b part 3 and check-overworld's 7 URLs follow).
 
-**Next step:** C5 (quests, the campaign, the landmark people's words), the last content session, is started in `gnomon-wtc5` on `ws/c5` from `p3i-c1b` (the user, 2026-10-30: "Start C5"); the integrator merges its tag when it comes; the balance proposal (the user's decisions, 2026-10-30, under "Open items") fits around them. Before: **C1b and C3 were started** (the user, 2026-10-29: "start C1b (in the c1 worktree, merging p3i-c2 first)
+**Next step:** the user's answer to the balance proposal (`docs/balance/proposal-2026-10-30.md`; nothing changes until they approve), then the integrator's backlog of the content sessions' code requests (the integration log's "Left" lists, C5 #3 first: placing the landmark people), then Phase 4. Before: **Next step:** C5 (quests, the campaign, the landmark people's words), the last content session, is started in `gnomon-wtc5` on `ws/c5` from `p3i-c1b` (the user, 2026-10-30: "Start C5"); the integrator merges its tag when it comes; the balance proposal (the user's decisions, 2026-10-30, under "Open items") fits around them. Before: **C1b and C3 were started** (the user, 2026-10-29: "start C1b (in the c1 worktree, merging p3i-c2 first)
 and C3 (a new c3 worktree from p3i-c2)"); the integrator merges their tags as they come, then C5 starts on the user's
 word. Meanwhile:
 - **C1b and C3** (the Phase 3 plan's table), started: their worktrees from `p3i-c2` (`c1` again for C1b, on `ws/c1`; a new `c3` on
@@ -391,6 +391,17 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p3i-c5`** (2026-10-30): `p3-c5` (a9749c8) merged into `integration`, cleanly: the campaign's intro, wake line,
+starter chain and 11 beats of *The Lengthening* as data, quest texts and pools, and the landmark people's words
+(`content/people-words.js`). Requests applied, each with an assertion and a mutant: #1 the line after the intro (the
+campaign's wake line off the test world), #2 the real world's Maren talks under "maren@real" (beat 1). Left, the
+integrator's next story work: #3 placing the landmark people (what makes their words reachable: view rules, kinds for
+those without one, and the parent's people, whom C1a left in the Keeper's Stair while Hollowmere's letters also name
+them), #4-#14 (the starter chain as quests, beats' rewards, quest items, Who Lit the Hush?, the finale, village pools by
+region, the other templates, barks, the dungeons' people, beats 9-10's matchers, Corner). Checks: `run-all` **38 of 38**
+(194.5 s; the real-world playthrough on seed 9); check-overworld alone 1.67 ms; `check-perf --against p3i-c1b` PASS;
+browser-2b, browser-gate, browser-0d1 PASS. **Phase 3's content sessions are all merged.**
 
 **`p3i-c1b`** (2026-10-30): `p3-c1b` (8f19dbb) merged into `integration`, cleanly: the other 15 landmarks on their plans
 (bible §5, §15.3), with their lines in three registers, people letters, dungeons' floors, gimmicks and bottoms as data,
