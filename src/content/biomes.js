@@ -84,7 +84,7 @@ export const BIOMES = {
     props: { count: [8, 16], kinds: flatsProps },
     lights: { count: [0, 1], post: "PLANK" },
     plateaus: 0.25,
-    spawns: [["saltrat", 6], ["brineGrub", 3], ["brinehog", 3], ["flatling", 1]], wildlife: [1, 3],
+    spawns: [["saltrat", 6], ["brineGrub", 3], ["brinehog", 3], ["flatling", 1], ["clatterer", 1], ["drownedKeeper", 1], ["lanternMoths", 1]], wildlife: [1, 3],
   },
   waste: {   // the Salt Waste: white dunes of a pressed sea, salt pans that are mosaics, Drover wells
     liquid: "brine", sub: "SALT",
@@ -92,7 +92,7 @@ export const BIOMES = {
     ponds: { count: [0, 1], radius: [1, 2] },
     props: { count: [3, 8], kinds: [["saltBloom", 4], ["bones", 2]] },
     plateaus: 0.3,
-    spawns: [["chaffDevil", 3], ["brinehog", 2], ["rustbackScav", 2]], wildlife: [1, 3],
+    spawns: [["chaffDevil", 3], ["brinehog", 2], ["rustbackScav", 2], ["longback", 1]], wildlife: [1, 3],
   },
   steps: {   // the Rust Steps: mesas stacked like stairs, ledges and sheer drops; Rustback heaps on the ledges
     liquid: "water", cliffTiers: 2, sub: "CLAY",
@@ -108,7 +108,7 @@ export const BIOMES = {
     ponds: { count: [0, 2], radius: [2, 3] },
     props: { count: [8, 16], kinds: [["tuft", 5], ["shrub", 3], ["bones", 1]] },
     plateaus: 0.25,
-    spawns: [["cairnHound", 3], ["barrowSkeleton", 2], ["duskBat", 2], ["brinehog", 2], ["barrowTroll", 1]], wildlife: [1, 3],
+    spawns: [["cairnHound", 3], ["barrowSkeleton", 2], ["duskBat", 2], ["brinehog", 2], ["barrowTroll", 1], ["assizeOutrider", 1]], wildlife: [1, 3],
   },
   pleatwood: {   // folding trees, fungal groves, a green dimness
     liquid: "water", sub: "DIRT",
@@ -124,7 +124,7 @@ export const BIOMES = {
     ponds: { count: [0, 1], radius: [2, 3] },
     props: { count: [12, 20], kinds: [["fern", 3], ["mushroom", 4], ["nest", 1], ["web", 1]] },
     plateaus: 0.3, clearings: [1, 2],
-    spawns: [["paperWasps", 3], ["mootWalker", 2], ["creasebeetle", 3], ["hangvine", 2]], wildlife: [2, 4],
+    spawns: [["paperWasps", 3], ["mootWalker", 2], ["creasebeetle", 3], ["hangvine", 2], ["plumbknight", 1], ["assizer", 1]], wildlife: [2, 4],
   },
   tessellate: {   // a dead-flat plain paved with the mosaics of pressed towns, readable only on the map
     liquid: "ink", sub: "STONE",
@@ -132,7 +132,7 @@ export const BIOMES = {
     ponds: { count: [0, 2], radius: [1, 2] },
     props: { count: [2, 6], kinds: [["inkStain", 3], ["bones", 1]] },
     plateaus: 0.25,
-    spawns: [["tileMimic", 3], ["pressHound", 3], ["mosaicGolem", 1], ["erratum", 1], ["flatling", 2]], wildlife: [1, 3],
+    spawns: [["tileMimic", 3], ["pressHound", 3], ["mosaicGolem", 1], ["erratum", 1], ["flatling", 2], ["lampHound", 1], ["flatfolkWanderer", 1], ["pressedPilgrim", 1]], wildlife: [1, 3],
   },
   stacks: {   // Deepwright cities: girders, shafts and automata
     liquid: "water", sub: "STONE",
@@ -141,7 +141,7 @@ export const BIOMES = {
     props: { count: [4, 10], kinds: [["scrap", 4], ["bones", 1]] },
     plateaus: 0.35, ramps: [1, 2], caches: 0.4,
     spawns: [["lensSentry", 2], ["beatSpider", 3], ["girderGolem", 1], ["rustbackBrute", 3], ["rustOoze", 2],
-             ["rustbackScav", 1]], wildlife: [2, 4],   // (the scavs: the Old Cuts, tier 2)
+             ["rustbackScav", 1], ["draughtsman", 1]], wildlife: [2, 4],   // (the scavs: the Old Cuts, tier 2)
   },
   shade: {   // Noon's burnt shadow: runes on every stone, umbra pools, ghosts
     liquid: "umbra", sub: "ASH",
@@ -149,7 +149,7 @@ export const BIOMES = {
     ponds: { count: [1, 2], radius: [2, 3] },
     props: { count: [4, 10], kinds: [["ashDrift", 4], ["bones", 2]] },
     plateaus: 0.3, ramps: [0, 1], caches: 0.3,
-    spawns: [["shade", 4], ["wraith", 2], ["longshadow", 2]], wildlife: [2, 4],
+    spawns: [["shade", 4], ["wraith", 2], ["longshadow", 2], ["lamplessChanter", 1]], wildlife: [2, 4],
   },
   lattice: {   // a crystal grid where the Pressing's creases still show
     liquid: "turnwater", sub: "CRYSTAL",
@@ -165,7 +165,7 @@ export const BIOMES = {
     ponds: { count: [0, 0], radius: [2, 2] },
     props: { count: [2, 6], kinds: [["bones", 2], ["nest", 1]] },
     plateaus: 0.3, ramps: [1, 3], caches: 0.4,
-    spawns: [["kite", 3], ["ledgehorn", 3], ["barrowTroll", 1]], wildlife: [1, 3],
+    spawns: [["kite", 3], ["ledgehorn", 3], ["barrowTroll", 1], ["lampHound", 1], ["chandlerGuard", 1]], wildlife: [1, 3],
   },
   sea: {   // the Glass Sea's shore: walkable crust, wrecks under the glass (the Hollow Mere's terrain, `mere`, has it too)
     liquid: "brine", sub: "GLASS",
@@ -190,7 +190,7 @@ export const BIOMES = {
     plateaus: 0.15,
     // The roads cross the land at every tier (levels 2-17): what walks them, from Rustbacks and hogs to press-hounds
     // and brutes.
-    spawns: [["rustbackScav", 2], ["brinehog", 2], ["cairnHound", 1], ["kite", 1], ["pressHound", 1], ["rustbackBrute", 1]], wildlife: [0, 2],
+    spawns: [["rustbackScav", 2], ["brinehog", 2], ["cairnHound", 1], ["kite", 1], ["pressHound", 1], ["rustbackBrute", 1], ["assizeOutrider", 1]], wildlife: [0, 2],
   },
 };
 
