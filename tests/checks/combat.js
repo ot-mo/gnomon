@@ -79,6 +79,7 @@ import { requestTarget, cursorTarget, lineOfFire, targetText } from "../../src/s
 import { mapView } from "../../src/renderMap.js";
 import { MISSILES } from "../../src/content/items/missiles.js";
 import { canEquip } from "../../src/body.js";
+import { CLASSES } from "../../src/content/items/forge.js";
 import { itemName, mendItem } from "../../src/items.js";
 import { EYE, FISTS, attackTime } from "../../src/player.js";
 import { compileWorld } from "../../src/world/worldmodel.js";
@@ -1902,7 +1903,7 @@ export function checkB1Combat(ctx) {
   const hit = (tgt, rng = fixed(0.6), view = "map") => resolveAttack(game, p, tgt, weaponSpec(p), { view, rng });
   const at = (type, x, y, level = 5, state = "chase") => dummy(field, type, x, y, level, state);
   const clear = () => { field.creatures.length = 0; };
-  const log = run.logged;
+  const log = run.logged, identity = {};
   try {
     // --- Materials ---------------------------------------------------------------------------------------------
     clear();
@@ -1962,7 +1963,7 @@ export function checkB1Combat(ctx) {
     const swordStab = dmgOf(sleeper);
     perk(); p.torch = true;
     const swordLit = dmgOf(sleeper);
-    expect(dark === 2 * lit && darkHunter === lit && swordDark === swordLit && swordStab === 2 * swordLit,
+    identity.shortBlade = expect(dark === 2 * lit && darkHunter === lit && swordDark === swordLit && swordStab === 2 * swordLit,
       `from the dark: a dagger ${lit} lit, ${dark} dark on the unaware, ${darkHunter} on a hunter; a longsword ${swordLit} lit, ${swordDark} dark, ${swordStab} with Dark backstab`);
     stats.backstab = `dagger ${lit} → ${dark} from the dark; longsword ${swordLit} → ${swordStab} with Dark backstab`;
     // The great blade's knockback.
@@ -1970,7 +1971,7 @@ export function checkB1Combat(ctx) {
     const shoved = at("goblin", 6, 5); shoved.status = {};
     wield("greatsword");
     hit(shoved);
-    expect(Math.floor(shoved.x) === 7 && Math.floor(shoved.y) === 5, `a greatsword's blow left the goblin at ${shoved.x}, ${shoved.y} (want a tile back, 7.5, 5.5)`);
+    identity.greatBlade = expect(Math.floor(shoved.x) === 7 && Math.floor(shoved.y) === 5, `a greatsword's blow left the goblin at ${shoved.x}, ${shoved.y} (want a tile back, 7.5, 5.5)`);
     field.set(8, 5, FLOOR_Z, B.STONE); field.set(8, 5, FLOOR_Z + 1, B.STONE); field.refresh();
     Object.assign(p, { x: 6.5 });
     hit(shoved);
@@ -1992,7 +1993,7 @@ export function checkB1Combat(ctx) {
     p.torch = false;
     const fOut = dmgOf(gob);
     p.torch = true;
-    expect(fs === 2 * fg && fOut === 1, `the lantern-flail: ${fs} on a shade, ${fg} on a goblin, ${fOut} with the torch out (want ×2, and 1)`);
+    identity.flail = expect(fs === 2 * fg && fOut === 1, `the lantern-flail: ${fs} on a shade, ${fg} on a goblin, ${fOut} with the torch out (want ×2, and 1)`);
     stats.flail = `${fg} on a goblin, ${fs} on a shade, ${fOut} with the torch out`;
 
     // --- Powers ----------------------------------------------------------------------------------------------
@@ -2006,7 +2007,7 @@ export function checkB1Combat(ctx) {
     expect(!hasStatus(t1, "bleeding"), "Bleed: a dagger's blow without a crit bled");
     hit(t1, fixed(0.99));
     const hp0 = t1.hp;
-    expect(hasStatus(t1, "bleeding") && Math.abs(t1.status.bleeding.t - 3) < 1e-9, `Bleed: a dagger's crit, bleeding ${JSON.stringify(t1.status.bleeding)}`);
+    identity.shortBleed = expect(hasStatus(t1, "bleeding") && Math.abs(t1.status.bleeding.t - 3) < 1e-9, `Bleed: a dagger's crit, bleeding ${JSON.stringify(t1.status.bleeding)}`);
     tickStatuses(game, t1, 3.01);
     expect(hp0 - t1.hp === 3 && !hasStatus(t1, "bleeding"), `bleeding 3 s took ${hp0 - t1.hp} (want 3), still ${hasStatus(t1, "bleeding")}`);
     wield("longsword");
@@ -2017,7 +2018,7 @@ export function checkB1Combat(ctx) {
     wield("mace"); perk("daze");
     t1.status = { pinned: t1.status.pinned };
     const dz = share(() => { delete t1.status.stunned; }, () => hasStatus(t1, "stunned"));
-    expect(Math.abs(dz - 0.25) < 0.03, `Daze: ${(dz * 100).toFixed(1)}% of a mace's blows dazed (want 25%)`);
+    identity.cudgel = expect(Math.abs(dz - 0.25) < 0.03, `Daze: ${(dz * 100).toFixed(1)}% of a mace's blows dazed (want 25%)`);
     hit(t1); const dazeT = t1.status.stunned?.t;
     perk();
     const dz0 = share(() => { delete t1.status.stunned; }, () => hasStatus(t1, "stunned"), 400);
@@ -2028,7 +2029,7 @@ export function checkB1Combat(ctx) {
     // Disarm: a fifth of an axe's blows on an armed kind; its blows halved.
     wield("waraxe"); perk("disarm");
     const dr = share(() => { delete t1.status.disarmed; }, () => hasStatus(t1, "disarmed"));
-    expect(Math.abs(dr - 0.2) < 0.03, `Disarm: ${(dr * 100).toFixed(1)}% of an axe's blows disarmed a goblin (want 20%)`);
+    identity.axeDisarm = expect(Math.abs(dr - 0.2) < 0.03, `Disarm: ${(dr * 100).toFixed(1)}% of an axe's blows disarmed a goblin (want 20%)`);
     const rat = at("rat", 4, 5);
     let ratDis = 0;
     for (let k = 0, rng = makeRng(8); k < 400; k++) { delete rat.status.disarmed; hit(rat, rng); if (hasStatus(rat, "disarmed")) ratDis++; }
@@ -2046,7 +2047,7 @@ export function checkB1Combat(ctx) {
     const c1 = at("goblin", 6, 5), c2 = at("goblin", 5, 6), far = at("goblin", 8, 8);
     wield("waraxe"); perk("cleave");
     const h2 = c2.hp, hf = far.hp, r1 = hit(c1);
-    expect(h2 - c2.hp === Math.floor(r1.dmg / 2) && hf === far.hp, `Cleave: a ${r1.dmg} blow gave the goblin beside you ${h2 - c2.hp} (want ${Math.floor(r1.dmg / 2)}), the far one ${hf - far.hp}`);
+    identity.axe = expect(h2 - c2.hp === Math.floor(r1.dmg / 2) && hf === far.hp, `Cleave: a ${r1.dmg} blow gave the goblin beside you ${h2 - c2.hp} (want ${Math.floor(r1.dmg / 2)}), the far one ${hf - far.hp}`);
     perk(); const h3 = c2.hp; hit(c1);
     wield("longsword"); perk("cleave"); hit(c1);
     expect(c2.hp === h3, "Cleave without the power, or with a longsword, still cut the second goblin");
@@ -2061,7 +2062,7 @@ export function checkB1Combat(ctx) {
     wield("longsword"); perk("highGround"); const upSword = dmgOf(low);
     field.set(5, 5, FLOOR_Z, B.AIR); field.refresh(); Object.assign(p, { z: FLOOR_Z });
     perk(); const flatSword = dmgOf(low);
-    expect(up === Math.ceil(flat * 1.5) && upNo === flat && upSword === flatSword, `High ground: a spear ${flat} → ${up} from a block up (${upNo} without the power); a longsword ${flatSword} → ${upSword}`);
+    identity.polearm = expect(up === Math.ceil(flat * 1.5) && upNo === flat && upSword === flatSword, `High ground: a spear ${flat} → ${up} from a block up (${upNo} without the power); a longsword ${flatSword} → ${upSword}`);
     stats.highGround = `a spear ${flat} → ${up}`;
     // Riposte.
     clear();
@@ -2076,7 +2077,7 @@ export function checkB1Combat(ctx) {
     const noPower = duel.cd;   // (a landed blow staggers it to 0.4 s at least: hurtCreature, the parent's)
     wield("dagger"); perk("riposte"); duel.cd = 0.1; hit(duel);
     const dagger = duel.cd;
-    expect(Math.abs(parried - cool) < 1e-9 && late === 0.5 && noPower < cool && dagger < cool && log.some((l) => /turn the goblin's blow aside/.test(l)),
+    identity.longBlade = expect(Math.abs(parried - cool) < 1e-9 && late === 0.5 && noPower < cool && dagger < cool && log.some((l) => /turn the goblin's blow aside/.test(l)),
       `Riposte: a longsword at 0.1 s left its cooldown ${parried} (want ${cool}); at 0.5 s ${late}; without the power ${noPower}; a dagger ${dagger}`);
     perk();
 
@@ -2097,6 +2098,10 @@ export function checkB1Combat(ctx) {
       `turned aside: nothing ${none}; a buckler ${(buck * 100).toFixed(1)}% of blows (want 20); a glass-scale ${(gsMelee * 100).toFixed(1)}% of blows, ${(gs * 100).toFixed(1)}% of arrows (want 0 and 15); with a mirror shield ${(both * 100).toFixed(1)}% (want 57.5)`);
     stats.turned = `buckler ${(buck * 100).toFixed(1)}% of blows, glass-scale ${(gs * 100).toFixed(1)}% of arrows, with the mirror shield ${(both * 100).toFixed(1)}%`;
     p.status = {}; p.body.equip.body = null; invalidateStats(p);
+    // Every class whose identity is built (no needs: check-content's rule since B1) has it asserted above.
+    const IDENTITY = { shortBlade: identity.shortBlade && identity.shortBleed, longBlade: identity.longBlade, cudgel: identity.cudgel,
+      axe: identity.axe && identity.axeDisarm, polearm: identity.polearm, greatBlade: identity.greatBlade, flail: identity.flail };
+    for (const [id, c] of Object.entries(CLASSES)) if (!c.needs && !IDENTITY[id]) expect(false, `class ${id}: built (no needs) but its identity isn't asserted here, or failed`);
 
     // --- Throwing (WS5 #8) --------------------------------------------------------------------------------------
     clear();

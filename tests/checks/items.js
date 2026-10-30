@@ -1891,6 +1891,89 @@ export function checkB1Gear(m) {
     stats.recharge = `a sun cell filled with Recharge for ${sun1.paid} glim, refused without; a brazier 3.5 tiles off lit by E with Kindle at range`;
   });
 
+  // 8. The specials (the coordinator's condition on check-content's info rule, 2026-10-30): every C4 armour piece with no
+  //    armour, no bonus and no needs maps to a special in SPECIALS, a field the code handles; each special's test wears
+  //    the piece and asserts what the game does differently. A piece with none of them fails. Every special a piece
+  //    has is tested (the glass-scale's reflect and the hooks' climb too).
+  section("specials", () => {
+    const A = I.ARMOURS, F = m.forge, G = m.gear, St = m.stats;
+    const partOf = (p, it) => m.body.defaultPart(p, it);
+    const SPECIALS = {
+      // takes a fifth of the blows that land on you (combat.js turnedAside)
+      block: (id) => {
+        startRun(13, m.testWorld.TEST_WORLD);
+        const p = game.player, foe = m.creatures.spawnCreature("goblin", 1, 1, 2, { level: 3, rng: () => 0.5 }), St = m.stats;
+        const turned = () => { let t = 0; for (let k = 0, rng = m.rng.makeRng(41); k < 1500; k++) { const r = m.combat.resolveAttack(game, foe, p, m.combat.naturalSpec(foe), { rng }); if (r.turned) t++; p.hp = m.stats.maxHp(p); } return t; };
+        const off = turned(); const it = G.makeGear("armour", id); m.body.equip(game, p, it, partOf(p, it)); const on = turned();
+        return off === 0 && on > 150 ? null : `turned ${off} without it, ${on} with it of 1,500 blows`;
+      },
+      // turns a share of arrows (combat.js turnedAside)
+      reflect: (id) => {
+        startRun(13, m.testWorld.TEST_WORLD);
+        const p = game.player, foe = m.creatures.spawnCreature("goblin", 1, 1, 2, { level: 3, rng: () => 0.5 });
+        const turned = () => { let t = 0; for (let k = 0, rng = m.rng.makeRng(43); k < 1500; k++) { const r = m.combat.resolveAttack(game, foe, p, m.combat.naturalSpec(foe), { rng, ranged: true }); if (r.turned) t++; p.hp = m.stats.maxHp(p); } return t; };
+        const off = turned(); const it = G.makeGear("armour", id); m.body.equip(game, p, it, partOf(p, it)); const on = turned();
+        return off === 0 && on > 100 ? null : `turned ${off} arrows without it, ${on} with it of 1,500`;
+      },
+      // reputation while worn (social/reputation.js syncWornRep, on body.js's "gear")
+      wornRep: (id) => {
+        startRun(13, m.testWorld.TEST_WORLD);
+        const p = game.player, it = G.makeGear("armour", id), def = A[id], R = m.factions;
+        let want = def.wornRep;
+        if (want === "hour") {
+          const H = game.run.history?.rulers?.find((h) => h.favoured?.length && h.hated?.length);
+          if (!H) return "no Hour in the run's history to wear a mask of";
+          it.hour = H.id;
+          want = Object.fromEntries([...H.favoured.map((f) => [f, def.hourRep]), ...H.hated.filter((f) => !H.favoured.includes(f)).map((f) => [f, -def.hourRep])]);
+        }
+        const ids = Object.keys(want).filter((f) => R.FACTIONS[f]);
+        for (const f of ids) R.addRep(game, f, -R.repOf(game, f));   // (all at 0: room both ways)
+        m.body.equip(game, p, it, partOf(p, it));
+        const on = ids.filter((f) => R.repOf(game, f) !== want[f]);
+        m.body.unequip(game, p, partOf(p, it));
+        const off = ids.filter((f) => R.repOf(game, f) !== 0);
+        return ids.length && !on.length && !off.length ? null : `rep on ${on.join(", ") || "as wanted"}, off ${off.join(", ") || "back"} (${JSON.stringify(want)})`;
+      },
+      // climbs 2 blocks on the map (turns.js mapStep): checked with the hooks in section 3 (survey)
+      climb: (id) => (id === "climbingHooks" && stats.gripSoles ? null : `no map climb tested for ${id}`),
+      // Lightsick's sun doesn't reach you (progression/mutations.js veiled): at noon on the temple's open ground
+      veil: (id) => {
+        const sick = (worn) => {
+          startRun(13, m.testWorld.TEST_WORLD);
+          const p = game.player;
+          game.view = "map"; game.mode = "map"; game.pages = null; game.story.cube = true;
+          p.mutations = { lightsick: 1 }; p.status = {}; St.invalidateStats(p);
+          let sunny = false;   // (somewhere under the open sky: the start is under the temple's roof)
+          for (let y = 1; y < game.zone.d - 1 && !sunny; y++) for (let x = 1; x < game.zone.w - 1 && !sunny; x++) {
+            const z = game.zone.stand[x + y * game.zone.w];
+            if (z >= 0 && m.light.naturalLight(game, game.zone, x + 0.5, y + 0.5, z + 1.45) >= 0.9) { Object.assign(p, { x: x + 0.5, y: y + 0.5, z }); sunny = true; }
+          }
+          if (!sunny) return -1;
+          if (worn) { const it = G.makeGear("armour", id); m.body.equip(game, p, it, partOf(p, it)); }
+          m.game.step(1 / 60);   // (the watch puts the sun on, or not)
+          const h = p.hp, noRegen = m.rules.overrideRules("regen", { ...m.rules.RULES.regen, base: 1e9 });
+          try { m.time.skipTime(game, 60, { interruptible: false }); } finally { noRegen(); }
+          return h - p.hp;
+        };
+        const bare = sick(false), under = sick(true);
+        return bare > 0 && under === 0 ? null : `Lightsick at noon: lost ${bare} HP in 60 s bare, ${under} under it`;
+      },
+    };
+    const infoOnly = Object.keys(F.GEAR_ARMOURS).filter((id) => !(A[id].armour > 0) && !Object.keys(A[id].bonus || {}).length && !A[id].needs);
+    const tested = {};
+    for (const id of Object.keys(F.GEAR_ARMOURS)) {
+      const has = Object.keys(SPECIALS).filter((k) => A[id][k] !== undefined && A[id][k] !== false);
+      if (infoOnly.includes(id) && !has.length) { fail(`armour ${id}: says what it does by its info alone, and no special the code handles (${Object.keys(SPECIALS).join(", ")})`); continue; }
+      for (const k of has) {
+        if (k === "veil" && A[id].needs && /veil|Lightsick/.test(A[id].needs)) continue;
+        const why = SPECIALS[k](id);
+        if (why) fail(`armour ${id}'s ${k}: ${why}`);
+        else (tested[k] ||= []).push(id);
+      }
+    }
+    stats.specials = `${infoOnly.length} pieces by their info alone (${infoOnly.join(", ")}); tested: ${Object.entries(tested).map(([k, v]) => `${k} ${v.join("/")}`).join("; ")}`;
+  });
+
   return { name: "items: B1's gear", ok: problems.length === 0, problems, stats };
 }
 
@@ -1919,7 +2002,7 @@ export async function run(env) {
   // B1's (checkB1Gear).
   await Promise.all([load("worldmap", "content/world/worldmap.js"), load("testWorld", "content/world/test-world.js"), load("zones", "zones.js"),
     load("common", "gen/biomes/common.js"), load("monsters", "monsters.js"), load("light", "light.js"),
-    load("render3d", "render3d.js"), load("turns", "turns.js"), load("discovery", "overworld/discovery.js")]);
+    load("render3d", "render3d.js"), load("turns", "turns.js"), load("discovery", "overworld/discovery.js"), load("factions", "factions.js")]);
   if (env.args?.only === "b1") return [checkB1Gear(m)];   // (node tools/check-items.mjs --only b1)
   return [checkItems(m), checkGear(m), checkB1Gear(m)];
 }
