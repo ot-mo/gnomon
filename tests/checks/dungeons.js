@@ -626,6 +626,16 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
       }
     }
   }
+  // The Keeper's Stair (C1b #15, WS10 #9; decided here): the real world lists its floors at levels 2-21 (bible §5 A, its place
+  // on the world's ladder), and they stay the parent's 20-level stack level for level (legacyParams' level z: golden (b)'s
+  // monsters and loot are picked by it). Both hold, so changing one without the other is seen.
+  {
+    const run = buildRun(seeds[0], W), ks = [...run.sites.values()].find((s) => s.landmarkId === "hollowmere");
+    const listed = REAL_WORLD.landmarks.find((l) => l.id === "hollowmere").dungeon.floors;
+    stats.keepersStair = `listed ${listed[0]}-${listed.at(-1)}, built as the legacy stack at ${legacyParams(1, 1).level}-${legacyParams(20, 1).level}`;
+    expect(ks?.dungeon?.legacy && ks.dungeon.levels === 20 && JSON.stringify(listed) === JSON.stringify(Array.from({ length: 20 }, (_, k) => k + 2))
+      && Array.from({ length: 20 }, (_, k) => legacyParams(k + 1, 1).level).every((l, k) => l === k + 1), `the Keeper's Stair: ${stats.keepersStair}`);
+  }
   // The founding relic is one no Hour site holds, the mask first (a made-up history where the mask is a site's).
   const fake = { history: { rulers: [{ id: "h1" }, { id: "h2" }], siteRequests: [{ relicId: "mask" }],
     relics: [{ id: "lost", rulerId: "h2", lostAt: {} }, { id: "free", rulerId: "h2" }, { id: "mask", rulerId: "h2", mask: true }, { id: "other", rulerId: "h1", mask: true }] } };
