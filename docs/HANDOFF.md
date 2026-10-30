@@ -3,9 +3,9 @@
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
 **Updated:** 2026-10-29, the integrator (local session), on `integration`. **Phases 1 and 2 are done; Phase 3 is under
-way.** C1a, C4 and C2 are merged (`p3i-c1a`, `p3i-c4`, `p3i-c2`), and §8.5's last wiring merge is done
+way.** C1a, C4, C2 and C3 are merged (`p3i-c1a`, `p3i-c4`, `p3i-c2`, `p3i-c3`), and §8.5's last wiring merge is done
 (`p3i-wiring`): **new games start on GNOMON's real world at Hollowmere** (`?world=test` for the test world). `main` =
-`p3i-c2` (7c2ff54). Nothing is running. From here on only the integrator edits this file and
+`p3i-c3`. C1b is running (asked to finish and tag); C5 after it. From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
@@ -44,7 +44,7 @@ Hollowmere, holding the cube (it has none to find yet); without the flag nothing
 the real world the default: then `main.js`'s `?world=real` branch and its cube hook go (`config.js` `WORLD` can stay
 or go with it; browser-2b part 3 and check-overworld's 7 URLs follow).
 
-**Next step:** **C1b and C3 are started** (the user, 2026-10-29: "start C1b (in the c1 worktree, merging p3i-c2 first)
+**Next step:** merge C1b's tag when it comes (with C3's requests 12 and 15, C1's spawns and rows), then C5 on the user's word; the balance proposal (the user's decisions, 2026-10-30, under "Open items") fits around them. Before: **C1b and C3 were started** (the user, 2026-10-29: "start C1b (in the c1 worktree, merging p3i-c2 first)
 and C3 (a new c3 worktree from p3i-c2)"); the integrator merges their tags as they come, then C5 starts on the user's
 word. Meanwhile:
 - **C1b and C3** (the Phase 3 plan's table), started: their worktrees from `p3i-c2` (`c1` again for C1b, on `ws/c1`; a new `c3` on
@@ -391,6 +391,18 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p3i-c3`** (2026-10-30, the user's go via the coordinating session): `p3-c3` (efbfe83) merged into `integration`, cleanly:
+bible §12's 63 creatures (56 registered, 7 waiting on systems) with d20 numbers and three registers, encounter tables
+and legends by region, the real world's TTK rows. Requests applied, each with an assertion and a mutant: #13
+`GEN_VERSION` 6; #3 bands by region (`overworld/encounters.js bandOf` reads the rows: real-world bands were goblins and
+rats); #4 legends by region (`world/sites.js makeLegend`); #1 levels above 20 (`contentMax` 23; `pickCreatureType` above
+20 from C3's level pool; P0's two literal 20s in check-stats and check-currency read the rule); #2 the three registers
+on the examine screen; #8 the hooks' lines by `TheOf`; #14 the README. Two follow-ups the gates found: check-content's
+coverage reads the legacy stack's tables at 20 at most (the Keeper's Stair's floor 20 is listed at 21), and browser-c3's
+map looks expect the Flat line. Left: #12 and #15 (C1's spawns and rows) at C1b's merge; #5 for C1b and C5; #6, #7, #9-#11
+new systems, the backlog. Checks: `run-all` 37 of 38 (the world-map draw under load; alone 1.61 ms); `check-perf
+--against p3i-c2 --rounds 3` alone PASS, ×0.83-1.14; browser-c3, browser-2b, browser-gate, browser-0d1 PASS.
 
 **`p3i-c2`** (2026-10-29): `p3-c2` (bd7b772) merged into `integration` (merge commit after `p3i-c4`), cleanly: the 21
 factions' relations and lines, the faiths, village cultures and architecture by region, the grammar's lists and
