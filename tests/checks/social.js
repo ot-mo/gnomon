@@ -2028,6 +2028,9 @@ export async function run(env) {
     game.zone.wx = 21;
     const nb = talk.talkTo(game, chand).options.find((o) => /bank here/.test(o.label));
     if (!nb || nb.go().text !== CUR.lines.noBank) fail("a Chandler away from the Houses doesn't say noBank");
+    game.state.rep.chandlers = -700;   // (at Dark: one goodbye, no bank: review 7)
+    if (talk.talkTo(game, chand).options.some((o) => /bank/i.test(o.label))) fail("a Chandler at Dark offers the bank");
+    game.state.rep.chandlers = 0;
     game.zone.wx = 0; game.zone.wy = 0; game.run = null;
     // A sale the flask can't hold: refused with the money's words.
     const trader = named("mira", "merchant", "drovers", { near: [0, 1], name: "Sebbu" });
