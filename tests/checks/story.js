@@ -915,6 +915,15 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json, captu
     fail("beats 1 and 10: the Assize plumb-seal or the Plumb Key isn't in your pack");
   if (!has((it) => it.kind === "artifact" && it.id === "plumbBob" && it.known)) fail("beat 2: no known plumb-bob");
   if ((p.maxHpGain || 0) - gain0 !== 5) fail(`beat 1: max HP +${(p.maxHpGain || 0) - gain0}, not +5`);
+  {
+    const EVt = await env.src("events.js"), lines = () => game.messages.slice(-6).map((m) => m.text);
+    delete C.paid.beat2; BT.payBeat(game, B[1]);
+    const two = lines();
+    delete C.paid.beat11; BT.payBeat(game, B[10]);
+    if (!two.includes(B[1].reward.text) || lines().at(-1) === B[10].reward.text) fail(`a beat's reward text isn't logged as it's paid (beat 2's), or the last beat's is: ${json(two)}`);
+    EVt.emit(game, "quest:start", { q: { id: "beat5", template: "beat" } });
+    if (lines().at(-1) !== B[4].offer) fail(`beat 5, which has no giver, didn't tell its offer as it began: "${lines().at(-1)}"`);
+  }
   if (rep("survey") < 100) fail(`beat 9: Survey +${rep("survey")}`);
   if (!C.faces?.includes("noon")) fail("beat 7: no Noon's Face");
   const flat = "hist:noon:6:flat", known = !!SEC.secretDef(game.run, flat), read = !!J.journalOf(game).secrets[flat];

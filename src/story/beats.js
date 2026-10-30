@@ -6,7 +6,8 @@
 //                    tonic (a balm); null for one not made yet (ARTIFACTS_WAITING: the homing pip, the unpress lens, the
 //                    Great Theodolite, the Noonglass), which is owed: campaign.owed, paid on a zone:enter once it can be
 //   giveCampaignItems(game, items)   [[id, n]] into your pack (each one that can be made), the rest owed
-//   payBeat(game, beat)   on "beat": its reward's items, maxHp (Maren's blessing: + max HP, healed by it), rep
+//   payBeat(game, beat)   on "beat": its reward's text logged (but the face's, said its own way, and the last beat's),
+//                    its items, maxHp (Maren's blessing: + max HP, healed by it), rep
 //                    (factions.addRep "quest"; a range, beat 9's "by the survivors", pays its low end until the siege counts
 //                    them: C5 #13), glim, reading (learnSecret) and face (campaign.faces; Noon's Face: screens/play.js)
 //   payGlim(game, n)   into your purse, the rest on the ground at your feet as cash
@@ -42,6 +43,7 @@ import { typeOf } from "../creatures.js";
 import { pay } from "../currency.js";
 import { standingOf } from "../social/builders.js";
 import * as factions from "../factions.js";
+import { raiseMaxHp } from "../stats.js";
 
 const CAMPAIGN = QUESTS.campaign;
 const beatOf = (id) => CAMPAIGN.beats.find((b) => b.id === id) || null;
@@ -97,9 +99,10 @@ export function payBeat(game, beat) {
   const r = beat?.reward, C = campaignOf(game), p = game.player;
   if (!r || C.paid?.[beat.id] !== undefined) return;   // (paid at time 0 is paid)
   (C.paid ||= {})[beat.id] = game.time || 0;
+  if (r.text && !r.face && beat.n < CAMPAIGN.beats.length) game.log?.(r.text, [255, 230, 160]);   // (the last beat's is the finale's: #8)
   giveCampaignItems(game, r.items);
   if (r.maxHp && p) {
-    p.maxHpGain = (p.maxHpGain || 0) + r.maxHp;
+    raiseMaxHp(p, r.maxHp);
     p.hp += r.maxHp;
     game.log?.(`Your health rises by ${r.maxHp}, for good.`, [140, 230, 140]);
   }
@@ -112,6 +115,11 @@ export function payBeat(game, beat) {
   }
 }
 on("beat", (game, { id }) => payBeat(game, beatOf(id)));
+// A beat with no giver (5, 7, 11) has no one to tell its offer: the log does, as it begins.
+on("quest:start", (game, { q }) => {
+  const beat = q?.template === "beat" && beatOf(q.id);
+  if (beat && !beat.giver && beat.offer) game.log?.(beat.offer, [220, 210, 170]);
+});
 
 export function choicesOpen(game) {
   const C = campaignOf(game), out = [];
