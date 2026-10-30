@@ -31,7 +31,7 @@ import { claimUid, uidWhere, zoneState } from "./zones.js";
 import { killMonster } from "./monsters.js";
 import { legendLooks } from "./content/creatures/legends.js";
 import { registerAIHook } from "./ai.js";
-import { spawnCreature, addCreature, removeCreature, TheOf } from "./creatures.js";
+import { spawnCreature, addCreature, removeCreature, TheOf, CREATURE_TYPES } from "./creatures.js";
 import { B, FLOOR_Z } from "./world.js";
 import { lightAt } from "./light.js";
 import { sfx } from "./sfx.js";
@@ -46,6 +46,17 @@ for (const id of ["flatqueen", "warden", "colossus"])
     capStatus(m, "stunned", 1);
     return guardianThink(game, m, dt, occ);
   });
+
+// A landmark's own guardian in a guardian's hall (the Gloam Warden in the Unlit Choir's floor 4: gen/vaults.js pickVault's
+// vaultGuardian; B2, C1b #6) is no guardian kind: when it dies its gate opens all the same (story-hooks.js opens it for a
+// guardian kind, and gives one of the parent's relics, which stay the Keeper's Stair's).
+on("kill", (game, { c }) => {
+  const zone = game.zone, hall = zone?.guardianHall;
+  if (!hall || CREATURE_TYPES[c.type]?.guardian || c.type !== hall.type) return;
+  for (const [x, y, z] of hall.gate) zone.set(x, y, z, B.AIR);
+  zone.refresh();
+  game.log(`${TheOf(c)} falls! Behind it, the gate to the stairs grinds open.`, [255, 230, 140]);
+});
 
 export function guardianThink(game, m, dt, occ) {
   if (m.state !== "chase") return false;   // asleep until it notices you (or you hit it)

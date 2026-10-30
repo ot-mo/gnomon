@@ -1116,9 +1116,16 @@ export function validateDungeonLevel(f, p = {}) {
   const at = (dist, x, y) => dist[Math.floor(x) + Math.floor(y) * w] >= 0;
 
   if (final) {
-    if (bottom?.kind === "boss") {
+    if (bottom?.kind === "boss" && f.bossSpot) {   // a landmark's boss (gen/vaults.js landmarkBoss): its spot, and it there once its kind is in
+      const boss = f.creatures.find((m) => m.type === f.bossSpot.id);
+      if (!at(all, f.bossSpot.x, f.bossSpot.y) || (CREATURE_TYPES[f.bossSpot.id] && (!boss || !at(all, boss.x, boss.y)))) problems.push("boss missing or unreachable");
+    } else if (bottom?.kind === "boss") {
       const boss = f.creatures.find((m) => CREATURE_TYPES[m.type].boss);
       if (!boss || !at(all, boss.x, boss.y)) problems.push("boss missing or unreachable");
+    }
+    if (bottom?.kind === "reading") {   // the Datum stone: its plinth's top, where you stand to read it, can be reached
+      const s = f.datumStone;
+      if (!s || f.stand[s.x + s.y * w] !== s.z || !at(all, s.x, s.y)) problems.push("the reading's plinth missing or unreachable");
     }
     if (bottom?.kind === "legend") {   // a lair: its owner stands where you can reach it
       const owner = f.creatures.find((m) => m.uid === bottom.uid && m.flags?.legend);
@@ -1129,15 +1136,15 @@ export function validateDungeonLevel(f, p = {}) {
       if (!altar || !at(all, altar.x, altar.y)) problems.push("the reliquary's altar missing or unreachable");
     }
     if (f.guardianHall) {   // a guardian at the bottom (a site's last level): it must be reachable
-      const g = f.creatures.find((m) => m.guardian);
+      const g = f.creatures.find((m) => m.guardian || m.type === f.guardianHall.type);
       if (!g || !at(all, g.x, g.y)) problems.push("guardian missing or unreachable");
     }
     if (f.stairs) problems.push("stairs down on the last floor");
     const hole = (x, y) => !f.get(x, y, 0) || f.get(x, y, 0) === B.WATER_DEEP || f.get(x, y, FLOOR_Z - 1) === B.WATER_DEEP;
     outer: for (let y = 0; y < d; y++) for (let x = 0; x < w; x++) if (hole(x, y)) { problems.push("a hole on the last floor"); break outer; }
   } else if (!f.stairs) problems.push("no stairs");
-  else if (f.guardianHall) {   // the stairs wait behind the guardian's gate: the gate must be reachable
-    const g = f.creatures.find((m) => m.guardian);
+  else if (f.guardianHall) {   // the stairs wait behind the guardian's gate: the gate must be reachable (a landmark's own
+    const g = f.creatures.find((m) => m.guardian || m.type === f.guardianHall.type);   // guardian in the hall: the Gloam Warden)
     if (!g || !at(all, g.x, g.y)) problems.push("guardian missing or unreachable");
     if (!at(all, ...f.guardianHall.front)) problems.push("guardian's gate unreachable");
   } else if (!at(all, f.stairs.x, f.stairs.y)) problems.push("stairs unreachable");

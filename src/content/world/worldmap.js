@@ -202,7 +202,7 @@ const LANDMARK_DUNGEONS = {
                creatures: { odd: [["latticeTroll", 2], ["askewAngle", 3], ["fold", 3]], even: [["smoother", 3], ["burnisher", 3], ["planarQueen", 1]] } } },
   underPage: { theme: "salt", gimmicks: ["murals"], vaultPool: ["mosaicHall"],   // (the Speaking Door is floor 2's alone: planned.vaults)
     named: ["the Under-Page, the First Leaf", "the Under-Page, the Speaking Door", "the Under-Page, the Founding"],
-    planned: { bottom: { kind: "relic", id: "pressedFounding", name: "the Pressed's founding relic", with: "a Second-Hour stele with all three accounts; a reading that names Vesper" },
+    planned: { bottom: { kind: "relic", id: "pressedFounding", name: "the Pressed's founding relic", hour: 2, with: "a Second-Hour stele with all three accounts; a reading that names Vesper" },
                vaults: { 2: "speakingDoor" }, creatures: [["tileMimic", 2], ["flatling", 2], ["pressedPilgrim", 1]] } },
   rootfold: { theme: "horn", gimmicks: ["allDeep"],
     named: ["the Rootfold, the Upper Roots", "the Rootfold, the Fold", "the Rootfold, the Heartroot"],
