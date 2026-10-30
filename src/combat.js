@@ -64,7 +64,7 @@ import { strNeeded, WEAPONS, ARMOURS, ELEMENTS } from "./items.js";
 import { colossusCore } from "./guardians.js";
 import { EYE, FISTS, attackTime, armourValue, weaponReach } from "./player.js";
 import { sfx } from "./sfx.js";
-import { attr, maxHp, mod, bonus, invalidateStats } from "./stats.js";
+import { attr, maxHp, mod, bonus, invalidateStats, clampHp } from "./stats.js";
 import { wielded, worn, fittedEffect } from "./body.js";
 import { addStatus, hasStatus, statusFlag, cooldownLeft, startCooldown, registerStatus, dvOf as playerDv } from "./status.js";
 import { RULES } from "./rules.js";
@@ -423,6 +423,8 @@ function snap(game, p, it) {
   it.broken = true;
   (p.inv ||= []).push(it);
   invalidateStats(p);
+  clampHp(p);
+  emit(game, "gear", { e: p });   // (what you hold changed, as body.js unequip says it: verification finding)
   game.log(`Your bone ${WEAPONS[it.id].name} snaps! (It goes in your pack, to be mended.)`, [222, 212, 182]);
   sfx("block", { at: p });
 }

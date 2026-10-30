@@ -1944,7 +1944,8 @@ export function checkB1Combat(ctx) {
     // Bone: 1 in 50.
     clear();
     const foe = at("goblin", 6, 5);
-    let snaps = 0, landed = 0;
+    let snaps = 0, landed = 0, gearEvents = 0;
+    const offGear = on("gear", () => gearEvents++);
     const bs = makeRng(77);
     for (let k = 0; k < 6000; k++) {
       const it = wield("dagger", "bone");
@@ -1953,7 +1954,8 @@ export function checkB1Combat(ctx) {
       landed++;
       if (it.broken) { snaps++; if (p.body.equip.hand_r === it || !p.inv.includes(it)) { expect(false, "a snapped bone dagger stayed in hand or missed the pack"); break; } p.inv.splice(p.inv.indexOf(it), 1); }
     }
-    expect(Math.abs(snaps / landed - 0.02) < 0.007, `bone snapped ${snaps} times in ${landed} hits (want 1 in 50)`);
+    offGear();
+    expect(Math.abs(snaps / landed - 0.02) < 0.007 && gearEvents === snaps, `bone snapped ${snaps} times in ${landed} hits (want 1 in 50), ${gearEvents} "gear" events`);
     const snapped = wield("dagger", "bone"); p.body.equip.hand_r = null; snapped.broken = true; p.inv.push(snapped);
     expect(canEquip(game, p, snapped, "hand_r").reason === "broken", "a snapped dagger can be held");
     expect(mendItem(game, p, snapped) === 0 && snapped.broken, "a snapped dagger mended without Repair");
