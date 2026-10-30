@@ -1642,6 +1642,19 @@ export function checkB1Gear(m) {
       }
     } finally { Math.random = rand; }
     if (drops.parent || drops.gear < 20 || drops.tonic < 10) fail(`a real-world elite's drops: ${JSON.stringify(drops)}`);
+    // The Keeper's Stair (the parent's stack inside the real world) keeps the parent's drops, as its floors do.
+    const was = zone.realLoot, before = zone.items.length, legacyDrops = { c4: 0, tonic: 0, n: 0 };
+    try {
+      zone.realLoot = false;   // (as a floor of the Keeper's Stair is)
+      let s = 7;
+      Math.random = () => (((s = (Math.imul(s ^ (s >>> 15), 0x2c1b3c6d) + 0x9e3779b9) >>> 0)) / 4294967296);
+      for (let k = 0; k < 120; k++) {
+        const c = m.creatures.addCreature(zone, m.creatures.spawnCreature("goblin", Math.floor(p.x), Math.floor(p.y), p.z, { level: 14, elite: true, rng: () => 0.5 }));
+        m.monsters.killMonster(game, c, "", true, true);
+      }
+      for (const it of zone.items.slice(before)) { legacyDrops.n++; if (it.kind === "tonic") legacyDrops.tonic++; else if (isGearKind(it) && it.made) legacyDrops.c4++; }
+    } finally { zone.realLoot = was; zone.items.length = before; Math.random = rand; }
+    if (!legacyDrops.n || legacyDrops.c4 || legacyDrops.tonic) fail(`elite drops on a parent's floor in the real world: ${JSON.stringify(legacyDrops)}`);
     const trader = { type: "villager", level: 9, talk: { state: {} }, merchant: { stock: "general" }, uid: "b1-trader" };
     const shelf = m.merchants.restock(game, trader).map((s) => s.item);
     if (!shelf.some((it) => it.kind === "tonic") || shelf.some((it) => isGearKind(it) && !c4Gear(it)) || !shelf.some((it) => it.made))

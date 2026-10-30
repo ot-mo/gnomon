@@ -7,7 +7,7 @@
 //       factions } (events.js) last: content/legacy/encounters.js logs Rook's quarry and story/quests.js
 //       routes it to his quest, game.js opens a guardian's gate and wins the run when the boss falls. src: the killer (the player when byPlayer, else a creature or null).
 import { DIRS8 } from "./pathing.js";
-import { makeItem, randomScroll, randomJewel, awayFromWalls, lootGear, lootPotion, realWorld } from "./items.js";
+import { makeItem, randomScroll, randomJewel, awayFromWalls, lootGear, lootPotion } from "./items.js";
 import { HEIGHT, RADIUS, moveAxis, bonus } from "./player.js";
 import { gainXp, killXp, modeXp } from "./leveling.js";
 import { RULES } from "./rules.js";
@@ -71,7 +71,9 @@ export function killMonster(game, m, message, dropLoot = true, byPlayer = true, 
     if (m.elite || Math.random() < 0.25 * luck)
       zone.items.push(makeItem({ kind: "cash", amount: Math.round((1 + Math.floor(Math.random() * (2 + zone.level * 0.6))) * (m.elite ? 1.5 : 1)) }, ...awayFromWalls(zone, m.x + 0.15, m.y + 0.1, ground), ground));
     const [ix, iy] = awayFromWalls(zone, m.x, m.y, ground);
-    const real = realWorld(game.run);
+    // (the zone's own loot, as its floors': the real world's surface and site floors; the Keeper's Stair, the parent's
+    // stack inside the real world, keeps the parent's; verification finding)
+    const real = !!zone.realLoot;
     if (m.elite) zone.items.push(makeItem(eliteLoot(zone.level, luck > 1 ? 0.15 : 0, real), ix, iy, ground));
     else if (Math.random() < 0.25 * luck) {
       const r = Math.random();
