@@ -54,6 +54,7 @@ import { TOP as TABLE_TOP } from "../../src/content/world/plans/tallTable.js";
 import { RINGS, FOLDMOTHER_LAYOUT } from "../../src/content/world/plans/foldmother.js";
 import { PRESSYARD_HOUSES } from "../../src/content/world/plans/pressyard.js";
 import { TOLL_GATE } from "../../src/content/world/plans/molar.js";
+import { FOLIO_PEOPLE } from "../../src/content/world/plans/folio.js";
 import { upFrom } from "../../src/screens/play.js";   // B2
 import { holyAt, steleAt } from "../../src/world/sites.js";
 import { LANDMARK_BUILDERS } from "../../src/gen/biomes/index.js";
@@ -373,11 +374,33 @@ const PROMISES = {
       "the Old Rule doesn't run through the gullet's two mouths"],
     [z.get(pa.x + 63, pa.y + 26, FLOOR_Z - 1) === B.METAL && reach[pa.x + 63 + (pa.y + 26) * z.w] >= 0, "the Root Canals' far mouth east of the checkpoint"],
     [[17, 18, 19, 20, 21].every((y) => z.get(pa.x + TOLL_GATE, pa.y + y, FLOOR_Z + 4) === B.STONE && z.stand[pa.x + TOLL_GATE + (pa.y + y) * z.w] === FLOOR_Z), "the toll gate's arch over the gullet, the way under it open"]],
-  folio: ({ z, pa, plan, cell }) => {
+  folio: ({ z, pa, plan, cell, reach }) => {
     let walls = 0, mosaic = 0;
     plan.rows.forEach((r, y) => [...r].forEach((ch, x) => { const k = z.kind[pa.x + x + (pa.y + y) * z.w]; if (k === KIND.WALL && ch !== "A") walls++; if (k === KIND.MOSAIC) mosaic++; }));
+    // The map's walk (B2, C1b #12): from the market, held by the drawn walls (zone.mapWalls) and stepping through the drawn
+    // door (zone.drawnDoors), it reaches every person and the archive's room; without the door, not the archive; in 3D the
+    // box has no way in.
+    const mapWalk = (useDoor) => {
+      const seen = new Set(), start = [pa.x + plan.hub[0], pa.y + plan.hub[1]], q = [start], walls = new Set(z.mapWalls || []);
+      seen.add(start.join());
+      while (q.length) {
+        const [x, y] = q.shift();
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          let nx = x + dx, ny = y + dy;
+          const door = (z.drawnDoors || []).find((d) => d.wall[0] === nx && d.wall[1] === ny);
+          if (door) { if (!useDoor) continue; const to = [x, y].join() === door.outside.join() ? door.inside : [x, y].join() === door.inside.join() ? door.outside : null; if (!to) continue; [nx, ny] = to; }
+          else if (nx < pa.x || ny < pa.y || nx >= pa.x + pa.w || ny >= pa.y + pa.d || walls.has(nx + ny * z.w) || z.kind[nx + ny * z.w] === KIND.WALL || z.stand[nx + ny * z.w] < 0) continue;
+          if (!seen.has(`${nx},${ny}`)) { seen.add(`${nx},${ny}`); q.push([nx, ny]); }
+        }
+      }
+      return seen;
+    };
+    const walk = mapWalk(true), noDoor = mapWalk(false), room = cell("a");
+    const people = Object.keys(FOLIO_PEOPLE).flatMap((ch) => cell(ch));
     return [[walls === 0, `${walls} walls on the map that aren't the archive (Folio's walls are drawn)`], [mosaic > 400, `only ${mosaic} mosaic tiles`],
-      [cell("A").every(([x, y]) => z.kind[x + y * z.w] === KIND.WALL) && cell("d").every(([x, y]) => z.get(x, y, FLOOR_Z - 1) === B.MOSAIC_GOLD), "the archive or its drawn door"]];
+      [cell("A").every(([x, y]) => z.kind[x + y * z.w] === KIND.WALL) && cell("d").every(([x, y]) => z.get(x, y, FLOOR_Z - 1) === B.MOSAIC_GOLD), "the archive or its drawn door"],
+      [(z.mapWalls || []).length > 300 && people.every(([x, y]) => walk.has(`${x},${y}`)) && room.every(([x, y]) => walk.has(`${x},${y}`) && !noDoor.has(`${x},${y}`) && reach[x + y * z.w] < 0 && z.get(x, y, FLOOR_Z + 3) === B.STONE),
+        `the map's walk: ${(z.mapWalls || []).length} drawn walls, ${people.filter(([x, y]) => walk.has(`${x},${y}`)).length} of ${people.length} people, the archive ${room.filter(([x, y]) => walk.has(`${x},${y}`)).length} of ${room.length} through the door, ${room.filter(([x, y]) => noDoor.has(`${x},${y}`)).length} without, ${room.filter(([x, y]) => reach[x + y * z.w] >= 0).length} in 3D`]];
   },
   halfnightWest: (c) => [...ward(c), [c.cell("B").length === 9 && c.z.get(c.pa.x + 34, c.pa.y + 37, FLOOR_Z + 11) === B.METAL, "the Noon Bell's tower"],
     [(c.z.murals || []).some((u) => u.view === "3d" && u.text === "LAMPS STAY LIT. THE HOURS ARE WATCHING."), "the Hour-house's sign"]],

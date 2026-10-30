@@ -669,6 +669,25 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
     stats.farMouth = `${game.zone.key} at (${Math.floor(pl.x)}, ${Math.floor(pl.y)}), the grate (${ex.at})`;
     expect(game.zone.key === ex.key && Math.abs(pl.x - ex.at[0] - 0.5) + Math.abs(pl.y - ex.at[1] - 0.5) <= 2, `in a game: up the far mouth to ${stats.farMouth}`);
   } else problems.push("in a game: no far mouth on the Root Canals' floor 2");
+  // In a game: Folio's drawn door on the map takes you into the archive and back out; a drawn wall holds you (C1b #12).
+  const { mapStep } = await import("../../src/turns.js");
+  const fo = game.run.world.landmarks.get("folio");
+  game.debug.enterZone(`${fo.wx},${fo.wy},0`);
+  game.view = "map";
+  const fd = game.zone.drawnDoors?.[0];
+  if (fd) {
+    const put = ([x, y]) => Object.assign(pl, { x: x + 0.5, y: y + 0.5, z: game.zone.stand[x + y * game.zone.w], onGround: true });
+    const dir = (a, b) => [Math.sign(b[0] - a[0]), Math.sign(b[1] - a[1])];
+    put(fd.outside);
+    const inOk = mapStep(game, ...dir(fd.outside, fd.wall)) && Math.floor(pl.x) === fd.inside[0] && Math.floor(pl.y) === fd.inside[1];
+    const outOk = mapStep(game, ...dir(fd.inside, fd.wall)) && Math.floor(pl.x) === fd.outside[0] && Math.floor(pl.y) === fd.outside[1];
+    const w = game.zone.mapWalls[0], wx = w % game.zone.w, wy = Math.floor(w / game.zone.w);
+    const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dy]) => game.zone.stand[wx + dx + (wy + dy) * game.zone.w] >= 0 && !game.zone.mapWalls.includes(wx + dx + (wy + dy) * game.zone.w));
+    put([wx + nb[0], wy + nb[1]]);
+    const held = !mapStep(game, -nb[0], -nb[1]) && Math.floor(pl.x) === wx + nb[0];
+    stats.drawnDoor = `in ${inOk}, out ${outOk}, a drawn wall holds ${held}`;
+    expect(inOk && outOk && held, `in a game: Folio's drawn door (${stats.drawnDoor})`);
+  } else problems.push("in a game: Folio has no drawn door");
   return { name: "landmark bottoms", ok: problems.length === 0, problems, stats };
 }
 
