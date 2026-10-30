@@ -354,10 +354,7 @@ export function drawInventory(game) {
   line(infoY);
   if (sel) {
     let info = itemInfo(game, sel);
-    const weapon = wielded(p), armour = wornOn(p, "body");
-    if (tab === "pack" && sel.kind === "weapon" && weapon) info += compare(WEAPONS[sel.id], WEAPONS[weapon.id], (a) => (a.dmg[0] + a.dmg[1]) / 2, "avg damage");
-    if (tab === "pack" && sel.kind === "armour" && (ARMOURS[sel.id].slot || "body") === "body")
-      info += compare(ARMOURS[sel.id], armour ? ARMOURS[armour.id] : { armour: 0 }, (a) => a.armour, "armour");
+    if (tab === "pack") info += compareLine(p, sel);
     if (isGear(sel) && !sel.known && !sel.relic) info += " · enchantment unknown until equipped";
     wrap(info, w - 4).slice(0, 2).forEach((l, k) => S.text(x0 + 2, infoY + 1 + k, l, 190, 190, 200));
   }
@@ -454,4 +451,15 @@ function drawBody(game, { x0, w, top, listH, rows }) {
 function compare(a, b, value, label) {
   const d = value(a) - value(b);
   return d === 0 ? "" : ` · ${d > 0 ? "+" : ""}${d} ${label} vs yours`;
+}
+// The pack's comparison with what you wield or wear on the body (B1, C4 #12): a weapon's average damage with its
+// material as it adds a blow (× its swing ÷ RULES.d20.swingRef, as its line shows it); body armour's armour with its
+// material. (Enchantment stays out: unknown until worn.) The parent's gear has no material: its numbers as before.
+const avgBlow = (it) => { const w = WEAPONS[it.id]; return (w.dmg[0] + w.dmg[1]) / 2 + Math.round((it.material || 0) * w.swing / RULES.d20.swingRef); };
+const bodyAv = (it) => (it ? ITEM_KINDS.armour.av({ ...it, ench: 0 }) : 0);
+export function compareLine(p, sel) {
+  const weapon = wielded(p);
+  if (sel?.kind === "weapon" && weapon) return compare(sel, weapon, avgBlow, "avg damage");
+  if (sel?.kind === "armour" && (ARMOURS[sel.id].slot || "body") === "body") return compare(sel, wornOn(p, "body"), bodyAv, "armour");
+  return "";
 }

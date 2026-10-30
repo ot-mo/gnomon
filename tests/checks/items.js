@@ -1791,6 +1791,22 @@ export function checkB1Gear(m) {
     stats.tonics = `a potion ${potion}, overdone ${sick}; a balm ${balm}, Alchemist's ${alch}; the pump at 30% used 1, at 50% none; the glimgun 4 shots ${paid} glim, Glimgunner ${paidGunner}; pins ${pin0} s, ${pin1} s with Pin`;
   });
 
+  // 5. The pack's comparison (C4 #12): the material counts (a noonsilver dagger against a copper one: +6 × 0.3 ÷ 0.7 → +3
+  //    a blow; saltsteel scale against iron scale +1 armour); the parent's gear reads as before (a longsword against a
+  //    dagger: the difference of their ranges' middles, the old line).
+  section("compare", () => {
+    startRun(13, m.testWorld.TEST_WORLD);
+    const p = game.player, G = m.gear, line = (sel) => m.inventory.compareLine(p, sel);
+    p.body.equip.hand_r = G.makeGear("weapon", "dagger", "copper"); p.body.equip.body = G.makeGear("armour", "scale", "iron"); m.stats.invalidateStats(p);
+    const silver = line(G.makeGear("weapon", "dagger", "noonsilver")), scale = line(G.makeGear("armour", "scale", "saltsteel"));
+    p.body.equip.hand_r = { kind: "weapon", id: "dagger", ench: 0, known: true };
+    const parent = line({ kind: "weapon", id: "longsword", ench: 2, known: false }), W = I.WEAPONS;
+    const old = (W.longsword.dmg[0] + W.longsword.dmg[1]) / 2 - (W.dagger.dmg[0] + W.dagger.dmg[1]) / 2;
+    if (silver !== " · +3 avg damage vs yours" || scale !== " · +1 armour vs yours" || parent !== ` · +${old} avg damage vs yours`)
+      fail(`the pack's comparison: a noonsilver dagger "${silver}", saltsteel scale "${scale}", the parent's longsword "${parent}"`);
+    stats.compare = `"${silver}", "${scale}", "${parent}"`;
+  });
+
   return { name: "items: B1's gear", ok: problems.length === 0, problems, stats };
 }
 
