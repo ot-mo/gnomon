@@ -501,7 +501,9 @@ function checkRegions(problems, bibleText, seeds) {
     for (const raw of m[2].split(",")) {
       const type = raw.trim().replace(/\.$/, "").replace(/ \(.*\)$/, "");
       const only = /the Inkrun only/.test(raw) ? ["inkrun"] : regions;
-      for (const id of only) if (!R[id].creatures.some(([t]) => t === type)) bad(`region ${id}: no ${type} (§15.2's ${m[1]} key)`);
+      // In the region's rows (its dungeons) or its biome's surface spawns: the surface folk (the longback, the moths, the
+      // Tessellate's wanderers and pilgrims) live on the surface, not underground (integrator, C3 #12, #15).
+      for (const id of only) if (!R[id].creatures.some(([t]) => t === type) && !(biomeOf(R[id].biome || id).spawns || []).some(([t]) => t === type)) bad(`region ${id}: no ${type} (§15.2's ${m[1]} key)`);
       named++;
     }
   }
@@ -529,6 +531,18 @@ function checkRegions(problems, bibleText, seeds) {
   const otherOff = M.tiles.filter((t) => t.region !== "glassShore" && !R[t.region]?.biome && t.biome !== (T[t.terrain].biome || t.terrain)).length;
   if (shoreOff || otherOff) bad(`biomes: ${shoreOff} Glass Shore spans not the sea's, ${otherOff} other spans not their terrain's`);
   out.shoreBiome = `${M.tiles.filter((t) => t.region === "glassShore").length} Glass Shore spans dress as the sea's shore`;
+  // What a landmark carries reaches the run's world (integrator, C1b #2): its lines, letters, inhabitants below, holy
+  // places and span plans, as worldmap.js's LANDMARKS give them; and each span plan's span is flattened (C1b #1).
+  {
+    const off = [];
+    for (const l of REAL_WORLD.landmarks) {
+      const L = M.landmarks.get(l.id);
+      for (const k of ["lines", "letters", "below", "holy", "holyFloors", "spanPlans"])
+        if (l[k] !== undefined && JSON.stringify(L?.[k]) !== JSON.stringify(l[k])) off.push(`${l.id}.${k}`);
+      for (const span of Object.keys(l.spanPlans || {})) if (!M.flatten.some((f) => `${f.wx},${f.wy}` === span)) off.push(`${l.id}: ${span} not flattened`);
+    }
+    if (off.length) bad(`landmarks' data not on the compiled world: ${off.slice(0, 5).join(", ")}`);
+  }
   // Music and fog reach the game: clock.js and music.js read them off the span's region.
   out.music = [...new Set(ids.map((id) => R[id].music))].join(", ");
   return out;

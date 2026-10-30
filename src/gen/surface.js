@@ -164,8 +164,12 @@ function* buildSurface(run, W, base, wx, wy, seed, rng) {
 
   // 1. The footprint: a landmark's is flat already (the world function); a per-run site's is flattened
   //    here with its skirt, the ground around it pulled down to it (1 block per tile).
-  const planDef = L?.plan ? world.plans?.[L.plan] : null;
+  // A multi-span landmark's other spans stand on their own plans (spanPlans), with no site of their own, on the footprint
+  // the world function flattened for them (integrator, C1b #1).
+  const spanPlan = L?.spanPlans?.[`${wx},${wy}`] || null;
+  const planDef = spanPlan ? world.plans?.[spanPlan] : L?.plan ? world.plans?.[L.plan] : null;
   let rect = site?.surface?.rect ? { ...site.surface.rect } : null;
+  if (!rect && spanPlan && planDef) { const f = world.flatten?.find((g) => g.wx === wx && g.wy === wy); if (f) rect = { ...f.rect }; }
   const wantsSite = !!site && (planDef || site.kind !== "landmark" || site.dungeon);
   if (wantsSite && !rect) rect = { x: ZW / 2 - 4, y: ZD / 2 - 3, w: 8, d: 6 };   // a landmark without a plan yet (C1)
   const worldFlat = !!(L && L.rect && L.flatten);   // the world function flattened it already

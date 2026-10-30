@@ -20,7 +20,7 @@ import { generateDungeonLevel, validateDungeonLevel, legacyParams, LEGACY_GUARDI
 import { stampVault, buildVault, pickVault, registerLegend, vaultById, VAULTS, GUARDIAN_HALLS, BOSS_HALLS, LAIR_HALLS, RELIC_HALLS, STAMP_DEFAULTS, BOTTOM_LOOT } from "../../src/gen/vaults.js";
 import { Zone, B, FLOOR_Z } from "../../src/world.js";
 import { makeRng, seedFor } from "../../src/rng.js";
-import { canTalk } from "../../src/creatures.js";
+import { canTalk, CREATURE_TYPES } from "../../src/creatures.js";
 import { ITEM_KINDS } from "../../src/items.js";
 import { makeLegend, dungeonParams, sinkholeSpots, SITE_KINDS, SITE_BUILDERS } from "../../src/world/sites.js";
 import { arrivalPoint } from "../../src/zones.js";
@@ -393,6 +393,15 @@ export function checkSites({ seeds = SEEDS } = {}) {
           }
           stats.sinkholes += here;
           if (here) stats.sinkholeSpans++;
+        }
+        // A landmark dungeon's floors draw its own inhabitants, registered ones, before the region's (integrator, C1b #19).
+        if (s.kind === "landmark" && s.dungeon && !s.dungeon.legacy && s.dungeon.creatures) {
+          for (let z = 1; z <= Math.min(2, s.dungeon.levels); z++) {
+            const p = dungeonParams(run, s, z), c = s.dungeon.creatures, rows = (Array.isArray(c) ? c : c[z % 2 ? "odd" : "even"]).filter(([t]) => CREATURE_TYPES[t]);
+            const own = new Set(rows.map(([t]) => t)), table = (p.creatureTable || []).map((r) => (Array.isArray(r) ? r[0] : r));
+            stats.ownTables = (stats.ownTables || 0) + 1;
+            if (rows.length && (table.length !== own.size || table.some((t) => !own.has(t)))) problems.push(`${where} floor ${z}: draws ${table.join(", ")}, not its own ${[...own].join(", ")}`);
+          }
         }
         if (s.kind !== "landmark") {
           const zone = generateSurface(run, s.at.wx, s.at.wy);

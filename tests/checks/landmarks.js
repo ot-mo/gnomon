@@ -439,18 +439,19 @@ function checkC1b(seeds, expect) {
   const ids = LANDMARK_INDEX.map((l) => l.id).filter((id) => id !== "hollowmere");
   const tally = { zones: 0, seams: 0, seamTiles: 0, keys: 0, floors: 0, promises: 0, climbs: 0 };
   for (const seed of seeds) {
-    const runs = { real: buildRun(seed, REAL_WORLD), wards: buildRun(seed, wardsWorld()) }, cache = new Map();
+    const runs = { real: buildRun(seed, REAL_WORLD) }, cache = new Map();
     const surface = (run, wx, wy) => { const k = `${run === runs.real ? "r" : "w"}${wx},${wy}`; if (!cache.has(k)) cache.set(k, generateSurface(run, wx, wy)); return cache.get(k); };
     const targets = [...ids.map((id) => ({ run: runs.real, id, plan: runs.real.world.landmarks.get(id).plan })),
-      { run: runs.wards, id: "halfnightMiddle", plan: "halfnightMiddle" }, { run: runs.wards, id: "halfnightEast", plan: "halfnightEast" }];
+      // Halfnight's Middle and East Wards on the real run, each on its own span (integrator, C1b #1: spanPlans).
+      { run: runs.real, id: "halfnight", plan: "halfnightMiddle", span: [25, 11] }, { run: runs.real, id: "halfnight", plan: "halfnightEast", span: [26, 11] }];
     for (const t of targets) {
-      const W = t.run.world, L = W.landmarks.get(t.id), plan = W.plans[t.plan], at = `real world seed ${seed} ${t.id}`;
+      const W = t.run.world, L0 = W.landmarks.get(t.id), L = t.span ? { ...L0, wx: t.span[0], wy: t.span[1] } : L0, plan = W.plans[t.plan], at = `real world seed ${seed} ${t.span ? t.plan : t.id}`;
       const z = surface(t.run, L.wx, L.wy), pa = z.gen?.planAt, def = REAL_WORLD.landmarks.find((l) => l.id === (t.id.startsWith("halfnight") ? "halfnight" : t.id));
       tally.zones++;
       for (const p of z.problems) expect(false, `${at}: ${p}`);
       expect(pa && pa.x === def.anchor[0] && pa.y === def.anchor[1] && pa.w === plan.rows[0].length && pa.d === plan.rows.length, `${at}: not on its plan at its anchor (${JSON.stringify(pa)})`);
       if (!pa) continue;
-      if (t.run === runs.wards) expect(sameZone(z, generateSurface(t.run, L.wx, L.wy)), `${at}: two generations differ`);
+      if (t.span) expect(sameZone(z, generateSurface(t.run, L.wx, L.wy)), `${at}: two generations differ`);
       const cell = (ch) => plan.rows.flatMap((r, y) => [...r].flatMap((c, x) => (c === ch ? [[pa.x + x, pa.y + y]] : [])));
       // Seams: the ground on both sides of every open edge is the world function's where the plan leaves it as it was.
       const Wf = worldFns(W, t.run.seed), built = (x, y) => x >= pa.x && y >= pa.y && x < pa.x + pa.w && y < pa.y + pa.d && plan.rows[y - pa.y][x - pa.x] !== ".";

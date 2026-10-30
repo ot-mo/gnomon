@@ -104,7 +104,16 @@ function landmarkDungeon(L) {
   if (d.vaultPool) spec.vaultPool = [...d.vaultPool];
   if (d.cradle) spec.cradle = [...d.cradle];
   if (d.floorGimmicks) spec.floorGimmicks = d.floorGimmicks.map((g) => [...g]);
+  if (d.planned?.creatures) spec.creatures = JSON.parse(JSON.stringify(d.planned.creatures));   // (its own inhabitants: dungeonParams)
   return spec;
+}
+
+// A landmark dungeon's own inhabitants on floor z (C1b's planned.creatures, [type, weight]; the Dial-works' by odd and even
+// floor), as a level table for that floor's level, registered kinds only: null when none is (integrator, C1b #19).
+function ownTable(spec, z, level) {
+  const c = spec.creatures, rows = Array.isArray(c) ? c : c ? c[z % 2 ? "odd" : "even"] : null;
+  const live = (rows || []).filter(([type, w]) => CREATURE_TYPES[type] && w > 0);
+  return live.length ? live.map(([type, w]) => [type, w, level, level]) : null;
 }
 
 function addSite(run, site) {
@@ -168,7 +177,7 @@ export function dungeonParams(run, site, z) {
     key: `${site.at.wx},${site.at.wy},${z}`, wx: site.at.wx, wy: site.at.wy, z, level, tier: tierOfLevel(level),
     index: z, count: spec.levels, final, theme: spec.theme || "legacy", hasUp: true, forcedVault: null,
     vaultPool: vaultPoolFor(spec, level), gimmicks: [...(spec.floorGimmicks?.[z - 1] || spec.gimmicks || [])], bottom, encounters: [],
-    creatureTable: run.world.regions?.[tile?.region]?.creatures || null, holesIn: null,
+    creatureTable: ownTable(spec, z, level) || run.world.regions?.[tile?.region]?.creatures || null, holesIn: null,   // (its own inhabitants first: integrator, C1b #19)
     cradle: !!spec.cradle?.includes(z), murals: spec.murals ? spec.murals.map((m) => ({ ...m })) : null,
     name: spec.named?.[z - 1] || `${site.name}, level ${z}`,
     landings: z === 1 ? sinkholeSpots(run, site).map(([x, y]) => [x, y]) : null,

@@ -273,7 +273,7 @@ const terrainKey = {
 for (const l of LANDMARK_INDEX) terrainKey[l.letter] = l.terrain;
 
 export const WORLD = {
-  id: "gnomon", version: 2, w: 42, h: 21, name: "the Long Noon",   // (2: C1a's regions and Hollowmere; a real-world run saved before them doesn't restore; integrator, C1a #6)
+  id: "gnomon", version: 3, w: 42, h: 21, name: "the Long Noon",   // (2: C1a's regions and Hollowmere; 3: C1b's landmark plans; a real-world run saved before them doesn't restore; integrator, C1a #6, C1b #16)
   terrain: WORLD_ROWS, terrainKey,
   tiers: TIER_ROWS,                       // the tier of every span (bible §4.5); a region's tier is its lowest
   regions: REGION_ROWS, regionKey: REGION_KEY,

@@ -57,6 +57,7 @@ function terrainOf(key, ch, x) {
 }
 
 // A landmark's footprint in its zone: given as rect, or from its plan's size and anchor, or null (no plan yet).
+const copy = (v) => (v === undefined || v === null ? null : JSON.parse(JSON.stringify(v)));
 function footprint(l, plans) {
   if (l.rect) return { x: l.rect.x, y: l.rect.y, w: l.rect.w, d: l.rect.d };
   const plan = l.plan && plans?.[l.plan];
@@ -207,6 +208,10 @@ export function compileWorld(def) {
       plan: l.plan || null, anchor: l.anchor || "center", rect, datum: l.datum ?? 0, flatten: l.flatten !== false,
       visibleFrom: l.visibleFrom ?? 0, checkpoint: !!l.checkpoint, description: l.description || "",
       dungeon: l.dungeon ? JSON.parse(JSON.stringify(l.dungeon)) : null,
+      // What C1b's landmarks carry for their readers (integrator, C1b #2): the three registers, who stands on each plan
+      // letter, who lives below, the holy places, and a multi-span landmark's other spans' plans.
+      lines: copy(l.lines), letters: copy(l.letters), below: copy(l.below), holy: l.holy ?? null, holyFloors: copy(l.holyFloors),
+      spanPlans: copy(l.spanPlans),
     };
     landmarks.set(L.id, L);
     for (const [x, y] of spans) {
@@ -215,6 +220,12 @@ export function compileWorld(def) {
       t.tier = L.tier; t.level = levelOfTier(L.tier);
     }
     if (rect && L.flatten) flatten.push({ wx, wy, rect: { ...rect }, z: L.datum });
+    // A multi-span landmark's other spans on their own plans (Halfnight's Middle and East Wards): each flattened for its
+    // own plan's footprint at the landmark's anchor (integrator, C1b #1).
+    for (const [k, pid] of Object.entries(L.spanPlans || {})) {
+      const [sx, sy] = k.split(",").map(Number), r = footprint({ plan: pid, anchor: l.anchor }, def.plans);
+      if (r && L.flatten) flatten.push({ wx: sx, wy: sy, rect: r, z: L.datum });
+    }
   }
 
   // Spans a road or a landmark makes enterable although their terrain is not. A river doesn't: the
