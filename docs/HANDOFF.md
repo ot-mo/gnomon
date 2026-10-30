@@ -1175,6 +1175,11 @@ its §8.4 files and two P0 checks).
     tunnel (C1b #24), picking that one up must not make a second: settled at B2's merge.
   - **check-perf's refresh** read ×1.27 against `p4i-people` (p50 10.13 ms, budget 10) while B1's TTK runs loaded the
     machine; nothing since touches refresh; it passed in run-all's alone slot at the tag. Recheck on a quiet machine.
+- **The tier-8 retune: approved, "HP ×0.85, damage −2"** (the user, 2026-10-30, relayed by the coordinating session; the
+  other choices were damage −4, and HP ×0.9 with damage −3): d20 only, creatures of level 21 and up, not bosses or
+  guardians. B1 measured tier 8 at 38.0% a kill alone and 38.8% with B3's six powers (mean over six sets of builds;
+  ttkTables' default set 38.6). B1 puts the numbers in `RULES.d20` and tags `p4b-b1`; the integrator merges it, then drops
+  the `needs` on B3's six powers and reruns check-combat. DECISIONS' combat row records it.
 - **The power pool: "Retune tier 8"** (the user, 2026-10-30, relayed by the coordinating session). B1 traced tier 8's rise to
   offer dilution (a build's two trees spent, the offers fill from every tree: a real cost, the base already 41.5% on
   average over six sets of builds). B1 proposes a d20-only retune of the level-23 creatures, measured over all six sets
