@@ -388,6 +388,10 @@ function checkPresence(seed, expect) {
   for (const z of Object.values(zones)) syncPeople(game, z);
   game.zone = zones.hollowmere;
   game.time = startOf(3);
+  game.trip = { fromKey: zones.hollowmere.key };   // out on the world map: the zone you left stays as it was
+  emit(game, "clock:midnight", { hour: 0, day: 3 });
+  expect(has("hollowmere", "pell"), "Pell left Hollowmere at midnight while you were out on the world map");
+  game.trip = null;
   emit(game, "clock:midnight", { hour: 0, day: 3 });
   expect(!has("hollowmere", "pell"), "Pell still at Hollowmere after midnight on day 2 (you stayed)");
   game.time = startOf(7);

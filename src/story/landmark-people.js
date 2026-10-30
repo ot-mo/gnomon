@@ -140,5 +140,7 @@ export function personKilled(game, uid) {
   ((game.state.landmarkPeople ||= {}).dead ||= {})[uid] = true;
 }
 on("zone:enter", (game, { zone }) => syncPeople(game, zone));
-on("clock:midnight", (game) => syncPeople(game, game.zone));   // a new day where you stand: Pell packs up and walks on
+// A new day where you stand: Pell packs up and walks on. Not over the zone you left for the world map (game.trip): it
+// stays as you left it until you come back (overworld/travel.js; check-overworld's walk holds it).
+on("clock:midnight", (game) => { if (!game.trip) syncPeople(game, game.zone); });
 on("kill", (game, { uid }) => personKilled(game, uid));
