@@ -41,7 +41,8 @@ import { makeRng } from "./rng.js";
 import { toggleMusic, updateMusic } from "./music.js";
 import { unlockAudio, audioFrame } from "./audio.js";
 import { sfx, toggleSounds, setListener } from "./sfx.js";
-import { introPages } from "./story/campaign.js";   // the parent's INTRO on the test world, the campaign's elsewhere (WS7b)
+import { introPages } from "./story/campaign.js";
+import { QUESTS } from "./content/quests.js";   // the parent's INTRO on the test world, the campaign's elsewhere (WS7b)
 import "./content/legacy/encounters.js";   // the parent game's people: dialogues, quests, Pell's services
 import { openTalk, talkKey, storyKey, openStory } from "./dialogue.js";
 import { statusFlag, cooldownLeft, startCooldown } from "./status.js";
@@ -240,7 +241,9 @@ export function startRun(seed, world = game.world, { mode = null, player = null 
   setMode(game, "map", null, { pointer: false });
   openStory(game, introPages(game.run), () => {
     refreshView(game);
-    game.log("You wake in your little room in the temple. Maren is waiting in the main hall, to the south.", [255, 220, 140]);
+    // On a world other than the test world, the campaign's own line (C5's QUESTS.campaign.wake; integrator, C5 #1).
+    const wake = game.run.world.id !== "test" && QUESTS.campaign?.wake;
+    game.log(wake || "You wake in your little room in the temple. Maren is waiting in the main hall, to the south.", [255, 220, 140]);
   });
 }
 

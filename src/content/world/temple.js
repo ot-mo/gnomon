@@ -86,7 +86,8 @@ registerLegend("altar", (c) => {
 });
 registerLegend("maren", (c) => {
   floorCol(c);
-  addCreature(c.zone, spawnCreature("maren", c.x, c.y, c.z0, { level: 0 }));
+  // (marenTalk: the dialogue she talks under where the temple stands on another world; the test world's is the parent's)
+  addCreature(c.zone, spawnCreature("maren", c.x, c.y, c.z0, { level: 0, ...(c.opts?.marenTalk ? { talk: { dialogue: c.opts.marenTalk, state: {} } } : {}) }));
   // Coming back up the legacy stack's stairs: in front of Maren, as in the parent game (her rest loop:
   // "come back if you need rest"), not down in the shaft's bottom room (zones.js arrivalPoint "up").
   c.zone.returnPoint = { x: c.x + 0.5, y: c.y + 2.5, z: c.z0, yaw: -Math.PI / 2 };
@@ -125,11 +126,11 @@ const cellsOf = (rows, ch, ox, oy) => {
 // Stamp the temple at (ox, oy). rng: the parent drew the spike timing, the right lever and the loose
 // mosaic tiles from makeRng(seed ^ 0x7e3a1e), in that order; pass the same and you get its puzzle.
 // Returns { spawn, stairs, keyPoints }.
-export function stampTemple(zone, ox, oy, rng, { roof = "slab", door = true, baseZ = FLOOR_Z } = {}) {
+export function stampTemple(zone, ox, oy, rng, { roof = "slab", door = true, baseZ = FLOOR_Z, marenTalk = null } = {}) {
   const rows = TEMPLE_ROWS;
   const legend = door ? MAIN_LEGEND : { ...MAIN_LEGEND, ...NO_DOOR };
   const main = { name: TEMPLE_PLAN.name, plan: rows, height: TEMPLE_PLAN.height, wall: B.STONE, floorBlock: B.TILE, links: [], legend };
-  stampVault(zone, main, ox, oy, rng, { roof, baseZ });
+  stampVault(zone, main, ox, oy, rng, { roof, baseZ, ...(marenTalk ? { marenTalk } : {}) });
   const S = SANCTUM;
   const sanctum = { name: "the sanctum", plan: rows.slice(S.y, S.y + S.d).map((r) => r.slice(S.x, S.x + S.w)),
                     height: TEMPLE_PLAN.height, wall: B.STONE, floorBlock: B.TILE, links: [], legend: SANCTUM_LEGEND };

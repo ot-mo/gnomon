@@ -840,6 +840,25 @@ async function campaign7b(env, { fail, stats, real, test, json, game, startRun }
   const introTest = game.mode === "story" && game.pages?.list;
   if (introTest !== INTRO || introReal !== CAM.CAMPAIGN.intro)
     fail(`startRun's intro: test world ${introTest === INTRO ? "INTRO" : introTest?.[0]?.title}, real world ${introReal === CAM.CAMPAIGN.intro ? "the campaign's" : introReal?.[0]?.title}`);
+  // The line logged when the intro closes (integrator, C5 #1): the campaign's wake line on the real world, the parent's
+  // on the test world.
+  {
+    const DLG = await env.src("dialogue.js"), woke = {};
+    for (const [w, def] of [["real", real], ["test", null]]) {
+      def ? startRun(3, def) : startRun(3);
+      for (let k = 0; k < 40 && game.mode === "story"; k++) DLG.nextPage(game);
+      woke[w] = game.messages.at(-1)?.text;
+    }
+    if (woke.real !== CAM.CAMPAIGN.wake || !/^You wake in your little room/.test(woke.test || "")) fail(`the line after the intro: real "${woke.real}", test "${woke.test}"`);
+    else stats.wake = `real: "${woke.real.slice(0, 40)}…"; test: the parent's`;
+    // Maren talks under the real world's dialogue at Hollowmere, the parent's at the test world's temple (integrator, C5 #2).
+    const talks = {};
+    for (const [w, def] of [["real", real], ["test", null]]) {
+      def ? startRun(3, def) : startRun(3);
+      talks[w] = game.zone.creatures.find((c) => c.type === "maren")?.talk?.dialogue;
+    }
+    if (talks.real !== "maren@real" || talks.test !== "maren") fail(`Maren's dialogue: real ${talks.real}, test ${talks.test}`);
+  }
   if (game.quests.some((q) => q.template === "beat") || game.state.campaign?.started != null || CAM.beginCampaign(game)) fail("the campaign started on the test world");
   // The real world (the run and the bus; zones are stand-ins with a landmark and a floor).
   const keep = { run: game.run, quests: game.quests, campaign: game.state.campaign };

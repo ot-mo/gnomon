@@ -99,7 +99,9 @@ const HOUSE = { h: "floor", ...Object.fromEntries(HOLLOWMERE_PEOPLE.map((ch) => 
 // Stamp it with its corner at (ox, oy). rng is the temple's (the parent's puzzle for the run's seed, TEMPLE_PLAN.rng),
 // spent on the temple alone; the village draws nothing. Returns { spawn, stairs, keyPoints }.
 export function stampHollowmere(zone, ox, oy, rng) {
-  const out = stampTemple(zone, ox + TEMPLE_AT[0], oy + TEMPLE_AT[1], rng, { roof: "slab" });
+  // Maren talks under the real world's dialogue (content/people-words.js dialogueIdOf("maren"): her beat 1; the parent's
+  // stays the test world's, golden; integrator, C5 #2).
+  const out = stampTemple(zone, ox + TEMPLE_AT[0], oy + TEMPLE_AT[1], rng, { roof: "slab", marenTalk: "maren@real" });
   const still = makeRng(seedFor(zone.seed, "hollowmere"));   // (stampVault wants one; no letter here draws from it)
   stampVault(zone, { name: "Hollowmere", plan: HOLLOWMERE_ROWS, height: 4, wall: B.PLANK, floorBlock: B.SALT, links: [],
                      legend: GROUND, props: PROPS, rubble: B.CRATE }, ox, oy, still, { roof: "none" });
