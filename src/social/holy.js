@@ -7,7 +7,8 @@
 //   the Lampless, the Spore Moot   a lit torch: at Warm or above they ask once, and turn 10 s later if it still burns;
 //                                  below Warm they are hostile there already. A Plumb with the dark-pass (darkPass) may
 //                                  carry it through the Lampless' places
-//   the Horary                     your torch going out inside the Hour-house: they turn at once
+//   the Horary                     your torch going out inside the Hour-house: "relight it" once, and they turn 10 s later if
+//                                  it is still out (relit in time, the warning stands and nothing more)
 //   the Assize                     a Bent below Bright inside the Square: told once, turned 10 s later if still inside
 //   the Plan                       a damaged block (a bomb going off in its place): a warning first, then −50 a block
 //   the Pressed                    a bomb on their mosaics (boots are forgiven): they turn
@@ -29,7 +30,7 @@ const memo = new WeakMap();
 export function holyNow(game) {
   const p = game.player, z = game.zone;
   if (!p || !z) return null;
-  const key = `${z.key}|${Math.floor(p.x)},${Math.floor(p.y)}`;
+  const key = `${z.key}|${Math.floor(p.x)},${Math.floor(p.y)}|${z.holy ?? ""}`;   // (a zone's own holy may be set late)
   const m = memo.get(game);
   if (m && m.key === key && m.zone === z) return m.v;
   const v = holyAt(game, p.x, p.y);
@@ -95,7 +96,8 @@ on("clock:tick", (game) => {
     return;
   }
   if (f === "horary") {
-    if (was && was.zone === zone && was.f === f && was.torch && !torch) turn(game, f);
+    if (was && was.zone === zone && was.f === f && was.torch && !torch && !t.warned) warn(game, f);
+    else if (t.warned && !torch && now - t.at >= GRACE) turn(game, f);
     return;
   }
   if (f === "assize") {

@@ -1888,7 +1888,35 @@ export async function run(env) {
     const ringer = named("mira", "villager", "horary", { near: [3, 0], name: "Bell" }); ringer.maxHp = ringer.hp = 12;
     game.state.rep.horary = 300;
     tick(0.1); p().torch = false; tick(0.1);
-    if (F.attitude(game, ringer, p()) !== "hostile") fail("your torch out in the Hour-house: the Horary didn't turn");
+    if (!game.state.trespass?.horary?.warned || F.attitude(game, ringer, p()) === "hostile") fail("your torch out in the Hour-house: not warned first, or turned at once");
+    tick(holy.GRACE + 0.1);
+    if (F.attitude(game, ringer, p()) !== "hostile") fail("your torch out in the Hour-house past the warning: the Horary didn't turn");
+    // The Assize: a Bent below Bright in the Square, told once, turned 10 s later; a Plumb never.
+    events.emit(game, "zone:leave", { zone: game.zone });
+    game.zone.holy = "assize";
+    const rule = named("mira", "villager", "assize", { near: [3, 1], name: "Castor" }); rule.maxHp = rule.hp = 12;
+    game.state.rep.assize = 300; tick(0.1);
+    if (!game.state.trespass?.assize?.warned || F.attitude(game, rule, p()) === "hostile") fail("a Bent at Warm in the Square: not warned first");
+    tick(holy.GRACE + 0.1);
+    if (F.attitude(game, rule, p()) !== "hostile") fail("a Bent at Warm in the Square past the warning: not turned");
+    events.emit(game, "zone:leave", { zone: game.zone }); p().genotype = "plumb"; tick(0.1); tick(holy.GRACE + 0.1);
+    if (game.state.trespass?.assize?.warned) fail("a Plumb warned in the Square");
+    p().genotype = "bent";
+    // The Plan: a bomb gone off in its place, a warning; another, −50 and they turn. The Pressed: a bomb, they turn.
+    events.emit(game, "zone:leave", { zone: game.zone });
+    game.zone.holy = "plan";
+    const unit = named("mira", "villager", "plan", { near: [3, -1], name: "Grid Five" }); unit.maxHp = unit.hp = 12;
+    game.state.rep.plan = 300;
+    const bomb = () => { const b = { x: p().x + 2, y: p().y, z: p().z, fuse: 1 }; (game.zone.bombs ||= []).push(b); tick(0.1); game.zone.bombs = game.zone.bombs.filter((o) => o !== b); tick(0.1); };
+    bomb();
+    if (!game.state.trespass?.plan?.warned || F.repOf(game, "plan") !== 300) fail(`a bomb in the Plan's place: warned ${!!game.state.trespass?.plan?.warned}, rep ${F.repOf(game, "plan")}`);
+    bomb();
+    if (F.repOf(game, "plan") !== 250 || F.attitude(game, unit, p()) !== "hostile") fail(`a second bomb in the Plan's place: rep ${F.repOf(game, "plan")}, ${F.attitude(game, unit, p())}`);
+    events.emit(game, "zone:leave", { zone: game.zone });
+    game.zone.holy = "pressed";
+    const pilgrim = named("mira", "villager", "pressed", { near: [-3, 1], name: "Vee" }); pilgrim.maxHp = pilgrim.hp = 12;
+    game.state.rep.pressed = 300; tick(0.1); bomb();
+    if (F.attitude(game, pilgrim, p()) !== "hostile") fail("a bomb on the Pressed's mosaics: they didn't turn");
     events.emit(game, "zone:leave", { zone: game.zone });
     if (game.state.trespass?.horary) fail("a trespass outlived the zone");
     delete game.zone.holy;
