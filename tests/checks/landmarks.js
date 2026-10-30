@@ -61,7 +61,8 @@ import { RINGS, FOLDMOTHER_LAYOUT } from "../../src/content/world/plans/foldmoth
 import { PRESSYARD_HOUSES } from "../../src/content/world/plans/pressyard.js";
 import { TOLL_GATE } from "../../src/content/world/plans/molar.js";
 import { peopleOn, kindOf, PRESENCE, syncPeople } from "../../src/story/landmark-people.js";   // the integrator, C5 #3
-import { dialogueIdOf } from "../../src/content/people-words.js";
+import { dialogueIdOf, PEOPLE_WORDS } from "../../src/content/people-words.js";
+import { isMerchant, ensureStock } from "../../src/social/merchants.js";
 import { dialogueIds } from "../../src/talk.js";
 import { dayNumber } from "../../src/clock.js";
 import { emit } from "../../src/events.js";
@@ -141,7 +142,7 @@ export function checkLandmarks({ seeds = [1, 7, 42, 1234, 31337], tiles = 500 } 
 
   // The real world's landmarks.
   let realZones = 0, realRetried = 0;
-  const people = { placed: 0, top: 0, flat: 0, ghosts: 0, later: 0 };
+  const people = { placed: 0, top: 0, flat: 0, ghosts: 0, later: 0, merchants: 0 };
   for (const seed of seeds) {
     const run = buildRun(seed, REAL_WORLD), world = run.world;
     for (const L of world.landmarks.values())
@@ -158,7 +159,7 @@ export function checkLandmarks({ seeds = [1, 7, 42, 1234, 31337], tiles = 500 } 
         peopleOfSpan(z, L, world.plans[L.spanPlans?.[`${wx},${wy}`] || L.plan], at, expect, people);
       }
   }
-  stats.people = `${people.placed} placed (${people.top} on the Tall Table's top, ${people.flat} flat, ${people.ghosts} ghosts), ` +
+  stats.people = `${people.placed} placed (${people.top} on the Tall Table's top, ${people.flat} flat, ${people.ghosts} ghosts, ${people.merchants} merchants), ` +
     `${people.later} come and go, on ${seeds.length} seeds; ${checkPresence(seeds[0], expect)}`;
 
   // C1a: Hollowmere on its plan (section 4 of the header), on every seed.
@@ -317,6 +318,7 @@ function peopleOfSpan(z, L, plan, at, expect, tally) {
     expect(c.type === kind && c.name === p.letter.name && c.named && c.landmark === L.id && c.who === p.who && c.z === z.stand[i] && z.stand[i] >= FLOOR_Z,
            `${at}: ${p.who} is ${c.type} "${c.name}" at ${c.z} (stand ${z.stand[i]})`);
     expect(c.talk?.dialogue === dialogueIdOf(p.who) && ids.has(c.talk.dialogue), `${at}: ${p.who} talks under ${c.talk?.dialogue}`);
+    if (PEOPLE_WORDS[p.who]?.role === "merchant") { tally.merchants++; expect(isMerchant(c), `${at}: ${p.who} talks as a merchant and isn't one`); }
     expect(c.vis.flat === FLAT_PEOPLE.has(p.who) && c.vis.ghostly === GHOST_PEOPLE.has(p.who), `${at}: ${p.who}'s view: flat ${c.vis.flat}, ghostly ${c.vis.ghostly}`);
     if (c.vis.flat) tally.flat++;
     if (c.vis.ghostly) tally.ghosts++;
@@ -348,12 +350,16 @@ function checkPresence(seed, expect) {
     syncPeople(game, zones.molar);
     expect(!has("molar", "castor") && game.state.landmarkPeople?.dead?.[castor.uid], "Castor came back after he was killed");
   }
+  // Every merchant by its words in the three towns of Pell's round has a stock to sell, Pell's included (his day 7 at Hollowmere).
+  const sellers = Object.values(zones).flatMap((z) => z.creatures.filter((c) => c.landmark && PEOPLE_WORDS[c.who]?.role === "merchant"));
+  for (const c of sellers) expect(ensureStock(game, c).length > 0, `${c.name} at ${c.landmark} has nothing to sell`);
+  expect(sellers.some((c) => c.who === "pell"), "Pell isn't among the sellers on day 7");
   // Through a save: the codec's record of a placed person keeps what it is.
   const kept = zones.benchmark.creatures.find((c) => c.who === "benchmarkSignaller");
   const back = kept && rebuildCreature(JSON.parse(JSON.stringify(trimCreature(kept))), zones.benchmark);
   expect(back && ["name", "title", "landmark", "who", "type"].every((f) => back[f] === kept[f]) && back.named && back.talk.dialogue === kept.talk.dialogue,
          `a saved person comes back as ${JSON.stringify(back && { name: back.name, title: back.title, landmark: back.landmark, who: back.who, dialogue: back.talk?.dialogue })}`);
-  return `Pell's round by day 1-7: ${where.join(", ")}; Castor at Molar from beat 2, not after he is killed; a person through a save`;
+  return `Pell's round by day 1-7: ${where.join(", ")}; Castor at Molar from beat 2, not after he is killed; ${sellers.length} sellers with stock; a person through a save`;
 }
 
 // --- C1b: the other 15 landmarks (section 5 of the header) -----------------------------------------------------------

@@ -21,11 +21,12 @@
 // The view rules are the types': Folio's people and Ess and Tee are flat (met only on the map); Brann, thol and the ghost
 // trader ghostly (seen and talked to only in the dark: your torch out, and under the sky only at night). A placed person:
 // uid "landmark:<id>:<letter>[:<n>]", its letter's name, named (the log says "Mira", "the leech"), level the span's,
-// c.landmark and c.who; where its type is a culture's or a creature's kind, its title is its role's first clause.
+// c.landmark and c.who; where its type is a culture's or a creature's kind, its title is its role's first clause; a
+// merchant by its words (PEOPLE_WORDS role) with a stock to sell.
 // A person killed is gone for good: one PRESENCE brings back is not brought back (game.state.landmarkPeople.dead).
 import { CREATURE_TYPES, spawnCreature, addCreature, removeCreature } from "../creatures.js";
 import { registerPlanPeople } from "../world/sites.js";
-import { dialogueIdOf } from "../content/people-words.js";
+import { dialogueIdOf, PEOPLE_WORDS } from "../content/people-words.js";
 import { PEOPLE } from "../content/creatures/people.js";
 import { dayNumber } from "../clock.js";
 import { on } from "../events.js";
@@ -92,6 +93,10 @@ function spawnPerson(sp) {
   c.landmark = sp.landmark;
   c.who = sp.who;
   if (sp.title) c.title = sp.title;
+  // Whose words give it the merchant role sells, the general stock unless its type keeps one of its own (Ottilie's,
+  // Detail C's); Pell too, who would otherwise wait for the Keeper's Stair's pack (social/merchants.js legacyPeddler).
+  // The landmarks' own stocks and services (banks, readings, rooms) are WS6b's, the backlog's B3.
+  if (PEOPLE_WORDS[sp.who]?.role === "merchant" && !CREATURE_TYPES[sp.kind].merchant?.stock) c.merchant = { stock: "general" };
   return c;
 }
 
