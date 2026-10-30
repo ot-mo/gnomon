@@ -460,6 +460,7 @@ export async function run(env) {
   await campaign7b(env, { fail, stats, real, test, json, game, startRun });
   await peoplesC2(env, { fail, stats });   // C2
   await storyC5(env, { fail, stats, json, game });   // C5
+  await registersB2(env, { fail, stats, game, startRun, REAL_WORLD, renderMap, events, murals });   // B2, C1b #4
   return { name: NAME, ok: problems.length === 0, problems, stats };
 }
 
@@ -472,6 +473,42 @@ export async function run(env) {
 // hover's and the look cursor's inspect (from the tablet's middle and edges), a lintel in 3D in light, a doorstep rune in
 // the dark only; the describer shows a tablet's text; the first visit's XP once and the faction registered; villagers
 // gossip, the warden doesn't; the leader's readings, opinions and name for the Kindling.
+// A landmark's three registers (bible §2.1 rule 3; B2, C1b #4), on the real world, every landmark's surface: the map's
+// inspect line over its plan ends with its Flat line (and off the plan, or on a span without a landmark, there is none);
+// a look in 3D at it logs its Deep line with your torch lit, its Dark line (lines joined by " / ") with it out; a hover
+// (not a look) logs nothing.
+async function registersB2(env, { fail, stats, game, startRun, REAL_WORLD, renderMap, events, murals }) {
+  startRun(5, REAL_WORLD);
+  let n = 0;
+  for (const L of game.run.world.landmarks.values()) {
+    game.debug.enterZone(`${L.wx},${L.wy},0`);
+    const z = game.zone, pa = z.gen?.planAt;
+    if (!pa) { fail(`registers: ${L.id} has no plan on its zone`); continue; }
+    const cx = pa.x + (pa.w >> 1), cy = pa.y + (pa.d >> 1), out = [pa.x - 1, pa.y - 1];
+    z.seen[cx + cy * z.w] = 1;
+    if (out[0] >= 0 && out[1] >= 0) z.seen[out[0] + out[1] * z.w] = 1;
+    game.view = "map";
+    const said = renderMap.describeTile(game, { x: cx, y: cy }), off = out[0] >= 0 && out[1] >= 0 ? renderMap.describeTile(game, { x: out[0], y: out[1] }) : "";
+    if (!said.endsWith(L.lines.flat) || off.includes(L.lines.flat)) fail(`registers: ${L.id} on the map: "${said}" (off its plan: "${off}")`);
+    game.view = "3d";
+    const log = () => game.messages.at(-1)?.text;
+    game.player.torch = true; game.messages = [];
+    events.emit(game, "inspect", { zone: z, x: cx, y: cy, z: 3, open: true });
+    const deep = game.messages.find((m) => m.text === L.lines.deep);
+    game.player.torch = false; game.messages = [];
+    events.emit(game, "inspect", { zone: z, x: cx, y: cy, z: 3, open: true });
+    const dark = game.messages.find((m) => m.text === L.lines.dark.split("\n").join(" / "));
+    game.messages = [];
+    events.emit(game, "inspect", { zone: z, x: cx, y: cy, z: 3, open: false });
+    const hover = game.messages.filter((m) => m.text === L.lines.deep || m.text === dark?.text).length;   // (a mural there may read itself)
+    game.player.torch = true;
+    if (!deep || !dark || hover) fail(`registers: ${L.id} in 3D: deep ${!!deep}, dark ${!!dark}, a hover logged ${hover} (${log()})`);
+    n++;
+  }
+  game.view = "map";
+  stats.registers = `${n} landmark zones: the Flat line on the map's inspect line, the Deep line on a 3D look, the Dark line with the torch out`;
+}
+
 async function villages7b(env, { fail, stats, test, real, json, startRun, game }) {
   const RUN = await env.src("world/run.js"), SUR = await env.src("gen/surface.js"), VIL = await env.src("story/villages.js");
   const VS = await env.src("story/village-site.js"), murals = await env.src("story/murals.js"), renderMap = await env.src("renderMap.js");

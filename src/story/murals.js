@@ -13,6 +13,14 @@
 //                                       and its secret learned (source "mural"). The only way a mural teaches anything:
 //                                       drawing and describing never do (R2).
 // The describer "murals" puts a mosaic's text on the map's inspect line, and says what a relief or rune needs. Pure.
+//
+// A landmark's three registers (bible §2.1 rule 3; B2, C1b #4), from the run's world (landmarks' `lines`):
+//   landmarkAt(game, zone, x, y) → landmark | null   the landmark whose plan the tile is part of (its surface zone, the
+//                                       plan's footprint: zone.gen.planAt)
+//   registerLine(game, L) → the line the view you're in reads: Flat on the map, Deep in 3D, Dark in 3D with your torch out
+// The describer "landmark" puts the Flat line on the map's inspect line over the plan; a look in 3D at it (WS8's L:
+// inspect open) logs the Deep line, or the Dark one with your torch out. (The world map's panel shows the Flat line too:
+// overworld/renderWorld.js spanLines.)
 import { on } from "../events.js";
 import { BLOCKS } from "../blocks.js";
 import { inDark } from "../light.js";
@@ -63,9 +71,28 @@ export function readMural(game, ev) {
   return learned;
 }
 
-on("inspect", (game, ev) => { readMural(game, ev); });
+on("inspect", (game, ev) => { readMural(game, ev); readLandmark(game, ev); });
+
+export function landmarkAt(game, zone, x, y) {
+  const pa = zone?.gen?.planAt;
+  if (!zone?.landmarkId || zone.z !== 0 || !pa || x < pa.x || y < pa.y || x >= pa.x + pa.w || y >= pa.y + pa.d) return null;
+  return game.run?.world?.landmarks?.get(zone.landmarkId) || null;
+}
+export function registerLine(game, L) {
+  const lines = L?.lines;
+  if (!lines) return null;
+  if (game.view === "map") return lines.flat || null;
+  return (game.player?.torch ? lines.deep : lines.dark) || null;
+}
+function readLandmark(game, ev) {
+  if (!ev?.open || game.view !== "3d") return;
+  const line = registerLine(game, landmarkAt(game, ev.zone || game.zone, ev.x, ev.y));
+  if (line) game.log?.(line.split("\n").join(" / "), game.player?.torch ? [215, 205, 180] : [175, 165, 230]);
+}
 
 // The map's inspect line: a mosaic reads plainly from above; a relief or a rune only says it's there.
+registerDescriber("landmark", (game, tile, { zone }) => (game.view === "map" ? registerLine(game, landmarkAt(game, zone, tile.x, tile.y)) : null), { order: 60 });
+
 registerDescriber("murals", (game, tile, { zone }) => {
   const ms = muralsAt(zone, tile.x, tile.y);
   if (!ms.length) return null;

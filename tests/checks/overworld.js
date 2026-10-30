@@ -1077,6 +1077,10 @@ function screen(G, scr, problems) {
     const g = fresh(G, 61, REAL_WORLD), W = g.run.world, st = W.start, t = W.tileAt(st.wx, st.wy), R = W.regions?.[t.region];
     const lines = spanLines(g, st.wx, st.wy).map((l) => l.text);
     if (!R?.line || lines.at(-1) !== R.line) problems.push(`screen: the panel of (${st.wx}, ${st.wy}) ends "${lines.at(-1)}", not its region's line`);
+    // A known landmark's Flat line in its panel, before the region's (B2, C1b #4); none on a span without one.
+    const flat = W.landmarks.get(st.landmarkId)?.lines?.flat, near = spanLines(g, st.wx + 2, st.wy - 2).map((l) => l.text);
+    if (!flat || lines.at(-2) !== flat || near.some((l) => /^[A-Z ]+\. /.test(l))) problems.push(`screen: the panel of (${st.wx}, ${st.wy}) shows "${lines.at(-2)}", not its Flat line "${flat}"`);
+    out.landmarkLine = flat;
     out.regionLine = `${t.region}: "${(R?.line || "").slice(0, 40)}…"`;
   }
   // The browser game's world (config.js WORLD, read by main.js; the last wiring merge): the real one, unless the URL
