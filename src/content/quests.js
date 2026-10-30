@@ -375,7 +375,7 @@ export const QUESTS = {
       { id: "seventhHour", title: "The Seventh Hour", requires: { items: ["hourHand"] }, act: "Set the hand and turn the dial forward.",
         text: "The new hand seats with a sound like a door. The Afternoon begins: long shadows, long rests, pressings at dusk. You rule it as the Seventh Hour, and the dial turns on, through evening and night, to the dawn of a new day of the world.", legacy: true },
       { id: "wholeNoon", title: "Whole Noon", requires: { items: ["noonglass"], rep: { flatfolk: "warm", lampless: "warm" } }, act: "Focus the noon light through the Noonglass and cast Noon's shadow back onto her.",
-        text: "The Noonglass gathers the noon and lays it down the Socket. Vesper's shadow runs back along it to Noon's feet, and stays there. The Shade lifts. The Plane opens. Far off in Hollowmere, Ess and Tee stand up." },
+        text: "The Noonglass gathers the noon and lays it down the Socket. Noon's shadow runs back along it to her feet, and stays there. The Shade lifts. The Plane opens. Far off in Hollowmere, Ess and Tee stand up." },
       { id: "pressing", title: "The Pressing", requires: { any: [{ alliance: "assize" }, { rep: { pressed: "bright" } }] }, act: "Give Vesper the Cube.",
         text: "Vesper takes the Cube and turns it once. The noon Hand runs out across the world, all the way to Hollowmere, and the world lies down. You rise out of your own eyes, back up above. The map is all there is now. It is very easy to read." },
     ],
