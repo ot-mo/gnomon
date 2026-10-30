@@ -291,6 +291,11 @@ function flatStep(game, dx, dy, nx, ny) {
   const { zone, player: p } = game;
   const kind = zone.kind[nx + ny * zone.w];
   if (kind === KIND.WALL) return false;
+  // A gate the landmarks' puzzles keep shut is sealed to the floor (the Gnomon's door, the true level's: B2): the Plane
+  // doesn't get under it, as it does under an ordinary door or gate.
+  const sealed = (zone.needleDoor && !zone.needleDoor.open && zone.needleDoor.cells.some(([x, y]) => x === nx && y === ny))
+    || (zone.trueLevel && !zone.trueLevel.solved && zone.trueLevel.gate.some(([x, y]) => x === nx && y === ny));
+  if (sealed) { game.log("The gate is sealed to the floor. Not even the Plane gets under it.", [220, 220, 230]); return false; }
   if (kind === KIND.LEVER || zone.get(nx, ny, FLOOR_Z) === B.BRAZIER || usableAt(game, nx, ny, { legacy: false }) >= 0) {
     game.log("You can't work that from the Plane: it stands up out of it.", [220, 220, 230]);
     return false;

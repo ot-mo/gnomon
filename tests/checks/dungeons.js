@@ -726,7 +726,7 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
   // The Gnomon's door (C1b #26, #10): shut over the stair at 09:00 and 14:00, open from 11:00 to 13:00 (by the clock while
   // you stand there); outside them the Cube turned on the threshold opens it for good for 10 max HP (asked first), the
   // Plumb Key opens it for nothing, and with neither it stays shut.
-  const { maxHp } = await import("../../src/stats.js"), { catchUp } = await import("../../src/clock.js");
+  const { maxHp } = await import("../../src/stats.js"), { catchUp } = await import("../../src/clock.js"), st0 = await import("../../src/status.js");
   const gn = game.run.world.landmarks.get("gnomon"), gk = `${gn.wx},${gn.wy},0`;
   const atHour = (h) => { game.time = (h - 6) * 60 + 24 * 60 * Math.floor((game.time + 1) / (24 * 60)); };
   const gnomonDoor = (h, setup) => {
@@ -755,7 +755,14 @@ export async function checkLandmarkBottoms({ seeds = SEEDS } = {}) {
   const dn = gnomonDoor(14);
   useColumn(game, ...dn.cells[0]); useColumn(game, ...dn.cells[0]);
   const none = shut(dn);
-  stats.gnomonDoor = { g9, g12, g14, clock: before && opened && closed, asked: !ask && asked, cube, key, none };
+  // Flat, you don't slide under it either (the Plane gets under an ordinary gate).
+  const [nx, ny] = dn.cells[0];
+  Object.assign(game.player, { x: nx + 0.5, y: ny + 1.5, z: game.zone.stand[nx + (ny + 1) * game.zone.w], onGround: true });
+  st0.addStatus(game, game.player, "flat", { t: 5 }); game.view = "map";
+  mapStep(game, 0, -1);
+  const flatHeld = game.zone.key === gk && Math.floor(game.player.y) === ny + 1;
+  st0.removeStatus(game, game.player, "flat");
+  stats.gnomonDoor = { g9, g12, g14, clock: before && opened && closed, asked: !ask && asked, cube, key, none, flatHeld };
   expect(Object.values(stats.gnomonDoor).every(Boolean), `in a game: the Gnomon's door ${JSON.stringify(stats.gnomonDoor)}`);
   // The gimmicks' code (C1b #10), in a game:
   //   the Metronome's off-beat doors: a door held on the beat, open on the off-beat;
