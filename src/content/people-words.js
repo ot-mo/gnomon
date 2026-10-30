@@ -31,7 +31,7 @@ export const PEOPLE_WORDS = {
   hallen: { role: "villager", greet: "Mind the reeds, they're somebody's supper. Noon keep you.",
     who: "Reeve Hallen. I hold the roll, the weir rights and the arguments.",
     topics: [["Your son?", "Tovi went east with the Survey a year ago. He writes when the Survey remembers to post things, which is never."]],
-    after: { beat5: "You found Tovi. Flat, they said, and now he isn't. I don't know what to pay for that, so I won't insult you." } },
+    after: { beat5: "You've been to the Pressyard. If you saw Tovi, tell me slowly. If you didn't, tell me that slowly too." } },
   mira: { role: "merchant", greet: "Interesting. Don't move, you're in my line.",
     who: "Mira, the Survey's cartographer for this block. I sell Location readings, and I'm usually right.",
     topics: [["Why the Survey?", "The Survey measured the world when nobody asked. Now everyone asks, and we're the only ones with numbers."]] },
