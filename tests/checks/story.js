@@ -869,7 +869,7 @@ async function campaign7b(env, { fail, stats, real, test, json, game, startRun }
   if (!CAM.beginCampaign(game) || CAM.beginCampaign(game) || open() !== "beat1") fail(`the start: ${open()}`);
   at("kettleMesa", 2);
   if (open() !== "beat1") fail("beat 1 finished on the wrong floor");
-  const p = game.player, lv = p.level;
+  const p = game.player, lv = p.level, gain0 = p.maxHpGain || 0, inv0 = p.inv.length, rep0 = { ...(game.state.rep || {}) };
   const finish = (b) => (b.done.event === "secret" ? events.emit(game, "secret", { id: b.done.id, kind: "history" }) : at(b.done.landmark, b.done.z));
   for (const b of B.slice(0, 6)) finish(b);
   if (open() !== "beat7,beat8") fail(`after beat 6: ${open()}`);
@@ -883,10 +883,100 @@ async function campaign7b(env, { fail, stats, real, test, json, game, startRun }
   const q10 = game.quests.find((q) => q.id === "beat10");
   if (q10?.reward?.xp !== Math.round(CAM.BEAT_XP(B[9].band[0]) * 1.5)) fail(`beat 10's early bonus: ${q10?.reward?.xp}`);
   if (json(beats) !== json([1, 2, 3, 4, 5, 6, 8, 7, 9, 10, 11]) || json(lengthen) !== json([5, 7, 9]) || open() !== "") fail(`beats ${json(beats)}, the Lengthening after ${json(lengthen)}`);
+  stats.beatsPaid = await beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json });
   offB(); offL();
   game.run = keep.run; game.quests = keep.quests; game.state.campaign = keep.campaign;
   stats.campaign = `11 beats as data at their landmarks' floors; the start on the real world gives beat 1 (none on the test world, whose intro stays the parent's); ` +
     `beats done by their events in order, 8 before 7, 9 after both; the Lengthening after beats ${json(lengthen)}; beat 10 begun early ×1.5`;
+}
+
+// A beat's offer, reward and choice and the campaign's things (the integrator, C5 #5 and #6; story/beats.js), on the
+// eleven beats just done: the quest items in your pack (the Assize plumb-seal, the Plumb Key), C4's plumb-bob made and
+// known, Maren's +5 max HP, beat 9's Survey rep at its low end, Noon's Face (and a turn then leaves you untouchable for
+// 1 s, every 8 s at most), Noon's Flat Account read; what can't be made yet owed (the unpress lens, the Great
+// Theodolite) and paid once it can; each beat's journal text its goal and routes. The choices: open for every done beat
+// but those byRoute (6 and 8); at the giver (each word of the beat's giver in the talker's name) "About ..." with its
+// options, which pay rep, glim and the ambush; a beat with no giver asks on its own (campaign:choice); "What's wrong?"
+// tells an open beat's offer at its giver.
+async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json }) {
+  const BT = await env.src("story/beats.js"), T = await env.src("talk.js"), SEC = await env.src("story/secrets.js");
+  const J = await env.src("story/journal.js"), PLAY = await env.src("screens/play.js"), ST = await env.src("status.js");
+  const F = await env.src("factions.js"), base = (f) => F.repOf({ state: { rep: {} }, player: p }, f);   // (a faction's start, where rep0 has none)
+  const C = game.state.campaign, has = (pred) => p.inv.some(pred), rep = (f) => F.repOf(game, f) - (f in rep0 ? rep0[f] : base(f));
+  if (!has((it) => it.kind === "quest" && it.id === "assizeSeal" && it.name === "Assize plumb-seal") || !has((it) => it.kind === "quest" && it.id === "plumbKey"))
+    fail("beats 1 and 10: the Assize plumb-seal or the Plumb Key isn't in your pack");
+  if (!has((it) => it.kind === "artifact" && it.id === "plumbBob" && it.known)) fail("beat 2: no known plumb-bob");
+  if ((p.maxHpGain || 0) - gain0 !== 5) fail(`beat 1: max HP +${(p.maxHpGain || 0) - gain0}, not +5`);
+  if (rep("survey") < 100) fail(`beat 9: Survey +${rep("survey")}`);
+  if (!C.faces?.includes("noon")) fail("beat 7: no Noon's Face");
+  const flat = "hist:noon:6:flat", known = !!SEC.secretDef(game.run, flat), read = !!J.journalOf(game).secrets[flat];
+  if (known !== read) fail(`beat 4: Noon's Flat Account ${known ? "not read" : "read without a def"}`);
+  const owed = (C.owed || []).map(([id]) => id).sort().join();
+  if (owed !== "greatTheodolite,unpressLens") fail(`owed: ${owed}`);
+  if (!B.every((b) => game.quests.find((q) => q.id === b.id)?.text === [b.goal, ...b.routes.map((r) => `- ${r}`)].join("\n"))) fail("a beat's journal text isn't its goal and routes");
+  // Owed, then paid once it can be made (a stand-in artifact registered for the test).
+  const A = (await env.src("content/items/artifacts.js")).ARTIFACTS;
+  A.unpressLens = { name: "unpress lens", vague: "a lens", class: "a planar", complexity: 5, charge: 0, value: 700, info: "(test)" };
+  const EV = await env.src("events.js");
+  try { EV.emit(game, "zone:enter", { zone: game.zone, how: "edge" }); } finally { delete A.unpressLens; }
+  if ((C.owed || []).map(([id]) => id).join() !== "greatTheodolite" || !has((it) => it.kind === "artifact" && it.id === "unpressLens")) fail(`the owed unpress lens wasn't paid once it could be made (${json(C.owed)})`);
+  // Noon's Face: a turn leaves you untouchable for 1 s, and not again for 8 s.
+  const cube = game.story.cube, mode = game.mode;
+  game.story.cube = true;
+  if (game.mode !== "map" && game.mode !== "explore") game.mode = "map";
+  delete p.cooldowns?.noonFace; ST.removeStatus?.(game, p, "guarded");
+  PLAY.toggleMap(game);
+  const guarded = ST.statusFlag(p, "untouchable"), cd = ST.cooldownLeft(p, "noonFace");
+  if (!guarded || !(cd > 7)) fail(`Noon's Face: untouchable ${guarded}, cooldown ${cd}`);
+  ST.removeStatus?.(game, p, "guarded");
+  PLAY.toggleMap(game);
+  if (ST.statusFlag(p, "untouchable")) fail("Noon's Face fired again within 8 s");
+  game.story.cube = cube; game.mode = mode; delete p.cooldowns?.noonFace;
+  // The choices.
+  const openIds = () => BT.choicesOpen(game).map((o) => `${o.beat.id}.${o.choice.id}`).join();
+  const want = "beat1.seal,beat2.reading,beat3.smuggler,beat4.warning,beat5.saffre,beat5.village,beat7.noon,beat9.fire,beat10.hierarch";
+  if (openIds() !== want) fail(`choices open: ${openIds()}`);
+  const talker = (name, dialogue) => ({ id: -2, type: "villager", name, vis: {}, talk: { dialogue, state: {}, met: true } });
+  const pick = (c, label, text) => {
+    const root = T.talkTo(game, c), o = root?.options.find((x) => x.label === label), n = o?.go();
+    const opt = n?.options?.find((x) => x.label === text);
+    if (!opt) return false;
+    opt.go();
+    return true;
+  };
+  const maren = talker("Maren", "maren@real"), qv = talker("Surveyor-General Teodor Quint-Vey", "quintVey");
+  const s0 = rep("survey"), h0 = rep("horary");
+  if (!pick(maren, "About the Assize plumb-seal...", "Give the seal to Mira.") || C.choices?.beat1?.seal !== "survey" || rep("survey") - s0 !== 100)
+    fail(`beat 1's choice at Maren: ${json(C.choices?.beat1)}, Survey +${rep("survey") - s0}`);
+  if (T.talkTo(game, maren).options.some((o) => /^About the Assize/.test(o.label))) fail("beat 1's choice still offered once made");
+  if (!pick(qv, "About the Datum reading...", "Sell it to the Horary. (The Seventh-Chimers will learn your name.)") || rep("horary") - h0 !== 150 || !C.ambushes?.includes("seventhChimers"))
+    fail(`beat 2's choice at Quint-Vey: ${json(C.choices?.beat2)}, Horary +${rep("horary") - h0}, ambushes ${json(C.ambushes)}`);
+  // (Benchmark's leech shares only "the" with beat 4's giver, Kay of the Long Line: not enough.)
+  if (T.talkTo(game, talker("the leech", "benchmarkLeech")).options.some((o) => /^About /.test(o.label))) fail("the leech is offered a choice that isn't hers");
+  // A beat with no giver (5, 7) asks on its own: the beat as the speaker, its choice and nothing else to leave by.
+  if (C.asking !== "beat7") fail(`asking: ${C.asking}`);
+  // ...and once you're in the world, the talk screen opens on its own with the beat as the speaker.
+  {
+    const EVs = await env.src("events.js"), SCR = await env.src("screens.js"), mode0 = game.mode;
+    if (game.mode !== "map" && game.mode !== "explore") game.mode = "map";
+    EVs.runUpdates(game, 0.016);
+    const t = game.talk, asked = game.mode === "talk" && t?.npc?.name === B[6].title && t.node?.options?.some((o) => o.label === "Promise Noon to hold the noon.");
+    if (game.mode === "talk") { game.talk = null; SCR.popMode(game); }
+    game.mode = mode0;
+    if (!asked) fail(`beat 7's choice didn't open on its own (mode ${game.mode}, ${t?.npc?.name})`);
+  }
+  const page = T.talkTo(game, { id: -1, type: "campaign", name: B[4].title, vis: {}, talk: { dialogue: "campaign:choice", state: { beat: "beat5" }, met: true } });
+  if (!page || page.options.length < 2 || !page.options.some((o) => o.label === "Expose House Saffre.")) fail(`beat 5's own page: ${json(page?.options?.map((o) => o.label))}`);
+  page.options.find((o) => o.label.startsWith("Take its silence money")).go();
+  if (C.choices?.beat5?.saffre !== "silence" || rep("chandlers") < 200) fail(`beat 5's choice: ${json(C.choices?.beat5)}`);
+  // "What's wrong?": an open beat's offer at its giver.
+  const keepQ = game.quests;
+  game.quests = [{ id: "beat2", template: "beat", done: false }];
+  const offer = T.talkTo(game, qv).options.find((o) => o.label === "What's wrong?")?.go();
+  game.quests = keepQ;
+  if (offer?.text !== B[1].offer) fail(`beat 2's offer at Quint-Vey: ${offer?.text}`);
+  return `11 beats paid (the plumb-seal and Plumb Key, the plumb-bob known, +5 max HP, Survey +${rep("survey")}, Noon's Face and its turn, the Flat Account ${known ? "read" : "has no def"}; ` +
+    `the unpress lens and Great Theodolite owed, the lens paid once made); ${want.split(",").length} choices open, two made at their givers, beat 5's on its own page; the offer at the giver; journal routes; ${p.inv.length - inv0} more in the pack`;
 }
 
 // --- 10. The peoples' content (C2) ----------------------------------------------------------------------------------

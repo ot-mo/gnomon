@@ -63,7 +63,8 @@ registerQuest("beat", {
 
 function startBeat(game, beat, quiet = false) {
   if (!beat || game.quests?.some((q) => q.id === beat.id)) return null;
-  const q = startQuest(game, "beat", { id: beat.id, title: `${beat.n}. ${beat.title}`, text: beat.goal, quiet,
+  // (its routes under its goal in the journal, the ways through the bible gives: C5 #5)
+  const q = startQuest(game, "beat", { id: beat.id, title: `${beat.n}. ${beat.title}`, text: [beat.goal, ...(beat.routes || []).map((r) => `- ${r}`)].join("\n"), quiet,
     vars: { beat: beat.id, startedAt: game.player?.level ?? 1 }, target: { landmark: beat.landmark } });
   return q;
 }

@@ -226,6 +226,11 @@ function foldPowers(game) {
   const p = game.player;
   const guard = bonus(p, "foldGuard");
   if (guard > 0) addStatus(game, p, "guarded", { t: guard, stack: "refresh" });
+  // Noon's Face, the Cube's sixth face (beat 7's reward, story/beats.js): 1 s untouchable a turn, every 8 s at most.
+  if (game.state?.campaign?.faces?.includes("noon") && !(cooldownLeft(p, "noonFace") > 0)) {
+    addStatus(game, p, "guarded", { t: 1, stack: "max" });
+    startCooldown(p, "noonFace", 8);
+  }
   if (hasKey(p.perks, "foldingStrike") && !(cooldownLeft(p, "foldingStrike") > 0)) {
     const near = hostilesTo(game, p).filter((m) => Math.hypot(m.x - p.x, m.y - p.y) < 1.9 && !m.guardian);
     if (near.length) {
