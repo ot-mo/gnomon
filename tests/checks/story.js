@@ -457,7 +457,7 @@ export async function run(env) {
   // --- Part 7b -----------------------------------------------------------------------------------------------------
   await villages7b(env, { fail, stats, test, real, json, startRun, game });
   await quests7b(env, { fail, stats, test, json, startRun, game });
-  await campaign7b(env, { fail, stats, real, test, json, game, startRun });
+  await campaign7b(env, { fail, stats, real, test, json, game, startRun, capture });
   await peoplesC2(env, { fail, stats });   // C2
   await storyC5(env, { fail, stats, json, game });   // C5
   return { name: NAME, ok: problems.length === 0, problems, stats };
@@ -817,7 +817,7 @@ async function quests7b(env, { fail, stats, test, json, startRun, game }) {
 // the intro, the starter chain. The engine: no campaign on the test world (the parent's story stays); on the real world the
 // start gives beat 1, each beat's event finishes it and starts the next; a wrong floor doesn't; 7 and 8 in either order,
 // 9 only after both; the Lengthening three times (after 5, the first of 7 and 8, and 9); the early bonus × 1.5.
-async function campaign7b(env, { fail, stats, real, test, json, game, startRun }) {
+async function campaign7b(env, { fail, stats, real, test, json, game, startRun, capture }) {
   const CAM = await env.src("story/campaign.js"), RUN = await env.src("world/run.js"), events = await env.src("events.js");
   const { INTRO } = await env.src("story/legacy.js"), { xpToNext } = await env.src("leveling.js");
   const B = CAM.CAMPAIGN.beats;
@@ -887,7 +887,7 @@ async function campaign7b(env, { fail, stats, real, test, json, game, startRun }
   const q10 = game.quests.find((q) => q.id === "beat10");
   if (q10?.reward?.xp !== Math.round(CAM.BEAT_XP(B[9].band[0]) * 1.5)) fail(`beat 10's early bonus: ${q10?.reward?.xp}`);
   if (json(beats) !== json([1, 2, 3, 4, 5, 6, 8, 7, 9, 10, 11]) || json(lengthen) !== json([5, 7, 9]) || open() !== "") fail(`beats ${json(beats)}, the Lengthening after ${json(lengthen)}`);
-  stats.beatsPaid = await beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json });
+  stats.beatsPaid = await beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json, capture });
   stats.corner = await cornerPetted(env, { fail, game, p });
   stats.questPools = await questPools(env, { fail, real, test, RUN });
   stats.routes = await beatRoutes(env, { fail, game, CAM, at, p });
@@ -906,7 +906,7 @@ async function campaign7b(env, { fail, stats, real, test, json, game, startRun }
 // but those byRoute (6 and 8); at the giver (each word of the beat's giver in the talker's name) "About ..." with its
 // options, which pay rep, glim and the ambush; a beat with no giver asks on its own (campaign:choice); "What's wrong?"
 // tells an open beat's offer at its giver.
-async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json }) {
+async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json, capture }) {
   const BT = await env.src("story/beats.js"), T = await env.src("talk.js"), SEC = await env.src("story/secrets.js");
   const J = await env.src("story/journal.js"), PLAY = await env.src("screens/play.js"), ST = await env.src("status.js");
   const F = await env.src("factions.js"), base = (f) => F.repOf({ state: { rep: {} }, player: p }, f);   // (a faction's start, where rep0 has none)
@@ -969,6 +969,17 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json }) {
     if (game.mode !== "map" && game.mode !== "explore") game.mode = "map";
     EVs.runUpdates(game, 0.016);
     const t = game.talk, asked = game.mode === "talk" && t?.npc?.name === B[6].title && t.node?.options?.some((o) => o.label === "Promise Noon to hold the noon.");
+    // ...and the frame draws: the box titled by the beat (it has no creature type; verification finding on 37da06f, the
+    // game froze here), and a placed person's box by its own name and title, not its type's ("a Chandler").
+    const GM = await env.src("game.js"), DLG = await env.src("dialogue.js"), screen = () => (capture.chars || []).join("");
+    let drawn = null;
+    try { GM.draw(); drawn = screen(); } catch (e) { fail(`drawing beat 7's own page threw: ${e.message}`); }
+    if (drawn !== null && !drawn.includes(B[6].title)) fail("beat 7's page doesn't show the beat's title");
+    if (game.mode === "talk") { game.talk = null; SCR.popMode(game); }
+    DLG.openTalk(game, { id: -6, type: "chandler", name: "Mother Saffre", title: "factor of Chandler House Saffre", color: [244, 210, 110], vis: {}, talk: { dialogue: "saffre", state: {}, met: true } });
+    try { GM.draw(); if (!screen().includes("Mother Saffre, factor of Chandler House Saffre")) fail("a placed person's talk box isn't titled by her own name and title"); }
+    catch (e) { fail(`drawing Saffre's talk threw: ${e.message}`); }
+    if (game.mode === "talk") { game.talk = null; SCR.popMode(game); }
     if (game.mode === "talk") { game.talk = null; SCR.popMode(game); }
     game.mode = mode0;
     if (!asked) fail(`beat 7's choice didn't open on its own (mode ${game.mode}, ${t?.npc?.name})`);

@@ -126,7 +126,10 @@ export function talkClick(game, cell) {
 export function talkHover(game, cell) { const k = optionUnder(cell); if (k >= 0 && game.talk) game.talk.sel = k; }
 
 export function drawTalk(game) {
-  const t = game.talk, type = typeOf(t.npc);
+  // The speaker by its own name, title and colour (a landmark person, a villager with a name of their own), else its
+  // type's; one with no type (a campaign beat's own page, story/beats.js) by its name alone.
+  const t = game.talk, npc = t.npc, kind = typeOf(npc) || {};
+  const type = { name: npc.name ?? kind.name, title: npc.title ?? kind.title, color: npc.color ?? kind.color ?? [230, 230, 230] };
   if (t.width !== TEXT_WIDTH()) layOut(t);
   const w = Math.min(S.cols - 4, 86), inner = w - 6;
   const text = t.lines;
