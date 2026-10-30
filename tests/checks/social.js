@@ -1897,6 +1897,7 @@ export async function run(env) {
       const zone = game.zone, savedSite = zone.siteId;
       zone.siteId = site.id;
       const thug = creatures.spawnCreature("goblin", Math.floor(p().x) + 3, Math.floor(p().y), p().z, { rng: R, level: 3 }); creatures.addCreature(zone, thug);
+      const raider = mob("rustbacks", null, { x: Math.floor(p().x) + 4, y: Math.floor(p().y) + 1 }); creatures.addCreature(zone, raider);   // (one with a faction of its own joins too: review 3)
       zone.bottomLoot = { relic: null };
       zone.set(Math.floor(p().x) + 6, Math.floor(p().y), FLOOR_Z - 1, (await m("blocks.js")).B.ALTAR);
       events.emit(game, "zone:enter", { zone, how: "walk" });
@@ -1906,6 +1907,7 @@ export async function run(env) {
       if (F.attitude(game, thug, p()) !== "hostile") fail("a cultist at −500 isn't out for you");
       game.state.journal = { ...(game.state.journal || {}), cultPass: { [R0.id]: 0 } };
       if (F.attitude(game, thug, p()) !== "neutral") fail("with the cult pass, a cultist in its site isn't neutral");
+      if (raider.faction?.[cid] !== 1 || raider.faction?.rustbacks !== 0.5 || F.attitude(game, raider, p()) !== "neutral") fail(`a Rustback on the cult's floor: ${JSON.stringify(raider.faction)}, ${F.attitude(game, raider, p())} with the pass`);
       events.emit(game, "zone:enter", { zone, how: "walk" });
       if (zone.creatures.filter((c) => c.hourbound).length !== 1) fail("a second Hourbound");
       // Its armour: in 3D in good light, the event's Deep Inscription learned.

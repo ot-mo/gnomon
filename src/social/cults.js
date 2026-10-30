@@ -59,7 +59,9 @@ on("zone:enter", (game, ev) => {
   const zone = ev.zone, site = zone?.siteId && game.run?.sites?.get(zone.siteId);
   const id = cultOfSite(game, site);
   if (!id || !game.state || !ensureCult(game, id)) return;
-  for (const c of zone.creatures) if (!c.talk && !membershipsOf(c).length && !c.brain?.leader) c.faction = { [id]: 1 };
+  // Every creature of the floor joins (its own factions kept beside, at half: a goblin of the cult is still a goblin).
+  for (const c of zone.creatures) if (!c.talk && !c.brain?.leader && !membershipsOf(c).some(([f]) => f === id))
+    c.faction = { ...Object.fromEntries(membershipsOf(c).map(([f, w]) => [f, Math.min(0.5, w)])), [id]: 1 };
   if (!zone.bottomLoot || site.kind === "village") return;   // (the reliquary: the floor whose hall holds the relic's altar)
   const uid = `hourbound:${site.id}`, st = cstate(game);
   if (st.leaders[uid] === "dead" || zone.creatures.some((c) => c.uid === uid)) return;
