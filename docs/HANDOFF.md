@@ -5,12 +5,12 @@ Update this file as the last act of every session (see `CLAUDE.md`, "Handing off
 **Updated:** 2026-10-30, the integrator (local session), on `integration`. **Phases 1 and 2 are done; Phase 3 is under
 way.** all six content sessions are merged (`p3i-c1a`, `p3i-c4`, `p3i-c2`, `p3i-c3`, `p3i-c1b`, `p3i-c5`), and §8.5's last wiring merge is done
 (`p3i-wiring`): **new games start on GNOMON's real world at Hollowmere** (`?world=test` for the test world). `main` =
-`p4i-b3` (B3's peoples and villages merged, on `p4i-beats`: C5's beats paid with their choices, barks, routes, Corner and village pools by region, on `p4i-people`, the landmark people placed, on `p3i-lightweapons`: the user's balance decisions of 2026-10-30 applied: creature scaling under d20, two species fixes, enchantment AV, fists, and light weapons by rule B; ttkTables' bounds on a typical build). **The backlog runs in four parts** (the user, 2026-10-30: "start everything that you can start"): B1, B2 and B3 in their worktrees from `p3i-lightweapons`, the integrator on the story (next step, below). From here on only the integrator edits this file and
+`p4i-b2` (B2's landmarks and dungeons merged, on `p4i-b3`, B3's peoples and villages merged, on `p4i-beats`: C5's beats paid with their choices, barks, routes, Corner and village pools by region, on `p4i-people`, the landmark people placed, on `p3i-lightweapons`: the user's balance decisions of 2026-10-30 applied: creature scaling under d20, two species fixes, enchantment AV, fists, and light weapons by rule B; ttkTables' bounds on a typical build). **The backlog runs in four parts** (the user, 2026-10-30: "start everything that you can start"): B1, B2 and B3 in their worktrees from `p3i-lightweapons`, the integrator on the story (next step, below). From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p4i-b3` (`p4b-b3` merged, on `p4i-beats`) on `integration`; before it `p4i-beats` (C5 #5, #6, #9, #11, #13 in part, #14, on `p4i-people`), `p4i-people` (C5 #3 with C1b #18: the landmark people placed, on `p3i-lightweapons`), `p3i-lightweapons` (light weapons, rule B, on `p3i-balance`), `p3i-balance` (the balance decisions of 2026-10-30, on `p3i-c5`), the Phase 3 merges (`p3i-c5`, `p3i-c1b`, `p3i-c3`, `p3i-c2`, `p3i-c4`, `p3i-wiring`, `p3i-c1a`), `p3i-sinkholes` (C1a's request 9, on `p3i-props`), `p3i-props` (props named; C1a's, C4's and C2's base), `p2-realworld`, `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+- **Last tag:** `p4i-b2` (`p4b-b2` merged, on `p4i-b3`) on `integration`; before it `p4i-b3` (`p4b-b3` merged, on `p4i-beats`), `p4i-beats` (C5 #5, #6, #9, #11, #13 in part, #14, on `p4i-people`), `p4i-people` (C5 #3 with C1b #18: the landmark people placed, on `p3i-lightweapons`), `p3i-lightweapons` (light weapons, rule B, on `p3i-balance`), `p3i-balance` (the balance decisions of 2026-10-30, on `p3i-c5`), the Phase 3 merges (`p3i-c5`, `p3i-c1b`, `p3i-c3`, `p3i-c2`, `p3i-c4`, `p3i-wiring`, `p3i-c1a`), `p3i-sinkholes` (C1a's request 9, on `p3i-props`), `p3i-props` (props named; C1a's, C4's and C2's base), `p2-realworld`, `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
   `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b`, `p1-ws10`, the flip, `p1-ws2a`, `p1-ws7a`,
   `p1-ws7b`, `p1-ws2b`, `p1-ws9` and `p1-ws1`, with their integration requests; `p2-ws3` … `p2-ws9` before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
@@ -45,7 +45,7 @@ the real world the default: then `main.js`'s `?world=real` branch and its cube h
 or go with it; browser-2b part 3 and check-overworld's 7 URLs follow).
 
 **Next step:** the backlog in four parts, all from `p3i-lightweapons` (the user, 2026-10-30: "start everything that you can start"; the coordinating session split it, its rules in the side-session notes' `backlog-rules.md`):
-- **The integrator**, on `integration`: the story, C5 #3-#14 (C1b #18, who stands where, with #3); #3 is done (`p4i-people`), #5, #6, #9, #11, #14 and #13's first part (`p4i-beats`); `p4b-b3` is merged (`p4i-b3`, GEN 8); next `p4b-b2` (its `WORLD.version` 4, GEN bumped again, and the people on its places), then `p4b-b1` once its tier-8 retune is approved, then #4 (the starter chain), #12 (the dungeons' people, on B2's floors), #7, #8, #10 and #13's rest; and it merges `p4b-b1`, `p4b-b2` and `p4b-b3` as they come, as a content tag, its merges setting `GEN_VERSION`.
+- **The integrator**, on `integration`: the story, C5 #3-#14 (C1b #18, who stands where, with #3); #3 is done (`p4i-people`), #5, #6, #9, #11, #14 and #13's first part (`p4i-beats`); `p4b-b3` and `p4b-b2` are merged (`p4i-b3`, GEN 8; `p4i-b2`, WORLD.version 4); next C5 #12, the people on B2's places (`docs/b2.md` "Requests" 3: the Hierarch on `27,2,-2`, the signaller's and the Map Room's services, the seal at `zone.clue` with beat 1's reward giving it no more, Tovi at `zone.captive`, the prisoners with Lio, `game.state.stradeAlly`, the Plumb Key), then `p4b-b1` once its tier-8 retune is approved, then #4 (the starter chain), #12 (the dungeons' people, on B2's floors), #7, #8, #10 and #13's rest; and it merges `p4b-b1`, `p4b-b2` and `p4b-b3` as they come, as a content tag, its merges setting `GEN_VERSION`.
 - **B1, gear and powers**: `C:\Users\Otto Mörner\Code\gnomon-wt\b1`, `ws/b1`, tag `p4b-b1`. C4 #1, #2 (with C2 #12), #4-#10, #12-#14; WS5 #8, #9, #19; WS4 #16, #19; WS6b #3; POWERS' needs but B3's.
 - **B2, landmarks and dungeons**: `gnomon-wt\b2`, `ws/b2`, tag `p4b-b2`. C1a #5; C1b #1-#17 and #19-#26 (not #18); WS10 #9. It builds the places, the integrator places the people; the bottoms (the Grub Mother, the Press-Master, the Gloam Warden, the Escapement, the Drowned Bellwether, Noon, the relics) are B2's as places and creatures, Vesper's phases, the endings and the barks the integrator's. C5 #12's Hierarch waits on B2's floors up (C1b #8), which B2 builds first.
 - **B3, peoples and villages**: `gnomon-wt\b3`, `ws/b3`, tag `p4b-b3`. C2 #3, #5-#9, #11, #13; WS10 #6; the lore powers (Hour script, Gossip, Triangulator); Oil fire, Brew, Chime; WS6b's stock and `buys`.
@@ -396,6 +396,22 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p4i-b2`** (2026-10-30): `p4b-b2` (f92c760, B2: landmarks and dungeons, from `p3i-lightweapons`) merged into `integration`
+on `p4i-b3`. Two conflicts, resolved keeping both sides: `story/murals.js` (B3's Hour script, `hasKey` and `nextAccount`;
+B2's landmark lines, `dialFloorReading`; one inspect handler reading both) and `tests/checks/landmarks.js` (both import
+blocks). What it brings is in `docs/b2.md`: the bottoms, halls, murals, the Square's floors up (`27,2,-1`, `27,2,-2`), the
+gimmicks' code, the clue and captive places, the prisoners' cells, the far mouth, the culvert, Folio's door, the nests, the
+billboards, the Keeper's Stair's levels, each dungeon's own inhabitants. **`WORLD.version` 3 → 4** (every real-world
+landmark dungeon and five surfaces generate differently; `GEN_VERSION` stays 8: `buildRun` unchanged; golden 86/86).
+B2's requests (`docs/b2.md` "Requests"): 1 the bosses' kinds (`pressMaster`, `noon`, `vesper`: C3/C5, the integrator;
+the Escapement wants the Colossus's rules for a non-guardian), 2 the Noonglass (C4's waiting artifact, B1), 3 who stands
+where (the integrator's C5 #12, next), 4 the Square's Rule-banners and patrols (hooks in player, fall damage, combat; C3's
+row-charging), 5 creature rules the gimmicks lean on (C3), 6 Kettle Mesa's floor 1 in daylight (WS3's renderer). The
+seal: B2 lays the place (`zone.clue`), not the item; #12 puts the seal there and beat 1's reward gives it no more.
+Checks: `run-all` 37 of 38 under load (check-overworld's world-map draw, 3.02-4.3 ms; alone all ten parts pass,
+1.29-2.17 ms); the real world's bot playthrough; browser-gate (1234, 7), browser-2b, browser-0d1 and browser-c3 pass
+(audio silenced, servers stopped).
 
 **`p4i-b3`** (2026-10-30): `p4b-b3` (e5e4df4, B3: peoples and villages, from `p3i-lightweapons`) merged into `integration`
 on `p4i-beats`, cleanly (`world/run.js` and `tests/checks/story.js` auto-merged). What it brings is in `docs/b3.md`: the
