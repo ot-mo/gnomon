@@ -186,7 +186,9 @@ export function checkContent(m) {
     }
     for (const id of Fg.FORGED.armour) need(I.ARMOURS[id], `forged armour ${id}: no such armour`);
     for (const id of Object.keys(Fg.VALUE)) need(I.WEAPONS[id] || I.ARMOURS[id] || m.c4.missiles.MISSILES[id], `value ${id}: no such weapon, armour or missile weapon`);
-    for (const [id, c] of Object.entries(Fg.CLASSES)) need(str(c.name) && (c.info === undefined || str(c.info)) && str(c.needs), `class ${id}: name, info and needs`);
+    // B1 (approved 2026-10-30): a class whose identity is built drops needs and says it in its info (check-combat's B1
+    // section asserts each such class's identity)
+    for (const [id, c] of Object.entries(Fg.CLASSES)) need(str(c.name) && (c.info === undefined || str(c.info)) && (str(c.needs) || str(c.info)), `class ${id}: name, info and needs`);
     for (const [id, t] of Object.entries(Tn.TONICS)) {
       need(str(t.name) && num(t.value) && t.value > 0 && num(t.t) && t.t > 0 && fn(t.info) && str(t.info(1)) && sentences(t.info(1)) <= 3 && str(t.info(0.5)) && fn(t.use) && fn(t.overdose),
         `tonic ${id}: name, value, time, info(k), use and overdose`);
