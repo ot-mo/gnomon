@@ -3,9 +3,9 @@
 Update this file as the last act of every session (see `CLAUDE.md`, "Handing off").
 
 **Updated:** 2026-10-30, the integrator (local session), on `integration`. **Phases 1 and 2 are done; Phase 3 is under
-way.** C1a, C4, C2 and C3 are merged (`p3i-c1a`, `p3i-c4`, `p3i-c2`, `p3i-c3`), and §8.5's last wiring merge is done
+way.** C1a, C4, C2, C3 and C1b are merged (`p3i-c1a`, `p3i-c4`, `p3i-c2`, `p3i-c3`, `p3i-c1b`), and §8.5's last wiring merge is done
 (`p3i-wiring`): **new games start on GNOMON's real world at Hollowmere** (`?world=test` for the test world). `main` =
-`p3i-c3`. C1b is running (asked to finish and tag); C5 after it. From here on only the integrator edits this file and
+`p3i-c1b`. Nothing is running; C5 is next, on the user's word. From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
@@ -44,7 +44,7 @@ Hollowmere, holding the cube (it has none to find yet); without the flag nothing
 the real world the default: then `main.js`'s `?world=real` branch and its cube hook go (`config.js` `WORLD` can stay
 or go with it; browser-2b part 3 and check-overworld's 7 URLs follow).
 
-**Next step:** merge C1b's tag when it comes (with C3's requests 12 and 15, C1's spawns and rows), then C5 on the user's word; the balance proposal (the user's decisions, 2026-10-30, under "Open items") fits around them. Before: **C1b and C3 were started** (the user, 2026-10-29: "start C1b (in the c1 worktree, merging p3i-c2 first)
+**Next step:** C5 (quests, the campaign, the landmark people's words), the last content session: its worktree from `p3i-c1b`, on the user's word (C1b, C2 and C3 are merged, as the plan asks); the balance proposal (the user's decisions, 2026-10-30, under "Open items") fits around them. Before: **C1b and C3 were started** (the user, 2026-10-29: "start C1b (in the c1 worktree, merging p3i-c2 first)
 and C3 (a new c3 worktree from p3i-c2)"); the integrator merges their tags as they come, then C5 starts on the user's
 word. Meanwhile:
 - **C1b and C3** (the Phase 3 plan's table), started: their worktrees from `p3i-c2` (`c1` again for C1b, on `ws/c1`; a new `c3` on
@@ -391,6 +391,19 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p3i-c1b`** (2026-10-30): `p3-c1b` (8f19dbb) merged into `integration`, cleanly: the other 15 landmarks on their plans
+(bible §5, §15.3), with their lines in three registers, people letters, dungeons' floors, gimmicks and bottoms as data,
+the Gnomon's foot. Requests applied, each with an assertion and a mutant: C1b #1 Halfnight's Middle and East Wards on
+their own plans (check-landmarks now checks them on the real run), #2 compileWorld keeps a landmark's lines, letters,
+below, holy, holyFloors and spanPlans, #16 the real world's `WORLD.version` 3, #19 each landmark dungeon's own
+inhabitants before the region's (100 floors checked); C3 #12 the new kinds in the biomes' surface spawns and #15 the
+surface folk out of the regions' dungeon rows (the moths, the wanderer and the pilgrim onto the Flats' and Tessellate's
+spawns; check-world's §15.2 key rule takes the rows or the biome's spawns). Left: C1b #3-#15, #17, #18, #20-#26 (holy
+places, the landmarks' registers shown, bottoms, vault floors, murals, floors up, the gimmicks' code…) for the backlog.
+Checks: `run-all` 37 of 38 (the world-map draw under load; alone 1.64 ms); `check-perf --against p3i-c3` alone PASS
+(surface p95 38.62, max 60.82 ms: the landmarks' plans, budget 150); browser-c3, browser-ws1, browser-2b, browser-gate,
+browser-0d1 PASS.
 
 **`p3i-c3`** (2026-10-30, the user's go via the coordinating session): `p3-c3` (efbfe83) merged into `integration`, cleanly:
 bible §12's 63 creatures (56 registered, 7 waiting on systems) with d20 numbers and three registers, encounter tables
