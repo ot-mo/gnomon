@@ -144,8 +144,8 @@ export const GEAR_ARMOURS = {
   // Arms
   buckler:       { name: "buckler", armour: 0, str: 9, tier: 2, metal: true, slot: "arm", block: 0.2,
                    info: "takes a fifth of the blows that would land on you" },   // (block: combat.js turnedAside, B1)
-  climbingHooks: { name: "climbing hooks", armour: 0, str: 0, tier: 2, metal: true, slot: "arm", climb: 2,
-                   needs: "climb 2 blocks on the map, grab walls in 3D (turns.js, player.js)" },
+  climbingHooks: { name: "climbing hooks", armour: 0, str: 0, tier: 2, metal: true, slot: "arm", climb: 2, info: "you climb 2 on the map",
+                   needs: "grab walls in 3D (player.js)" },   // (the map's climb: turns.js, B1)
   // Hands
   examiningKit:  { name: "examining kit", armour: 0, str: 0, tier: 1, metal: false, slot: "gloves", bonus: { examine: 2 } },
   inkGloves:     { name: "ink-gloves", armour: 0, str: 0, tier: 4, metal: false, slot: "gloves", markers: true,

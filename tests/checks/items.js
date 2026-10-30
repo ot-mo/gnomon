@@ -1228,7 +1228,7 @@ export function checkGear(m) {
     // since B1 a special that is built (a worn reputation).
     const LOOT_ARMOUR = ["leather", "chain", "scale", "plate", "copperCap", "ironHelm", "goggles", "cloak", "bracers", "gauntlets", "boots",
       "helm", "plumbHelm", "lampCrownHat", "monocle", "glassScale", "pleatedCoat", "reedCloak", "featherCloak", "mapCase", "kiteGlider", "examiningKit",
-      "stiltSandals", "stiltBoots", "featheredHood", "assizeWrit", "buckler"];   // (B1: the hood and the writ, their worn reputation built)
+      "stiltSandals", "stiltBoots", "featheredHood", "assizeWrit", "buckler", "climbingHooks"];   // (B1: the hood and the writ, their worn reputation built)
     const drawnArmour = new Set();
     const tally = {};
     for (let level = 1; level <= 30; level++) {
@@ -1732,6 +1732,10 @@ export function checkB1Gear(m) {
     p.body.implants.feet = { kind: "implant", id: "gripSoles" }; m.stats.invalidateStats(p);
     const withSoles = tryStep();
     p.body.implants.feet = null; m.stats.invalidateStats(p);
+    p.body.equip.arms = m.gear.makeGear("armour", "climbingHooks"); m.stats.invalidateStats(p);   // (the climbing hooks, C4 #6)
+    const withHooks = tryStep();
+    p.body.equip.arms = null; m.stats.invalidateStats(p);
+    if (!withHooks) fail("the climbing hooks: a 2-block step on the map refused");
     for (let k = 0; k < 2; k++) z.set(x, y, p.z + k, m.world.B.AIR);
     z.refresh();
     if (without || !withSoles) fail(`grip soles: a 2-block step on the map ${without ? "taken" : "refused"} without them, ${withSoles ? "taken" : "refused"} with them`);
