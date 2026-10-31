@@ -24,7 +24,7 @@ import { seededSort } from "./rng.js";
 import { hasKey } from "./keyset.js";
 import { RULES } from "./rules.js";
 import { POTIONS, SCROLLS, SYLLABLES, ELEMENTS, WEAPONS, ARMOURS, PROPERTIES, RINGS, AMULETS, RELICS, RELIC_COLOR } from "./content/items/legacy.js";
-import { MATERIALS } from "./content/items/forge.js";
+import { MATERIALS, REQUIRES, SCALING, MATERIAL_REQ, GRADES, GRADE_ORDER } from "./content/items/forge.js";
 export { POTIONS, POTION_COLORS, SCROLLS, ELEMENTS, WEAPONS, WEAPON_PALETTE, ARMOURS, PROPERTIES, RINGS, AMULETS, GEMS, RELICS,
   RELIC_COLOR, FLOOR_ART, makeRelic, pickRelic } from "./content/items/legacy.js";
 
@@ -90,6 +90,35 @@ export function strNeeded(it) {
   const base = (it.kind === "weapon" ? WEAPONS : ARMOURS)[it.id].str;
   // (B1, C4 #4: a material's own, pleatmetal's -3)
   return Math.max(0, base + (MATERIALS[it.made]?.strReq || 0) + (it.props || []).reduce((s, k) => s + (PROPERTIES[k].strReq || 0), 0));
+}
+
+// What an item asks of your attributes (B4): under the attribute set its REQUIRES row (forge.js) with its material's
+// shifts and a light armour's −3 STR; under the legacy set the parent's STR number (strNeeded). → { attr: n } (only
+// attributes above 0). scaling(it) → { attr: share a point }: the grades' GRADES (a material moves them a letter).
+// shortfall(it, have) → [{ attr, need, have }] for every attribute have(attr) falls short of.
+export function requirements(it) {
+  if (RULES.stats === "legacy") { const n = strNeeded(it); return n > 0 ? { str: n } : {}; }
+  const out = { ...(REQUIRES[it.id] || {}) }, m = MATERIAL_REQ[it.made];
+  for (const k in m?.req || {}) if (out[k]) out[k] += m.req[k];
+  for (const k in m?.min || {}) out[k] = Math.max(out[k] || 0, m.min[k]);
+  const light = (it.props || []).reduce((s, k) => s + (PROPERTIES[k].strReq || 0), 0);
+  if (light && out.str) out.str += light;
+  for (const k in out) if (!(out[k] > 0)) delete out[k];
+  return out;
+}
+export function scaling(it) {
+  const g = { ...(SCALING[it.id] || {}) }, m = MATERIAL_REQ[it.made];
+  for (const k in m?.grade || {}) {
+    const at = g[k] ? GRADE_ORDER.indexOf(g[k]) + m.grade[k] : m.grade[k] - 1;
+    if (at < 0) delete g[k]; else g[k] = GRADE_ORDER[Math.min(GRADE_ORDER.length - 1, at)];
+  }
+  return g;
+}
+export const gradeShare = (letter) => GRADES[letter] || 0;
+export function shortfall(it, have) {
+  const req = requirements(it), out = [];
+  for (const k in req) if (have(k) < req[k]) out.push({ attr: k, need: req[k], have: have(k) });
+  return out;
 }
 
 // The Repair power (B1, bible §10.8 Artificing): E on a broken thing mends it, a snapped bone weapon or a broken

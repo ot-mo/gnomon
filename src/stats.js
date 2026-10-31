@@ -36,7 +36,7 @@
 //   water: 1 = twice as long; status.js drowning; the bellows lung).
 // (`pv` from the tech design is gone: DECISIONS, no penetration dice.)
 import { RULES } from "./rules.js";
-import { itemBonuses, ITEM_KINDS } from "./items.js";
+import { itemBonuses, ITEM_KINDS, shortfall } from "./items.js";
 import { worn } from "./body.js";
 import { PERKS, perkRank } from "./leveling.js";
 import { hasKey, keysOf } from "./keyset.js";
@@ -130,14 +130,16 @@ export function maxHp(e) {
 // (ITEM_KINDS[kind].av, today only body armour) plus bonuses.
 export function av(e) {
   let body = 0;
-  for (const it of worn(e)) body += ITEM_KINDS[it.kind]?.av?.(it) || 0;
-  if (legacy()) return body + bonus(e, "armour");
+  if (legacy()) { for (const it of worn(e)) body += ITEM_KINDS[it.kind]?.av?.(it) || 0; return body + bonus(e, "armour"); }
+  for (const it of worn(e)) { const a = ITEM_KINDS[it.kind]?.av?.(it) || 0; body += unmetPiece(e, it) ? Math.floor(a / 2) : a; }   // (B4: not met, half)
   return body + bonus(e, "armour") + bonus(e, "av") + (e.naturalAv || 0);
 }
 export function dv(e, { unable = false } = {}) {
   if (unable) return 0;                                  // stunned or paralysed (status.js passes its noAct flag)
-  return RULES.dv.base + mod(e, "agi") + bonus(e, "dv");
+  return RULES.dv.base + mod(e, "agi") + bonus(e, "dv") - (legacy() ? 0 : worn(e).filter((it) => unmetPiece(e, it)).length);   // (B4: −1 a piece not met)
 }
+// An armour piece whose requirements you lack (B4; items.js shortfall).
+const unmetPiece = (e, it) => it.kind === "armour" && shortfall(it, (k) => attr(e, k)).length > 0;
 export const ma = (e) => RULES.ma.base + mod(e, "wil") + bonus(e, "ma");
 export const speedMul = (e) => 1 + bonus(e, "speed");   // haste is applied by whoever moves (× RULES.haste)
 export function cooldownMul(e) {

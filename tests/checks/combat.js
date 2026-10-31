@@ -49,7 +49,7 @@
 import { Zone, B, FLOOR_Z } from "../../src/world.js";
 import { enterZone, changeZone, cachedZone, zoneState } from "../../src/zones.js";
 import { spawnCreature, addCreature, CREATURE_TYPES, pickCreatureType, touchable, nearestCreature, witnessesOf, creaturesAlong } from "../../src/creatures.js";
-import { resolveAttack, rollToHit, hitChance, toHitMod, critNat, dvOf, weaponSpec, naturalSpec, playerMelee, bumpAttack, combatLine, thrownSpec, GEAR as COMBAT_GEAR } from "../../src/combat.js";
+import { resolveAttack, rollToHit, hitChance, toHitMod, critNat, dvOf, weaponSpec, naturalSpec, playerMelee, bumpAttack, combatLine, thrownSpec, unmetOf, GEAR as COMBAT_GEAR } from "../../src/combat.js";
 import { guardianThink } from "../../src/guardians.js";
 import { pushPlayerOut, killMonster } from "../../src/monsters.js";
 import { killXp, offerPowers, takePerk } from "../../src/leveling.js";
@@ -62,7 +62,7 @@ import { overrideRules, RULES } from "../../src/rules.js";
 import { invalidateStats, mod, attr, maxHp, av as armourValue, bonusTable, bonus } from "../../src/stats.js";
 import { makeBody } from "../../src/body.js";
 import { makeRng, distance } from "../../src/rng.js";
-import { WEAPONS, ARMOURS, ITEM_KINDS, strNeeded, useItem } from "../../src/items.js";
+import { WEAPONS, ARMOURS, ITEM_KINDS, strNeeded, useItem, scaling, gradeShare } from "../../src/items.js";
 import { on } from "../../src/events.js";
 import { setDaylight } from "../../src/light.js";
 import { setMode } from "../../src/screens.js";
@@ -1691,11 +1691,15 @@ export function typicalBuilds(game, pref = TYPICAL_PREF, buildSeed = 0) {
       wearTypical(p, build, level);
       const str = attr(p, "str");
       const blow = (it) => {
-        const w = WEAPONS[it.id], req = strNeeded(it);
-        const add = Math.round(((it.material || 0) + Math.floor((str - RULES.d20.strOver) / 2)) * w.swing / RULES.d20.swingRef);   // (combat.js)
-        return ((w.dmg[0] + w.dmg[1]) / 2 + add) * (1 - 0.1 * Math.min(6, 2 * Math.max(0, req - str)));
+        // (B4: what its line and your attributes promise: its grades' bonus, or used badly, ×reqDmg with nothing from
+        // your attributes; each point of the to-hit cost taken as 5% off)
+        const w = WEAPONS[it.id], D = RULES.d20, s = w.swing / D.swingRef, { miss, unmet } = unmetOf(p, it), g = scaling(it);
+        if (unmet) return ((w.dmg[0] + w.dmg[1]) / 2 + Math.round((it.material || 0) * s)) * D.reqDmg * (1 - 0.05 * Math.max(D.reqPenaltyMin, Math.min(D.reqPenaltyMax, D.reqPenalty * miss)));
+        let t = 0;
+        for (const k in g) t += gradeShare(g[k]) * (attr(p, k) - D.strOver) / 2;
+        return (w.dmg[0] + w.dmg[1]) / 2 + Math.round(((it.material || 0) + t) * s);
       };
-      const shown = (it) => ITEM_KINDS.armour.av({ ...it, ench: 0 });
+      const shown = (it) => { const a = ITEM_KINDS.armour.av({ ...it, ench: 0 }); return unmetOf(p, it).unmet ? Math.floor(a / 2) - 0.5 : a; };   // (B4: not met, half, and −1 DV)
       const kit = build.at[level].kit;
       kit.weapon = seenW.reduce((b, it) => (!b || blow({ ...it, ench: 0 }) > blow({ ...b, ench: 0 }) ? it : b), null);
       for (const it of seenA) {

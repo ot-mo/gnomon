@@ -39,7 +39,7 @@ const CORE = {
   // (tier 8: level 21 up) their health × tier8Hp and their damage − tier8Dmg (the user's decision of 2026-10-30, "Retune
   // tier 8", HP ×0.85 and damage −2, measured in the coordinator's b1-ttk-measured.md: a typical kill at tier 8 ~38%).
   d20: { die: 20, crit: 2, critPerAgi: 0.02, minCritNat: 2, highGround: 1, highGroundZ: 1, aimed: 3,
-         creatureDv: 5, dvPerLevels: 4, hitPerLevels: 3, reqPenalty: 2, reqPenaltyMax: 6, strOver: 10, swingRef: 0.7,
+         creatureDv: 5, dvPerLevels: 4, hitPerLevels: 3, reqPenalty: 2, reqPenaltyMin: 4, reqPenaltyMax: 8, reqDmg: 0.6, strOver: 10, swingRef: 0.7,
          creatureHp: 0.18, creatureDmg: 3, creatureDmgEvery: 1.5, tier8From: 21, tier8Hp: 0.85, tier8Dmg: 2 },   // B1
 
   // Attributes (bible §10.6): modifier = floor((score − center) / 2); everyone has `base` until WS4.

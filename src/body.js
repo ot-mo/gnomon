@@ -148,7 +148,7 @@ export function canEquip(game, e, it, partId = defaultPart(e, it)) {
   const ids = partsTaken(e, it, partId);
   if (!ids) return { ok: false, reason: "slot" };   // two-handed, one hand
   const need = ITEM_KINDS[it.kind]?.req?.(it)?.str;
-  if (need !== undefined && attr(e, "str") < need) return { ok: false, reason: "weak", need };
+  if (RULES.stats === "legacy" && need !== undefined && attr(e, "str") < need) return { ok: false, reason: "weak", need };   // (B4: the attribute set uses it badly instead)
   const stuck = occupants(e, ids).find((o) => o.ench < 0);
   if (stuck) return { ok: false, reason: "cursed", item: stuck };
   return { ok: true };
