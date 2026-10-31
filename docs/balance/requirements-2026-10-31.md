@@ -1,8 +1,8 @@
 # Attribute requirements and scaling grades (B4)
 
-Proposed for the user's approval (2026-10-31), on `p4i-six`. **Nothing in the game changes until you approve.** The
-numbers below were measured on a prototype on the branch `wip/b4-proto`, which is for measuring only and won't be
-merged. They come from the game's own `resolveAttack`, check-combat's `ttkTables` (the mean of the six build sets, as
+Proposed for the user's approval (2026-10-31), on `p4i-six`; **approved and built in `p4b-b4`** (see "Decided"). The
+numbers below were measured first on a prototype on the branch `wip/b4-proto`, which was for measuring only and won't be
+merged; `docs/sessions/b4.md` has them measured again on the built code. They come from the game's own `resolveAttack`, check-combat's `ttkTables` (the mean of the six build sets, as
 you decided on 2026-10-31, with the bounds unchanged) and three scripts in the session's scratch folder (`arch.mjs`,
 `dps.mjs`, `ttk.mjs`). Everything here is under the attribute set only (`RULES.stats === "attributes"`). The legacy
 set, golden (b) and the legacy fights keep the parent's single STR number.
@@ -13,20 +13,31 @@ weapons"; then: "make it more like Elden Ring's system, where attributes … can
 
 ## Decided (2026-10-31)
 
-The user, in the coordinating session, after the brief: "Then follow your plan for balancing". The coordinating
-session's ruling: build the recommendations below without asking again, and stop for the user only if the TTK tables
-leave their bounds, if the growth pace would change, or if anything under the legacy rules would change. So
-`p4b-b4` builds:
+The user's decisions, in the coordinating session, relayed to B4:
+- "Then follow your plan for balancing", after the brief.
+- **The "used badly" rule:** "no that sounds good". It was put to the user as: you can still use gear you don't meet
+  the requirements for, at a to-hit penalty, 60% damage and without its class power, as Elden Ring does it, or else
+  it could be truly locked.
+- **The growth pace:** "yes", to switching to a point every 3 levels as a follow-up after the requirements build.
 
+Built in `p4b-b4`, with the coordinating session's ruling to take B4's recommendations without asking again:
 - the requirement and grade tables of §2;
 - the full "used badly" rule of §1 (not the softer one);
 - armour by requirements (§4);
 - no ×1.5 for two hands;
-- no INT requirement on artifact weapons. That needs `bodymods/artifacts.js`, and the brief left it open.
+- an attribute point every 3rd level (§5);
+- no INT requirement on artifact weapons. That needs `bodymods/artifacts.js`, and the brief left it open: a request
+  in `docs/b4.md`.
 
-**Held for the user: the growth pace.** `p4b-b4` keeps one attribute point every 4 levels. Its typical build passes
-the bounds (§6, "point every 4"), with tier 7 at 40.5% against 41%. A point every 3 levels (§5) is a separate decision
-for the user, who has been asked through the coordinating session.
+Settled while building, after the independent review (`docs/sessions/b4.md`):
+- **A weapon in your hand keeps its own bonuses** (properties, a relic's gifts, noonsilver's cut) when used badly. The
+  user's rule takes only its to-hit, damage and class power.
+- **An armour piece worn badly gives none of its own bonuses.**
+- **A weapon in another hand**, never swung there, is held to its requirements as armour is.
+- **A piece's penalties (a negative bonus) always count**, so which pieces you meet is the same in whatever order they
+  went on.
+- **The parent's own legacy-rule caps stay**: −6 at most for a weapon too heavy under the legacy stat set. B4's cap is
+  its own, 8.
 
 ## 0. In short
 
@@ -83,7 +94,7 @@ points) is at least the number. Under the legacy set it returns `{ str: strNeede
 
 | | met | not met |
 |---|---|---|
-| to hit | AGI mod and the rest | −2 a missing point, at least −4, at most −8 (`RULES.d20.reqPenalty` 2, new `reqPenaltyMin` 4, `reqPenaltyMax` 6 → 8) |
+| to hit | AGI mod and the rest | −2 a missing point, at least −4, at most −8 (`RULES.d20.reqPenalty` 2, new `reqPenaltyMin` 4 and `reqPenaltyCap` 8; the legacy set's `reqPenaltyMax` stays 6) |
 | damage a blow | range + round((material + scaling) × swing ÷ 0.7) + enchantment | round((range + round(material × swing ÷ 0.7)) × 0.6) + enchantment (new `RULES.d20.reqDmg` 0.6): nothing from your attributes |
 | the class's power | on | off: Bleed and the dark backstab ×2 (short blade), Riposte (long blade), Daze (cudgel), Cleave and Disarm (axe), High ground (polearm), the knockback (great blade), the lantern-flail's ×2 on shades (its uselessness with the torch out stays) |
 | armour | its AV, its special | half its AV (rounded down), −1 DV a piece, its special off (the buckler's block, the glass-scale's turned arrows) |
@@ -143,8 +154,9 @@ weapon with the off hand empty), which is a new control in both views. I'd leave
 
 So a blackglass dagger asks for AGI 20 and scales AGI A. A truesteel greatsword asks for STR 29 and scales STR S. A
 noonsilver longsword asks for STR 21, AGI 17 and WIL 16 and adds WIL E. Noonsilver's WIL 16 stops only someone who left
-WIL low, so the last tier's reward stays meaningful for everyone. The materials shift armour's requirements the same
-way (bone −2, truesteel +2, pleatmetal −3 STR).
+WIL low, so the last tier's reward stays meaningful for everyone. The materials shift every forged piece's requirements
+the same way: armour and the bolt-bow too. So noonsilver plate or a noonsilver bolt-bow also asks WIL 16, a truesteel
+bolt-bow STR +2, and bone and pleatmetal pieces STR −2 and −3.
 
 ### Armour
 
@@ -355,7 +367,8 @@ great 4-6. With 5 points by level 20, a balanced start climbs one step in one at
 climb any faster than that. In the tables, the Bent start reaches the war axe only at level 20. The Plumb start never
 reaches the glaive. The skirmisher's AGI goes from 24 to 28.
 
-**Proposed: a point every 3rd level** (levels 3, 6, … 21: 7 points), `RULES.progression.level.attrPointEvery` 4 → 3.
+**Proposed, and decided by the user (2026-10-31, "yes"): a point every 3rd level** (levels 3, 6, … 21: 7 points),
+`RULES.progression.level.attrPointEvery` 4 → 3. It is built in `p4b-b4`.
 It gives each build one more step by the end. It also takes 0.4-3.8 points off the typical build's cost a kill at tiers 5-8 (25.8 /
 33.5 / 36.7 / 36.1%, against 27.8 / 33.9 / 40.5 / 39.9% at every 4), and puts tier 7 back where it has room under 41%.
 
@@ -404,7 +417,7 @@ you kill it, and you kill in 0.5-12 s. All three variants pass. Under the requir
   are.
 - `inventory.js`: the pack row's "STR 21 AGI 17", each number red when unmet, and the equip warning.
 - `combat.js`: to hit, damage, the class powers and the armour specials.
-- `rules.js`: `reqPenaltyMin`, `reqPenaltyMax` 8 and `reqDmg`.
+- `rules.js`: `reqPenaltyMin`, `reqPenaltyCap` and `reqDmg` (the legacy set's `reqPenaltyMax` stays 6).
 - Checks in check-combat and check-items, each with a mutant:
   - every kit usable at creation;
   - used badly costs what the table says;
