@@ -579,7 +579,7 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
   if (!you && hasStatus(att, "disarmed")) dmg = Math.floor(dmg / 2);   // (Disarm: B1)
   if (you && spec.kind === "melee" && spec.unmet) dmg = Math.round((dmg + Math.round((spec.material || 0) * (spec.swing ?? D.swingRef) / D.swingRef)) * D.reqDmg) + spec.ench;   // (B4: used badly)
   else if (you && spec.kind === "melee") dmg += Math.round(((spec.material || 0) + scaled(p, spec)) * (spec.swing ?? D.swingRef) / D.swingRef) + spec.ench;
-  else if (you && spec.kind === "missile" && spec.fixed === undefined) dmg += (spec.material || 0) + (spec.ench || 0);
+  else if (you && spec.kind === "missile" && spec.fixed === undefined) dmg = (spec.unmet ? Math.round((dmg + (spec.material || 0)) * D.reqDmg) : dmg + (spec.material || 0)) + (spec.ench || 0);   // (B4: a launcher used badly)
   dmg = Math.max(1, dmg);
   if (onYou) {
     const aside = turnedAside(game, p, !!ctx.ranged, rng);   // (B1: the buckler, the glass-scale, the mirror shield)

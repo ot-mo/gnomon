@@ -2426,6 +2426,14 @@ export function checkB4Requirements(ctx) {
       expect(armourValue(p) === 4, `the legacy stat set: iron plate at STR 6 is AV ${armourValue(p)} (want 4, as before)`);
     } finally { undoA(); p.body.equip.body = null; invalidateStats(p); }
     stats.armour = `iron plate met AV ${avMet}/DV ${dvMet}, short AV ${avBad}/DV ${dvBad}; monocle examine ${exMet}/${exBad}; buckler ${bMet}/${bBad}`;
+
+    // 4 A missile weapon you lack the attributes for: the same to-hit cost, and its shot × reqDmg (range + material).
+    const bow = makeGear("missile", "boltBow", "iron");   // STR 14, INT 19; 3-7, material 1
+    const shot = (a) => { set(a); const sp = missileSpec(p, bow); return { cost: toHitMod(game, p, tgt, { acc: sp.acc }, {}) - toHitMod(game, p, tgt, sp, {}), dmg: resolveAttack(game, p, tgt, sp, { view: "map", rng: fixed(0.6), aimed: true }).dmg }; };
+    const bm = shot({ int: 19, agi: 30 }), bb = shot({ int: 18, agi: 30 }), r6 = 3 + Math.floor(0.6 * 5);
+    expect(bm.cost === 0 && bm.dmg === r6 + 1 && bb.cost === D.reqPenaltyMin && bb.dmg === Math.round((r6 + 1) * D.reqDmg),
+      `an iron bolt-bow (INT 19): met to hit −${bm.cost}, ${bm.dmg} a shot (want 0, ${r6 + 1}); a point of INT short −${bb.cost}, ${bb.dmg} (want ${D.reqPenaltyMin}, ${Math.round((r6 + 1) * D.reqDmg)})`);
+    stats.missile = `iron bolt-bow met ${bm.dmg}, short ${bb.dmg} (−${bb.cost} to hit)`;
   } finally { run.restore(); }
   return resultOf("combat: B4's attribute requirements and scaling grades", problems, stats);
 }

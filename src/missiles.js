@@ -7,7 +7,8 @@
 //       the first in your pack; null if you carry none
 //   ammoFor(p, launcher) → the ammo stack it shoots, null when you have none; a launcher with free shots
 //       (the sling: stones lie everywhere) needs none and gets true
-//   missileSpec(p, launcher) → { kind: "missile", dmg, acc, ench, material, noun, onHit }: a shot's spec;
+//   missileSpec(p, launcher) → { kind: "missile", dmg, acc, ench, material, noun, onHit, miss?, unmet? }: a shot's spec
+//       (miss, unmet: B4, the attribute set: a launcher you lack the attributes for costs to hit and shoots × reqDmg);
 //       d20 damage is the range + material + enchantment (no STR: the string throws it); acc is the weapon's
 //       + bonus(p, "missileAcc") (stats.js; Steady hand, bible §10.8)
 //   fire(game) → bool        V in 3D: a shot along your view (pitch included, a little lift for the drop),
@@ -24,13 +25,14 @@ import { openTarget } from "./screens/target.js";
 import { takeOne } from "./items.js";
 import { EYE } from "./player.js";
 import { sfx } from "./sfx.js";
-import { combatRng } from "./combat.js";
+import { combatRng, unmetOf } from "./combat.js";
 import { bonus } from "./stats.js";
 import { addStatus, registerStatus, statusFlag, cooldownLeft, startCooldown } from "./status.js";
 import { bind } from "./keys.js";
 import { registerHudSegment } from "./hud.js";
 import { theOf, TheOf } from "./creatures.js";
 import { hasKey } from "./keyset.js";
+import { RULES } from "./rules.js";
 export const PIN_MORE = 1;   // the Pin power: a bolt's pin lasts a second longer (bible §10.8 "bolts pin for 2 s", the bolt-bow's own)
 
 registerStatus("pinned", { name: "pinned", color: [215, 205, 160], t: 2, stack: "max", flags: { noMove: true },
@@ -50,7 +52,7 @@ export function missileSpec(p, launcher) {
   const m = MISSILES[launcher.id], hit = m.onHit;
   return {
     kind: "missile", weapon: launcher, dmg: [...m.dmg], acc: m.acc + bonus(p, "missileAcc"), ench: launcher.ench || 0, material: launcher.material || 0,
-    element: null, noun: m.noun,
+    element: null, noun: m.noun, ...(RULES.stats !== "legacy" ? unmetOf(p, launcher) : {}),
     onHit: hit ? (game, tgt) => {
       if (combatRng(game)() >= hit.chance) return;
       const more = hit.status === "pinned" && hasKey(p.perks, "pin") ? PIN_MORE : 0;   // (the Pin power: B1)
