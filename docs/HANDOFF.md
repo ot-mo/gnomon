@@ -5,12 +5,12 @@ Update this file as the last act of every session (see `CLAUDE.md`, "Handing off
 **Updated:** 2026-10-30, the integrator (local session), on `integration`. **Phases 1 and 2 are done; Phase 3 is under
 way.** all six content sessions are merged (`p3i-c1a`, `p3i-c4`, `p3i-c2`, `p3i-c3`, `p3i-c1b`, `p3i-c5`), and §8.5's last wiring merge is done
 (`p3i-wiring`): **new games start on GNOMON's real world at Hollowmere** (`?world=test` for the test world). `main` =
-`p4i-b1` (B1's gear and powers merged with the user's tier-8 retune, and C5 #12, on `p4i-b2`, B2's landmarks and dungeons merged, on `p4i-b3`, B3's peoples and villages merged, on `p4i-beats`: C5's beats paid with their choices, barks, routes, Corner and village pools by region, on `p4i-people`, the landmark people placed, on `p3i-lightweapons`: the user's balance decisions of 2026-10-30 applied: creature scaling under d20, two species fixes, enchantment AV, fists, and light weapons by rule B; ttkTables' bounds on a typical build). **The backlog runs in four parts** (the user, 2026-10-30: "start everything that you can start"): B1, B2 and B3 in their worktrees from `p3i-lightweapons`, the integrator on the story (next step, below). From here on only the integrator edits this file and
+`p4i-six` (check-combat's typical build on the mean of six build sets, the user's decision, and B3's six powers live, on `p4i-b1`: B1's gear and powers merged with the user's tier-8 retune, and C5 #12, on `p4i-b2`, B2's landmarks and dungeons merged, on `p4i-b3`, B3's peoples and villages merged, on `p4i-beats`: C5's beats paid with their choices, barks, routes, Corner and village pools by region, on `p4i-people`, the landmark people placed, on `p3i-lightweapons`: the user's balance decisions of 2026-10-30 applied: creature scaling under d20, two species fixes, enchantment AV, fists, and light weapons by rule B; ttkTables' bounds on a typical build). **The backlog runs in four parts** (the user, 2026-10-30: "start everything that you can start"): B1, B2 and B3 in their worktrees from `p3i-lightweapons`, the integrator on the story (next step, below). From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p4i-b1` (`p4b-b1` merged and C5 #12, on `p4i-b2`) on `integration`; before it `p4i-b2` (`p4b-b2` merged, on `p4i-b3`), `p4i-b3` (`p4b-b3` merged, on `p4i-beats`), `p4i-beats` (C5 #5, #6, #9, #11, #13 in part, #14, on `p4i-people`), `p4i-people` (C5 #3 with C1b #18: the landmark people placed, on `p3i-lightweapons`), `p3i-lightweapons` (light weapons, rule B, on `p3i-balance`), `p3i-balance` (the balance decisions of 2026-10-30, on `p3i-c5`), the Phase 3 merges (`p3i-c5`, `p3i-c1b`, `p3i-c3`, `p3i-c2`, `p3i-c4`, `p3i-wiring`, `p3i-c1a`), `p3i-sinkholes` (C1a's request 9, on `p3i-props`), `p3i-props` (props named; C1a's, C4's and C2's base), `p2-realworld`, `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+- **Last tag:** `p4i-six` (the six-set typical build and B3's six powers live, on `p4i-b1`) on `integration`; before it `p4i-b1` (`p4b-b1` merged and C5 #12, on `p4i-b2`), `p4i-b2` (`p4b-b2` merged, on `p4i-b3`), `p4i-b3` (`p4b-b3` merged, on `p4i-beats`), `p4i-beats` (C5 #5, #6, #9, #11, #13 in part, #14, on `p4i-people`), `p4i-people` (C5 #3 with C1b #18: the landmark people placed, on `p3i-lightweapons`), `p3i-lightweapons` (light weapons, rule B, on `p3i-balance`), `p3i-balance` (the balance decisions of 2026-10-30, on `p3i-c5`), the Phase 3 merges (`p3i-c5`, `p3i-c1b`, `p3i-c3`, `p3i-c2`, `p3i-c4`, `p3i-wiring`, `p3i-c1a`), `p3i-sinkholes` (C1a's request 9, on `p3i-props`), `p3i-props` (props named; C1a's, C4's and C2's base), `p2-realworld`, `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
   `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b`, `p1-ws10`, the flip, `p1-ws2a`, `p1-ws7a`,
   `p1-ws7b`, `p1-ws2b`, `p1-ws9` and `p1-ws1`, with their integration requests; `p2-ws3` … `p2-ws9` before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
@@ -45,7 +45,7 @@ the real world the default: then `main.js`'s `?world=real` branch and its cube h
 or go with it; browser-2b part 3 and check-overworld's 7 URLs follow).
 
 **Next step:** the backlog in four parts, all from `p3i-lightweapons` (the user, 2026-10-30: "start everything that you can start"; the coordinating session split it, its rules in the side-session notes' `backlog-rules.md`):
-- **The integrator**, on `integration`: the story, C5 #3-#14 (C1b #18, who stands where, with #3); #3 is done (`p4i-people`), #5, #6, #9, #11, #14 and #13's first part (`p4i-beats`); all three B tags are merged (`p4i-b3`, GEN 8; `p4i-b2`, WORLD.version 4; `p4i-b1`, GEN 9) and C5 #12 is in (`p4i-b1`); next, the coordinator's ruling of 2026-10-30: check-combat's typical build measured as the mean of B1's six build sets (its own commit, DECISIONS and HANDOFF), then B3's six powers live again, then C5 #4, #7, #8, #10 and #13's rest, then #4 (the starter chain), #12 (the dungeons' people, on B2's floors), #7, #8, #10 and #13's rest; and it merges `p4b-b1`, `p4b-b2` and `p4b-b3` as they come, as a content tag, its merges setting `GEN_VERSION`.
+- **The integrator**, on `integration`: the story, C5 #3-#14 (C1b #18, who stands where, with #3); #3 is done (`p4i-people`), #5, #6, #9, #11, #14 and #13's first part (`p4i-beats`); all three B tags are merged (`p4i-b3`, GEN 8; `p4i-b2`, WORLD.version 4; `p4i-b1`, GEN 9) and C5 #12 is in (`p4i-b1`); check-combat's typical build is the mean of B1's six build sets (the user, 2026-10-31) and B3's six powers are live (`p4i-six`); next C5 #4, #7, #8, #10 and #13's rest, then #4 (the starter chain), #12 (the dungeons' people, on B2's floors), #7, #8, #10 and #13's rest; and it merges `p4b-b1`, `p4b-b2` and `p4b-b3` as they come, as a content tag, its merges setting `GEN_VERSION`.
 - **B1, gear and powers**: `C:\Users\Otto Mörner\Code\gnomon-wt\b1`, `ws/b1`, tag `p4b-b1`. C4 #1, #2 (with C2 #12), #4-#10, #12-#14; WS5 #8, #9, #19; WS4 #16, #19; WS6b #3; POWERS' needs but B3's.
 - **B2, landmarks and dungeons**: `gnomon-wt\b2`, `ws/b2`, tag `p4b-b2`. C1a #5; C1b #1-#17 and #19-#26 (not #18); WS10 #9. It builds the places, the integrator places the people; the bottoms (the Grub Mother, the Press-Master, the Gloam Warden, the Escapement, the Drowned Bellwether, Noon, the relics) are B2's as places and creatures, Vesper's phases, the endings and the barks the integrator's. C5 #12's Hierarch waits on B2's floors up (C1b #8), which B2 builds first.
 - **B3, peoples and villages**: `gnomon-wt\b3`, `ws/b3`, tag `p4b-b3`. C2 #3, #5-#9, #11, #13; WS10 #6; the lore powers (Hour script, Gossip, Triangulator); Oil fire, Brew, Chime; WS6b's stock and `buys`.
@@ -396,6 +396,20 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p4i-six`** (2026-10-31): on `p4i-b1`, the user's decision "keep six-set-average" (2026-10-31, confirming the coordinating
+session's ruling of 2026-10-30) and B3's six powers live.
+- **check-combat** (d31884a): ttkTables' typical rows take every build of B1's six sets (buildSeed 0-5, `TYPICAL_SETS`) and
+  hold their mean to the bounds, unchanged; each tier prints each set's own mean beside it. With the six held: tiers 5-8
+  26.7 / 32.6 / 38.7 / 37.9% (B1 measured 38.0 at tier 8). Mutant: the tier-8 retune undone reads 49% on the mean (sets
+  44.5-50.9%), killed. DECISIONS' combat row (e0f0ba3).
+- **B3's six powers live** (e1a2666, reapplying 2ed2658): Hour script, Gossip, Triangulator, Oil fire, Brew and Chime without
+  `needs`, `BUILT_B3` gone, check-social 18 turned round (each offered to a player of its own tree). check-combat with
+  them: tiers 5-8 27.3 / 33.4 / 39.6 / 38.9% (sets 26.9-27.7, 32.5-34.6, 38.1-41.9, 37.0-41.8; B1 measured 38.8 at tier 8).
+- An interrupted mutant run (the app quit) had left `rules.js` with the retune undone; found and restored before anything
+  else ran; nothing was committed with it.
+- **Checks**: `run-all` 37 of 38 under load (check-overworld's world-map draw, 3.37-4.57 ms; alone 0.9-1.79 ms); check-combat
+  160 s in run-all; the real world's bot playthrough; browser-gate (1234, 7) and browser-2b pass.
 
 **`p4i-b1`** (2026-10-30): C5 #12 (643cb76, 34c8910) and `p4b-b1` (5c7eb2c, B1: gear and powers, with the user's tier-8
 retune "HP ×0.85, damage −2" from level 21) merged on `p4i-b2`.
@@ -1195,6 +1209,11 @@ its §8.4 files and two P0 checks).
     tunnel (C1b #24), picking that one up must not make a second: settled at B2's merge.
   - **check-perf's refresh** read ×1.27 against `p4i-people` (p50 10.13 ms, budget 10) while B1's TTK runs loaded the
     machine; nothing since touches refresh; it passed in run-all's alone slot at the tag. Recheck on a quiet machine.
+- **The typical build: the mean of six build sets** (the user, 2026-10-31, in the coordinating session: "keep six-set-average",
+  confirming the coordinator's ruling of 2026-10-30). check-combat's ttkTables holds the mean over B1's six sets of builds
+  (buildSeed 0-5, `TYPICAL_SETS`) to its unchanged bounds, prints each set's mean beside it, and fails with the tier-8
+  retune undone (49% on the mean). B3's six powers are live with it (tier 8 38.9%, sets 37.0-41.8%). DECISIONS' combat row
+  records it. check-combat takes 160 s in run-all now (96.9 s before), run-all about 247 s (216 before).
 - **The tier-8 retune: approved, "HP ×0.85, damage −2"** (the user, 2026-10-30, relayed by the coordinating session; the
   other choices were damage −4, and HP ×0.9 with damage −3): d20 only, creatures of level 21 and up, not bosses or
   guardians. B1 measured tier 8 at 38.0% a kill alone and 38.8% with B3's six powers (mean over six sets of builds;
