@@ -78,7 +78,8 @@ import { fire, fireAt, readyLauncher, missileSpec } from "../../src/missiles.js"
 import { requestTarget, cursorTarget, lineOfFire, targetText } from "../../src/screens/target.js";
 import { mapView } from "../../src/renderMap.js";
 import { MISSILES } from "../../src/content/items/missiles.js";
-import { canEquip } from "../../src/body.js";
+import { canEquip, wielded } from "../../src/body.js";
+import { equip as invEquip } from "../../src/inventory.js";
 import { CLASSES, REQUIRES, SCALING } from "../../src/content/items/forge.js";
 import { itemName, itemInfo, mendItem, MEND_TIME } from "../../src/items.js";
 import { EYE, FISTS, attackTime } from "../../src/player.js";
@@ -2454,6 +2455,21 @@ export function checkB4Requirements(ctx) {
       expect(old.endsWith(` · needs ${WEAPONS.longsword.str} STR`) && !/scales|lack/.test(old), `the legacy set: a longsword's line "${old}" (want the parent's "needs ${WEAPONS.longsword.str} STR")`);
     } finally { undoL(); }
     stats.lines = lineBad;
+
+    // 6 Putting it on: under the attribute set a piece you lack the attributes for goes on, and the log says what it costs;
+    //   under the legacy stat set it is refused, as before.
+    const putOn = (it) => { p.inv.push(it); run.logged.length = 0; const ok = invEquip(game, it, p.inv.length - 1); return { ok, said: run.logged.join(" | ") }; };
+    set({ str: 18, agi: 17 }); p.body.equip.hand_r = null; p.body.belt = null;
+    const on = putOn(makeGear("weapon", "longsword", "copper"));
+    expect(on.ok && wielded(p)?.id === "longsword" && on.said.includes("You can hardly use the copper longsword (needs STR 21, AGI 17; you have STR 18): −6 to hit, ×0.6 damage, no Riposte."),
+      `a copper longsword at STR 18: on ${on.ok}, the log "${on.said}"`);
+    const undoE = overrideRules("stats", "legacy");
+    try {
+      set({ str: 6 }); p.body.equip.hand_r = null; p.body.belt = null;
+      const off = putOn(makeGear("weapon", "greatsword", "copper"));
+      expect(!off.ok && /not strong enough/.test(off.said), `the legacy set: a greatsword at STR ${attr(p, "str")}: on ${off.ok}, the log "${off.said}" (want refused)`);
+    } finally { undoE(); p.inv.length = 0; p.body.equip.hand_r = null; invalidateStats(p); }
+    stats.equip = on.said;
   } finally { run.restore(); }
   return resultOf("combat: B4's attribute requirements and scaling grades", problems, stats);
 }

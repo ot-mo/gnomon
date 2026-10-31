@@ -220,11 +220,17 @@ export function checkItems(m) {
     } finally { St.STATS_DEBUG.verify = false; }
     stats.matrix = { fits, refusals, cursedHeld, byPlan: matrix };
 
-    // The STR requirement still refuses; a weak entity is told why.
+    // The STR requirement still refuses under the legacy stat set; a weak entity is told why. (B4: the attribute set lets
+    // it on, to be worn badly: check-combat's req.)
     {
       const e = entity("humanoid"); e.attrs = St.makeAttrs(6);
+      const undoS = m.rules.overrideRules("stats", "legacy");
+      try {
+        const r = Bd.canEquip(game, e, { kind: "armour", id: "ironHelm", ench: 0, known: true }, "head");
+        if (r.ok || r.reason !== "weak") fail(`the legacy set: an iron helm at STR ${St.attr(e, "str")}: ${r.ok ? "accepted" : r.reason}, want weak`);
+      } finally { undoS(); }
       const r = Bd.canEquip(game, e, { kind: "armour", id: "ironHelm", ench: 0, known: true }, "head");
-      if (r.ok || r.reason !== "weak") fail(`an iron helm at STR ${St.attr(e, "str")}: ${r.ok ? "accepted" : r.reason}, want weak`);
+      if (!r.ok) fail(`the attribute set: an iron helm at STR ${St.attr(e, "str")}: ${r.reason}, want it on (worn badly)`);
     }
 
     // Through the inventory, with base fields watched.

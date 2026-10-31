@@ -8,7 +8,9 @@
 //                                            first part of its type (one ring at a time "as in the existing game",
 //                                            bible §13.3; the second finger takes one only when asked by part id)
 //   canEquip(game, e, item, partId) → { ok, reason, item?, need? }   reason: "part" | "slot" | "weak" | "cursed" | "broken" |
-//                                                                   "shell" (Shellback: no body armour)
+//                                                                   "shell" (Shellback: no body armour); "weak" under the
+//                                                                   legacy stat set only (B4: the attribute set lets it on,
+//                                                                   and combat.js and stats.js use it badly)
 //   equip(game, e, item, partId) → { ok, removed: [], time, reason }   what it pushed off is the caller's to put away
 //   unequip(game, e, partId) → { ok, item, reason }                  cursed things stick (reason "cursed")
 //   worn(e) → item[]                          equipped items and implants, each once (bonus() sees implants too)
@@ -148,7 +150,7 @@ export function canEquip(game, e, it, partId = defaultPart(e, it)) {
   const ids = partsTaken(e, it, partId);
   if (!ids) return { ok: false, reason: "slot" };   // two-handed, one hand
   const need = ITEM_KINDS[it.kind]?.req?.(it)?.str;
-  if (need !== undefined && attr(e, "str") < need) return { ok: false, reason: "weak", need };
+  if (RULES.stats === "legacy" && need !== undefined && attr(e, "str") < need) return { ok: false, reason: "weak", need };   // (B4: the attribute set uses it badly instead)
   const stuck = occupants(e, ids).find((o) => o.ench < 0);
   if (stuck) return { ok: false, reason: "cursed", item: stuck };
   return { ok: true };
