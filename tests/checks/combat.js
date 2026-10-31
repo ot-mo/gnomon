@@ -2520,6 +2520,13 @@ export function checkB4Requirements(ctx) {
     expect(offCrit === 0 && mainCrit === 0.1 && JSON.stringify(oneWay) === JSON.stringify([17, 0, Math.floor(ITEM_KINDS.armour.av(scale) / 2) + 1]) && JSON.stringify(oneWay) === JSON.stringify(otherWay),
       `a keen longsword at 16: crit ${offCrit} in the other hand (want 0), ${mainCrit} in the primary (want 0.1); glass-scale beside −3 AGI boots at AGI 20: [AGI, ward, AV] ${JSON.stringify(oneWay)} and ${JSON.stringify(otherWay)} (want AGI 17, ward 0, half its armour + the boots' 1, both ways)`);
     stats.review = `off-hand crit ${offCrit}, primary ${mainCrit}; glass-scale and −3 AGI boots ${JSON.stringify(oneWay)}`;
+    // 10 The review's finding 5: the bonus cache follows the formula set (a monocle unmet under the attribute set gives
+    //    nothing; switched to the legacy set without invalidateStats, it gives its +3 at once).
+    p.body.equip.face = { kind: "armour", id: "monocle", ench: 0, known: true }; set({ int: 16 });
+    const exAttr = bonus(p, "examine"), undoC = overrideRules("stats", "legacy"), exLegacy = bonus(p, "examine");
+    undoC(); const exBack = bonus(p, "examine");
+    p.body.equip.face = null; invalidateStats(p);
+    expect(exAttr === 0 && exLegacy === 3 && exBack === 0, `a monocle at INT 16: examine ${exAttr}, then ${exLegacy} under the legacy set and ${exBack} back (want 0, 3, 0, no invalidateStats between)`);
   } finally { run.restore(); }
   return resultOf("combat: B4's attribute requirements and scaling grades", problems, stats);
 }

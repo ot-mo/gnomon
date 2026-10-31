@@ -115,8 +115,8 @@ const real = (e) => guarded.get(e) || e;
 export function bonusTable(e) {
   e = real(e);
   let c = cache.get(e);
-  if (!c || c.epoch !== cacheEpoch) {
-    c = { epoch: cacheEpoch, table: Object.freeze(bonusTableUncached(e)) };
+  if (!c || c.epoch !== cacheEpoch || c.set !== RULES.stats) {   // (B4: the gear source reads the formula set: a switch rebuilds)
+    c = { epoch: cacheEpoch, set: RULES.stats, table: Object.freeze(bonusTableUncached(e)) };
     cache.set(e, c);
     STATS_DEBUG.builds++;
   } else if (STATS_DEBUG.verify) {
