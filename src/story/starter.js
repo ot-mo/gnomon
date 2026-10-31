@@ -99,7 +99,13 @@ export function payStep(game, s) {
 }
 
 // The Turning begins with the campaign (it has no giver); the rest wait for their givers.
-on("zone:enter", (game, ev) => { if (ev.how === "start" && game.state?.campaign?.started != null) startStep(game, "turning", true); });
+// (on any entry, a load included: a save made before the starter chain was built gets it too, done at once if the Cube
+// is already touched; review of b499abe)
+on("zone:enter", (game) => {
+  if (game.state?.campaign?.started == null || quest(game, "turning")) return;
+  const q = startStep(game, "turning", true);
+  if (q && game.story?.cube) advanceQuest(game, q, "done", { quiet: true });
+});
 
 // Talk: a giver offers its step ("Is there anything I can do?", its offer), and takes it back ("It's done.") when the step
 // waits on it; Brann takes his skull.

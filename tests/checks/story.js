@@ -1198,6 +1198,15 @@ async function starterChain(env, { fail, game, p, RUN, real, at }) {
     const say = (c, label) => T.talkTo(game, c).options.find((o) => o.label === label);
     const take = (c) => say(c, "Is there anything I can do?")?.go()?.options?.find((o) => o.label === "I'll do it.")?.go();
     if (!q("turning") || q("turning").done) fail("the Turning didn't begin with the campaign");
+    // A save from before the starter chain (the campaign begun, no Turning): it begins on the load, done if the Cube is touched.
+    {
+      const k0 = { quests: game.quests, cube: game.story.cube };
+      game.quests = game.quests.filter((x) => x.id !== "starter:turning"); game.story.cube = true;
+      EV.emit(game, "zone:enter", { zone: { landmarkId: "hollowmere", z: 0, key: "5,16,0" }, how: "load" });
+      const t = q("turning");
+      game.quests = k0.quests; game.story.cube = k0.cube;
+      if (!t?.done) fail(`a save from before the starter chain, the Cube touched: the Turning ${t ? (t.done ? "done" : t.stage) : "missing"} on the load`);
+    }
     { // (the Cube touched for real: screens/play.js onCube, its mode, view and the story's flag put back after)
       const PL = await env.src("screens/play.js"), k0 = { mode: game.mode, view: game.view, cube: game.story.cube };
       PL.onCube(game);
