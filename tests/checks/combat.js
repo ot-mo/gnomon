@@ -80,7 +80,7 @@ import { mapView } from "../../src/renderMap.js";
 import { MISSILES } from "../../src/content/items/missiles.js";
 import { canEquip } from "../../src/body.js";
 import { CLASSES, REQUIRES, SCALING } from "../../src/content/items/forge.js";
-import { itemName, mendItem, MEND_TIME } from "../../src/items.js";
+import { itemName, itemInfo, mendItem, MEND_TIME } from "../../src/items.js";
 import { EYE, FISTS, attackTime } from "../../src/player.js";
 import { compileWorld } from "../../src/world/worldmodel.js";
 import { REAL_WORLD } from "../../src/content/world/worldmap.js";
@@ -2434,6 +2434,26 @@ export function checkB4Requirements(ctx) {
     expect(bm.cost === 0 && bm.dmg === r6 + 1 && bb.cost === D.reqPenaltyMin && bb.dmg === Math.round((r6 + 1) * D.reqDmg),
       `an iron bolt-bow (INT 19): met to hit −${bm.cost}, ${bm.dmg} a shot (want 0, ${r6 + 1}); a point of INT short −${bb.cost}, ${bb.dmg} (want ${D.reqPenaltyMin}, ${Math.round((r6 + 1) * D.reqDmg)})`);
     stats.missile = `iron bolt-bow met ${bm.dmg}, short ${bb.dmg} (−${bb.cost} to hit)`;
+
+    // 5 The lines: an item's info names every requirement and grade, and what you lack and what it costs; the legacy set's
+    //   line keeps the parent's "needs N STR".
+    const sword = makeGear("weapon", "longsword", "copper");
+    set({ str: 21, agi: 17 }); const lineMet = itemInfo(game, sword);
+    set({ str: 18, agi: 17 }); const lineBad = itemInfo(game, sword);
+    set({ str: 20, agi: 17 }); const lineOne = itemInfo(game, sword);
+    expect(lineOne.endsWith(` · you lack 1 STR: used badly (−${D.reqPenaltyMin} to hit, ×0.6 damage, no Riposte)`), `a copper longsword's line, a point of STR short: "${lineOne}"`);
+    set({ str: 25, tou: 20 }); const plateBad = itemInfo(game, makeGear("armour", "plate", "iron"));
+    const bowLine = itemInfo(game, makeGear("missile", "boltBow", "copper"));
+    expect(/ · needs STR 21, AGI 17 · scales STR B, AGI D$/.test(lineMet), `a copper longsword's line, met: "${lineMet}"`);
+    expect(lineBad.endsWith(" · needs STR 21, AGI 17 · scales STR B, AGI D · you lack 3 STR: used badly (−6 to hit, ×0.6 damage, no Riposte)"), `a copper longsword's line, 3 STR short: "${lineBad}"`);
+    expect(plateBad.endsWith(" · needs STR 26, TOU 20 · you lack 1 STR: worn badly (half its armour, −1 DV, none of its own)"), `iron plate's line, a point of STR short: "${plateBad}"`);
+    expect(bowLine.endsWith("V fires it · needs STR 14, INT 19 · you lack 3 INT: used badly (−6 to hit, ×0.6 damage)"), `a bolt-bow's line at INT 16: "${bowLine}"`);
+    const undoL = overrideRules("stats", "legacy");
+    try {
+      const old = itemInfo(game, sword);
+      expect(old.endsWith(` · needs ${WEAPONS.longsword.str} STR`) && !/scales|lack/.test(old), `the legacy set: a longsword's line "${old}" (want the parent's "needs ${WEAPONS.longsword.str} STR")`);
+    } finally { undoL(); }
+    stats.lines = lineBad;
   } finally { run.restore(); }
   return resultOf("combat: B4's attribute requirements and scaling grades", problems, stats);
 }

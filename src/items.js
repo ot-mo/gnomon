@@ -24,7 +24,7 @@ import { seededSort } from "./rng.js";
 import { hasKey } from "./keyset.js";
 import { RULES } from "./rules.js";
 import { POTIONS, SCROLLS, SYLLABLES, ELEMENTS, WEAPONS, ARMOURS, PROPERTIES, RINGS, AMULETS, RELICS, RELIC_COLOR } from "./content/items/legacy.js";
-import { MATERIALS, REQUIRES, SCALING, MATERIAL_REQ, GRADES, GRADE_ORDER } from "./content/items/forge.js";
+import { MATERIALS, REQUIRES, SCALING, MATERIAL_REQ, GRADES, GRADE_ORDER, CLASS_OF } from "./content/items/forge.js";
 export { POTIONS, POTION_COLORS, SCROLLS, ELEMENTS, WEAPONS, WEAPON_PALETTE, ARMOURS, PROPERTIES, RINGS, AMULETS, GEMS, RELICS,
   RELIC_COLOR, FLOOR_ART, makeRelic, pickRelic } from "./content/items/legacy.js";
 
@@ -117,6 +117,27 @@ export function scaling(it) {
   return g;
 }
 export const gradeShare = (letter) => GRADES[letter] || 0;
+// The words for them (B4; the item lines, the pack and the log): needsText(it) → "needs STR 21, AGI 17 · scales STR B,
+// AGI D" ("" for an item that asks for nothing); badlyText(it, have) → "you lack 3 STR: used badly (−6 to hit, ×0.6
+// damage, no Riposte)", or "" when it's met. have(attr) → your score (stats.js attr).
+const AN = (k) => k.toUpperCase();
+const POWER_OFF = { shortBlade: "no Bleed or backstab", longBlade: "no Riposte", cudgel: "no Daze", axe: "no Cleave or Disarm",
+  polearm: "no High ground", greatBlade: "no knockback", flail: "no ×2 on shades" };
+export function needsText(it) {
+  const req = Object.entries(requirements(it)), g = Object.entries(scaling(it));
+  return [req.length && `needs ${req.map(([k, n]) => `${AN(k)} ${n}`).join(", ")}`, g.length && `scales ${g.map(([k, l]) => `${AN(k)} ${l}`).join(", ")}`]
+    .filter(Boolean).join(" · ");
+}
+export function badlyText(it, have) {
+  if (RULES.stats === "legacy") return "";
+  const short = shortfall(it, have);
+  if (!short.length) return "";
+  const lack = `you lack ${short.map((s) => `${s.need - s.have} ${AN(s.attr)}`).join(" and ")}`, D = RULES.d20;
+  if (it.kind === "armour") return `${lack}: worn badly (half its armour, −1 DV, none of its own)`;
+  const miss = short.reduce((s, r) => s + r.need - r.have, 0), pen = Math.max(D.reqPenaltyMin, Math.min(D.reqPenaltyMax, D.reqPenalty * miss));
+  const power = it.kind === "weapon" && POWER_OFF[CLASS_OF[it.id]];
+  return `${lack}: used badly (−${pen} to hit, ×${D.reqDmg} damage${power ? `, ${power}` : ""})`;
+}
 export function shortfall(it, have) {
   const req = requirements(it), out = [];
   for (const k in req) if (have(k) < req[k]) out.push({ attr: k, need: req[k], have: have(k) });

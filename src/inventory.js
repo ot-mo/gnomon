@@ -24,7 +24,7 @@ import { pushMode, popMode } from "./screens.js";
 import { emit } from "./events.js";
 import { UI, hit, at, hitLabel, list, listKey, listWheel, tabs, tabsKey, wrap } from "./ui.js";
 import { WEAPONS, ARMOURS, ELEMENTS, ITEM_KINDS, itemName, itemInfo, itemGlyph, itemAura, itemWeight, makeItem, isGear, strNeeded, takeOne,
-  registerItemAction, useItem, canUse, RELIC_COLOR, mendItem } from "./items.js";
+  registerItemAction, useItem, canUse, RELIC_COLOR, mendItem, requirements, shortfall, badlyText } from "./items.js";
 import { drinkPotion, readScroll } from "./effects.js";
 import { RULES } from "./rules.js";
 import { armourValue, bonus, weaponReach } from "./player.js";
@@ -217,6 +217,7 @@ export function equip(game, it, index, part = defaultPart(game.player, it)) {
   if (!wasKnown && it.ench < 0) game.log(`You ${verb} the ${itemName(game, it)}. A chill runs through you: it's cursed, and it won't let go!`, CURSE);
   else if (!wasKnown && it.ench > 0 && !it.relic) game.log(`You ${verb} the ${itemName(game, it)}. It hums with a blessing.`, [255, 245, 200]);
   else game.log(`You ${verb} the ${itemName(game, it)}.`, [220, 220, 220]);
+  warnBadly(game, it);
   if (holds && old) game.log(`Your ${itemName(game, old)} goes on your belt. (R: swap weapons)`, DIM);
   if (game.invFilter === "for") { game.invFilter = "all"; game.invFor = null; }
   game.invSel = Math.min(game.invSel, Math.max(0, p.inv.length - 1));
@@ -281,8 +282,18 @@ export function swapWeapons(game) {
   w.known = true;
   const bad = fresh && w.ench < 0;
   game.log(`You draw the ${itemName(game, w)}.${bad ? " It's cursed, and it won't let go!" : ""}`, bad ? CURSE : [220, 220, 220]);
+  warnBadly(game, w);
   p.attackCd = Math.max(p.attackCd, r.time);
   return r.time;
+}
+
+// Put on or drawn without the attributes it asks for (B4, the attribute set): it goes on, and the log says what it costs.
+function warnBadly(game, it) {
+  const p = game.player, lack = badlyText(it, (k) => attr(p, k));
+  if (!lack) return;
+  const need = Object.entries(requirements(it)).map(([k, n]) => `${k.toUpperCase()} ${n}`).join(", ");
+  const have = shortfall(it, (k) => attr(p, k)).map((s) => `${s.attr.toUpperCase()} ${s.have}`).join(", ");
+  game.log(`You can hardly ${it.kind === "armour" ? "move in" : "use"} the ${itemName(game, it)} (needs ${need}; you have ${have}): ${lack.replace(/^[^:]*: /, "")}.`, BAD);
 }
 
 function dropSelected(game) {
@@ -397,11 +408,20 @@ function packRow(game, it, i, { x, y, w, sel }) {
   S.text(x + 4, y, name.slice(0, Math.max(0, w - 30)), ...(it.relic ? RELIC_COLOR : sel ? [255, 255, 255] : [200, 200, 200]));
   // Right side: what you know about it: strength needed, and good / neutral / bad.
   let right = x + w - 2;
-  if (it.kind === "weapon" || it.kind === "armour") {
+  if (RULES.stats === "legacy" && (it.kind === "weapon" || it.kind === "armour")) {
     const need = strNeeded(it), tag = `needs ${need} STR`;
     right -= tag.length;
     S.text(right, y, tag, ...(attr(p, "str") < need ? [255, 110, 100] : [120, 200, 120]));
     right -= 1;
+  } else if (it.kind === "weapon" || it.kind === "armour" || it.kind === "missile") {
+    // (B4: every attribute it asks for, "STR 21 AGI 17", each red when you lack it)
+    const req = Object.entries(requirements(it));
+    for (let k = req.length - 1; k >= 0; k--) {
+      const [a, n] = req[k], tag = `${a.toUpperCase()} ${n}`;
+      right -= tag.length;
+      S.text(right, y, tag, ...(attr(p, a) < n ? [255, 110, 100] : [120, 200, 120]));
+      right -= 1;
+    }
   }
   const aura = itemAura(game, it);
   const named = (it.kind === "potion" && game.knownPotions.has(it.effect)) || (it.kind === "scroll" && game.knownScrolls.has(it.effect));
