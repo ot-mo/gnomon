@@ -11,6 +11,23 @@ Your words (2026-10-31): the old STR requirements "seem a little low since most 
 strength", so rebalance them, "possibly multi-stat requirements for certain more specialised items, armours and
 weapons"; then: "make it more like Elden Ring's system, where attributes … can be required to use certain items".
 
+## Decided (2026-10-31)
+
+The user, in the coordinating session, after the brief: "Then follow your plan for balancing". The coordinating
+session's ruling: build the recommendations below without asking again, and stop for the user only if the TTK tables
+leave their bounds, if the growth pace would change, or if anything under the legacy rules would change. So
+`p4b-b4` builds:
+
+- the requirement and grade tables of §2;
+- the full "used badly" rule of §1 (not the softer one);
+- armour by requirements (§4);
+- no ×1.5 for two hands;
+- no INT requirement on artifact weapons. That needs `bodymods/artifacts.js`, and the brief left it open.
+
+**Held for the user: the growth pace.** `p4b-b4` keeps one attribute point every 4 levels. Its typical build passes
+the bounds (§6, "point every 4"), with tier 7 at 40.5% against 41%. A point every 3 levels (§5) is a separate decision
+for the user, who has been asked through the coordinating session.
+
 ## 0. In short
 
 - **What's there now.** Each weapon and armour piece asks for one STR number, 6-17. Attributes start at 10 (Bent) or
