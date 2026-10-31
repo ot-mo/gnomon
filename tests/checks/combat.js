@@ -62,7 +62,7 @@ import { overrideRules, RULES } from "../../src/rules.js";
 import { invalidateStats, mod, attr, maxHp, av as armourValue, bonusTable, bonus } from "../../src/stats.js";
 import { makeBody } from "../../src/body.js";
 import { makeRng, distance } from "../../src/rng.js";
-import { WEAPONS, ARMOURS, ITEM_KINDS, strNeeded, useItem } from "../../src/items.js";
+import { WEAPONS, ARMOURS, ITEM_KINDS, strNeeded, useItem, requirements, scaling, shortfall } from "../../src/items.js";
 import { on } from "../../src/events.js";
 import { setDaylight } from "../../src/light.js";
 import { setMode } from "../../src/screens.js";
@@ -79,7 +79,7 @@ import { requestTarget, cursorTarget, lineOfFire, targetText } from "../../src/s
 import { mapView } from "../../src/renderMap.js";
 import { MISSILES } from "../../src/content/items/missiles.js";
 import { canEquip } from "../../src/body.js";
-import { CLASSES } from "../../src/content/items/forge.js";
+import { CLASSES, REQUIRES, SCALING } from "../../src/content/items/forge.js";
 import { itemName, mendItem, MEND_TIME } from "../../src/items.js";
 import { EYE, FISTS, attackTime } from "../../src/player.js";
 import { compileWorld } from "../../src/world/worldmodel.js";
@@ -2302,4 +2302,53 @@ export async function measureWs8Perf(trees, { seconds = 40, installNodeEnv, seed
       lines.push(`  ${name.padEnd(18)} ${t.name.padEnd(12)} p50 ${q(xs, 0.5).toFixed(2)} ms, p95 ${q(xs, 0.95).toFixed(2)}, max ${Math.max(...xs).toFixed(2)} (${counts[name]} creatures at each start)`);
     }
   return lines;
+}
+
+// --- B4: attribute requirements and scaling grades (docs/balance/requirements-2026-10-31.md; the attribute set only) ----
+// 1 The tables: every weapon, missile weapon and armoured piece asks for something; every starting kit fits its own
+//   background at creation (the suggested spread with the background's bonus); the materials shift as affinities do;
+//   the legacy set reads the parent's STR number, as before.
+export function checkB4Requirements(ctx) {
+  const problems = [], stats = {};
+  const expect = (ok, m) => { if (!ok) problems.push(m); return ok; };
+  const fmt = (r) => JSON.stringify(r);
+  // 1 The tables
+  for (const id of [...Object.keys(WEAPONS), ...Object.keys(MISSILES)]) expect(Object.keys(REQUIRES[id] || {}).length > 0, `${id} asks for nothing`);
+  for (const id of Object.keys(WEAPONS)) expect(Object.keys(SCALING[id] || {}).length > 0, `${id} doesn't scale with anything`);
+  for (const [id, a] of Object.entries(ARMOURS)) if (a.armour > 0) expect(Object.keys(REQUIRES[id] || {}).length > 0, `${id} (armour ${a.armour}) asks for nothing`);
+  const kits = {};
+  for (const [bgId, bg] of Object.entries(BACKGROUNDS)) {
+    const a = suggestSpread(bg.genotype, bgId);
+    for (const k in bg.bonus || {}) if (k in a) a[k] += bg.bonus[k];
+    const gear = [...Object.values(bg.kit.equip), ...(bg.kit.belt ? [bg.kit.belt] : []), ...bg.kit.pack].filter((it) => ["weapon", "armour", "missile"].includes(it.kind));
+    const short = gear.flatMap((it) => shortfall(it, (k) => a[k]).map((s) => `${it.id} ${s.attr} ${s.have}/${s.need}`));
+    expect(short.length === 0, `${bgId}'s kit at creation: ${short.join(", ")}`);
+    kits[bgId] = gear.map((it) => it.id).join(",");
+  }
+  const want = [
+    [makeGear("weapon", "dagger", "copper"), { str: 10, agi: 18 }, { agi: "B", str: "E" }],
+    [makeGear("weapon", "dagger", "bone"), { str: 8, agi: 18 }, { agi: "B", str: "E" }],
+    [makeGear("weapon", "dagger", "blackglass"), { str: 10, agi: 20 }, { agi: "A" }],
+    [makeGear("weapon", "greatsword", "truesteel"), { str: 29, tou: 18 }, { str: "S", tou: "D" }],
+    [makeGear("weapon", "glaive", "pleatmetal"), { str: 18, agi: 21 }, { str: "C", agi: "A" }],
+    [makeGear("weapon", "longsword", "noonsilver"), { str: 21, agi: 17, wil: 16 }, { str: "B", agi: "D", wil: "E" }],
+    [makeGear("weapon", "mace", "blackglass"), { str: 20, tou: 16 }, { str: "C", tou: "D", agi: "E" }],
+    [makeGear("armour", "plate", "pleatmetal"), { str: 23, tou: 20 }, {}],
+    [{ kind: "armour", id: "chain", ench: 0, props: ["light"] }, { str: 16, tou: 17 }, {}],
+    [{ kind: "missile", id: "boltBow", ench: 0 }, { str: 14, int: 19 }, {}],
+    [{ kind: "armour", id: "cloak", ench: 0 }, {}, {}],
+  ];
+  for (const [it, req, grades] of want) {
+    expect(fmt(requirements(it)) === fmt(req), `${it.made || ""} ${it.id}${it.props ? " (light)" : ""} asks ${fmt(requirements(it))}, want ${fmt(req)}`);
+    expect(fmt(scaling(it)) === fmt(grades), `${it.made || ""} ${it.id} scales ${fmt(scaling(it))}, want ${fmt(grades)}`);
+  }
+  const undo = overrideRules("stats", "legacy");
+  try {
+    for (const id of ["dagger", "greatsword", "plate", "leather"]) {
+      const it = { kind: id in WEAPONS ? "weapon" : "armour", id, ench: 0 };
+      expect(fmt(requirements(it)) === fmt({ str: strNeeded(it) }), `the legacy set: ${id} asks ${fmt(requirements(it))}, want the parent's STR ${strNeeded(it)}`);
+    }
+  } finally { undo(); }
+  stats.tables = `${Object.keys(REQUIRES).length} items ask, ${Object.keys(SCALING).length} weapons scale; ${Object.keys(kits).length} kits fit at creation`;
+  return resultOf("combat: B4's attribute requirements and scaling grades", problems, stats);
 }

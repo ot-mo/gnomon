@@ -234,3 +234,47 @@ export const materialLine = (made, kind = null) => {
   return d ? `${d.name}: ${d.info}${kind === "weapon" && d.weaponInfo ? `; ${d.weaponInfo}` : ""}` : "";
 };
 export const isForged = (kind, id) => kind === "weapon" || !!FORGED[kind]?.includes(id);
+
+// --- Requirements and scaling (B4, the attribute set only: items.js requirements, scaling) ------------------------------
+// Every weapon, missile weapon and armour piece asks for attributes (bible §10.6's six) under RULES.stats "attributes";
+// the legacy set keeps the parent's single STR number (WEAPONS[id].str, ARMOURS[id].str). Not met, an item is used
+// badly, not refused (combat.js: to-hit, damage, the class's power; stats.js: armour). A weapon's attribute bonus is
+// its scaling: a grade a letter, GRADES its share of (attribute − RULES.d20.strOver) ÷ 2 a blow.
+//   REQUIRES[id] = { attr: n }   SCALING[id] = { attr: letter }   (an id with no row asks for nothing / doesn't scale)
+// A material shifts both as an affinity does (MATERIAL_REQ[made]: req { attr: ±n } on what the item asks, min { attr: n }
+// a floor it adds, grade { attr: ±steps }, from E for an attribute it didn't scale with); a "light"
+// armour asks 3 less STR (PROPERTIES.light).
+export const GRADES = { S: 1.2, A: 1, B: 0.8, C: 0.6, D: 0.4, E: 0.2 };
+export const GRADE_ORDER = ["E", "D", "C", "B", "A", "S"];
+export const REQUIRES = {
+  // Weapons: light (any start that hasn't left the attribute low), medium (a start built for it), heavy (a strong start),
+  // great (growth first)
+  dagger: { str: 10, agi: 18 }, stylus: { agi: 15, int: 18 }, shortsword: { str: 16, agi: 16 }, handAxe: { str: 17, tou: 15 },
+  staff: { str: 12, wil: 17 }, mace: { str: 20, tou: 16 }, spear: { str: 16, agi: 19 }, lanternFlail: { str: 15, wil: 18 },
+  longsword: { str: 21, agi: 17 }, waraxe: { str: 23, tou: 18 }, glaive: { str: 21, agi: 21 }, greatsword: { str: 27, tou: 18 },
+  maul: { str: 29, tou: 20 },
+  // Missile weapons
+  sling: { agi: 16 }, boltBow: { str: 14, int: 19 },
+  // Armour
+  leather: { str: 15 }, chain: { str: 19, tou: 17 }, scale: { str: 22, tou: 19 }, plate: { str: 26, tou: 20 },
+  copperCap: { str: 14 }, ironHelm: { str: 17 }, helm: { str: 18, tou: 16 }, plumbHelm: { str: 18, tou: 20 },
+  bracers: { str: 15 }, gauntlets: { str: 18 }, boots: { str: 13 }, buckler: { str: 15, agi: 18 },
+  glassScale: { agi: 20, tou: 17 }, pleatedCoat: { agi: 22 },
+  lampCrownHat: { wil: 19 }, monocle: { int: 19 }, examiningKit: { int: 17 }, hourMask: { ego: 20 },
+  kiteGlider: { agi: 18 }, climbingHooks: { str: 16, agi: 16 }, stiltSandals: { agi: 15 }, stiltBoots: { agi: 19 },
+};
+export const SCALING = {
+  dagger: { agi: "B", str: "E" }, stylus: { int: "C", agi: "D" }, shortsword: { str: "C", agi: "C" }, handAxe: { str: "B", tou: "E" },
+  staff: { str: "D", wil: "C" }, mace: { str: "B", tou: "D" }, spear: { agi: "C", str: "C" }, lanternFlail: { wil: "B", str: "D" },
+  longsword: { str: "B", agi: "D" }, waraxe: { str: "A", tou: "E" }, glaive: { str: "C", agi: "B" }, maul: { str: "S" },
+  greatsword: { str: "A", tou: "D" },
+};
+// The materials' shifts (an affinity's: bone and pleatmetal lighter, truesteel heavier, blackglass keen, noonsilver
+// asks for will).
+export const MATERIAL_REQ = {
+  bone: { req: { str: -2 } },
+  blackglass: { req: { agi: 2 }, grade: { agi: 1, str: -1 } },
+  truesteel: { req: { str: 2 }, grade: { str: 1 } },
+  pleatmetal: { req: { str: -3 }, grade: { agi: 1 } },
+  noonsilver: { min: { wil: 16 }, grade: { wil: 1 } },
+};
