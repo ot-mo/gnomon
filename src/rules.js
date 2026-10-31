@@ -28,9 +28,10 @@ const CORE = {
   // natural ≥ critNat hits and crits (× crit); critNat = 20 − round(20 × (bonus(crit) + critPerAgi × AGI mod)),
   // never below minCritNat. Creatures: d20 + floor(level / hitPerLevels) vs your DV; their DV is creatureDv +
   // floor(level / dvPerLevels) + the species' dv. aimed: a projectile that physically reached its target;
-  // reqPenalty per missing STR point of the wielded weapon, at most reqPenaltyMax. strOver: every blow of
-  // your blade, fists too, counts STR over this, not over the weapon's requirement (which still costs to-hit when you
-  // lack it); swingRef: that STR term and the material scale by the weapon's swing ÷ this, so a fast blade's damage a
+  // reqPenalty per missing point of the wielded weapon's requirements (B4: all its attributes, at least reqPenaltyMin;
+  // the legacy stat set: its STR, no minimum), at most reqPenaltyMax; reqDmg: a weapon used badly (B4) does its range and
+  // material × this, nothing from your attributes. strOver: every blow counts its attributes over this (B4: a weapon by
+  // its grades, fists STR), not over the weapon's requirement; swingRef: that STR term and the material scale by the weapon's swing ÷ this, so a fast blade's damage a
   // second matches a slow one's (the light-weapon fix, approved by the user 2026-10-30: docs/balance/
   // light-weapons-2026-10-30.md, rule B; until then fistReq 10 for bare hands and the weapon's requirement otherwise).
   // Creatures (creatures.js spawnCreature, not bosses or guardians): health × (1 + creatureHp × (level − 1)), damage +
@@ -39,7 +40,7 @@ const CORE = {
   // (tier 8: level 21 up) their health × tier8Hp and their damage − tier8Dmg (the user's decision of 2026-10-30, "Retune
   // tier 8", HP ×0.85 and damage −2, measured in the coordinator's b1-ttk-measured.md: a typical kill at tier 8 ~38%).
   d20: { die: 20, crit: 2, critPerAgi: 0.02, minCritNat: 2, highGround: 1, highGroundZ: 1, aimed: 3,
-         creatureDv: 5, dvPerLevels: 4, hitPerLevels: 3, reqPenalty: 2, reqPenaltyMax: 6, strOver: 10, swingRef: 0.7,
+         creatureDv: 5, dvPerLevels: 4, hitPerLevels: 3, reqPenalty: 2, reqPenaltyMin: 4, reqPenaltyMax: 8, reqDmg: 0.6, strOver: 10, swingRef: 0.7,
          creatureHp: 0.18, creatureDmg: 3, creatureDmgEvery: 1.5, tier8From: 21, tier8Hp: 0.85, tier8Dmg: 2 },   // B1
 
   // Attributes (bible §10.6): modifier = floor((score − center) / 2); everyone has `base` until WS4.

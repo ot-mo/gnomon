@@ -49,7 +49,7 @@
 import { Zone, B, FLOOR_Z } from "../../src/world.js";
 import { enterZone, changeZone, cachedZone, zoneState } from "../../src/zones.js";
 import { spawnCreature, addCreature, CREATURE_TYPES, pickCreatureType, touchable, nearestCreature, witnessesOf, creaturesAlong } from "../../src/creatures.js";
-import { resolveAttack, rollToHit, hitChance, toHitMod, critNat, dvOf, weaponSpec, naturalSpec, playerMelee, bumpAttack, combatLine, thrownSpec, GEAR as COMBAT_GEAR } from "../../src/combat.js";
+import { resolveAttack, rollToHit, hitChance, toHitMod, critNat, dvOf, weaponSpec, naturalSpec, playerMelee, bumpAttack, combatLine, thrownSpec, unmetOf, GEAR as COMBAT_GEAR } from "../../src/combat.js";
 import { guardianThink } from "../../src/guardians.js";
 import { pushPlayerOut, killMonster } from "../../src/monsters.js";
 import { killXp, offerPowers, takePerk } from "../../src/leveling.js";
@@ -62,7 +62,7 @@ import { overrideRules, RULES } from "../../src/rules.js";
 import { invalidateStats, mod, attr, maxHp, av as armourValue, bonusTable, bonus } from "../../src/stats.js";
 import { makeBody } from "../../src/body.js";
 import { makeRng, distance } from "../../src/rng.js";
-import { WEAPONS, ARMOURS, ITEM_KINDS, strNeeded, useItem, requirements, scaling, shortfall } from "../../src/items.js";
+import { WEAPONS, ARMOURS, ITEM_KINDS, strNeeded, useItem, requirements, scaling, shortfall, gradeShare } from "../../src/items.js";
 import { on } from "../../src/events.js";
 import { setDaylight } from "../../src/light.js";
 import { setMode } from "../../src/screens.js";
@@ -1691,9 +1691,13 @@ export function typicalBuilds(game, pref = TYPICAL_PREF, buildSeed = 0) {
       wearTypical(p, build, level);
       const str = attr(p, "str");
       const blow = (it) => {
-        const w = WEAPONS[it.id], req = strNeeded(it);
-        const add = Math.round(((it.material || 0) + Math.floor((str - RULES.d20.strOver) / 2)) * w.swing / RULES.d20.swingRef);   // (combat.js)
-        return ((w.dmg[0] + w.dmg[1]) / 2 + add) * (1 - 0.1 * Math.min(6, 2 * Math.max(0, req - str)));
+        // (B4: what its line and your attributes promise: its grades' bonus, or used badly, ×reqDmg with nothing from
+        // your attributes; each point of the to-hit cost taken as 5% off)
+        const w = WEAPONS[it.id], D = RULES.d20, s = w.swing / D.swingRef, { miss, unmet } = unmetOf(p, it), g = scaling(it);
+        if (unmet) return ((w.dmg[0] + w.dmg[1]) / 2 + Math.round((it.material || 0) * s)) * D.reqDmg * (1 - 0.05 * Math.max(D.reqPenaltyMin, Math.min(D.reqPenaltyMax, D.reqPenalty * miss)));
+        let t = 0;
+        for (const k in g) t += gradeShare(g[k]) * (attr(p, k) - D.strOver) / 2;
+        return (w.dmg[0] + w.dmg[1]) / 2 + Math.round(((it.material || 0) + t) * s);
       };
       const shown = (it) => ITEM_KINDS.armour.av({ ...it, ench: 0 });
       const kit = build.at[level].kit;
@@ -1928,7 +1932,8 @@ export function checkB1Combat(ctx) {
   const field = arena("b1-gear");
   enterZone(game, field, { how: "start" });
   Object.assign(p, { x: 5.5, y: 5.5, z: FLOOR_Z, yaw: 0, pitch: 0, attackCd: 0 });
-  p.torch = true; p.attrs.str = 20; p.attrs.agi = 14; p.perks = {}; invalidateStats(p);
+  p.torch = true; p.attrs.str = 20; p.attrs.agi = 14; p.perks = {};
+  Object.assign(p.attrs, { str: 29, tou: 20, agi: 21, wil: 18 }); invalidateStats(p);   // (B4: every class's requirements met, or its power is off)
   const wield = (id, made = "copper") => { const it = makeGear("weapon", id, made); p.body.equip.hand_r = it; p.body.equip.hand_l = WEAPONS[id].hands === 2 ? "hand_r" : null; invalidateStats(p); return it; };
   const perk = (...ids) => { p.perks = Object.fromEntries(ids.map((k) => [k, 1])); invalidateStats(p); };
   const fixed = (v) => () => v;
@@ -2350,5 +2355,52 @@ export function checkB4Requirements(ctx) {
     }
   } finally { undo(); }
   stats.tables = `${Object.keys(REQUIRES).length} items ask, ${Object.keys(SCALING).length} weapons scale; ${Object.keys(kits).length} kits fit at creation`;
+
+  // 2 Your blade: unmet costs 2 to hit a missing point (at least reqPenaltyMin, at most reqPenaltyMax), damage × reqDmg with
+  //   nothing from your attributes, and the class's power; met, the grades add their shares of (attribute − strOver) ÷ 2;
+  //   fists keep STR over strOver; under the legacy stat set a spec carries the parent's STR number as before.
+  const { game } = ctx, D = RULES.d20, run = fresh(ctx, 93), p = game.player;
+  const field = arena("b4-req");
+  enterZone(game, field, { how: "start" });
+  Object.assign(p, { x: 5.5, y: 5.5, z: FLOOR_Z, yaw: 0, pitch: 0, attackCd: 0, torch: true, perks: {}, background: null });
+  const set = (a) => { p.attrs = { str: 16, agi: 16, tou: 16, int: 16, wil: 16, ego: 16, ...a }; invalidateStats(p); };
+  const wield = (id, made = "copper") => { const it = makeGear("weapon", id, made); p.body.equip.hand_r = it; p.body.equip.hand_l = WEAPONS[id].hands === 2 ? "hand_r" : null; invalidateStats(p); return it; };
+  const fixed = (v) => () => v;
+  const tgt = dummy(field, "goblin", 6, 5, 1); tgt.armour = 0;
+  const blow = () => resolveAttack(game, p, tgt, weaponSpec(p), { view: "map", rng: fixed(0.6) });   // a natural 13, no crit
+  try {
+    wield("longsword");   // STR 21, AGI 17; STR B, AGI D
+    const base = (a) => { set(a); return toHitMod(game, p, tgt, { acc: 0 }, {}); };
+    const cost = (a) => base(a) - toHitMod(game, p, tgt, weaponSpec(p), {});
+    const c1 = cost({ str: 20, agi: 17 }), c3 = cost({ str: 18, agi: 17 }), c6 = cost({ str: 16, agi: 16 }), c0 = cost({ str: 21, agi: 17 });
+    expect(c0 === 0 && c1 === D.reqPenaltyMin && c3 === 2 * 3 && c6 === D.reqPenaltyMax,
+      `to hit with a longsword (STR 21, AGI 17): 0, 1, 3 and 6 points short cost ${c0}, ${c1}, ${c3}, ${c6} (want 0, ${D.reqPenaltyMin}, 6, ${D.reqPenaltyMax})`);
+    const s = WEAPONS.longsword.swing / D.swingRef, roll = 4 + Math.floor(0.6 * 5);   // (the 4-8 range at 0.6)
+    set({ str: 26, agi: 30 });
+    const met = blow().dmg, wantMet = roll + Math.round((0 + 0.8 * (26 - 10) / 2 + 0.4 * (30 - 10) / 2) * s);
+    set({ str: 20, agi: 30 });
+    const bad = blow().dmg, wantBad = Math.round(roll * D.reqDmg);
+    expect(met === wantMet && bad === wantBad, `a longsword blow: met (STR 26, AGI 30) ${met} (want ${wantMet}: STR B and AGI D), a point of STR short ${bad} (want ${wantBad}: × ${D.reqDmg}, nothing from attributes)`);
+    wield("dagger", "iron");   // AGI B, STR E; material 1
+    set({ str: 16, agi: 26 });
+    const dag = blow().dmg, sd = WEAPONS.dagger.swing / D.swingRef, wantDag = 3 + Math.round((1 + 0.8 * 8 + 0.2 * 3) * sd);
+    expect(dag === wantDag, `an iron dagger at AGI 26, STR 16: ${dag} (want ${wantDag}: its grades are AGI B and STR E, not STR over 10)`);
+    p.body.equip.hand_r = null; invalidateStats(p); set({ str: 26, agi: 30 });
+    const fist = blow().dmg, wantFist = 1 + Math.floor(0.6 * 2) + Math.round(Math.floor((26 - D.strOver) / 2) * 0.5 / D.swingRef);
+    expect(fist === wantFist, `a punch at STR 26: ${fist} (want ${wantFist}: STR over ${D.strOver}, as before)`);
+    // The class's power: a mace's Daze (rng 0.1, under its quarter) met and not met
+    p.perks = { daze: 1 }; wield("mace");   // STR 20, TOU 16
+    const dazed = (a) => { set(a); delete tgt.status.stunned; resolveAttack(game, p, tgt, weaponSpec(p), { view: "map", rng: fixed(0.1) }); return hasStatus(tgt, "stunned"); };
+    const dMet = dazed({ str: 20, agi: 30 }), dBad = dazed({ str: 19, agi: 30 });
+    expect(dMet && !dBad, `Daze with a mace: met ${dMet}, a point of STR short ${dBad} (want true, false: a weapon used badly has no class power)`);
+    p.perks = {};
+    stats.blows = `longsword met ${met}, short ${bad}; iron dagger at AGI 26 ${dag}; fist at STR 26 ${fist}; to hit short 1/3/6: -${c1}/-${c3}/-${c6}`;
+    // The legacy stat set: the parent's STR number on the spec, no shortfall
+    const undoS = overrideRules("stats", "legacy");
+    try {
+      wield("greatsword"); const sp = weaponSpec(p);
+      expect(sp.miss === undefined && sp.scale === undefined && sp.req === WEAPONS.greatsword.str, `the legacy stat set: a greatsword's spec ${JSON.stringify({ miss: sp.miss, scale: sp.scale, req: sp.req })} (want only req ${WEAPONS.greatsword.str})`);
+    } finally { undoS(); }
+  } finally { run.restore(); }
   return resultOf("combat: B4's attribute requirements and scaling grades", problems, stats);
 }
