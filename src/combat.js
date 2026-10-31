@@ -14,9 +14,13 @@
 //               blow lands, 12% + crit bonus crits (×2, Sunder ×3), elites soak a flat `armour`, your armour
 //               soaks 0..AV, a thrown knife crits 12%.
 //     "d20"     d20 + toHitMod > DV, a natural 1 misses, a natural ≥ critNat hits and crits (× RULES.d20.crit);
-//               damage = the weapon's range + round((material + floor((STR − 10) / 2)) × swing ÷ 0.7) +
-//               enchantment (RULES.d20.strOver, swingRef: the light-weapon fix, 2026-10-30), then the
-//               element/holy/crush/burn/executioner/giant-slayer multipliers; armour soaks 0..AV at random.
+//               damage = the weapon's range + round((material + its grades' bonus) × swing ÷ 0.7) + enchantment,
+//               the bonus Σ GRADES[letter] × (attribute − 10) ÷ 2 over the weapon's scaling (B4, the attribute set;
+//               the legacy stat set and fists: floor((STR − 10) / 2); RULES.d20.strOver, swingRef: the light-weapon
+//               fix, 2026-10-30), then the element/holy/crush/burn/executioner/giant-slayer multipliers; armour
+//               soaks 0..AV at random. A weapon whose requirements (items.js requirements) you lack is used badly
+//               (B4): to hit −reqPenalty a missing point (reqPenaltyMin..reqPenaltyCap), damage round((range +
+//               material) × reqDmg) + enchantment with nothing from your attributes, and its class's power is off.
 //               A missile weapon's shot adds its material and enchantment, not STR. Creatures roll
 //               d20 + floor(level / 3) against your DV (stats.js dv, 0 while unable to act). Every blow
 //               tells one line in one format, in both views (combatLine).
@@ -60,7 +64,7 @@
 //              arrows and bolts aside, a raised mirror shield half (bible §13.3, §13.4).
 import { lineOfSight } from "./raycast.js";
 import { solidFor } from "./world.js";
-import { strNeeded, WEAPONS, ARMOURS, ELEMENTS } from "./items.js";
+import { strNeeded, WEAPONS, ARMOURS, ELEMENTS, requirements, scaling, shortfall, gradeShare } from "./items.js";
 import { colossusCore } from "./guardians.js";
 import { EYE, FISTS, attackTime, armourValue, weaponReach } from "./player.js";
 import { sfx } from "./sfx.js";
@@ -101,8 +105,8 @@ export function resistText(m) {
 
 // --- Specs ------------------------------------------------------------------------------------------
 // The wielded weapon (bonus maxDmg widens the top of the range). Material: bible §13.1, 0 until items
-// carry one. Bare hands (fists): req 0 (no to-hit cost); under d20 every blow, a fist's too, counts STR over
-// RULES.d20.strOver, scaled by its swing (`swing`: the weapon's, FISTS.swing for bare hands). Fists hit for 1-2; in gauntlets 1d4; with truesteel knuckles fitted (WS5's implant,
+// carry one. Bare hands (fists): req 0 (no to-hit cost); under d20 a fist's blow counts STR over RULES.d20.strOver (a
+// weapon's, its grades: B4), scaled by its swing (`swing`: the weapon's, FISTS.swing for bare hands). Fists hit for 1-2; in gauntlets 1d4; with truesteel knuckles fitted (WS5's implant,
 // effect "knuckles"; bible §13.6) 2d4, and they crush (×2 against the brittle, as bonus crush does).
 export const fitted = fittedEffect;   // (body.js; B1)
 export function weaponSpec(e) {
@@ -113,8 +117,29 @@ export function weaponSpec(e) {
     return { kind: "melee", weapon: null, dmg: [dmg[0], dmg[1] + bonus(e, "maxDmg")], ench: 0, element: null, req: 0, acc: 0, material: 0, fists: true, swing: FISTS.swing,
              ...(knuckles ? { crush: true } : {}) };
   }
-  return { kind: "melee", weapon: it, dmg: [w.dmg[0], w.dmg[1] + bonus(e, "maxDmg")], ench: it.ench || 0, element: it.element || null,
+  const spec = { kind: "melee", weapon: it, dmg: [w.dmg[0], w.dmg[1] + bonus(e, "maxDmg")], ench: it.ench || 0, element: it.element || null,
            req: strNeeded(it), acc: w.acc || 0, material: it.material || 0, swing: w.swing, cls: CLASS_OF[it.id] || null, made: it.made || null };
+  // (B4: the attribute set's requirements and scaling; the legacy set keeps req, the parent's STR number)
+  if (RULES.stats !== "legacy") Object.assign(spec, unmetOf(e, it), { scale: scaling(it) });
+  return spec;
+}
+// What an item you hold or wear lacks (B4, the attribute set; the legacy stat set has its own STR rule, so nothing here):
+// { miss: the attribute points short in all, unmet: any }.
+export function unmetOf(e, it) {
+  if (RULES.stats === "legacy") return { miss: 0, unmet: false };
+  const short = shortfall(it, (k) => attr(e, k));
+  return { miss: short.reduce((s, r) => s + r.need - r.have, 0), unmet: short.length > 0 };
+}
+// The class's power works only with its requirements met (B4: a weapon used badly has none).
+const power = (spec, cls) => spec.cls === cls && !spec.unmet;
+// A weapon's attribute bonus a blow before its swing's scaling (B4): its grades' shares of (attribute − strOver) ÷ 2;
+// bare hands (no grades) count STR as the light-weapon fix does.
+function scaled(p, spec) {
+  const D = RULES.d20;
+  if (!spec.scale) return Math.floor((attr(p, "str") - D.strOver) / 2);
+  let t = 0;
+  for (const k in spec.scale) t += gradeShare(spec.scale[k]) * (attr(p, k) - D.strOver) / 2;
+  return t;
 }
 // A creature's own blow: its type's damage range and its level bonus (+1 per 4 levels, creatures.js).
 export function naturalSpec(c) {
@@ -157,7 +182,8 @@ export function toHitMod(game, att, tgt, spec = {}, ctx = {}) {
   if (groundOf(game, att) - groundOf(game, tgt) >= D.highGroundZ) m += D.highGround;   // standing a block or more above it
   if (att.attrs) {
     m += mod(att, "agi");
-    if (spec.req) m -= Math.min(D.reqPenaltyMax, D.reqPenalty * Math.max(0, spec.req - attr(att, "str")));
+    if (spec.miss !== undefined) { if (spec.miss > 0) m -= Math.max(D.reqPenaltyMin, Math.min(D.reqPenaltyCap, D.reqPenalty * spec.miss)); }   // (B4)
+    else if (spec.req) m -= Math.min(D.reqPenaltyMax, D.reqPenalty * Math.max(0, spec.req - attr(att, "str")));
   } else m += Math.floor((att.level || 1) / D.hitPerLevels);
   return m;
 }
@@ -343,14 +369,14 @@ registerStatus("disarmed", { color: [190, 190, 150], t: GEAR.disarmT, stack: "re
 const unaware = (game, m) => m.state !== "chase" && m.state !== "flee";   // (not hunting you, not running: a sleeper, a wanderer)
 const isShade = (m) => isGhostly(m) || !!CREATURE_TYPES[m.type]?.ghostly || m.type === "shade" || m.type === "wraith";
 function gearMultipliers(game, p, m, dmg, spec) {
-  if (!p.torch && unaware(game, m) && (spec.cls === "shortBlade" || hasKey(p.perks, "darkBackstab"))) dmg *= 2;   // from the dark
-  if (spec.cls === "polearm" && hasKey(p.perks, "highGround") && groundOf(game, p) - groundOf(game, m) >= RULES.d20.highGroundZ) dmg = Math.ceil(dmg * GEAR.highGround);
-  if (spec.cls === "flail") dmg = p.torch ? (isShade(m) ? dmg * 2 : dmg) : 1;   // the lantern-flail: useless with the torch out
+  if (!p.torch && unaware(game, m) && (power(spec, "shortBlade") || hasKey(p.perks, "darkBackstab"))) dmg *= 2;   // from the dark
+  if (power(spec, "polearm") && hasKey(p.perks, "highGround") && groundOf(game, p) - groundOf(game, m) >= RULES.d20.highGroundZ) dmg = Math.ceil(dmg * GEAR.highGround);
+  if (spec.cls === "flail") dmg = p.torch ? (isShade(m) && !spec.unmet ? dmg * 2 : dmg) : 1;   // the lantern-flail: useless with the torch out
   return dmg;
 }
 // Before the roll: a long blade's riposte (the foe's blow about to land is cancelled).
 function riposte(game, p, m, spec) {
-  if (spec.cls !== "longBlade" || !hasKey(p.perks, "riposte") || !(m.cd > 0) || m.cd > GEAR.riposteWindow) return false;
+  if (!power(spec, "longBlade") || !hasKey(p.perks, "riposte") || !(m.cd > 0) || m.cd > GEAR.riposteWindow) return false;
   if (attitude(game, m, p) !== "hostile" || distance(p.x - m.x, p.y - m.y) > (CREATURE_TYPES[m.type]?.reach ?? 1.6) + 0.5) return false;
   m.cd = (CREATURE_TYPES[m.type]?.cooldown || 1) * (m.cdMul || 1);
   game.log(`You turn ${theOf(m)}'s blow aside.`, [200, 220, 255]);
@@ -365,21 +391,21 @@ function gearAfter(game, p, m, spec, result, rng) {
     game.log(`Your blackglass ${WEAPONS[it.id].name} chips on ${theOf(m)}'s armour.`, [150, 140, 190]);
   }
   if (alive) {
-    if (spec.cls === "shortBlade" && result.crit && hasKey(p.perks, "bleed")) {
+    if (power(spec, "shortBlade") && result.crit && hasKey(p.perks, "bleed")) {
       if (!hasStatus(m, "bleeding")) game.log(`${TheOf(m)} bleeds.`, [200, 60, 70]);
       addStatus(game, m, "bleeding", { t: GEAR.bleedT, src: "player" });
     }
-    if (spec.cls === "cudgel" && hasKey(p.perks, "daze") && rng() < GEAR.dazeChance) {
+    if (power(spec, "cudgel") && hasKey(p.perks, "daze") && rng() < GEAR.dazeChance) {
       addStatus(game, m, "stunned", { t: GEAR.dazeT, stack: "max" });
       game.log(`${TheOf(m)} reels, dazed.`, [215, 205, 160]);
     }
-    if (spec.cls === "axe" && hasKey(p.perks, "disarm") && (canTalk(m) || ARMED.has(m.type)) && !hasStatus(m, "disarmed") && rng() < GEAR.disarmChance) {
+    if (power(spec, "axe") && hasKey(p.perks, "disarm") && (canTalk(m) || ARMED.has(m.type)) && !hasStatus(m, "disarmed") && rng() < GEAR.disarmChance) {
       addStatus(game, m, "disarmed", { t: GEAR.disarmT });
       game.log(`${TheOf(m)} drops ${canTalk(m) ? "what it was holding" : "its weapon"} and fumbles for it.`, [215, 205, 160]);
     }
-    if (spec.cls === "greatBlade") knockBack(game, p, m);
+    if (power(spec, "greatBlade")) knockBack(game, p, m);
   }
-  if (spec.cls === "axe" && hasKey(p.perks, "cleave") && result.dmg > 1) cleave(game, p, m, result, rng);
+  if (power(spec, "axe") && hasKey(p.perks, "cleave") && result.dmg > 1) cleave(game, p, m, result, rng);
   if (it && spec.made === "bone" && rng() < GEAR.boneSnap) snap(game, p, it);
 }
 function cleave(game, p, m, result, rng) {
@@ -433,11 +459,11 @@ function snap(game, p, it) {
 function turnedAside(game, p, ranged, rng) {
   if (ranged) {
     let keep = 1;
-    for (const g of worn(p)) if (g.kind === "armour" && ARMOURS[g.id]?.reflect) keep *= 1 - ARMOURS[g.id].reflect;
+    for (const g of worn(p)) if (g.kind === "armour" && ARMOURS[g.id]?.reflect && !unmetOf(p, g).unmet) keep *= 1 - ARMOURS[g.id].reflect;   // (B4: not met, off)
     if (hasStatus(p, "running:mirrorShield")) keep *= 0.5;
     if (keep < 1 && rng() >= keep) return "Your gear turns the shot aside.";
   }
-  if (worn(p).some((g) => g.kind === "armour" && ARMOURS[g.id]?.block) && rng() < GEAR.block) return "Your buckler takes the blow.";
+  if (worn(p).some((g) => g.kind === "armour" && ARMOURS[g.id]?.block && !unmetOf(p, g).unmet) && rng() < GEAR.block) return "Your buckler takes the blow.";
   return null;
 }
 
@@ -546,14 +572,16 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
     return "noticed";   // (resolveAttack: noticeBlow after the "attack" event)
   }
   const crit = result.crit;
-  // 3 Damage: the range, + material and STR over RULES.d20.strOver scaled by the blade's swing ÷ swingRef (rounded
-  // once), + enchantment (your blade; a spec without a swing counts as swingRef; a missile
+  // 3 Damage: the range, + material and the grades' bonus (fists, and the legacy stat set: STR over RULES.d20.strOver),
+  // scaled by the blade's swing ÷ swingRef (rounded once), + enchantment (your blade; used badly, B4:
+  // (range + material) × reqDmg + enchantment; a spec without a swing counts as swingRef; a missile
   // weapon's shot takes material and enchantment, no STR); a creature's level bonus; then the multipliers
   // and the crit.
   let dmg = spec.fixed ?? roll(rng, spec.dmg[0], spec.dmg[1]) + (spec.plus || 0);
   if (!you && hasStatus(att, "disarmed")) dmg = Math.floor(dmg / 2);   // (Disarm: B1)
-  if (you && spec.kind === "melee") dmg += Math.round(((spec.material || 0) + Math.floor((attr(p, "str") - D.strOver) / 2)) * (spec.swing ?? D.swingRef) / D.swingRef) + spec.ench;
-  else if (you && spec.kind === "missile" && spec.fixed === undefined) dmg += (spec.material || 0) + (spec.ench || 0);
+  if (you && spec.kind === "melee" && spec.unmet) dmg = Math.round((dmg + Math.round((spec.material || 0) * (spec.swing ?? D.swingRef) / D.swingRef)) * D.reqDmg) + spec.ench;   // (B4: used badly)
+  else if (you && spec.kind === "melee") dmg += Math.round(((spec.material || 0) + scaled(p, spec)) * (spec.swing ?? D.swingRef) / D.swingRef) + spec.ench;
+  else if (you && spec.kind === "missile" && spec.fixed === undefined) dmg = (spec.unmet ? Math.round((dmg + (spec.material || 0)) * D.reqDmg) : dmg + (spec.material || 0)) + (spec.ench || 0);   // (B4: a launcher used badly)
   dmg = Math.max(1, dmg);
   if (onYou) {
     const aside = turnedAside(game, p, !!ctx.ranged, rng);   // (B1: the buckler, the glass-scale, the mirror shield)

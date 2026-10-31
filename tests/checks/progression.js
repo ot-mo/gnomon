@@ -14,7 +14,8 @@
 //      and it takes a step on the map and walks in 3D.
 //   3. Levels 1 → 20 for every background, each card answered through the real keys: max HP follows TOU + 4 +
 //      (level − 1) × max(1, 3 + TOU mod) at every level (and you stay at full health), the Bent gain a crease a level,
-//      an attribute point comes at 4, 8, 12, 16, 20 and is spent on the card first, one power a level; 3 offers (4 at
+//      an attribute point comes every attrPointEvery-th level (3, 6 … 18 since B4, the user's decision of 2026-10-31; it
+//      was 4, 8 … 20) and is spent on the card first, one power a level; 3 offers (4 at
 //      INT 18+), all different, none still waiting (needs) or maxed, a major first at 5, 10, 15, 20. The same seed
 //      makes the same offers; another seed other ones. XP: killXp's table, Pilgrim's kills and quests.
 //   4. The wizard (screens/create.js) through the real key and mouse dispatch at 100×30: a Bent and a Plumb by
@@ -206,7 +207,10 @@ export async function checkProgression(m) {
         }
         const tou = st.attr(p, "tou");
         if (st.maxHp(p) !== tou + 4 || p.hp !== st.maxHp(p)) fail(`${what}: HP ${p.hp}/${st.maxHp(p)}, want ${tou + 4}`);
-        const wantDv = 6 + Math.floor((st.attr(p, "agi") - 16) / 2);
+        // (B4: a kit piece the spread can't meet is worn badly: −1 DV, half its armour, none of its bonus; check-combat's req)
+        const badly = (it) => !!it && it.kind === "armour" && m.items.shortfall(it, (k) => st.attr(p, k)).length > 0;
+        const kitWorn = Object.values(B.kit.equip).filter((it) => it.kind === "armour");
+        const wantDv = 6 + Math.floor((st.attr(p, "agi") - 16) / 2) - kitWorn.filter(badly).length;
         if (st.dv(p) !== wantDv) fail(`${what}: DV ${st.dv(p)}, want ${wantDv}`);
         // The Levels (bible §10.10), written out here rather than read from the table under test: Vey +3 to examine,
         // Orrum +1 natural armour, Cassin neither.
@@ -214,10 +218,10 @@ export async function checkProgression(m) {
         // (C4) and the kits' worn pieces, written out too: the Archivist's examining kit, +2 (bible §10.10).
         const KIT_WANT = { archivistOfVey: { examine: 2 } };
         const want = { ...(LEVEL_WANT[B.level] || { examine: 0, av: 0 }) };
-        want.examine += KIT_WANT[bg]?.examine || 0;
+        want.examine += badly(B.kit.equip.hands) ? 0 : KIT_WANT[bg]?.examine || 0;
         // (The free implant, fitted since the WS9 merge, adds its own: WS5's table, not the one under test.)
         const own = (g === "plumb" && m.implants.IMPLANTS[B.implant]?.bonus) || {};
-        const armour = { clothes: 0, leather: 1, chain: 2 }[B.kit.equip.body?.id] ?? 0, wantAv = armour + want.av + (own.av || 0);
+        const worn = { clothes: 0, leather: 1, chain: 2 }[B.kit.equip.body?.id] ?? 0, armour = badly(B.kit.equip.body) ? Math.floor(worn / 2) : worn, wantAv = armour + want.av + (own.av || 0);
         if (st.av(p) !== wantAv) fail(`${what}: AV ${st.av(p)}, want ${wantAv}`);
         if (st.bonus(p, "examine") !== want.examine + (own.examine || 0)) fail(`${what}: examine +${st.bonus(p, "examine")}, want +${want.examine + (own.examine || 0)}`);
         if ((g === "plumb") !== !!B.level) fail(`${what}: a ${g} with Level ${B.level}`);
@@ -279,13 +283,14 @@ export async function checkProgression(m) {
     const p = begun(choicesFor(bg, C.suggestSpread(g, bg)), seed);
     const offers = [], issues = [];
     let pointsGot = 0, pointsSpent = 0, majors = 0;
+    const EVERY = m.rules.RULES.progression.level.attrPointEvery;   // (B4: 3)
     for (let level = 2; level <= 20; level++) {
       const fullBefore = p.hp === st.maxHp(p), maxBefore = st.maxHp(p);
       game.messages = [];
       L.gainXp(game, L.xpToNext(p.level) - p.xp, { source: "quest" });
       // What the level gave, in the log and on its card: "+N max HP" (max(1, 3 + TOU mod)), the Bent's crease, the point.
       const hpPer = Math.max(1, 3 + Math.floor((st.attr(p, "tou") - 16) / 2));
-      const gains = [`+${hpPer} max HP`, ...(g === "bent" ? ["+1 crease"] : []), ...(level % 4 === 0 ? ["an attribute point"] : [])];
+      const gains = [`+${hpPer} max HP`, ...(g === "bent" ? ["+1 crease"] : []), ...(level % EVERY === 0 ? ["an attribute point"] : [])];
       const line = `You reach level ${level}${level % 5 === 0 ? " (a milestone!)" : ""}! (${gains.join(", ")})`;
       if (!game.messages.some((x) => x.text === line)) issues.push(`level ${level}: the log says ${JSON.stringify(game.messages.map((x) => x.text))}, want "${line}"`);
       if (p.level !== level || p.pendingLevels !== 1) { issues.push(`level ${p.level}, pending ${p.pendingLevels} (want ${level}, 1)`); break; }
@@ -294,7 +299,7 @@ export async function checkProgression(m) {
       else if (p.hp !== st.maxHp(p) || st.maxHp(p) <= maxBefore) issues.push(`level ${level}: ${p.hp}/${st.maxHp(p)} after the level, ${maxBefore} before`);
       step(1 / 60);
       if (game.mode !== "levelup") { issues.push(`level ${level}: no card (in ${game.mode})`); break; }
-      if (level % 4 === 0) {
+      if (level % EVERY === 0) {
         pointsGot++;
         if (LU.levelCard(game).step !== "attr") issues.push(`level ${level}: the card asks for no attribute point first`);
         const k = pick.pick(st.ATTRS), before = st.attr(p, k), full = p.hp === st.maxHp(p);
@@ -336,7 +341,8 @@ export async function checkProgression(m) {
     }
     const ranks = Object.keys(p.perks).reduce((n, id) => n + L.perkRank(p, id), 0);
     if (ranks !== 19) issues.push(`19 levels gave ${ranks} power ranks`);
-    if (pointsGot !== 5 || pointsSpent !== 5 || p.attrPoints !== 0) issues.push(`attribute points: ${pointsGot} got, ${pointsSpent} spent, ${p.attrPoints} left (want 5, 5, 0)`);
+    const wantPoints = Math.floor(20 / EVERY);   // (B4: 6 by level 20; 5 at every 4th)
+    if (pointsGot !== wantPoints || pointsSpent !== wantPoints || p.attrPoints !== 0) issues.push(`attribute points: ${pointsGot} got, ${pointsSpent} spent, ${p.attrPoints} left (want ${wantPoints}, ${wantPoints}, 0)`);
     if (majors !== 4) issues.push(`${majors} majors at levels 5-20, want 4`);
     return { offers, issues, p };
   }
@@ -357,9 +363,10 @@ export async function checkProgression(m) {
     if (a.join(" ") === c.join(" ")) fail("seeds 77 and 78 made the same 19 offers");
     out.sameSeed = `seed 77 twice: ${a.length} offers the same; seed 78: ${a.filter((x, k) => x !== c[k]).length} of ${a.length} differ`;
     // Levels 3 to 8 in one gain: six cards in order, each with its level, its milestone (5 only) and the major first there;
-    // a level's own point (4 and 8) comes with its card, and a point kept for later ("Keep it for a later level") is
-    // asked about again on the next card.
+    // a level's own point (3 and 6 since B4; 4 and 8 before) comes with its card, and a point kept for later ("Keep it for
+    // a later level") is asked about again on the next card.
     {
+      const EVERY = m.rules.RULES.progression.level.attrPointEvery;
       const p = begun(choicesFor("droversChild", C.suggestSpread("bent", "droversChild")), 41);
       L.gainXp(game, L.xpToNext(1), { source: "quest" }); step(1 / 60); press("Digit1");   // level 2, out of the way
       let xp = 0;
@@ -370,12 +377,12 @@ export async function checkProgression(m) {
       if (p.level !== 8 || p.pendingLevels !== 6 || p.attrPoints !== 0) fail(`six levels at once: level ${p.level}, pending ${p.pendingLevels}, points ${p.attrPoints}`);
       for (let k = 0; k < 6; k++) {
         step(1 / 60);
-        const cd = LU.levelCard(game), first = POWERS[game.perkChoices[0]], own = cd.level % 4 === 0 ? 1 : 0;
+        const cd = LU.levelCard(game), first = POWERS[game.perkChoices[0]], own = cd.level % EVERY === 0 ? 1 : 0;
         seen.push(`${cd.level}${cd.step === "attr" ? `+${p.attrPoints}` : ""}${cd.milestone ? "!" : ""}`);
         if (cd.level !== k + 3) fail(`six levels at once: card ${k + 1} is level ${cd.level}, want ${k + 3}`);
         if (p.attrPoints !== kept + own || (cd.step === "attr") !== (kept + own > 0)) fail(`six levels at once: level ${cd.level}'s card holds ${p.attrPoints} points (want ${kept + own}) on ${cd.step}`);
         if (cd.milestone !== (cd.level === 5) || (cd.level === 5 && !first?.major)) fail(`six levels at once: level ${cd.level} milestone ${cd.milestone}, first offer ${game.perkChoices[0]}`);
-        if (cd.step === "attr" && cd.level === 4) {
+        if (cd.step === "attr" && cd.level === EVERY) {   // (the first point: kept)
           press("Digit7");
           kept = 1;
           if (p.attrPoints !== 1 || LU.levelCard(game).step !== "power") fail(`"Keep it for a later level": ${p.attrPoints} points kept, on ${LU.levelCard(game).step}`);
@@ -777,7 +784,8 @@ export async function checkProgression(m) {
       // Shellback works without body armour (clothes are none).
       const sh = bentIn(["shellback"]);
       const avBare = st.av(sh);
-      sh.body.equip.body = { kind: "armour", id: "plate", ench: 0, known: true }; st.invalidateStats(sh);
+      sh.body.equip.body = { kind: "armour", id: "plate", ench: 0, known: true };
+      Object.assign(sh.attrs, { str: 26, tou: 20 }); st.invalidateStats(sh);   // (B4: plate's requirements met, or it counts half)
       const avPlate = st.av(sh);
       if (avPlate !== m.items.ARMOURS.plate.armour) fail(`Shellback under plate: AV ${avPlate}, want the plate's ${m.items.ARMOURS.plate.armour} alone`);
       out.shellback = `AV ${avBare} bare, ${avPlate} in plate`;

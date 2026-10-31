@@ -11,7 +11,9 @@
 // its effect, items.js stackKey). A missile weapon is carried in the pack, not held: V fires the ready one
 // (missiles.js), in 3D where you look and on the map at the target screen's cursor, and your hands keep
 // your blade for the swing. E on one in the pack readies it.
-import { registerItemKind } from "../../items.js";
+import { registerItemKind, needsText, badlyText } from "../../items.js";
+import { attr } from "../../stats.js";
+import { RULES } from "../../rules.js";
 import { MATERIALS, VALUE } from "./forge.js";   // C4: a forged bolt-bow (`made`, and `material`: the damage its shot adds)
 
 export const MISSILES = {
@@ -37,6 +39,12 @@ const ART = {
 };
 
 const made = (it) => (it.made && MATERIALS[it.made]) || null;
+// What it asks of you (B4, the attribute set; items.js needsText, badlyText): the legacy set showed nothing.
+const needsLine = (game, it) => {
+  if (RULES.stats === "legacy") return "";
+  const p = game?.player, parts = [needsText(it), p?.attrs ? badlyText(it, (k) => attr(p, k)) : ""].filter(Boolean);
+  return parts.length ? " · " + parts.join(" · ") : "";
+};
 registerItemKind("missile", {
   stack: false, weight: () => 0,
   price: (it) => (made(it) ? Math.round((VALUE[it.id] || MISSILES[it.id].price) * made(it).value) : MISSILES[it.id].price) + 30 * Math.max(0, it.ench || 0),
@@ -44,7 +52,7 @@ registerItemKind("missile", {
   glyph: (game, it) => [")", made(it)?.color || [200, 165, 110]],   // a weapon (bible §15.7), in the colour of its wood (or its metal)
   info(game, it) {
     const m = MISSILES[it.id], ammo = m.ammo ? `shoots ${AMMO[m.ammo].plural}` : `shoots ${m.noun}s, free`, d = made(it)?.dmg || 0;
-    return `${m.dmg[0] + d}-${m.dmg[1] + d} damage · range ${m.range} · ${m.reload} s a shot · ${ammo} · ${m.info}${made(it) ? ` · ${made(it).name}: ${made(it).info}` : ""} · V fires it`;
+    return `${m.dmg[0] + d}-${m.dmg[1] + d} damage · range ${m.range} · ${m.reload} s a shot · ${ammo} · ${m.info}${made(it) ? ` · ${made(it).name}: ${made(it).info}` : ""} · V fires it${needsLine(game, it)}`;
   },
   art: ART.launcher,
   palette: (game, it) => (made(it) ? { ...WOOD, ...STRING, i: [made(it).color.map((v) => Math.round(v * 0.7)), 0.15], I: [made(it).color, 0.25] } : { ...WOOD, ...STRING, ...IRON }),

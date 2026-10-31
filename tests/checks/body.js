@@ -22,7 +22,9 @@
 //      on the player in src/ (the five parent fields live on the body now).
 //
 // game/startRun/inventory: the real modules. srcFiles: [{ file, text }] of every src/ module.
-import { RULES } from "../../src/rules.js";
+import { RULES, overrideRules } from "../../src/rules.js";
+import { weaponSpec, toHitMod, resolveAttack } from "../../src/combat.js";   // B4 (§5's attribute case)
+import { spawnCreature, addCreature } from "../../src/creatures.js";         // B4 (§5's attribute case)
 import * as I from "../../src/items.js";
 import * as Bd from "../../src/body.js";
 import * as St from "../../src/stats.js";
@@ -235,19 +237,44 @@ export function checkBody({ game, startRun, inventory, srcFiles }) {
   stats.parts = { fits, cursedRefusals };
 
   // --- 5. swapBelt --------------------------------------------------------------------------------
+  // B4 (the coordinator's approval, 2026-10-31: P0's twelfth exception): the parent's refusals under the legacy stat set,
+  // where the STR lock stays; under the attribute set a weapon you lack the attributes for comes off the belt, to be
+  // used badly (combat.js: the to-hit cost and × reqDmg).
   {
-    const e = { body: Bd.makeBody("humanoid"), inv: [], attrs: St.makeAttrs(), level: 1, maxHpGain: 0, hp: 20 };
-    const a = { kind: "weapon", id: "shortsword", ench: 0, known: true }, b = { kind: "weapon", id: "greatsword", ench: 0, known: true };
-    e.body.equip.hand_r = a;
-    const reasons = [Bd.swapBelt(game, e).reason];
-    e.body.belt = b;
-    reasons.push(Bd.swapBelt(game, e).reason);                 // the legacy set reads STR 10: too weak for a greatsword
-    St.raiseAttr(e, "str", 10);
-    a.ench = -1; reasons.push(Bd.swapBelt(game, e).reason); a.ench = 0;
-    const ok = Bd.swapBelt(game, e);
-    if (!same(reasons, ["empty", "weak", "cursed"])) fail(`swapBelt refusals: ${reasons.join(", ")}`);
-    if (!ok.ok || ok.time !== RULES.body.beltSwap || Bd.wielded(e) !== b || Bd.belt(e) !== a) fail(`swapBelt: ${JSON.stringify(ok)}`);
-    stats.swapBelt = { refusals: reasons, time: ok.time };
+    const undoSet = [overrideRules("stats", "legacy"), overrideRules("combat", "legacy")];
+    try {
+      const e = { body: Bd.makeBody("humanoid"), inv: [], attrs: St.makeAttrs(), level: 1, maxHpGain: 0, hp: 20 };
+      const a = { kind: "weapon", id: "shortsword", ench: 0, known: true }, b = { kind: "weapon", id: "greatsword", ench: 0, known: true };
+      e.body.equip.hand_r = a;
+      const reasons = [Bd.swapBelt(game, e).reason];
+      e.body.belt = b;
+      reasons.push(Bd.swapBelt(game, e).reason);                 // the legacy set reads STR 10: too weak for a greatsword
+      St.raiseAttr(e, "str", 10);
+      a.ench = -1; reasons.push(Bd.swapBelt(game, e).reason); a.ench = 0;
+      const ok = Bd.swapBelt(game, e);
+      if (!same(reasons, ["empty", "weak", "cursed"])) fail(`swapBelt refusals: ${reasons.join(", ")}`);
+      if (!ok.ok || ok.time !== RULES.body.beltSwap || Bd.wielded(e) !== b || Bd.belt(e) !== a) fail(`swapBelt: ${JSON.stringify(ok)}`);
+      stats.swapBelt = { refusals: reasons, time: ok.time };
+    } finally { while (undoSet.length) undoSet.pop()(); }
+  }
+  // B4: the attribute set. A copper greatsword (STR 27, TOU 18) on the belt of a player at 16 in everything swaps in; its
+  // spec is unmet by 13 points, so it costs reqPenaltyCap to hit and a blow does round(range roll × reqDmg).
+  {
+    const p = game.player, keep = { body: p.body, attrs: p.attrs };
+    p.body = Bd.makeBody("humanoid"); p.attrs = St.makeAttrs();
+    const foe = addCreature(game.zone, spawnCreature("goblin", Math.floor(p.x), Math.floor(p.y), p.z, { rng: () => 0.5, level: 1, state: "chase" }));
+    foe.hp = foe.maxHp = 1e9; foe.armour = 0; foe.cd = Infinity;
+    try {
+      p.body.equip.hand_r = { kind: "weapon", id: "shortsword", made: "copper", material: 0, ench: 0, known: true };
+      const g = { kind: "weapon", id: "greatsword", made: "copper", material: 0, ench: 0, known: true };
+      p.body.belt = g; St.invalidateStats(p);
+      const r = Bd.swapBelt(game, p), spec = weaponSpec(p), D = RULES.d20;
+      const cost = toHitMod(game, p, foe, { acc: 0 }, {}) - toHitMod(game, p, foe, spec, {});
+      const dmg = resolveAttack(game, p, foe, spec, { view: "map", rng: () => 0.9 }).dmg, want = Math.round((7 + Math.floor(0.9 * 6)) * D.reqDmg);   // (a natural 19: a hit, no crit)
+      if (!r.ok || Bd.wielded(p) !== g || !spec.unmet || spec.miss !== 13 || cost !== D.reqPenaltyCap || dmg !== want)
+        fail(`the attribute set: a greatsword off the belt at 16 in everything: ${r.ok ? "swapped" : r.reason}, unmet ${spec.unmet} by ${spec.miss} (want 13), to hit −${cost} (want ${D.reqPenaltyMax}), a blow ${dmg} (want ${want}: × ${D.reqDmg})`);
+      stats.swapBeltBadly = { ok: r.ok, miss: spec.miss, cost, dmg };
+    } finally { game.zone.creatures.splice(game.zone.creatures.indexOf(foe), 1); p.body = keep.body; p.attrs = keep.attrs; St.invalidateStats(p); }
   }
 
   // --- 6. Migration ---------------------------------------------------------------------------------

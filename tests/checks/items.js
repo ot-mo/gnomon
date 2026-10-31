@@ -220,11 +220,17 @@ export function checkItems(m) {
     } finally { St.STATS_DEBUG.verify = false; }
     stats.matrix = { fits, refusals, cursedHeld, byPlan: matrix };
 
-    // The STR requirement still refuses; a weak entity is told why.
+    // The STR requirement still refuses under the legacy stat set; a weak entity is told why. (B4: the attribute set lets
+    // it on, to be worn badly: check-combat's req.)
     {
       const e = entity("humanoid"); e.attrs = St.makeAttrs(6);
+      const undoS = m.rules.overrideRules("stats", "legacy");
+      try {
+        const r = Bd.canEquip(game, e, { kind: "armour", id: "ironHelm", ench: 0, known: true }, "head");
+        if (r.ok || r.reason !== "weak") fail(`the legacy set: an iron helm at STR ${St.attr(e, "str")}: ${r.ok ? "accepted" : r.reason}, want weak`);
+      } finally { undoS(); }
       const r = Bd.canEquip(game, e, { kind: "armour", id: "ironHelm", ench: 0, known: true }, "head");
-      if (r.ok || r.reason !== "weak") fail(`an iron helm at STR ${St.attr(e, "str")}: ${r.ok ? "accepted" : r.reason}, want weak`);
+      if (!r.ok) fail(`the attribute set: an iron helm at STR ${St.attr(e, "str")}: ${r.reason}, want it on (worn badly)`);
     }
 
     // Through the inventory, with base fields watched.
@@ -1103,10 +1109,15 @@ const PARENT_WEAPONS = ["dagger", "shortsword", "mace", "spear", "longsword", "w
 const PARENT_ARMOURS = ["clothes", "leather", "chain", "scale", "plate", "reedHat", "copperCap", "ironHelm", "goggles", "cloak", "bracers",
   "gloves", "gauntlets", "sandals", "boots"];
 export function parentGearTrace(m) {
+  return Object.fromEntries(Object.entries(parentGearLooks(m)).map(([label, look]) => [label, fnv(JSON.stringify(look))]));
+}
+// (B4: the looks themselves, so the attribute set's lines can be held against the legacy set's piece by piece; the
+// trace is their fnv, as recorded)
+export function parentGearLooks(m) {
   const I = m.items, game = m.game.game, out = {};
-  const look = (it) => JSON.stringify([I.itemName(game, it), I.itemInfo(game, it), I.itemPrice(it), I.itemGlyph(game, it), I.itemPalette(game, it),
-    I.itemBonuses(it), I.ITEM_KINDS[it.kind].av?.(it) ?? null]);
-  const add = (label, it) => { out[label] = fnv(look(it)); };
+  const look = (it) => [I.itemName(game, it), I.itemInfo(game, it), I.itemPrice(it), I.itemGlyph(game, it), I.itemPalette(game, it),
+    I.itemBonuses(it), I.ITEM_KINDS[it.kind].av?.(it) ?? null];
+  const add = (label, it) => { out[label] = look(it); };
   for (const ench of [-1, 0, 2]) for (const known of [false, true]) {
     for (const id of PARENT_WEAPONS) {
       add(`weapon ${id} ${ench} ${known}`, { kind: "weapon", id, ench, known });
@@ -1171,12 +1182,35 @@ export function checkGear(m) {
   const LADDER = [["bone", 1, -1, 0], ["copper", 2, 0, 0], ["iron", 3, 1, 0], ["saltsteel", 4, 2, 1], ["blackglass", 5, 3, 1],
     ["truesteel", 6, 4, 2], ["pleatmetal", 7, 5, 2], ["noonsilver", 8, 6, 3]];
 
+  // B4 (the coordinator's ruling of 2026-10-31, within golden (b)): the trace as recorded holds under the legacy rules;
+  // under the attribute set each piece reads the same but for its requirement part, the line's tail from " · needs …"
+  // (the legacy set's "needs N STR"; the attribute set's attributes, grades and "you lack …"), which a piece has when it
+  // asks for something (every piece under the legacy set; under the attribute set, every one with a REQUIRES row).
   section("the parent's gear", () => {
-    const trace = parentGearTrace(m), n = Object.keys(trace).length, h = fnv(JSON.stringify(trace));
+    const undo = [m.rules.overrideRules("stats", "legacy"), m.rules.overrideRules("combat", "legacy")];
+    let trace, before;
+    try { trace = parentGearTrace(m); before = parentGearLooks(m); } finally { while (undo.length) undo.pop()(); }
+    const n = Object.keys(trace).length, h = fnv(JSON.stringify(trace));
     if (n !== PARENT_GEAR.entries || h !== PARENT_GEAR.hash) {
-      fail(`the parent's gear reads differently from p3i-props: ${n} entries hashing ${h}, want ${PARENT_GEAR.entries} hashing ${PARENT_GEAR.hash}`);
+      fail(`the parent's gear reads differently from p3i-props under the legacy rules: ${n} entries hashing ${h}, want ${PARENT_GEAR.entries} hashing ${PARENT_GEAR.hash}`);
     }
-    stats.parentGear = `${n} pieces of the parent's gear read as at p3i-props (${h})`;
+    const now = parentGearLooks(m), OLD = / · needs \d+ STR$/, NEW = / · needs [A-Z]{3} \d+.*$/;
+    let held = 0;
+    for (const [label, look] of Object.entries(before)) {
+      const [kind, id] = label.split(" "), cur = now[label];
+      if (!cur) { fail(`the parent's ${label}: missing under the attribute set`); continue; }
+      // (a relic is a weapon or an armour piece too: its own item, makeRelic's)
+      const it = kind === "relic" ? I.makeRelic(id) : { kind, id, ench: 0 }, gear = it.kind === "weapon" || it.kind === "armour";
+      const asks = gear && Object.keys(I.requirements(it)).length > 0;
+      if (gear && !OLD.test(look[1])) fail(`the parent's ${label} under the legacy rules: no "needs N STR" in "${look[1]}"`);
+      if (asks && !NEW.test(cur[1])) fail(`the parent's ${label} under the attribute set: no requirement part in "${cur[1]}"`);
+      if (gear && !asks && NEW.test(cur[1])) fail(`the parent's ${label} asks for nothing, yet reads "${cur[1]}"`);
+      const strip = (l, re) => [l[0], l[1].replace(re, ""), ...l.slice(2)];
+      const a = gear ? strip(look, OLD) : look, b = gear ? strip(cur, NEW) : cur;
+      if (JSON.stringify(a) !== JSON.stringify(b)) fail(`the parent's ${label} differs under the attribute set beyond its requirement part: ${JSON.stringify(b)}, legacy ${JSON.stringify(a)}`);
+      else held++;
+    }
+    stats.parentGear = `${n} pieces of the parent's gear read as at p3i-props under the legacy rules (${h}); ${held} the same under the attribute set but for their requirement part`;
   });
 
   section("ladder", () => {
@@ -1939,13 +1973,15 @@ export function checkB1Gear(m) {
   section("specials", () => {
     const A = I.ARMOURS, F = m.forge, G = m.gear, St = m.stats;
     const partOf = (p, it) => m.body.defaultPart(p, it);
+    // (B4: worn by someone who meets its requirements; one who doesn't loses its block and reflection, check-combat's req)
+    const fit = (p, it) => { for (const [k, n] of Object.entries(I.requirements(it))) p.attrs[k] = Math.max(p.attrs[k], n); St.invalidateStats(p); return it; };
     const SPECIALS = {
       // takes a fifth of the blows that land on you (combat.js turnedAside)
       block: (id) => {
         startRun(13, m.testWorld.TEST_WORLD);
         const p = game.player, foe = m.creatures.spawnCreature("goblin", 1, 1, 2, { level: 3, rng: () => 0.5 }), St = m.stats;
         const turned = () => { let t = 0; for (let k = 0, rng = m.rng.makeRng(41); k < 1500; k++) { const r = m.combat.resolveAttack(game, foe, p, m.combat.naturalSpec(foe), { rng }); if (r.turned) t++; p.hp = m.stats.maxHp(p); } return t; };
-        const off = turned(); const it = G.makeGear("armour", id); m.body.equip(game, p, it, partOf(p, it)); const on = turned();
+        const off = turned(); const it = fit(p, G.makeGear("armour", id)); m.body.equip(game, p, it, partOf(p, it)); const on = turned();
         return off === 0 && on > 150 ? null : `turned ${off} without it, ${on} with it of 1,500 blows`;
       },
       // turns a share of arrows (combat.js turnedAside)
@@ -1953,7 +1989,7 @@ export function checkB1Gear(m) {
         startRun(13, m.testWorld.TEST_WORLD);
         const p = game.player, foe = m.creatures.spawnCreature("goblin", 1, 1, 2, { level: 3, rng: () => 0.5 });
         const turned = () => { let t = 0; for (let k = 0, rng = m.rng.makeRng(43); k < 1500; k++) { const r = m.combat.resolveAttack(game, foe, p, m.combat.naturalSpec(foe), { rng, ranged: true }); if (r.turned) t++; p.hp = m.stats.maxHp(p); } return t; };
-        const off = turned(); const it = G.makeGear("armour", id); m.body.equip(game, p, it, partOf(p, it)); const on = turned();
+        const off = turned(); const it = fit(p, G.makeGear("armour", id)); m.body.equip(game, p, it, partOf(p, it)); const on = turned();
         return off === 0 && on > 100 ? null : `turned ${off} arrows without it, ${on} with it of 1,500`;
       },
       // reputation while worn (social/reputation.js syncWornRep, on body.js's "gear")

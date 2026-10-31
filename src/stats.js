@@ -36,8 +36,8 @@
 //   water: 1 = twice as long; status.js drowning; the bellows lung).
 // (`pv` from the tech design is gone: DECISIONS, no penetration dice.)
 import { RULES } from "./rules.js";
-import { itemBonuses, ITEM_KINDS } from "./items.js";
-import { worn } from "./body.js";
+import { itemBonuses, ITEM_KINDS, shortfall } from "./items.js";
+import { worn, wielded } from "./body.js";
 import { PERKS, perkRank } from "./leveling.js";
 import { hasKey, keysOf } from "./keyset.js";
 
@@ -62,8 +62,29 @@ export function registerBonusSource(name, fn) {
 export const bonusSources = () => SOURCES.map((s) => s.name);
 
 // What an entity wears and wields (body.js worn(): equipped items and implants; the weapon on the
-// belt only counts once it's in your hand).
-registerBonusSource("gear", (e) => worn(e).map(itemBonuses));
+// belt only counts once it's in your hand). B4: under the attribute set an armour piece whose requirements you lack
+// gives none of its own bonuses, only its penalties (unmetPiece; av() and dv() take its armour), and so does a weapon in
+// a hand that isn't the primary one (never swung, it would lend its bonuses for nothing). The weapon in your hand keeps
+// its own: combat.js uses it badly. Which pieces you meet is a least fixed point, the same whatever order they went on
+// in: requirements read your base, every other source, every piece's penalties and the bonuses of the pieces you meet;
+// start from everything else, and add each such piece those attributes meet until none is added. A piece that needs another's bonus is met once
+// that one is; two that each need the other's are not; penalties always count, so adding a piece never unmeets one.
+// (It can't ask bonus(): this source is part of it.)
+const split = (b, sign) => Object.fromEntries(Object.entries(b).filter(([, v]) => Math.sign(v) === sign));
+registerBonusSource("gear", (e) => {
+  const own = worn(e).map((it) => [it, itemBonuses(it)]), hand = wielded(e);
+  const asks = (it) => it.kind === "armour" || (it.kind === "weapon" && it !== hand);
+  if (legacy() || !own.some(([it]) => asks(it))) return own.map(([, b]) => b);
+  const lift = {}, met = new Set();
+  const add = (b) => { for (const k of ATTRS) lift[k] = (lift[k] || 0) + (b[k] || 0); };
+  for (const { name, fn } of SOURCES) if (name !== "gear") for (const b of fn(e)) add(b);
+  for (const [it, b] of own) if (!asks(it)) { met.add(it); add(b); } else add(split(b, -1));
+  for (let more = true; more;) {
+    more = false;
+    for (const [it, b] of own) if (!met.has(it) && !shortfall(it, (k) => baseAttr(e, k) + (lift[k] || 0)).length) { met.add(it); add(split(b, 1)); more = true; }
+  }
+  return own.map(([it, b]) => (met.has(it) ? b : split(b, -1)));
+});
 registerBonusSource("powers", function* (e) {
   if (!e.perks) return;
   for (const k of keysOf(e.perks)) { const b = PERKS[k]?.bonus; if (b) yield b(perkRank(e, k)); }
@@ -94,8 +115,8 @@ const real = (e) => guarded.get(e) || e;
 export function bonusTable(e) {
   e = real(e);
   let c = cache.get(e);
-  if (!c || c.epoch !== cacheEpoch) {
-    c = { epoch: cacheEpoch, table: Object.freeze(bonusTableUncached(e)) };
+  if (!c || c.epoch !== cacheEpoch || c.set !== RULES.stats) {   // (B4: the gear source reads the formula set: a switch rebuilds)
+    c = { epoch: cacheEpoch, set: RULES.stats, table: Object.freeze(bonusTableUncached(e)) };
     cache.set(e, c);
     STATS_DEBUG.builds++;
   } else if (STATS_DEBUG.verify) {
@@ -130,14 +151,17 @@ export function maxHp(e) {
 // (ITEM_KINDS[kind].av, today only body armour) plus bonuses.
 export function av(e) {
   let body = 0;
-  for (const it of worn(e)) body += ITEM_KINDS[it.kind]?.av?.(it) || 0;
-  if (legacy()) return body + bonus(e, "armour");
+  if (legacy()) { for (const it of worn(e)) body += ITEM_KINDS[it.kind]?.av?.(it) || 0; return body + bonus(e, "armour"); }
+  for (const it of worn(e)) { const a = ITEM_KINDS[it.kind]?.av?.(it) || 0; body += unmetPiece(e, it) ? Math.floor(a / 2) : a; }   // (B4: not met, half)
   return body + bonus(e, "armour") + bonus(e, "av") + (e.naturalAv || 0);
 }
 export function dv(e, { unable = false } = {}) {
   if (unable) return 0;                                  // stunned or paralysed (status.js passes its noAct flag)
-  return RULES.dv.base + mod(e, "agi") + bonus(e, "dv");
+  return RULES.dv.base + mod(e, "agi") + bonus(e, "dv") - (legacy() ? 0 : worn(e).filter((it) => unmetPiece(e, it)).length);   // (B4: −1 a piece not met)
 }
+// An armour piece whose requirements you lack (B4; items.js shortfall): half its armour, −1 DV, no bonuses (the "gear"
+// source), and its special off (combat.js turnedAside).
+const unmetPiece = (e, it) => it.kind === "armour" && shortfall(it, (k) => attr(e, k)).length > 0;
 export const ma = (e) => RULES.ma.base + mod(e, "wil") + bonus(e, "ma");
 export const speedMul = (e) => 1 + bonus(e, "speed");   // haste is applied by whoever moves (× RULES.haste)
 export function cooldownMul(e) {

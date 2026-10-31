@@ -6,8 +6,8 @@
 //
 // Every potion and scroll has an aura: "good", "neutral" or "bad". A potion of seeing lets you
 // sense the auras of everything you're carrying, even before you know what it is.
-import { registerItemKind, strNeeded } from "../../items.js";
-import { raiseAttr, raiseMaxHp } from "../../stats.js";
+import { registerItemKind, strNeeded, requirements, needsText, badlyText } from "../../items.js";
+import { raiseAttr, raiseMaxHp, attr } from "../../stats.js";
 import { CURRENCY } from "../currency.js";
 import { RULES } from "../../rules.js";
 import { receive, formatPrice, purseRoom } from "../../currency.js";
@@ -315,7 +315,14 @@ const jewelBonuses = (it) => jewelTable(it)[it.id].bonus(it.ench);
 // where it goes). Potions are "drink" and scrolls "read" (effects.js, through inventory.js).
 const gear = (def) => ({ stack: false, weight: () => 0, price: gearPrice, aura: gearAura, name: gearName, use: "wear", ...def });
 // Strength needed (weapons and armour; "light" armour needs less): an attribute requirement.
-const strReq = (it) => ({ str: strNeeded(it) });
+const strReq = (it) => requirements(it);   // (B4: the attribute set's tables; the legacy set's { str })
+// The line's requirement part (B4): the legacy set's "needs N STR"; the attribute set's attributes and grades, and what
+// you lack, if you do (items.js needsText, badlyText).
+export function needsLine(game, it) {
+  if (RULES.stats === "legacy") return ` · needs ${strNeeded(it)} STR`;
+  const p = game?.player, parts = [needsText(it), p?.attrs ? badlyText(it, (k) => attr(p, k)) : ""].filter(Boolean);
+  return parts.length ? " · " + parts.join(" · ") : "";
+}
 
 registerItemKind("potion", {
   stack: true, throwable: true, weight: () => 0,
@@ -342,7 +349,7 @@ registerItemKind("scroll", {
 function weaponInfo(game, it) {
   const w = WEAPONS[it.id], m = Math.round(materialDmg(it) * w.swing / RULES.d20.swingRef);   // what the material adds a blow (combat.js: × swing ÷ swingRef)
   const el = it.element ? ` · ${ELEMENTS[it.element].info}` : "";
-  return `${w.dmg[0] + m}-${w.dmg[1] + m} damage · ${w.swing}s per swing · reach ${w.reach}${w.thrust ? " · thrusts" : ""}${el}${extrasInfo(it)}${newInfo(it)} · needs ${strNeeded(it)} STR`;
+  return `${w.dmg[0] + m}-${w.dmg[1] + m} damage · ${w.swing}s per swing · reach ${w.reach}${w.thrust ? " · thrusts" : ""}${el}${extrasInfo(it)}${newInfo(it)}${needsLine(game, it)}`;
 }
 registerItemKind("weapon", gear({
   slot: () => "hand", hands: (it) => WEAPONS[it.id].hands || 1, req: strReq, stands: true,
@@ -359,7 +366,7 @@ registerItemKind("weapon", gear({
     return color ? { ...STEEL, w: [color, 0.6], W: [color, 0.4], ...GOLD, ...GRIP } : { ...STEEL, ...GOLD, ...GRIP };
   },
 }));
-const armourInfo = (game, it) => `armour ${ARMOURS[it.id].armour + materialAv(it)}${extrasInfo(it)}${newInfo(it)}${ARMOURS[it.id].slot ? ` · worn on the ${{ arm: "arms", gloves: "hands" }[ARMOURS[it.id].slot] || ARMOURS[it.id].slot}` : ""} · needs ${strNeeded(it)} STR`;
+const armourInfo = (game, it) => `armour ${ARMOURS[it.id].armour + materialAv(it)}${extrasInfo(it)}${newInfo(it)}${ARMOURS[it.id].slot ? ` · worn on the ${{ arm: "arms", gloves: "hands" }[ARMOURS[it.id].slot] || ARMOURS[it.id].slot}` : ""}${needsLine(game, it)}`;
 registerItemKind("armour", gear({
   slot: (it) => ARMOURS[it.id].slot || "body", req: strReq,
   bonuses: (it) => ({ ...(ARMOURS[it.id].bonus || {}) }),
