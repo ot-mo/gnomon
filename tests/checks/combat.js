@@ -1639,6 +1639,10 @@ const TYPICAL_BGS = ["aspirantOfTheRule", "forgehandOfOrrum", "droversChild", "r
 const TYPICAL_PREF = ["daze", "giantSlayer", "tough", "quick", "mighty", "thickBlood", "ironSkin", "highGround", "bleed", "riposte",
   "foldingStrike", "disarm", "keenEye", "secondWind", "cleave", "crushing", "executioner", "longReach", "darkBackstab", "regen"];
 const TYPICAL_SEEDS = Array.from({ length: 20 }, (_, k) => 1001 + k);
+// The typical build is the mean of six sets of builds, B1's (buildSeed 0-5, another 20 builds a background each; set 0 is
+// the one the check used alone before): the user's tier-8 decision ("HP ×0.85, damage −2", 2026-10-30) was measured on
+// their mean, and one set alone swings 36.5-41.8% at tier 8 (the coordinator's ruling, 2026-10-30; the bounds unchanged).
+export const TYPICAL_SETS = [0, 1, 2, 3, 4, 5];
 const typicalSnap = (p) => ({ attrs: { ...p.attrs }, perks: structuredClone(p.perks), perkRank: { ...p.perkRank }, maxHpGain: p.maxHpGain });
 // Put a build on the player as it was at `level` (its body made fresh from the kit).
 function wearTypical(p, build, level) {
@@ -1721,7 +1725,8 @@ function blowsToKill(dmgs, hp, low = null, lowBelow = 0) {
 }
 // pref: the typical build's preference (the default TYPICAL_PREF); typicalOnly: only the typical rows, with no bounds
 // held (B1's measurement of the powers' worth, 2026-10-30).
-export function ttkTables(ctx, { blows = 1500, typicalBlows = 40, pref = TYPICAL_PREF, typicalOnly = false, seed = 0, buildSeed = 0 } = {}) {
+export function ttkTables(ctx, { blows = 1500, typicalBlows = 40, pref = TYPICAL_PREF, typicalOnly = false, seed = 0, buildSeed = null } = {}) {
+  const buildSeeds = buildSeed === null ? TYPICAL_SETS : [buildSeed];   // (one set: a harness's; by default all six)
   const { game, seedRandom, restoreRandom } = ctx;
   const problems = [], stats = {};
   const expect = (ok, m) => { if (!ok) problems.push(m); return ok; };
@@ -1737,9 +1742,10 @@ export function ttkTables(ctx, { blows = 1500, typicalBlows = 40, pref = TYPICAL
                 ["d20", "attributes", "real"], ["d20", "attributes", "typical"]];
   // The typical build's row at a band: each build against the real world's kinds of the band, typicalBlows a side
   // (the blows to kill from their spread: blowsToKill), the means over the builds; the worst kind by its mean cost.
-  let builds = null;
+  let buildSets = null;
   const typicalRow = (tier, level) => {
-    builds ||= typicalBuilds(game, pref, buildSeed);
+    buildSets ||= buildSeeds.map((s) => typicalBuilds(game, pref, s));
+    const builds = buildSets.flatMap((bs, si) => bs.map((b) => ({ ...b, si })));
     const counts = realBand(game, tier, level), kinds = {}, rs = [];
     game.combatRng = makeRng(level * 97 + 3 + 7919 * seed);   // (seed: another stream of dice, for the spread over seeds; 0 as before)
     for (const b of builds) {
@@ -1780,7 +1786,7 @@ export function ttkTables(ctx, { blows = 1500, typicalBlows = 40, pref = TYPICAL
         r.you += w * yourTtk; r.it += w * itsTtk; r.cost += w * cost;
         (kinds[type] ||= { cost: 0 }).cost += cost / builds.length;
       }
-      rs.push({ ...r, hp: hpMax, dv: dvOf(game, p), av: armourValue(p) });
+      rs.push({ ...r, si: b.si, hp: hpMax, dv: dvOf(game, p), av: armourValue(p) });
     }
     const mean = (f) => rs.reduce((a, r) => a + f(r), 0) / rs.length;
     const [worst, wc] = Object.entries(kinds).reduce((a, [type, v]) => (v.cost > a[1] ? [type, v.cost] : a), ["", -1]);
@@ -1788,6 +1794,8 @@ export function ttkTables(ctx, { blows = 1500, typicalBlows = 40, pref = TYPICAL
              youKill: +mean((r) => r.you).toFixed(2), itKills: +mean((r) => r.it).toFixed(1), costPct: +(100 * mean((r) => r.cost)).toFixed(1),
              worst: `${worst} ${(100 * wc).toFixed(0)}%`, types: Object.keys(kinds).length,
              builds: `${(100 * Math.min(...rs.map((r) => r.cost))).toFixed(0)}-${(100 * Math.max(...rs.map((r) => r.cost))).toFixed(0)}%`,
+             sets: (() => { const m = buildSets.map((_, si) => { const g = rs.filter((r) => r.si === si); return 100 * g.reduce((a, r) => a + r.cost, 0) / g.length; });
+               return `${Math.min(...m).toFixed(1)}-${Math.max(...m).toFixed(1)}%`; })(),   // (each set's own mean: the spread stays in sight)
              minRatio: +Math.min(...rs.map((r) => r.it / r.you)).toFixed(1) };
   };
   seedRandom?.(97);   // (the legacy set draws Math.random)
@@ -1865,7 +1873,7 @@ export function ttkTables(ctx, { blows = 1500, typicalBlows = 40, pref = TYPICAL
       expect(r.youKill >= 0.5 && r.youKill <= 12, `typical tier ${r.tier} (level ${r.level}): you kill a creature of your level in ${r.youKill} s on average (want 0.5-12)`);
       expect(r.itKills >= 1.5 * r.youKill, `typical tier ${r.tier}: it kills you in ${r.itKills} s, you it in ${r.youKill} s (want it 1.5× slower)`);
       if (r.tier <= 4) expect(r.costPct <= 1.5 * L.costPct + 3 && r.youKill <= 1.5 * L.youKill + 0.5, `typical tier ${r.tier}: a kill costs ${r.costPct}% in ${r.youKill} s against the legacy set's ${L.costPct}% in ${L.youKill} s (want within 1.5× + 3)`);
-      else expect(r.costPct >= 22 && r.costPct <= 41, `typical tier ${r.tier}: a kill costs ${r.costPct}% (want 25-38% ±3)`);
+      else expect(r.costPct >= 22 && r.costPct <= 41, `typical tier ${r.tier}: a kill costs ${r.costPct}% (want 25-38% ±3; the mean of ${buildSeeds.length} sets, each ${r.sets})`);
     });
     // The real world (C3): every band has kinds out for you.
     for (const r of table.real) expect(r.types >= 3, `real tier ${r.tier} (level ${r.level}): ${r.types} kinds out for you, want 3 or more`);
@@ -1880,7 +1888,7 @@ export function ttkTables(ctx, { blows = 1500, typicalBlows = 40, pref = TYPICAL
     stats.d20 = table.d20.map((r) => `tier ${r.tier} L${r.level} (${r.weapon}, HP ${r.hp}, DV ${r.dv}, AV ${r.av}): you kill in ${r.youKill} s, it kills you in ${r.itKills} s, a kill costs ${r.costPct}% (worst ${r.worst}; ${r.types} kinds)`);
     stats.legacy = table.legacy.map((r) => `tier ${r.tier} L${r.level}: you kill in ${r.youKill} s, it kills you in ${r.itKills} s, a kill costs ${r.costPct}%`);
     stats.real = table.real.map((r) => `tier ${r.tier} L${r.level} (${r.weapon}, HP ${r.hp}, DV ${r.dv}, AV ${r.av}): you kill in ${r.youKill} s, it kills you in ${r.itKills} s, a kill costs ${r.costPct}% (worst ${r.worst}; ${r.types} kinds)`);
-    stats.typical = table.typical.map((r) => `tier ${r.tier} L${r.level} (HP ${r.hp}, DV ${r.dv}, AV ${r.av}): you kill in ${r.youKill} s, it kills you in ${r.itKills} s, a kill costs ${r.costPct}% (builds ${r.builds}, the closest fight ${r.minRatio}×; worst ${r.worst}; ${r.types} kinds)`);
+    stats.typical = table.typical.map((r) => `tier ${r.tier} L${r.level} (HP ${r.hp}, DV ${r.dv}, AV ${r.av}): you kill in ${r.youKill} s, it kills you in ${r.itKills} s, a kill costs ${r.costPct}% (sets ${r.sets}; builds ${r.builds}, the closest fight ${r.minRatio}×; worst ${r.worst}; ${r.types} kinds)`);
     stats.table = table;
   } finally {
     Object.assign(p, saved);
