@@ -1109,10 +1109,15 @@ const PARENT_WEAPONS = ["dagger", "shortsword", "mace", "spear", "longsword", "w
 const PARENT_ARMOURS = ["clothes", "leather", "chain", "scale", "plate", "reedHat", "copperCap", "ironHelm", "goggles", "cloak", "bracers",
   "gloves", "gauntlets", "sandals", "boots"];
 export function parentGearTrace(m) {
+  return Object.fromEntries(Object.entries(parentGearLooks(m)).map(([label, look]) => [label, fnv(JSON.stringify(look))]));
+}
+// (B4: the looks themselves, so the attribute set's lines can be held against the legacy set's piece by piece; the
+// trace is their fnv, as recorded)
+export function parentGearLooks(m) {
   const I = m.items, game = m.game.game, out = {};
-  const look = (it) => JSON.stringify([I.itemName(game, it), I.itemInfo(game, it), I.itemPrice(it), I.itemGlyph(game, it), I.itemPalette(game, it),
-    I.itemBonuses(it), I.ITEM_KINDS[it.kind].av?.(it) ?? null]);
-  const add = (label, it) => { out[label] = fnv(look(it)); };
+  const look = (it) => [I.itemName(game, it), I.itemInfo(game, it), I.itemPrice(it), I.itemGlyph(game, it), I.itemPalette(game, it),
+    I.itemBonuses(it), I.ITEM_KINDS[it.kind].av?.(it) ?? null];
+  const add = (label, it) => { out[label] = look(it); };
   for (const ench of [-1, 0, 2]) for (const known of [false, true]) {
     for (const id of PARENT_WEAPONS) {
       add(`weapon ${id} ${ench} ${known}`, { kind: "weapon", id, ench, known });
@@ -1177,12 +1182,35 @@ export function checkGear(m) {
   const LADDER = [["bone", 1, -1, 0], ["copper", 2, 0, 0], ["iron", 3, 1, 0], ["saltsteel", 4, 2, 1], ["blackglass", 5, 3, 1],
     ["truesteel", 6, 4, 2], ["pleatmetal", 7, 5, 2], ["noonsilver", 8, 6, 3]];
 
+  // B4 (the coordinator's ruling of 2026-10-31, within golden (b)): the trace as recorded holds under the legacy rules;
+  // under the attribute set each piece reads the same but for its requirement part, the line's tail from " · needs …"
+  // (the legacy set's "needs N STR"; the attribute set's attributes, grades and "you lack …"), which a piece has when it
+  // asks for something (every piece under the legacy set; under the attribute set, every one with a REQUIRES row).
   section("the parent's gear", () => {
-    const trace = parentGearTrace(m), n = Object.keys(trace).length, h = fnv(JSON.stringify(trace));
+    const undo = [m.rules.overrideRules("stats", "legacy"), m.rules.overrideRules("combat", "legacy")];
+    let trace, before;
+    try { trace = parentGearTrace(m); before = parentGearLooks(m); } finally { while (undo.length) undo.pop()(); }
+    const n = Object.keys(trace).length, h = fnv(JSON.stringify(trace));
     if (n !== PARENT_GEAR.entries || h !== PARENT_GEAR.hash) {
-      fail(`the parent's gear reads differently from p3i-props: ${n} entries hashing ${h}, want ${PARENT_GEAR.entries} hashing ${PARENT_GEAR.hash}`);
+      fail(`the parent's gear reads differently from p3i-props under the legacy rules: ${n} entries hashing ${h}, want ${PARENT_GEAR.entries} hashing ${PARENT_GEAR.hash}`);
     }
-    stats.parentGear = `${n} pieces of the parent's gear read as at p3i-props (${h})`;
+    const now = parentGearLooks(m), OLD = / · needs \d+ STR$/, NEW = / · needs [A-Z]{3} \d+.*$/;
+    let held = 0;
+    for (const [label, look] of Object.entries(before)) {
+      const [kind, id] = label.split(" "), cur = now[label];
+      if (!cur) { fail(`the parent's ${label}: missing under the attribute set`); continue; }
+      // (a relic is a weapon or an armour piece too: its own item, makeRelic's)
+      const it = kind === "relic" ? I.makeRelic(id) : { kind, id, ench: 0 }, gear = it.kind === "weapon" || it.kind === "armour";
+      const asks = gear && Object.keys(I.requirements(it)).length > 0;
+      if (gear && !OLD.test(look[1])) fail(`the parent's ${label} under the legacy rules: no "needs N STR" in "${look[1]}"`);
+      if (asks && !NEW.test(cur[1])) fail(`the parent's ${label} under the attribute set: no requirement part in "${cur[1]}"`);
+      if (gear && !asks && NEW.test(cur[1])) fail(`the parent's ${label} asks for nothing, yet reads "${cur[1]}"`);
+      const strip = (l, re) => [l[0], l[1].replace(re, ""), ...l.slice(2)];
+      const a = gear ? strip(look, OLD) : look, b = gear ? strip(cur, NEW) : cur;
+      if (JSON.stringify(a) !== JSON.stringify(b)) fail(`the parent's ${label} differs under the attribute set beyond its requirement part: ${JSON.stringify(b)}, legacy ${JSON.stringify(a)}`);
+      else held++;
+    }
+    stats.parentGear = `${n} pieces of the parent's gear read as at p3i-props under the legacy rules (${h}); ${held} the same under the attribute set but for their requirement part`;
   });
 
   section("ladder", () => {
