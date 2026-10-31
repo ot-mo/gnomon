@@ -19,7 +19,7 @@
 //               the legacy stat set and fists: floor((STR − 10) / 2); RULES.d20.strOver, swingRef: the light-weapon
 //               fix, 2026-10-30), then the element/holy/crush/burn/executioner/giant-slayer multipliers; armour
 //               soaks 0..AV at random. A weapon whose requirements (items.js requirements) you lack is used badly
-//               (B4): to hit −reqPenalty a missing point (reqPenaltyMin..reqPenaltyMax), damage round((range +
+//               (B4): to hit −reqPenalty a missing point (reqPenaltyMin..reqPenaltyCap), damage round((range +
 //               material) × reqDmg) + enchantment with nothing from your attributes, and its class's power is off.
 //               A missile weapon's shot adds its material and enchantment, not STR. Creatures roll
 //               d20 + floor(level / 3) against your DV (stats.js dv, 0 while unable to act). Every blow
@@ -123,8 +123,10 @@ export function weaponSpec(e) {
   if (RULES.stats !== "legacy") Object.assign(spec, unmetOf(e, it), { scale: scaling(it) });
   return spec;
 }
-// What an item you hold or wear lacks (B4): { miss: the attribute points short in all, unmet: any }.
+// What an item you hold or wear lacks (B4, the attribute set; the legacy stat set has its own STR rule, so nothing here):
+// { miss: the attribute points short in all, unmet: any }.
 export function unmetOf(e, it) {
+  if (RULES.stats === "legacy") return { miss: 0, unmet: false };
   const short = shortfall(it, (k) => attr(e, k));
   return { miss: short.reduce((s, r) => s + r.need - r.have, 0), unmet: short.length > 0 };
 }
@@ -180,7 +182,7 @@ export function toHitMod(game, att, tgt, spec = {}, ctx = {}) {
   if (groundOf(game, att) - groundOf(game, tgt) >= D.highGroundZ) m += D.highGround;   // standing a block or more above it
   if (att.attrs) {
     m += mod(att, "agi");
-    if (spec.miss !== undefined) { if (spec.miss > 0) m -= Math.max(D.reqPenaltyMin, Math.min(D.reqPenaltyMax, D.reqPenalty * spec.miss)); }   // (B4)
+    if (spec.miss !== undefined) { if (spec.miss > 0) m -= Math.max(D.reqPenaltyMin, Math.min(D.reqPenaltyCap, D.reqPenalty * spec.miss)); }   // (B4)
     else if (spec.req) m -= Math.min(D.reqPenaltyMax, D.reqPenalty * Math.max(0, spec.req - attr(att, "str")));
   } else m += Math.floor((att.level || 1) / D.hitPerLevels);
   return m;

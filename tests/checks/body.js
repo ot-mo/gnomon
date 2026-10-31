@@ -258,7 +258,7 @@ export function checkBody({ game, startRun, inventory, srcFiles }) {
     } finally { while (undoSet.length) undoSet.pop()(); }
   }
   // B4: the attribute set. A copper greatsword (STR 27, TOU 18) on the belt of a player at 16 in everything swaps in; its
-  // spec is unmet by 13 points, so it costs reqPenaltyMax to hit and a blow does round(range roll × reqDmg).
+  // spec is unmet by 13 points, so it costs reqPenaltyCap to hit and a blow does round(range roll × reqDmg).
   {
     const p = game.player, keep = { body: p.body, attrs: p.attrs };
     p.body = Bd.makeBody("humanoid"); p.attrs = St.makeAttrs();
@@ -271,7 +271,7 @@ export function checkBody({ game, startRun, inventory, srcFiles }) {
       const r = Bd.swapBelt(game, p), spec = weaponSpec(p), D = RULES.d20;
       const cost = toHitMod(game, p, foe, { acc: 0 }, {}) - toHitMod(game, p, foe, spec, {});
       const dmg = resolveAttack(game, p, foe, spec, { view: "map", rng: () => 0.9 }).dmg, want = Math.round((7 + Math.floor(0.9 * 6)) * D.reqDmg);   // (a natural 19: a hit, no crit)
-      if (!r.ok || Bd.wielded(p) !== g || !spec.unmet || spec.miss !== 13 || cost !== D.reqPenaltyMax || dmg !== want)
+      if (!r.ok || Bd.wielded(p) !== g || !spec.unmet || spec.miss !== 13 || cost !== D.reqPenaltyCap || dmg !== want)
         fail(`the attribute set: a greatsword off the belt at 16 in everything: ${r.ok ? "swapped" : r.reason}, unmet ${spec.unmet} by ${spec.miss} (want 13), to hit −${cost} (want ${D.reqPenaltyMax}), a blow ${dmg} (want ${want}: × ${D.reqDmg})`);
       stats.swapBeltBadly = { ok: r.ok, miss: spec.miss, cost, dmg };
     } finally { game.zone.creatures.splice(game.zone.creatures.indexOf(foe), 1); p.body = keep.body; p.attrs = keep.attrs; St.invalidateStats(p); }

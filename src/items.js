@@ -134,7 +134,7 @@ export function badlyText(it, have) {
   if (!short.length) return "";
   const lack = `you lack ${short.map((s) => `${s.need - s.have} ${AN(s.attr)}`).join(" and ")}`, D = RULES.d20;
   if (it.kind === "armour") return `${lack}: worn badly (half its armour, −1 DV, none of its own)`;
-  const miss = short.reduce((s, r) => s + r.need - r.have, 0), pen = Math.max(D.reqPenaltyMin, Math.min(D.reqPenaltyMax, D.reqPenalty * miss));
+  const miss = short.reduce((s, r) => s + r.need - r.have, 0), pen = Math.max(D.reqPenaltyMin, Math.min(D.reqPenaltyCap, D.reqPenalty * miss));
   const power = it.kind === "weapon" && POWER_OFF[CLASS_OF[it.id]];
   return `${lack}: used badly (−${pen} to hit, ×${D.reqDmg} damage${power ? `, ${power}` : ""})`;
 }

@@ -1695,7 +1695,7 @@ export function typicalBuilds(game, pref = TYPICAL_PREF, buildSeed = 0) {
         // (B4: what its line and your attributes promise: its grades' bonus, or used badly, ×reqDmg with nothing from
         // your attributes; each point of the to-hit cost taken as 5% off)
         const w = WEAPONS[it.id], D = RULES.d20, s = w.swing / D.swingRef, { miss, unmet } = unmetOf(p, it), g = scaling(it);
-        if (unmet) return ((w.dmg[0] + w.dmg[1]) / 2 + Math.round((it.material || 0) * s)) * D.reqDmg * (1 - 0.05 * Math.max(D.reqPenaltyMin, Math.min(D.reqPenaltyMax, D.reqPenalty * miss)));
+        if (unmet) return ((w.dmg[0] + w.dmg[1]) / 2 + Math.round((it.material || 0) * s)) * D.reqDmg * (1 - 0.05 * Math.max(D.reqPenaltyMin, Math.min(D.reqPenaltyCap, D.reqPenalty * miss)));
         let t = 0;
         for (const k in g) t += gradeShare(g[k]) * (attr(p, k) - D.strOver) / 2;
         return (w.dmg[0] + w.dmg[1]) / 2 + Math.round(((it.material || 0) + t) * s);
@@ -2357,7 +2357,7 @@ export function checkB4Requirements(ctx) {
   } finally { undo(); }
   stats.tables = `${Object.keys(REQUIRES).length} items ask, ${Object.keys(SCALING).length} weapons scale; ${Object.keys(kits).length} kits fit at creation`;
 
-  // 2 Your blade: unmet costs 2 to hit a missing point (at least reqPenaltyMin, at most reqPenaltyMax), damage × reqDmg with
+  // 2 Your blade: unmet costs 2 to hit a missing point (at least reqPenaltyMin, at most reqPenaltyCap), damage × reqDmg with
   //   nothing from your attributes, and the class's power; met, the grades add their shares of (attribute − strOver) ÷ 2;
   //   fists keep STR over strOver; under the legacy stat set a spec carries the parent's STR number as before.
   const { game } = ctx, D = RULES.d20, run = fresh(ctx, 93), p = game.player;
@@ -2374,8 +2374,8 @@ export function checkB4Requirements(ctx) {
     const base = (a) => { set(a); return toHitMod(game, p, tgt, { acc: 0 }, {}); };
     const cost = (a) => base(a) - toHitMod(game, p, tgt, weaponSpec(p), {});
     const c1 = cost({ str: 20, agi: 17 }), c3 = cost({ str: 18, agi: 17 }), c6 = cost({ str: 16, agi: 16 }), c0 = cost({ str: 21, agi: 17 });
-    expect(c0 === 0 && c1 === D.reqPenaltyMin && c3 === 2 * 3 && c6 === D.reqPenaltyMax,
-      `to hit with a longsword (STR 21, AGI 17): 0, 1, 3 and 6 points short cost ${c0}, ${c1}, ${c3}, ${c6} (want 0, ${D.reqPenaltyMin}, 6, ${D.reqPenaltyMax})`);
+    expect(c0 === 0 && c1 === D.reqPenaltyMin && c3 === 2 * 3 && c6 === D.reqPenaltyCap,
+      `to hit with a longsword (STR 21, AGI 17): 0, 1, 3 and 6 points short cost ${c0}, ${c1}, ${c3}, ${c6} (want 0, ${D.reqPenaltyMin}, 6, ${D.reqPenaltyCap})`);
     const s = WEAPONS.longsword.swing / D.swingRef, roll = 4 + Math.floor(0.6 * 5);   // (the 4-8 range at 0.6)
     set({ str: 26, agi: 30 });
     const met = blow().dmg, wantMet = roll + Math.round((0 + 0.8 * (26 - 10) / 2 + 0.4 * (30 - 10) / 2) * s);
@@ -2489,6 +2489,20 @@ export function checkB4Requirements(ctx) {
     expect(red.includes("You lack 3 STR: used badly (−6 to hit, ×0.6 damage, no Riposte)."), `the shortfall's own line: "${red.trim()}"`);
     expect(before.some((l) => l.includes("needs 13 STR")) && !before.some((l) => l.includes("You lack")), `the legacy set's pack: ${before.filter((l) => /longsword|needs|lack/.test(l)).map((l) => l.trim()).join(" / ")}`);
     stats.pack = `${row.trim()} / ${red.trim()}`;
+
+    // 8 The legacy stat set under d20 (check-combat's 0C tables use it): the parent's STR rule only. A weapon far too
+    //   heavy costs at most reqPenaltyMax (6), not B4's cap; a buckler (the parent's STR 9) blocks for anyone.
+    const undoL8 = overrideRules("stats", "legacy");
+    try {
+      set({ str: 10 }); p.body.equip.arms = null; wield("maul");   // legacy STR 4, the maul's 16
+      const heavy = toHitMod(game, p, tgt, { acc: 0 }, {}) - toHitMod(game, p, tgt, weaponSpec(p), {});
+      p.body.equip.hand_r = null; p.body.equip.hand_l = null;
+      p.body.equip.arms = { kind: "armour", id: "buckler", ench: 0, known: true }; invalidateStats(p);
+      const blockL = !!resolveAttack(game, tgt, p, naturalSpec(tgt), { view: "map", rng: seq(0.99, 0.5, 0.1) }).turned;
+      p.body.equip.arms = null; invalidateStats(p);
+      expect(heavy === D.reqPenaltyMax && blockL, `the legacy stat set under d20: a maul at STR 4 costs −${heavy} to hit (want ${D.reqPenaltyMax}), a buckler at STR 4 blocks ${blockL} (want true)`);
+      stats.legacyD20 = `maul at STR 4 −${heavy}; buckler ${blockL}`;
+    } finally { undoL8(); }
   } finally { run.restore(); }
   return resultOf("combat: B4's attribute requirements and scaling grades", problems, stats);
 }
