@@ -1212,6 +1212,8 @@ async function starterChain(env, { fail, game, p, RUN, real, at }) {
     EV.emit(game, "kill", { c: { uid: `legend:${ksite.id}`, type: "brineGrub", name: "the Grub Mother" }, uid: `legend:${ksite.id}` });
     if (q("grubs")?.stage !== "culvert") fail(`the Grub Mother dead: ${q("grubs")?.stage}, not the culvert`);
     if (say(hallen, "It's done.")) fail("Hallen takes Grubs in the Kettle back before you come home through the culvert");
+    EV.emit(game, "zone:enter", { zone: { landmarkId: "hollowmere", z: 0, key: "5,16,0" }, how: "travel", from: `${K.wx},${K.wy},3` });   // (a homing pip home: review of b499abe)
+    if (q("grubs")?.stage !== "culvert") fail(`a homing pip home from Kettle Mesa's floor 3 counted as the culvert: ${q("grubs")?.stage}`);
     EV.emit(game, "zone:enter", { zone: { landmarkId: "hollowmere", z: 0, key: "5,16,0" }, how: "up", from: `${K.wx},${K.wy},3` });
     if (q("grubs")?.stage !== "return") fail(`home through the culvert: ${q("grubs")?.stage}`);
     say(hallen, "It's done.")?.go();

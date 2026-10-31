@@ -45,7 +45,8 @@ registerQuest("starter", {
     } },
     culvert: { on: { "zone:enter": (game, q, ev) => {
       const k = landmark(game, "kettleMesa");
-      return ev?.zone?.landmarkId === "hollowmere" && ev.zone.z === 0 && k && ev.from === `${k.wx},${k.wy},3` ? "return" : null;
+      // (the culvert's own arrival: up from Kettle Mesa's floor 3, screens/play.js changeFloor; a homing pip's is "travel")
+      return ev?.zone?.landmarkId === "hollowmere" && ev.zone.z === 0 && ev.how === "up" && k && ev.from === `${k.wx},${k.wy},3` ? "return" : null;
     } } },
     visit: { on: { "zone:enter": (game, q, ev) => {
       const s = game.run?.sites?.get(dial(game)?.siteId);
