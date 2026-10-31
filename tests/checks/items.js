@@ -1939,13 +1939,15 @@ export function checkB1Gear(m) {
   section("specials", () => {
     const A = I.ARMOURS, F = m.forge, G = m.gear, St = m.stats;
     const partOf = (p, it) => m.body.defaultPart(p, it);
+    // (B4: worn by someone who meets its requirements; one who doesn't loses its block and reflection, check-combat's req)
+    const fit = (p, it) => { for (const [k, n] of Object.entries(I.requirements(it))) p.attrs[k] = Math.max(p.attrs[k], n); St.invalidateStats(p); return it; };
     const SPECIALS = {
       // takes a fifth of the blows that land on you (combat.js turnedAside)
       block: (id) => {
         startRun(13, m.testWorld.TEST_WORLD);
         const p = game.player, foe = m.creatures.spawnCreature("goblin", 1, 1, 2, { level: 3, rng: () => 0.5 }), St = m.stats;
         const turned = () => { let t = 0; for (let k = 0, rng = m.rng.makeRng(41); k < 1500; k++) { const r = m.combat.resolveAttack(game, foe, p, m.combat.naturalSpec(foe), { rng }); if (r.turned) t++; p.hp = m.stats.maxHp(p); } return t; };
-        const off = turned(); const it = G.makeGear("armour", id); m.body.equip(game, p, it, partOf(p, it)); const on = turned();
+        const off = turned(); const it = fit(p, G.makeGear("armour", id)); m.body.equip(game, p, it, partOf(p, it)); const on = turned();
         return off === 0 && on > 150 ? null : `turned ${off} without it, ${on} with it of 1,500 blows`;
       },
       // turns a share of arrows (combat.js turnedAside)
@@ -1953,7 +1955,7 @@ export function checkB1Gear(m) {
         startRun(13, m.testWorld.TEST_WORLD);
         const p = game.player, foe = m.creatures.spawnCreature("goblin", 1, 1, 2, { level: 3, rng: () => 0.5 });
         const turned = () => { let t = 0; for (let k = 0, rng = m.rng.makeRng(43); k < 1500; k++) { const r = m.combat.resolveAttack(game, foe, p, m.combat.naturalSpec(foe), { rng, ranged: true }); if (r.turned) t++; p.hp = m.stats.maxHp(p); } return t; };
-        const off = turned(); const it = G.makeGear("armour", id); m.body.equip(game, p, it, partOf(p, it)); const on = turned();
+        const off = turned(); const it = fit(p, G.makeGear("armour", id)); m.body.equip(game, p, it, partOf(p, it)); const on = turned();
         return off === 0 && on > 100 ? null : `turned ${off} arrows without it, ${on} with it of 1,500`;
       },
       // reputation while worn (social/reputation.js syncWornRep, on body.js's "gear")

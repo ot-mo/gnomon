@@ -206,7 +206,10 @@ export async function checkProgression(m) {
         }
         const tou = st.attr(p, "tou");
         if (st.maxHp(p) !== tou + 4 || p.hp !== st.maxHp(p)) fail(`${what}: HP ${p.hp}/${st.maxHp(p)}, want ${tou + 4}`);
-        const wantDv = 6 + Math.floor((st.attr(p, "agi") - 16) / 2);
+        // (B4: a kit piece the spread can't meet is worn badly: −1 DV, half its armour, none of its bonus; check-combat's req)
+        const badly = (it) => !!it && it.kind === "armour" && m.items.shortfall(it, (k) => st.attr(p, k)).length > 0;
+        const kitWorn = Object.values(B.kit.equip).filter((it) => it.kind === "armour");
+        const wantDv = 6 + Math.floor((st.attr(p, "agi") - 16) / 2) - kitWorn.filter(badly).length;
         if (st.dv(p) !== wantDv) fail(`${what}: DV ${st.dv(p)}, want ${wantDv}`);
         // The Levels (bible §10.10), written out here rather than read from the table under test: Vey +3 to examine,
         // Orrum +1 natural armour, Cassin neither.
@@ -214,10 +217,10 @@ export async function checkProgression(m) {
         // (C4) and the kits' worn pieces, written out too: the Archivist's examining kit, +2 (bible §10.10).
         const KIT_WANT = { archivistOfVey: { examine: 2 } };
         const want = { ...(LEVEL_WANT[B.level] || { examine: 0, av: 0 }) };
-        want.examine += KIT_WANT[bg]?.examine || 0;
+        want.examine += badly(B.kit.equip.hands) ? 0 : KIT_WANT[bg]?.examine || 0;
         // (The free implant, fitted since the WS9 merge, adds its own: WS5's table, not the one under test.)
         const own = (g === "plumb" && m.implants.IMPLANTS[B.implant]?.bonus) || {};
-        const armour = { clothes: 0, leather: 1, chain: 2 }[B.kit.equip.body?.id] ?? 0, wantAv = armour + want.av + (own.av || 0);
+        const worn = { clothes: 0, leather: 1, chain: 2 }[B.kit.equip.body?.id] ?? 0, armour = badly(B.kit.equip.body) ? Math.floor(worn / 2) : worn, wantAv = armour + want.av + (own.av || 0);
         if (st.av(p) !== wantAv) fail(`${what}: AV ${st.av(p)}, want ${wantAv}`);
         if (st.bonus(p, "examine") !== want.examine + (own.examine || 0)) fail(`${what}: examine +${st.bonus(p, "examine")}, want +${want.examine + (own.examine || 0)}`);
         if ((g === "plumb") !== !!B.level) fail(`${what}: a ${g} with Level ${B.level}`);
@@ -777,7 +780,8 @@ export async function checkProgression(m) {
       // Shellback works without body armour (clothes are none).
       const sh = bentIn(["shellback"]);
       const avBare = st.av(sh);
-      sh.body.equip.body = { kind: "armour", id: "plate", ench: 0, known: true }; st.invalidateStats(sh);
+      sh.body.equip.body = { kind: "armour", id: "plate", ench: 0, known: true };
+      Object.assign(sh.attrs, { str: 26, tou: 20 }); st.invalidateStats(sh);   // (B4: plate's requirements met, or it counts half)
       const avPlate = st.av(sh);
       if (avPlate !== m.items.ARMOURS.plate.armour) fail(`Shellback under plate: AV ${avPlate}, want the plate's ${m.items.ARMOURS.plate.armour} alone`);
       out.shellback = `AV ${avBare} bare, ${avPlate} in plate`;
