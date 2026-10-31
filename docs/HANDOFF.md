@@ -5,12 +5,12 @@ Update this file as the last act of every session (see `CLAUDE.md`, "Handing off
 **Updated:** 2026-10-30, the integrator (local session), on `integration`. **Phases 1 and 2 are done; Phase 3 is under
 way.** all six content sessions are merged (`p3i-c1a`, `p3i-c4`, `p3i-c2`, `p3i-c3`, `p3i-c1b`, `p3i-c5`), and §8.5's last wiring merge is done
 (`p3i-wiring`): **new games start on GNOMON's real world at Hollowmere** (`?world=test` for the test world). `main` =
-`p4i-starter` (C5 #4, the starter chain as quests, and #12 finished, on `p4i-six`: check-combat's typical build on the mean of six build sets, the user's decision, and B3's six powers live, on `p4i-b1`: B1's gear and powers merged with the user's tier-8 retune, and C5 #12, on `p4i-b2`, B2's landmarks and dungeons merged, on `p4i-b3`, B3's peoples and villages merged, on `p4i-beats`: C5's beats paid with their choices, barks, routes, Corner and village pools by region, on `p4i-people`, the landmark people placed, on `p3i-lightweapons`: the user's balance decisions of 2026-10-30 applied: creature scaling under d20, two species fixes, enchantment AV, fists, and light weapons by rule B; ttkTables' bounds on a typical build). **The backlog runs in four parts** (the user, 2026-10-30: "start everything that you can start"): B1, B2 and B3 in their worktrees from `p3i-lightweapons`, the integrator on the story (next step, below). From here on only the integrator edits this file and
+`p4i-b4` (B4's gear requirements and scaling grades merged, on `p4i-starter`: C5 #4, the starter chain as quests, and #12 finished, on `p4i-six`: check-combat's typical build on the mean of six build sets, the user's decision, and B3's six powers live, on `p4i-b1`: B1's gear and powers merged with the user's tier-8 retune, and C5 #12, on `p4i-b2`, B2's landmarks and dungeons merged, on `p4i-b3`, B3's peoples and villages merged, on `p4i-beats`: C5's beats paid with their choices, barks, routes, Corner and village pools by region, on `p4i-people`, the landmark people placed, on `p3i-lightweapons`: the user's balance decisions of 2026-10-30 applied: creature scaling under d20, two species fixes, enchantment AV, fists, and light weapons by rule B; ttkTables' bounds on a typical build). **The backlog runs in four parts** (the user, 2026-10-30: "start everything that you can start"): B1, B2 and B3 in their worktrees from `p3i-lightweapons`, the integrator on the story (next step, below). From here on only the integrator edits this file and
 moves `main` (the workstreams write their handoffs in `docs/<ws>.md`).
 
 ## State
 
-- **Last tag:** `p4i-starter` (C5 #4 and #12's last two, on `p4i-six`) on `integration`; before it `p4i-six` (the six-set typical build and B3's six powers live, on `p4i-b1`), `p4i-b1` (`p4b-b1` merged and C5 #12, on `p4i-b2`), `p4i-b2` (`p4b-b2` merged, on `p4i-b3`), `p4i-b3` (`p4b-b3` merged, on `p4i-beats`), `p4i-beats` (C5 #5, #6, #9, #11, #13 in part, #14, on `p4i-people`), `p4i-people` (C5 #3 with C1b #18: the landmark people placed, on `p3i-lightweapons`), `p3i-lightweapons` (light weapons, rule B, on `p3i-balance`), `p3i-balance` (the balance decisions of 2026-10-30, on `p3i-c5`), the Phase 3 merges (`p3i-c5`, `p3i-c1b`, `p3i-c3`, `p3i-c2`, `p3i-c4`, `p3i-wiring`, `p3i-c1a`), `p3i-sinkholes` (C1a's request 9, on `p3i-props`), `p3i-props` (props named; C1a's, C4's and C2's base), `p2-realworld`, `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
+- **Last tag:** `p4i-b4` (`p4b-b4` merged, on `p4i-starter`) on `integration`; before it `p4i-starter` (C5 #4 and #12's last two, on `p4i-six`), `p4i-six` (the six-set typical build and B3's six powers live, on `p4i-b1`), `p4i-b1` (`p4b-b1` merged and C5 #12, on `p4i-b2`), `p4i-b2` (`p4b-b2` merged, on `p4i-b3`), `p4i-b3` (`p4b-b3` merged, on `p4i-beats`), `p4i-beats` (C5 #5, #6, #9, #11, #13 in part, #14, on `p4i-people`), `p4i-people` (C5 #3 with C1b #18: the landmark people placed, on `p3i-lightweapons`), `p3i-lightweapons` (light weapons, rule B, on `p3i-balance`), `p3i-balance` (the balance decisions of 2026-10-30, on `p3i-c5`), the Phase 3 merges (`p3i-c5`, `p3i-c1b`, `p3i-c3`, `p3i-c2`, `p3i-c4`, `p3i-wiring`, `p3i-c1a`), `p3i-sinkholes` (C1a's request 9, on `p3i-props`), `p3i-props` (props named; C1a's, C4's and C2's base), `p2-realworld`, `p2-2b` (2B hardening on `p2-ws1`: `docs/sessions/2B.md` and the integration log). Before it `p2-ws1` (`p0-done` + the Phase 1 plan + §8.4's fold + `p1-ws3`, `p1-ws8`,
   `p1-ws4a`, `p1-ws5`, `p1-ws6a`, `p1-ws4b`, `p1-ws6b`, `p1-ws10`, the flip, `p1-ws2a`, `p1-ws7a`,
   `p1-ws7b`, `p1-ws2b`, `p1-ws9` and `p1-ws1`, with their integration requests; `p2-ws3` … `p2-ws9` before it).
   `main` is fast-forwarded to it (the timed gates confirmed alone on a quiet machine first). Phase 0's tags (`p0-0a1` … `p0-done`) and the workstreams' `p1-*` tags are on GitHub.
@@ -396,6 +396,15 @@ at that merge (so it doesn't conflict with the branch). Numbers are the asking w
   `state.noonLength` for the Lengthening).
 
 ## Integration log
+
+**`p4i-b4`** (2026-10-31): `p4b-b4` (df9c9bc, B4: gear requirements and scaling grades, from `p4i-six`) merged into
+`integration` on `p4i-starter`, cleanly. Under the attribute set every weapon, missile weapon and armour piece asks for 1-3
+attributes, scaling grades S-E replace "STR over 10", gear you don't meet goes on used badly, and an attribute point comes
+every 3 levels (the user's decisions of 2026-10-31: open items, DECISIONS). `GEN_VERSION` stays 10. P0 exceptions the
+coordinator approved for B4: check-body §5 (the 12th), the check-stats §2 oracle with its extension (the 13th); the
+parent-gear trace in check-items held within golden (b). check-combat's typical build (six-set mean, bounds unchanged):
+9.8 / 11.6 / 12.6 / 19.8 / 25.8 / 33.5 / 36.7 / 36.1% (before: 10.0 / 11.9 / 12.7 / 21.0 / 27.3 / 33.4 / 39.6 / 38.9%).
+Checks: `run-all` **38 of 38** (280.5 s); the real world's bot playthrough; browser-gate (1234, 7) and browser-2b pass.
 
 **`p4i-starter`** (2026-10-31): C5 #4, the starter chain as quests, and #12's last two, on `p4i-six`.
 - **#4** (`story/starter.js`): each step a quest begun at its giver ("Is there anything I can do?", its offer; the Turning
@@ -1217,6 +1226,14 @@ its §8.4 files and two P0 checks).
 
 ## Open items carried forward
 
+- **Gear requirements and growth** (the user's decisions of 2026-10-31, relayed by the coordinating session to B4; merged at
+  `p4i-b4`; DECISIONS' row "Gear requirements and growth"): "Then follow your plan for balancing" (requirements and scaling
+  grades under the attribute set, `docs/balance/requirements-2026-10-31.md`); the "used badly" rule, "no that sounds good"
+  (gear you don't meet goes on: weapons −2 to hit a missing point, 4 to 8, ×0.6 damage with no attribute bonus, the class
+  power off; armour half AV, −1 DV, none of its own bonuses); an attribute point every 3 levels, "yes" (the bible's every 4
+  overridden). Left for others (`docs/b4.md` "Requests"): artifact weapons' INT, specials read outside the stat bus, the
+  pack's "+N avg damage" ignoring grades, Dark backstab with an unmet weapon; and for WS8, check-combat's unbounded rows
+  (`d20`, `real`, `powers`) read much higher, their fixed STR 18-21 fighters not meeting the parent's GEAR.
 - **Left of the story work at `p4i-beats`** (2026-10-30), for whoever owns each:
   - **Beat 5's Shame reading** (`"shame:saffre"`, the silence option's "You keep a Shame reading."): no secret of that kind
     exists (`story/secrets.js` defines none), so the option pays its rep and glim and the reading silently doesn't come.
