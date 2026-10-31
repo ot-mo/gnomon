@@ -457,11 +457,11 @@ function snap(game, p, it) {
 function turnedAside(game, p, ranged, rng) {
   if (ranged) {
     let keep = 1;
-    for (const g of worn(p)) if (g.kind === "armour" && ARMOURS[g.id]?.reflect) keep *= 1 - ARMOURS[g.id].reflect;
+    for (const g of worn(p)) if (g.kind === "armour" && ARMOURS[g.id]?.reflect && !unmetOf(p, g).unmet) keep *= 1 - ARMOURS[g.id].reflect;   // (B4: not met, off)
     if (hasStatus(p, "running:mirrorShield")) keep *= 0.5;
     if (keep < 1 && rng() >= keep) return "Your gear turns the shot aside.";
   }
-  if (worn(p).some((g) => g.kind === "armour" && ARMOURS[g.id]?.block) && rng() < GEAR.block) return "Your buckler takes the blow.";
+  if (worn(p).some((g) => g.kind === "armour" && ARMOURS[g.id]?.block && !unmetOf(p, g).unmet) && rng() < GEAR.block) return "Your buckler takes the blow.";
   return null;
 }
 
@@ -570,8 +570,9 @@ function d20Blow(game, att, tgt, spec, ctx, result) {
     return "noticed";   // (resolveAttack: noticeBlow after the "attack" event)
   }
   const crit = result.crit;
-  // 3 Damage: the range, + material and STR over RULES.d20.strOver scaled by the blade's swing ÷ swingRef (rounded
-  // once), + enchantment (your blade; a spec without a swing counts as swingRef; a missile
+  // 3 Damage: the range, + material and the grades' bonus (fists, and the legacy stat set: STR over RULES.d20.strOver),
+  // scaled by the blade's swing ÷ swingRef (rounded once), + enchantment (your blade; used badly, B4:
+  // (range + material) × reqDmg + enchantment; a spec without a swing counts as swingRef; a missile
   // weapon's shot takes material and enchantment, no STR); a creature's level bonus; then the multipliers
   // and the crit.
   let dmg = spec.fixed ?? roll(rng, spec.dmg[0], spec.dmg[1]) + (spec.plus || 0);

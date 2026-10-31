@@ -59,7 +59,7 @@ import { hasKey } from "../../src/keyset.js";
 import { randomGear, makeGear } from "../../src/content/items/gear.js";
 import { mapStep, passTime, refreshView, startTravel, travelStep } from "../../src/turns.js";
 import { overrideRules, RULES } from "../../src/rules.js";
-import { invalidateStats, mod, attr, maxHp, av as armourValue, bonusTable, bonus } from "../../src/stats.js";
+import { invalidateStats, mod, attr, maxHp, av as armourValue, dv as playerDv, bonusTable, bonus } from "../../src/stats.js";
 import { makeBody } from "../../src/body.js";
 import { makeRng, distance } from "../../src/rng.js";
 import { WEAPONS, ARMOURS, ITEM_KINDS, strNeeded, useItem, requirements, scaling, shortfall, gradeShare } from "../../src/items.js";
@@ -1699,7 +1699,7 @@ export function typicalBuilds(game, pref = TYPICAL_PREF, buildSeed = 0) {
         for (const k in g) t += gradeShare(g[k]) * (attr(p, k) - D.strOver) / 2;
         return (w.dmg[0] + w.dmg[1]) / 2 + Math.round(((it.material || 0) + t) * s);
       };
-      const shown = (it) => ITEM_KINDS.armour.av({ ...it, ench: 0 });
+      const shown = (it) => { const a = ITEM_KINDS.armour.av({ ...it, ench: 0 }); return unmetOf(p, it).unmet ? Math.floor(a / 2) - 0.5 : a; };   // (B4: not met, half its armour and −1 DV)
       const kit = build.at[level].kit;
       kit.weapon = seenW.reduce((b, it) => (!b || blow({ ...it, ench: 0 }) > blow({ ...b, ench: 0 }) ? it : b), null);
       for (const it of seenA) {
@@ -2401,6 +2401,31 @@ export function checkB4Requirements(ctx) {
       wield("greatsword"); const sp = weaponSpec(p);
       expect(sp.miss === undefined && sp.scale === undefined && sp.req === WEAPONS.greatsword.str, `the legacy stat set: a greatsword's spec ${JSON.stringify({ miss: sp.miss, scale: sp.scale, req: sp.req })} (want only req ${WEAPONS.greatsword.str})`);
     } finally { undoS(); }
+
+    // 3 Your armour: a piece you lack the attributes for counts half its armour (rounded down), −1 DV, none of its bonuses
+    //   and not its special; the legacy stat set as before.
+    p.body.equip.hand_r = null;
+    const plate = makeGear("armour", "plate", "iron");   // STR 26, TOU 20; AV 4
+    p.body.equip.body = plate;
+    const avDv = (a) => { set(a); return [armourValue(p), playerDv(p)]; };
+    const [avMet, dvMet] = avDv({ str: 26, tou: 20 }), [avBad, dvBad] = avDv({ str: 25, tou: 20 });
+    expect(avMet === 4 && avBad === 2 && dvBad === dvMet - 1, `iron plate (STR 26, TOU 20): met AV ${avMet} DV ${dvMet}, a point of STR short AV ${avBad} DV ${dvBad} (want 4, and 2 with 1 less DV)`);
+    p.body.equip.body = null;
+    p.body.equip.face = { kind: "armour", id: "monocle", ench: 0, known: true };   // INT 19, examine +3
+    set({ int: 18 }); const exBad = bonus(p, "examine"); set({ int: 19 }); const exMet = bonus(p, "examine");
+    p.body.equip.face = null;
+    p.body.equip.arms = { kind: "armour", id: "buckler", ench: 0, known: true };   // STR 15, AGI 18; blocks a fifth
+    const seq = (...v) => { let k = 0; return () => v[Math.min(k++, v.length - 1)]; };
+    const blocked = (a) => { set(a); return !!resolveAttack(game, tgt, p, naturalSpec(tgt), { view: "map", rng: seq(0.99, 0.5, 0.1) }).turned; };
+    const bMet = blocked({ agi: 18 }), bBad = blocked({ agi: 17 });
+    p.body.equip.arms = null;
+    expect(exMet === 3 && exBad === 0 && bMet && !bBad, `a monocle (INT 19): examine ${exMet} met, ${exBad} a point short (want 3, 0); a buckler (AGI 18) blocks ${bMet} met, ${bBad} a point short (want true, false)`);
+    const undoA = overrideRules("stats", "legacy");
+    try {
+      p.body.equip.body = plate; set({ str: 6, tou: 6 });
+      expect(armourValue(p) === 4, `the legacy stat set: iron plate at STR 6 is AV ${armourValue(p)} (want 4, as before)`);
+    } finally { undoA(); p.body.equip.body = null; invalidateStats(p); }
+    stats.armour = `iron plate met AV ${avMet}/DV ${dvMet}, short AV ${avBad}/DV ${dvBad}; monocle examine ${exMet}/${exBad}; buckler ${bMet}/${bBad}`;
   } finally { run.restore(); }
   return resultOf("combat: B4's attribute requirements and scaling grades", problems, stats);
 }
