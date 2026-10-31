@@ -37,7 +37,7 @@
 // (`pv` from the tech design is gone: DECISIONS, no penetration dice.)
 import { RULES } from "./rules.js";
 import { itemBonuses, ITEM_KINDS, shortfall } from "./items.js";
-import { worn } from "./body.js";
+import { worn, wielded } from "./body.js";
 import { PERKS, perkRank } from "./leveling.js";
 import { hasKey, keysOf } from "./keyset.js";
 
@@ -62,24 +62,28 @@ export function registerBonusSource(name, fn) {
 export const bonusSources = () => SOURCES.map((s) => s.name);
 
 // What an entity wears and wields (body.js worn(): equipped items and implants; the weapon on the
-// belt only counts once it's in your hand). B4: under the attribute set an armour piece whose requirements you lack gives
-// none of its bonuses (unmetPiece; av() and dv() take its armour). Which pieces you meet is a least fixed point, the
-// same whatever order they went on in: requirements read your base, every other source and the bonuses of the pieces
-// you meet; start from everything that isn't armour, and add each armour piece those attributes meet until none is
-// added. A piece that needs another's bonus is met once that one is; two that each need the other's are not. (Its
-// check can't ask bonus(): this source is part of it.)
+// belt only counts once it's in your hand). B4: under the attribute set an armour piece whose requirements you lack
+// gives none of its own bonuses, only its penalties (unmetPiece; av() and dv() take its armour), and so does a weapon in
+// a hand that isn't the primary one (never swung, it would lend its bonuses for nothing). The weapon in your hand keeps
+// its own: combat.js uses it badly. Which pieces you meet is a least fixed point, the same whatever order they went on
+// in: requirements read your base, every other source, every piece's penalties and the bonuses of the pieces you meet;
+// start from everything else, and add each such piece those attributes meet until none is added. A piece that needs another's bonus is met once
+// that one is; two that each need the other's are not; penalties always count, so adding a piece never unmeets one.
+// (It can't ask bonus(): this source is part of it.)
+const split = (b, sign) => Object.fromEntries(Object.entries(b).filter(([, v]) => Math.sign(v) === sign));
 registerBonusSource("gear", (e) => {
-  const own = worn(e).map((it) => [it, itemBonuses(it)]);
-  if (legacy() || !own.some(([it]) => it.kind === "armour")) return own.map(([, b]) => b);
+  const own = worn(e).map((it) => [it, itemBonuses(it)]), hand = wielded(e);
+  const asks = (it) => it.kind === "armour" || (it.kind === "weapon" && it !== hand);
+  if (legacy() || !own.some(([it]) => asks(it))) return own.map(([, b]) => b);
   const lift = {}, met = new Set();
   const add = (b) => { for (const k of ATTRS) lift[k] = (lift[k] || 0) + (b[k] || 0); };
   for (const { name, fn } of SOURCES) if (name !== "gear") for (const b of fn(e)) add(b);
-  for (const [it, b] of own) if (it.kind !== "armour") { met.add(it); add(b); }
+  for (const [it, b] of own) if (!asks(it)) { met.add(it); add(b); } else add(split(b, -1));
   for (let more = true; more;) {
     more = false;
-    for (const [it, b] of own) if (!met.has(it) && !shortfall(it, (k) => baseAttr(e, k) + (lift[k] || 0)).length) { met.add(it); add(b); more = true; }
+    for (const [it, b] of own) if (!met.has(it) && !shortfall(it, (k) => baseAttr(e, k) + (lift[k] || 0)).length) { met.add(it); add(split(b, 1)); more = true; }
   }
-  return own.map(([it, b]) => (met.has(it) ? b : {}));
+  return own.map(([it, b]) => (met.has(it) ? b : split(b, -1)));
 });
 registerBonusSource("powers", function* (e) {
   if (!e.perks) return;

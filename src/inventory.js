@@ -293,7 +293,9 @@ function warnBadly(game, it) {
   if (!lack) return;
   const need = Object.entries(requirements(it)).map(([k, n]) => `${k.toUpperCase()} ${n}`).join(", ");
   const have = shortfall(it, (k) => attr(p, k)).map((s) => `${s.attr.toUpperCase()} ${s.have}`).join(", ");
-  game.log(`You can hardly ${it.kind === "armour" ? "move in" : "use"} the ${itemName(game, it)} (needs ${need}; you have ${have}): ${lack.replace(/^[^:]*: (used|worn) badly \((.*)\)$/, "$2")}.`, BAD);   // (what it costs: badlyText's brackets)
+  const cost = it.kind === "weapon" && wielded(p) !== it ? "in that hand it gives you none of its own"   // (stats.js: never swung there)
+    : lack.replace(/^[^:]*: (used|worn) badly \((.*)\)$/, "$2");   // (what it costs: badlyText's brackets)
+  game.log(`You can hardly ${it.kind === "armour" ? "move in" : "use"} the ${itemName(game, it)} (needs ${need}; you have ${have}): ${cost}.`, BAD);
 }
 
 function dropSelected(game) {

@@ -2503,6 +2503,23 @@ export function checkB4Requirements(ctx) {
       expect(heavy === 6 && blockL, `the legacy stat set under d20: a maul at STR 4 costs −${heavy} to hit (want the parent's 6), a buckler at STR 4 blocks ${blockL} (want true)`);
       stats.legacyD20 = `maul at STR 4 −${heavy}; buckler ${blockL}`;
     } finally { undoL8(); }
+
+    // 9 The review's findings 2 and 4: a weapon in a hand that isn't the primary one, which is never swung, gives none of
+    //   its own when you lack its attributes (in the primary hand it keeps them: it's used badly instead); and a piece's
+    //   penalty always counts, so glass-scale (AGI 20) beside boots of −3 AGI at AGI 20 is unmet, worn either way round.
+    const keen = { ...makeGear("weapon", "longsword", "copper"), props: ["keen"] };
+    set({}); p.body.equip.hand_r = null; p.body.equip.hand_l = keen; invalidateStats(p);
+    const offCrit = bonus(p, "crit");
+    p.body.equip.hand_l = null; p.body.equip.hand_r = keen; invalidateStats(p);
+    const mainCrit = bonus(p, "crit");
+    p.body.equip.hand_r = null;
+    const scale = makeGear("armour", "glassScale"), minus = { kind: "armour", id: "boots", ench: 0, known: true, histRelic: true, powers: [{ agi: -3 }] };
+    const both = (x, y, px, py) => { p.body.equip.body = null; p.body.equip.feet = null; p.body.equip[px] = x; p.body.equip[py] = y; set({ agi: 20, tou: 17 }); return [attr(p, "agi"), bonus(p, "ward"), armourValue(p)]; };
+    const oneWay = both(scale, minus, "body", "feet"), otherWay = both(minus, scale, "feet", "body");
+    p.body.equip.body = null; p.body.equip.feet = null; invalidateStats(p);
+    expect(offCrit === 0 && mainCrit === 0.1 && JSON.stringify(oneWay) === JSON.stringify([17, 0, Math.floor(ITEM_KINDS.armour.av(scale) / 2) + 1]) && JSON.stringify(oneWay) === JSON.stringify(otherWay),
+      `a keen longsword at 16: crit ${offCrit} in the other hand (want 0), ${mainCrit} in the primary (want 0.1); glass-scale beside −3 AGI boots at AGI 20: [AGI, ward, AV] ${JSON.stringify(oneWay)} and ${JSON.stringify(otherWay)} (want AGI 17, ward 0, half its armour + the boots' 1, both ways)`);
+    stats.review = `off-hand crit ${offCrit}, primary ${mainCrit}; glass-scale and −3 AGI boots ${JSON.stringify(oneWay)}`;
   } finally { run.restore(); }
   return resultOf("combat: B4's attribute requirements and scaling grades", problems, stats);
 }
