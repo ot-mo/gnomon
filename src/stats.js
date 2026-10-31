@@ -63,15 +63,23 @@ export const bonusSources = () => SOURCES.map((s) => s.name);
 
 // What an entity wears and wields (body.js worn(): equipped items and implants; the weapon on the
 // belt only counts once it's in your hand). B4: under the attribute set an armour piece whose requirements you lack gives
-// none of its bonuses (unmetPiece; av() and dv() take its armour). Its check can't ask bonus() (this source is part of
-// it), so it adds up the attributes itself: your base, every other source's and the worn gear's own.
+// none of its bonuses (unmetPiece; av() and dv() take its armour). Which pieces you meet is a least fixed point, the
+// same whatever order they went on in: requirements read your base, every other source and the bonuses of the pieces
+// you meet; start from everything that isn't armour, and add each armour piece those attributes meet until none is
+// added. A piece that needs another's bonus is met once that one is; two that each need the other's are not. (Its
+// check can't ask bonus(): this source is part of it.)
 registerBonusSource("gear", (e) => {
   const own = worn(e).map((it) => [it, itemBonuses(it)]);
   if (legacy() || !own.some(([it]) => it.kind === "armour")) return own.map(([, b]) => b);
-  const lift = {};
-  for (const [, b] of own) for (const k of ATTRS) lift[k] = (lift[k] || 0) + (b[k] || 0);
-  for (const { name, fn } of SOURCES) if (name !== "gear") for (const b of fn(e)) for (const k of ATTRS) lift[k] = (lift[k] || 0) + (b[k] || 0);
-  return own.map(([it, b]) => (it.kind === "armour" && shortfall(it, (k) => baseAttr(e, k) + (lift[k] || 0)).length ? {} : b));
+  const lift = {}, met = new Set();
+  const add = (b) => { for (const k of ATTRS) lift[k] = (lift[k] || 0) + (b[k] || 0); };
+  for (const { name, fn } of SOURCES) if (name !== "gear") for (const b of fn(e)) add(b);
+  for (const [it, b] of own) if (it.kind !== "armour") { met.add(it); add(b); }
+  for (let more = true; more;) {
+    more = false;
+    for (const [it, b] of own) if (!met.has(it) && !shortfall(it, (k) => baseAttr(e, k) + (lift[k] || 0)).length) { met.add(it); add(b); more = true; }
+  }
+  return own.map(([it, b]) => (met.has(it) ? b : {}));
 });
 registerBonusSource("powers", function* (e) {
   if (!e.perks) return;
