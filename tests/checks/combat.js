@@ -2391,9 +2391,10 @@ export function checkB4Requirements(ctx) {
     expect(fist === wantFist, `a punch at STR 26: ${fist} (want ${wantFist}: STR over ${D.strOver}, as before)`);
     // The class's power: a mace's Daze (rng 0.1, under its quarter) met and not met
     p.perks = { daze: 1 }; wield("mace");   // STR 20, TOU 16
-    const dazed = (a) => { set(a); delete tgt.status.stunned; resolveAttack(game, p, tgt, weaponSpec(p), { view: "map", rng: fixed(0.1) }); return hasStatus(tgt, "stunned"); };
+    // (the blow must land for "no Daze" to mean anything: the review's finding 8; a natural 3 + AGI 30's +7 − 4 = 6 > DV 5)
+    const dazed = (a) => { set(a); delete tgt.status.stunned; const r = resolveAttack(game, p, tgt, weaponSpec(p), { view: "map", rng: fixed(0.1) }); return r.hit && hasStatus(tgt, "stunned") ? "dazed" : r.hit ? "hit" : "missed"; };
     const dMet = dazed({ str: 20, agi: 30 }), dBad = dazed({ str: 19, agi: 30 });
-    expect(dMet && !dBad, `Daze with a mace: met ${dMet}, a point of STR short ${dBad} (want true, false: a weapon used badly has no class power)`);
+    expect(dMet === "dazed" && dBad === "hit", `Daze with a mace: met ${dMet}, a point of STR short ${dBad} (want dazed, then a hit that doesn't daze: a weapon used badly has no class power)`);
     p.perks = {};
     stats.blows = `longsword met ${met}, short ${bad}; iron dagger at AGI 26 ${dag}; fist at STR 26 ${fist}; to hit short 1/3/6: -${c1}/-${c3}/-${c6}`;
     // The legacy stat set: the parent's STR number on the spec, no shortfall
