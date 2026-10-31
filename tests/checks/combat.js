@@ -2500,7 +2500,7 @@ export function checkB4Requirements(ctx) {
       p.body.equip.arms = { kind: "armour", id: "buckler", ench: 0, known: true }; invalidateStats(p);
       const blockL = !!resolveAttack(game, tgt, p, naturalSpec(tgt), { view: "map", rng: seq(0.99, 0.5, 0.1) }).turned;
       p.body.equip.arms = null; invalidateStats(p);
-      expect(heavy === D.reqPenaltyMax && blockL, `the legacy stat set under d20: a maul at STR 4 costs −${heavy} to hit (want ${D.reqPenaltyMax}), a buckler at STR 4 blocks ${blockL} (want true)`);
+      expect(heavy === 6 && blockL, `the legacy stat set under d20: a maul at STR 4 costs −${heavy} to hit (want the parent's 6), a buckler at STR 4 blocks ${blockL} (want true)`);
       stats.legacyD20 = `maul at STR 4 −${heavy}; buckler ${blockL}`;
     } finally { undoL8(); }
   } finally { run.restore(); }
