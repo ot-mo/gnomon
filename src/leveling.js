@@ -8,7 +8,7 @@
 //   "legacy"      the parent game exactly: +3 max HP a level, three of its 25 perks offered with Math.random
 //                 (four at a milestone, the first a major), and the same log lines, so golden (a) holds.
 //   "attributes"  bible §10.7, §15.6: max HP is derived (stats.js: max(1, 3 + TOU mod) a level), the Bent gain a
-//                 crease a level, an attribute point comes every 4th level, and the powers are offered from your
+//                 crease a level, an attribute point comes every 3rd level (B4), and the powers are offered from your
 //                 open trees and the general pool by offerPowers, seeded from the run's seed and the level.
 //
 //   xpToNext(level) = lvlXP(level)        10L² + 10: what one level costs (20, 50, 100, 170, 260…)
@@ -40,7 +40,9 @@ extendRules("progression", {
     rewards: { landmark: 0.3, site: 0.1, village: 0.2, siteBottom: 0.4, villageQuest: 0.6, triangulation: 0.15, kindling: 0.08, beat: 0.75 },   // (site: WS1's discovery, at its merge)
     beatEarly: 1.5,                                        // a beat begun below its band
   },
-  level: { attrPointEvery: 4, milestoneEvery: 5, offers: 3, offersHighInt: 4, highInt: 18 },
+  // attrPointEvery: 3 since B4 (the user's decision of 2026-10-31, docs/balance/requirements-2026-10-31.md §5: with
+  // attribute requirements a build needs room to grow into its gear; the bible's 4 gave 5 points by level 20, this 7 by 21)
+  level: { attrPointEvery: 3, milestoneEvery: 5, offers: 3, offersHighInt: 4, highInt: 18 },
 });
 
 export const PERKS = POWERS;
@@ -88,7 +90,7 @@ export function gainXp(game, amount, { source = "kill" } = {}) {
   }
 }
 
-// One level under the attribute set: what max HP gains and the Bent's crease. Its attribute point (every 4th level)
+// One level under the attribute set: what max HP gains and the Bent's crease. Its attribute point (every 3rd level)
 // and its power come with its own level-up card (screens/levelup.js), one card for each pending level in order, so
 // levels gained together each bring their point to their own card.
 function levelUp(game, p) {

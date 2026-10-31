@@ -52,7 +52,7 @@ import { spawnCreature, addCreature, CREATURE_TYPES, pickCreatureType, touchable
 import { resolveAttack, rollToHit, hitChance, toHitMod, critNat, dvOf, weaponSpec, naturalSpec, playerMelee, bumpAttack, combatLine, thrownSpec, unmetOf, GEAR as COMBAT_GEAR } from "../../src/combat.js";
 import { guardianThink } from "../../src/guardians.js";
 import { pushPlayerOut, killMonster } from "../../src/monsters.js";
-import { killXp, offerPowers, takePerk } from "../../src/leveling.js";
+import { killXp, offerPowers, takePerk, gainXp, xpToNext } from "../../src/leveling.js";
 import { BACKGROUNDS } from "../../src/content/backgrounds.js";
 import { suggestSpread } from "../../src/progression/chargen.js";
 import { hasKey } from "../../src/keyset.js";
@@ -1624,7 +1624,7 @@ export function realBand(game, tier, level) {
 // The typical build (the bounds' build since the balance decision of 2026-10-30, the user's: docs/balance/
 // proposal-2026-10-30.md §3.6). Each fighter background as character creation suggests it (chargen.js suggestSpread;
 // its genotype and trees), levels 2-23 with the powers offered on a seed (leveling.js offerPowers: the first combat
-// power offered by TYPICAL_PREF, else the first offered) taken through takePerk, and an attribute point every 4th level
+// power offered by TYPICAL_PREF, else the first offered) taken through takePerk, and an attribute point every attrPointEvery-th level (3 since B4; 4 before)
 // into STR and AGI by turns. Its kit at each band is the best of what it has found by then: its background's kit and
 // content/items/gear.js randomGear at the bands' levels (a weapon and two pieces at tier 1, two and four at each tier
 // after; elements and properties left off), the weapon by the damage a blow its info line and your STR promise (a
@@ -2528,6 +2528,15 @@ export function checkB4Requirements(ctx) {
     undoC(); const exBack = bonus(p, "examine");
     p.body.equip.face = null; invalidateStats(p);
     expect(exAttr === 0 && exLegacy === 3 && exBack === 0, `a monocle at INT 16: examine ${exAttr}, then ${exLegacy} under the legacy set and ${exBack} back (want 0, 3, 0, no invalidateStats between)`);
+
+    // 11 The growth pace (the user's decision of 2026-10-31, the proposal's §5): an attribute point every 3rd level, so
+    //    from level 1 to 7 the level-ups at 3 and 6 bring one.
+    Object.assign(p, { level: 1, xp: 0, pendingLevels: 0 }); run.logged.length = 0;
+    let need = 0; for (let l = 1; l < 7; l++) need += xpToNext(l);
+    gainXp(game, need, { source: "quest" });
+    const pointsAt = run.logged.filter((t) => /an attribute point/.test(t)).map((t) => +(/level (\d+)/.exec(t)?.[1] || 0));
+    expect(p.level === 7 && JSON.stringify(pointsAt) === "[3,6]", `from level 1 to ${p.level}: attribute points at levels ${JSON.stringify(pointsAt)} (want 7, and points at [3,6])`);
+    stats.growth = `points at levels ${JSON.stringify(pointsAt)} on the way to ${p.level}`;
   } finally { run.restore(); }
   return resultOf("combat: B4's attribute requirements and scaling grades", problems, stats);
 }

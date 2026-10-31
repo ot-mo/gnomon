@@ -22,6 +22,7 @@ import { STATUS_DEFS } from "../status.js";
 import { ABILITIES } from "../abilities.js";
 import { keysOf } from "../keyset.js";
 import { RULES } from "../rules.js";
+const ordinal = (n) => `${n}${n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th"}`;   // (B4: the point's pace is a rule)
 import { GENOTYPES } from "../content/genotypes.js";
 import { BACKGROUNDS } from "../content/backgrounds.js";
 import { MUTATIONS } from "../content/mutations.js";
@@ -81,7 +82,7 @@ function act(game, row) {
   const p = game.player;
   if (!row) return;
   if (row.attr) {
-    if (!(p.attrPoints > 0)) { sheet.msg = "You have no attribute points to spend: one comes every 4th level."; return; }
+    if (!(p.attrPoints > 0)) { sheet.msg = `You have no attribute points to spend: one comes every ${ordinal(RULES.progression.level.attrPointEvery)} level.`; return; }
     const before = maxHp(p);
     raiseAttr(p, row.attr, 1);
     p.attrPoints--;
