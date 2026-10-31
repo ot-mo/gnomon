@@ -343,9 +343,10 @@ export function drawInventory(game) {
   const p = game.player, tab = game.invTab || "pack";
   const w = Math.min(S.cols - 4, 96);
   const shown = visible(game), rows = bodyRows(game);
-  const listMax = Math.max(3, S.rows - 12);
+  const extra = RULES.stats === "legacy" ? 0 : 1;   // (B4: a third line under the item's, for what you lack, in red)
+  const listMax = Math.max(3, S.rows - 12);   // (the box grows by the extra line: S.rows − 12 + 10 still fits)
   const listH = Math.max(4, Math.min(listMax, Math.max(shown.length, rows.length)));
-  const h = listH + 9;
+  const h = listH + 9 + extra;
   const x0 = (S.cols - w) >> 1, y0 = Math.max(1, (S.rows - h) >> 1);
   S.blank(x0, y0, w, h);
   const line = (y) => { for (let x = x0; x < x0 + w; x++) S.put(x, y, "-", 70, 70, 80); };
@@ -368,7 +369,10 @@ export function drawInventory(game) {
     let info = itemInfo(game, sel);
     if (tab === "pack") info += compareLine(p, sel);
     if (isGear(sel) && !sel.known && !sel.relic) info += " · enchantment unknown until equipped";
-    wrap(info, w - 4).slice(0, 2).forEach((l, k) => S.text(x0 + 2, infoY + 1 + k, l, 190, 190, 200));
+    const lack = extra ? badlyText(sel, (k) => attr(p, k)) : "";
+    if (lack) info = info.replace(` · ${lack}`, "");
+    wrap(info, w - 4).slice(0, 2 + (lack ? 0 : extra)).forEach((l, k) => S.text(x0 + 2, infoY + 1 + k, l, 190, 190, 200));
+    if (lack) S.text(x0 + 2, infoY + 3, wrap(`You ${lack.slice(4)}.`, w - 4)[0], 255, 110, 100);
   }
   // The keys, "I close" first so a narrow screen never loses it; the hint where it fits.
   const hint = game.view === "map" ? "  (each takes a turn)" : "  (game paused)";

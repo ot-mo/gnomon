@@ -2470,6 +2470,25 @@ export function checkB4Requirements(ctx) {
       expect(!off.ok && /not strong enough/.test(off.said), `the legacy set: a greatsword at STR ${attr(p, "str")}: on ${off.ok}, the log "${off.said}" (want refused)`);
     } finally { undoE(); p.inv.length = 0; p.body.equip.hand_r = null; invalidateStats(p); }
     stats.equip = on.said;
+
+    // 7 The pack: a row names each attribute asked ("STR 21 AGI 17"); the selected piece's shortfall has a red line of its
+    //   own under its line; the legacy set's row reads "needs N STR" and has no such line.
+    const frame = () => { game.debug.draw(); const c = ctx.env.capture; return Array.from({ length: c.rows }, (_, y) => c.chars.slice(y * c.cols, (y + 1) * c.cols).join("")); };
+    const pack = (statsSet) => {
+      const undoP = overrideRules("stats", statsSet);
+      try {
+        game.modeStack = []; game.mode = "map"; game.view = "map";
+        p.inv.length = 0; p.inv.push(makeGear("weapon", "longsword", "copper"));
+        set({ str: 18, agi: 17 }); game.debug.openInv(); game.invTab = "pack"; game.invFilter = "all"; game.invSel = 0;
+        return frame();
+      } finally { undoP(); game.modeStack = []; game.mode = "map"; p.inv.length = 0; }
+    };
+    const now = pack("attributes"), before = pack("legacy");
+    const row = now.find((l) => l.includes("copper longsword")) || "", red = now.find((l) => l.includes("You lack 3 STR: used badly")) || "";
+    expect(row.includes("STR 21 AGI 17"), `the pack row: "${row.trim()}" (want "STR 21 AGI 17")`);
+    expect(red.includes("You lack 3 STR: used badly (−6 to hit, ×0.6 damage, no Riposte)."), `the shortfall's own line: "${red.trim()}"`);
+    expect(before.some((l) => l.includes("needs 13 STR")) && !before.some((l) => l.includes("You lack")), `the legacy set's pack: ${before.filter((l) => /longsword|needs|lack/.test(l)).map((l) => l.trim()).join(" / ")}`);
+    stats.pack = `${row.trim()} / ${red.trim()}`;
   } finally { run.restore(); }
   return resultOf("combat: B4's attribute requirements and scaling grades", problems, stats);
 }
