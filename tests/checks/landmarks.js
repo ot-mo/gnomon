@@ -435,7 +435,16 @@ function dungeonPeople(seed, expect) {
          `Benchmark's services: the signaller ${JSON.stringify(sig?.merchant)}, the Map Room ${JSON.stringify(map?.merchant)}`);
   const board = sig && talkTo({ state: {}, quests: [], run }, sig).options.find((o) => o.label === "What does the board show?");
   expect(board && board.go()?.trade === "services", "the signaller offers no way to the Signal Room's board");
-  out.push("Tovi pressed at the Press, the seal at the tunnel's end, the bottoms' who, Benchmark's two services");
+  // The Speaking Door (the Under-Page's floor 2) asks C5's question over the parent's riddle; the stele's reading on floor 3.
+  const doorFloor = floor("saltpage", 2), door = doorFloor.creatures.find((c) => c.type === "door");
+  const asked = door && talkTo({ state: {}, quests: [], run, zone: doorFloor }, door);
+  expect(asked?.text === PEOPLE_WORDS.speakingDoor.greet && asked.options.filter((o) => /^"/.test(o.label)).length >= 2,
+         `the Speaking Door: "${asked?.text}" with ${asked?.options?.length} options`);
+  const said = [], g = { state: {}, log: (t) => said.push(t) };
+  emit(g, "zone:enter", { zone: { landmarkId: "saltpage", z: 3, key: "x" }, how: "down" });
+  emit(g, "zone:enter", { zone: { landmarkId: "saltpage", z: 3, key: "x" }, how: "down" });
+  expect(said.filter((t) => t.includes(PEOPLE_WORDS.secondHourStele.greet)).length === 1, `the Second-Hour stele's reading told ${said.length} times`);
+  out.push("Tovi pressed at the Press, the seal at the tunnel's end, the bottoms' who, Benchmark's two services, the Speaking Door's question and the stele's reading");
   return out.join("; ");
 }
 

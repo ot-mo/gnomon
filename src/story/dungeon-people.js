@@ -12,7 +12,8 @@
 //   the Assize plumb-seal at the end of Kettle Mesa's floor-3 sapper tunnel (zone.clue): beat 1's find (its reward no
 //     longer gives it, so it can't come twice)
 //   the bottoms' `who` (their barks, story/barks.js): a `below` entry's creature found by its kind or name (the Grub
-//     Mother, a legend of the brine-grubs; the Gloam Warden; the Speaking Door, the parent's door)
+//     Mother, a legend of the brine-grubs; the Gloam Warden); the Speaking Door, the parent's door, asking C5's question
+//     over its riddle ("speakingDoor:riddle"); the Second-Hour stele's reading, told on first reaching the Under-Page's floor 3
 //   PRESSED   who lies flat until freed: Lio, Tovi Hallen, the prisoners (vis.flat, kept by a save)
 import { addCreature } from "../creatures.js";
 import { distance } from "../rng.js";
@@ -22,6 +23,8 @@ import { spawnLandmarkPerson, kindOf } from "./landmark-people.js";
 import { campaignItem } from "./beats.js";
 import { makeItem } from "../items.js";
 import { on } from "../events.js";
+import { registerDialogue, talkTo, node } from "../talk.js";
+import { PEOPLE_WORDS } from "../content/people-words.js";
 
 export const PRESSED = new Set(["lio", "toviHallen", "pressedPilgrim"]);
 const PRISONER = { who: "pressedPilgrim", kind: "pressedPilgrim", name: "a pressed prisoner", role: "a prisoner of the Assize" };
@@ -63,7 +66,7 @@ export function placeDungeonPeople(zone, { site, z, landmark: L }) {
     }
     // a bottom or an inhabitant the floor already holds: its `who`, for its bark
     for (const c of zone.creatures) if (!c.who && !c.talk && ((entry.kind && c.type === entry.kind) || c.name === entry.name)) c.who = entry.who;
-    for (const c of zone.creatures) if (!c.who && c.type === "door" && entry.who === "speakingDoor") c.who = entry.who;
+    for (const c of zone.creatures) if (!c.who && c.type === "door" && entry.who === "speakingDoor") { c.who = entry.who; c.talk.dialogue = "speakingDoor:riddle"; }
   }
   // The Square's cells: Lio in floor 2's first, a pressed prisoner in every other.
   const lio = here.find((b) => b.who === "lio");
@@ -79,6 +82,20 @@ export function placeDungeonPeople(zone, { site, z, landmark: L }) {
   }
 }
 registerDungeonPeople(placeDungeonPeople);
+
+// The Under-Page's Speaking Door asks C5's question (PEOPLE_WORDS.speakingDoor.greet) over the parent's riddle: its
+// answers, its gate and its hatches are the parent's door's (content/legacy/encounters.js "door"), as is its word once open.
+registerDialogue("speakingDoor:riddle", (game, c) => {
+  const base = talkTo(game, { ...c, talk: { ...c.talk, dialogue: "door", own: true } });
+  return !base || c.talk.state.open ? base : node(PEOPLE_WORDS.speakingDoor.greet, base.options);
+});
+// The Second-Hour stele on the Under-Page's founding floor (Saltpage's dungeon, floor 3: B2 carved its Hour's accounts in the
+// walls): the reading that names Vesper (PEOPLE_WORDS.secondHourStele.greet), told the first time you stand there.
+on("zone:enter", (game, { zone }) => {
+  if (zone?.landmarkId !== "saltpage" || zone.z !== 3 || !game.state || game.state.steleRead) return;
+  game.state.steleRead = game.time || true;
+  game.log?.(`A Second-Hour stele stands in the founding hall. Its carving reads: ${PEOPLE_WORDS.secondHourStele.greet}`, [220, 200, 150]);
+});
 
 // A press-wheel turned (B2's "prisoner:freed"): the one in that cell stands up, no longer flat.
 on("prisoner:freed", (game, { zone, prisoner }) => {
