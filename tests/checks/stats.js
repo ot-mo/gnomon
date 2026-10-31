@@ -57,26 +57,31 @@ const diff = (a, b) => Object.keys(a).filter((k) => !same(a[k], b[k])).join(", "
 // B4 (P0's thirteenth exception, the coordinator's approval of 2026-10-31): under the attribute set an armour piece whose
 // requirements (items.js requirements, held to literal numbers by check-combat's req: a light armour, the materials, a
 // three-attribute piece) you lack is worn badly: none of its bonuses, half its armour (rounded down), −1 DV. Which pieces
-// you meet, by hand: a least fixed point over your base, the perks' and statuses' bonuses, everything worn that isn't
-// armour and the armour met so far, adding each piece those attributes meet until none is added (no order in it).
+// you meet, by hand: a least fixed point over your base, the perks' and statuses' bonuses, everything worn that asks for
+// nothing, every asking piece's penalties and the positive bonuses of the pieces met so far, adding each piece those
+// attributes meet until none is added (no order in it). (B4, the extension after the review, approved: a weapon in a
+// hand that isn't the primary one asks as armour does; a piece's penalties, its negative entries, always count.)
+const asksOf = (e) => { const main = e.body?.parts?.find((q) => q.primary)?.id, hand = main && e.body.equip[main];
+  return (it) => it.kind === "armour" || (it.kind === "weapon" && it !== hand); };
+const signed = (b, sign) => Object.fromEntries(Object.entries(b).filter(([, v]) => Math.sign(v) === sign));
 function badlyWorn(e, statusBonus) {
   if (RULES.stats === "legacy") return new Set();
-  const lift = {}, items = onBody(e);
+  const lift = {}, items = onBody(e), asks = asksOf(e);
   const add = (b) => { for (const k in b) lift[k] = (lift[k] || 0) + b[k]; };
   for (const k of e.perks instanceof Set ? e.perks : Object.keys(e.perks || {})) if (PERKS[k].bonus) add(PERKS[k].bonus(perkRank(e, k)));
   for (const id in e.status || {}) add(statusBonus(id, e.status[id]) || {});
-  const met = new Set(items.filter((it) => it.kind !== "armour"));
-  for (const it of met) add(itemBonuses(it));
+  const met = new Set(items.filter((it) => !asks(it)));
+  for (const it of items) add(met.has(it) ? itemBonuses(it) : signed(itemBonuses(it), -1));
   for (let more = true; more;) {
     more = false;
-    for (const it of items) if (!met.has(it) && Object.entries(requirements(it)).every(([k, n]) => (e.attrs?.[k] ?? RULES.attr.base) + (lift[k] || 0) >= n)) { met.add(it); add(itemBonuses(it)); more = true; }
+    for (const it of items) if (!met.has(it) && Object.entries(requirements(it)).every(([k, n]) => (e.attrs?.[k] ?? RULES.attr.base) + (lift[k] || 0) >= n)) { met.add(it); add(signed(itemBonuses(it), 1)); more = true; }
   }
   return new Set(items.filter((it) => !met.has(it)));
 }
 function expectedBonus(e, statusBonus, bad = badlyWorn(e, statusBonus)) {
   const out = {};
   const add = (b) => { for (const k in b) out[k] = (out[k] || 0) + b[k]; };
-  for (const it of onBody(e)) if (!bad.has(it)) add(itemBonuses(it));
+  for (const it of onBody(e)) add(bad.has(it) ? signed(itemBonuses(it), -1) : itemBonuses(it));
   for (const k of e.perks instanceof Set ? e.perks : Object.keys(e.perks || {})) if (PERKS[k].bonus) add(PERKS[k].bonus(perkRank(e, k)));
   for (const id in e.status || {}) add(statusBonus(id, e.status[id]) || {});
   return out;
@@ -92,7 +97,7 @@ function expectedCore(e, b, bad = new Set()) {
   const piece = (it) => (GEAR_ARMOURS[it.id] && !(ARMOURS[it.id].armour > 0) ? 0 : ARMOURS[it.id].armour + it.ench);
   const body = onBody(e).filter((it) => it.kind === "armour").reduce((s, it) => s + (bad.has(it) ? Math.floor(piece(it) / 2) : piece(it)), 0);
   const av = legacy ? body + g("armour") : body + g("armour") + g("av");
-  const dv = RULES.dv.base + Math.floor((e.attrs.agi + g("agi") - 16) / 2) + g("dv") - bad.size;   // (B4: −1 a piece worn badly)
+  const dv = RULES.dv.base + Math.floor((e.attrs.agi + g("agi") - 16) / 2) + g("dv") - [...bad].filter((it) => it.kind === "armour").length;   // (B4: −1 an armour piece worn badly)
   return { str, maxHp, av, dv };
 }
 
@@ -187,6 +192,31 @@ export function checkStats({ game, startRun, inventory, mechanics, gate = null }
           const got = wear(first, second);
           if (!same(got, want[name])) problems.push(`B4, the ${name} case, ${first.id} first: ${JSON.stringify(got)}, want ${JSON.stringify(want[name])}`);
         }
+      // (the extension) A keen longsword at 16 lends its crit in the primary hand only; glass-scale (AGI 20) beside boots
+      // of −3 AGI at AGI 20 is unmet either way round; and three pieces in all six orders at STR 17: bracers (+1 STR)
+      // would meet gauntlets (STR 18), but boots of −1 STR take it back below, so the gauntlets are worn badly.
+      const keen = { kind: "weapon", id: "longsword", made: "copper", material: 0, ench: 0, known: true, props: ["keen"] };
+      const hold = (part) => { const k = { hand_r: p.body.equip.hand_r, hand_l: p.body.equip.hand_l }; p.body.equip.hand_r = null; p.body.equip.hand_l = null; p.body.equip[part] = keen; St.invalidateStats(p);
+        consistent(`B4: a keen longsword on ${part}`); const c = St.bonus(p, "crit"); Object.assign(p.body.equip, k); St.invalidateStats(p); return c; };
+      const critL = hold("hand_l"), critR = hold("hand_r");
+      if (critL !== 0 || critR !== 0.1) problems.push(`B4: a keen longsword at 16 gives crit ${critL} in the other hand (want 0), ${critR} in the primary (want 0.1)`);
+      const parts = ["arms", "hands", "feet", "body"], keepParts = Object.fromEntries(parts.map((q) => [q, p.body.equip[q]])), keepAttrs = { ...p.attrs };
+      const put = (items, attrs) => { for (const q of parts) p.body.equip[q] = null; items.forEach((it, k) => { p.body.equip[parts[k]] = it; }); Object.assign(p.attrs, attrs); St.invalidateStats(p);
+        consistent(`B4: ${items.map((it) => it.id).join(", ")}`); const out = { str: St.attr(p, "str"), agi: St.attr(p, "agi"), av: St.av(p), dv: St.dv(p), ward: St.bonus(p, "ward") };
+        for (const q of parts) p.body.equip[q] = keepParts[q]; Object.assign(p.attrs, keepAttrs); St.invalidateStats(p); return out; };
+      const scale = { kind: "armour", id: "glassScale", ench: 0, known: true }, minusAgi = relic("boots", { agi: -3 });
+      const gs = [put([scale, minusAgi], { agi: 20, tou: 17 }), put([minusAgi, scale], { agi: 20, tou: 17 })];
+      const gsWant = { str: base.str, agi: 17, av: base.av + Math.floor(3 / 2) + 1, dv: base.dv - 1, ward: 0 };
+      if (!gs.every((g) => same(g, gsWant))) problems.push(`B4: glass-scale beside −3 AGI boots at AGI 20: ${JSON.stringify(gs)}, want ${JSON.stringify(gsWant)} both ways`);
+      const plusOne = relic("bracers", { str: 1 }), gauntlets = relic("gauntlets", {}), minusOne = relic("boots", { str: -1 });
+      const three = [plusOne, gauntlets, minusOne], orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+      const threeWant = { str: 17, agi: base.agi, av: base.av + 1 + 0 + 1, dv: base.dv - 1, ward: 0 };
+      for (const o of orders) {
+        const got = put(o.map((k) => three[k]), { str: 17 });
+        if (!same(got, threeWant)) problems.push(`B4: bracers +1 STR, gauntlets, boots −1 STR at STR 17, worn ${o.map((k) => three[k].id).join(", ")}: ${JSON.stringify(got)}, want ${JSON.stringify(threeWant)}`);
+      }
+      const two = put([plusOne, gauntlets], { str: 17 });
+      if (two.str !== 18 || two.dv !== base.dv) problems.push(`B4: bracers +1 STR and gauntlets at STR 17, no boots: ${JSON.stringify(two)} (want STR 18, the gauntlets met)`);
     }
     // Statuses through the "statuses" source: addStatus / removeStatus drop the cache themselves (no
     // invalidateStats here, so a status that forgot to would show as a stale cache).
