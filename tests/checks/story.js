@@ -1256,10 +1256,9 @@ async function starterChain(env, { fail, game, p, RUN, real, at }) {
       game.quests = k.quests; game.state.campaign = k.campaign;
       out.push("a deed done before its step taken moves it on");
     }
-    // Mira's Blank Corner: begun, waiting on its wreck.
-    take(talker("Mira", "mira@real"));
-    if (q("blankCorner")?.stage !== "open" || q("blankCorner").done) fail("Mira's Blank Corner not begun at Mira");
-    out.push("Mira's Blank Corner begun (its wreck waits)");
+    // Mira's Blank Corner: not offered while its wreck isn't built (review of b499abe: it began and could never finish).
+    if (say(talker("Mira", "mira@real"), "Is there anything I can do?") || q("blankCorner")) fail("Mira offers her Blank Corner, whose wreck isn't built");
+    out.push("Mira's Blank Corner held back (its wreck waits)");
   } finally {
     Object.assign(game, { run: keep.run, quests: keep.quests }); game.state.campaign = keep.campaign;
     Object.assign(p, { inv: keep.inv, perks: keep.perks, perkRank: keep.perkRank });

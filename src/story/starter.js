@@ -5,8 +5,8 @@
 //   turning      the Cube touched (screens/play.js onCube: "cube:touched"); no giver, paid at once
 //   grubs        the Grub Mother killed (her uid, legend:<Kettle Mesa's site>), then home through the culvert (Hollowmere
 //                entered from Kettle Mesa's floor 3), then Reeve Hallen
-//   blankCorner  Mira's: started and told; the wreck in the Hollow Mere (its deck mosaic, its hold) isn't built yet, so it
-//                waits there (its events are a request)
+//   blankCorner  Mira's: held back (WAITS) until the wreck in the Hollow Mere (its deck mosaic, its hold) is built: a
+//                request
 //   skull        Brann's skull (world/legacy.js lays it on the real Keeper's Stair's floor 2), carried to Brann in the crypt
 //   dialFloor    the Dial Floor's three accounts read (its event triangulated: story/secrets.js "triangulate"), its
 //                Fifth-Hour site visited, then Brother Tamsin
@@ -30,6 +30,9 @@ export const STARTER = QUESTS.campaign.starter;
 const stepOf = (id) => STARTER.find((s) => s.id === id) || null;
 const qid = (id) => `starter:${id}`;
 const quest = (game, id) => questOf(game, qid(id));
+// A step whose world isn't built is held back (not offered: a quest that can't finish would sit open in the journal):
+// Mira's Blank Corner wants the wreck in the Hollow Mere, its deck mosaic and its hold (a request).
+export const WAITS = { blankCorner: "the wreck in the Hollow Mere (its deck mosaic read on the map, its hold looked into in 3D)" };
 
 const landmark = (game, id) => game.run?.world?.landmarks?.get(id) || null;
 const siteOfLandmark = (game, id) => [...(game.run?.sites?.values() || [])].find((s) => s.landmarkId === id) || null;
@@ -104,7 +107,7 @@ registerTalkOptions("starter", (game, c) => {
   if (game.state?.campaign?.started == null) return null;   // (the test world has no campaign)
   const out = [];
   for (const s of STARTER) {
-    if (!s.giver || !isGiver(c, { giver: s.giver })) continue;
+    if (!s.giver || WAITS[s.id] || !isGiver(c, { giver: s.giver })) continue;
     const q = quest(game, s.id);
     if (!q && s.offer) out.push({ label: "Is there anything I can do?", go: () => node(s.offer.split("\n").join(" "), [
       { label: "I'll do it.", go: () => { startStep(game, s.id); return node("Good.", [bye()]); } }, bye("Not now.")]) });
