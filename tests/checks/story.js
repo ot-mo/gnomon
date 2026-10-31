@@ -997,6 +997,7 @@ async function campaign7b(env, { fail, stats, real, test, json, game, startRun, 
   stats.questPools = await questPools(env, { fail, real, test, RUN });
   stats.routes = await beatRoutes(env, { fail, game, CAM, at, p });
   stats.barks = await barks(env, { fail, game, p });
+  stats.starter = await starterChain(env, { fail, game, p, RUN, real, at });
   offB(); offL();
   game.run = keep.run; game.quests = keep.quests; game.state.campaign = keep.campaign;
   stats.campaign = `11 beats as data at their landmarks' floors; the start on the real world gives beat 1 (none on the test world, whose intro stays the parent's); ` +
@@ -1177,6 +1178,78 @@ async function beatsPaid(env, { fail, game, B, p, gain0, inv0, rep0, json, captu
   if (offer?.text !== B[1].offer) fail(`beat 2's offer at Quint-Vey: ${offer?.text}`);
   return `11 beats paid (the plumb-seal and Plumb Key, the plumb-bob known, +5 max HP, Survey +${rep("survey")}, Noon's Face and its turn, the Flat Account ${known ? "read" : "has no def"}; ` +
     `the unpress lens and Great Theodolite owed, the lens paid once made); ${want.split(",").length} choices open, two made at their givers, beat 5's on its own page; the offer at the giver; journal routes; ${p.inv.length - inv0} more in the pack`;
+}
+
+// The starter chain as quests (the integrator, C5 #4; story/starter.js), on a fresh campaign: the Turning begun with it and
+// done by the Cube; Grubs in the Kettle offered by Reeve Hallen, on to the culvert when the Grub Mother dies, home through it,
+// paid at Hallen ("It's done.": Hollowmere +100, three balms, a Pathcraft power); Brann's Skull taken back only with the skull
+// in your pack (Brann's Lantern); the Dial Floor on to its Fifth-Hour site once its event is triangulated, then Tamsin; Mira's
+// Blank Corner begun and waiting (its wreck isn't built).
+async function starterChain(env, { fail, game, p, RUN, real, at }) {
+  const EV = await env.src("events.js"), T = await env.src("talk.js"), CAM = await env.src("story/campaign.js"), F = await env.src("factions.js");
+  const DF = await env.src("content/world/plans/dialFloor.js");
+  const keep = { run: game.run, quests: game.quests, campaign: game.state.campaign, inv: p.inv, perks: p.perks, perkRank: p.perkRank };
+  const out = [];
+  try {
+    game.run = RUN.buildRun(1, real); game.quests = []; delete game.state.campaign; p.inv = []; p.perks = {}; p.perkRank = {};
+    EV.emit(game, "zone:enter", { zone: { landmarkId: "hollowmere", z: 0, key: "5,16,0" }, how: "start" });
+    const q = (id) => game.quests.find((x) => x.id === `starter:${id}`), W = game.run.world;
+    const talker = (name, dialogue) => ({ id: -7, type: "villager", name, vis: {}, talk: { dialogue, state: {}, met: true } });
+    const say = (c, label) => T.talkTo(game, c).options.find((o) => o.label === label);
+    const take = (c) => say(c, "Is there anything I can do?")?.go()?.options?.find((o) => o.label === "I'll do it.")?.go();
+    if (!q("turning") || q("turning").done) fail("the Turning didn't begin with the campaign");
+    { // (the Cube touched for real: screens/play.js onCube, its mode, view and the story's flag put back after)
+      const PL = await env.src("screens/play.js"), k0 = { mode: game.mode, view: game.view, cube: game.story.cube };
+      PL.onCube(game);
+      Object.assign(game, { mode: k0.mode, view: k0.view }); game.story.cube = k0.cube;
+    }
+    if (!q("turning")?.done) fail("the Turning isn't done when the Cube is touched");
+    // Grubs in the Kettle.
+    const hallen = talker("Reeve Hallen", "hallen"), rep0 = F.repOf(game, "hollowmere");
+    take(hallen);
+    if (q("grubs")?.stage !== "open") fail(`Grubs in the Kettle not begun at Reeve Hallen (${q("grubs")?.stage})`);
+    const K = W.landmarks.get("kettleMesa"), ksite = [...game.run.sites.values()].find((s) => s.landmarkId === "kettleMesa");
+    EV.emit(game, "kill", { c: { uid: `legend:${ksite.id}`, type: "brineGrub", name: "the Grub Mother" }, uid: `legend:${ksite.id}` });
+    if (q("grubs")?.stage !== "culvert") fail(`the Grub Mother dead: ${q("grubs")?.stage}, not the culvert`);
+    if (say(hallen, "It's done.")) fail("Hallen takes Grubs in the Kettle back before you come home through the culvert");
+    EV.emit(game, "zone:enter", { zone: { landmarkId: "hollowmere", z: 0, key: "5,16,0" }, how: "up", from: `${K.wx},${K.wy},3` });
+    if (q("grubs")?.stage !== "return") fail(`home through the culvert: ${q("grubs")?.stage}`);
+    say(hallen, "It's done.")?.go();
+    const balms = p.inv.filter((it) => it.kind === "tonic" && it.effect === "balm").reduce((a, it) => a + (it.count || 1), 0);
+    const path = Object.keys(p.perks || {}).length > 0;
+    if (!q("grubs")?.done || F.repOf(game, "hollowmere") - rep0 !== 100 || balms !== 3 || !path) fail(`Grubs in the Kettle paid: done ${q("grubs")?.done}, Hollowmere +${F.repOf(game, "hollowmere") - rep0}, ${balms} balms, a power ${path}`);
+    out.push("the Turning; Grubs in the Kettle through the culvert, paid");
+    // Brann's Skull.
+    const brann = talker("Brann", "brann@real");
+    take(brann);
+    if (q("skull")?.stage !== "open" || say(brann, "Here is your skull.")) fail("Brann's Skull: not begun, or taken back without the skull");
+    p.inv.push({ kind: "quest", id: "skull", name: "Brann's skull" });
+    say(brann, "Here is your skull.")?.go();
+    if (!q("skull")?.done || p.inv.some((it) => it.id === "skull") || !p.inv.some((it) => it.relic === "lantern")) fail(`Brann's Skull: done ${q("skull")?.done}, the lantern ${p.inv.some((it) => it.relic === "lantern")}`);
+    out.push("Brann's Skull for the lantern");
+    // The Dial Floor.
+    const tamsin = talker("Brother Tamsin", "tamsin"), D = W.landmarks.get("dialFloor"), r = DF.dialFloorReading(game.run, D.wx, D.wy);
+    take(tamsin);
+    if (!r) fail("the Dial Floor has no reading on seed 1");
+    else {
+      EV.emit(game, "triangulate", { key: r.eventId, xp: 0 });
+      if (q("dialFloor")?.stage !== "visit") fail(`the Dial Floor triangulated: ${q("dialFloor")?.stage}`);
+      const s = game.run.sites.get(r.siteId);
+      EV.emit(game, "zone:enter", { zone: { wx: s.at.wx, wy: s.at.wy, z: 0, key: `${s.at.wx},${s.at.wy},0` }, how: "edge" });
+      if (q("dialFloor")?.stage !== "return") fail(`the Fifth-Hour site visited: ${q("dialFloor")?.stage}`);
+      say(tamsin, "It's done.")?.go();
+      if (!q("dialFloor")?.done) fail("the Dial Floor not done at Tamsin");
+      out.push("the Dial Floor, triangulated and visited");
+    }
+    // Mira's Blank Corner: begun, waiting on its wreck.
+    take(talker("Mira", "mira@real"));
+    if (q("blankCorner")?.stage !== "open" || q("blankCorner").done) fail("Mira's Blank Corner not begun at Mira");
+    out.push("Mira's Blank Corner begun (its wreck waits)");
+  } finally {
+    Object.assign(game, { run: keep.run, quests: keep.quests }); game.state.campaign = keep.campaign;
+    Object.assign(p, { inv: keep.inv, perks: keep.perks, perkRank: keep.perkRank });
+  }
+  return out.join("; ");
 }
 
 // Barks (the integrator, C5 #11; story/barks.js): a plumbknight's line when it first notices you, once; the Escapement's

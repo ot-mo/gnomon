@@ -288,6 +288,7 @@ function foldPowers(game) {
 // You touch the Rotation Cube: the world turns (the rotate screen), then the story continues.
 export function onCube(game) {
   game.story.cube = true;
+  emit(game, "cube:touched", {});   // (story/starter.js: the Turning, C5 #4)
   playCubeTheme();   // and the music turns with it
   openCubeWall(game.zone);
   game.travel = null;

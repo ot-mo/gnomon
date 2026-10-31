@@ -26,6 +26,7 @@ import "./landmark-people.js";   // who stands on the landmark plans' letters (C
 import "./beats.js";   // a beat's reward and choice, the campaign's things (C5 #5, #6, #13)
 import "./barks.js";   // the barks of those who don't talk (C5 #11)
 import "./dungeon-people.js";   // who stands in the landmark dungeons (C5 #12)
+import "./starter.js";   // the starter chain as quests (C5 #4)
 export { generateHistory } from "./history.js";
 export { generateVillage } from "./villages.js";
 export { startQuest } from "./quests.js";

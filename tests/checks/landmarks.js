@@ -310,22 +310,24 @@ function checkHollowmere(seeds, expect) {
 // same seed's stack still has every one of them and the skull (golden holds it block for block).
 function keepersStair(seed, run, expect) {
   const test = buildRun(seed, TEST_WORLD), seen = { real: new Set(), test: new Set() };
-  let peddlers = 0, skulls = { real: 0, test: 0 };
+  let peddlers = 0, skulls = { real: 0, test: 0 }, skullAt = null;
   for (let z = 1; z <= 20; z++) {
     for (const [w, r] of [["real", run], ["test", test]]) {
       const f = legacyZone({ seed, run: r }, { wx: 5, wy: 16, z }, w === "real" ? siteWithDungeon(run, 5, 16) : null) ||
                 legacyZone({ seed, run: r }, { wx: 0, wy: 0, z });
       for (const c of f.creatures) if (RESIDENTS.includes(c.type)) seen[w].add(c.type);
-      skulls[w] += f.items.filter((it) => it.kind === "quest" && it.id === "skull").length;
+      const sk = f.items.filter((it) => it.kind === "quest" && it.id === "skull").length;
+      skulls[w] += sk;
+      if (w === "real" && sk) skullAt = z;
       if (w === "real") for (const c of f.creatures.filter((n) => n.type === "pell")) {
         peddlers++;
         expect(c.name === "a peddler" && c.talk.dialogue === "merchant" && c.talk.state.stock?.length > 0, `the real Keeper's Stair floor ${z}: its peddler is "${c.name}" (${c.talk.dialogue})`);
       }
     }
   }
-  expect(!seen.real.size && !skulls.real, `the real Keeper's Stair holds ${[...seen.real]} and ${skulls.real} skull(s)`);
+  expect(!seen.real.size && skulls.real === 1 && skullAt === 2, `the real Keeper's Stair holds ${[...seen.real]} and ${skulls.real} skull(s) (on floor ${skullAt}; want one, on floor 2: C5 #4)`);
   expect(seen.test.size === RESIDENTS.length && skulls.test === 1, `the test world's stack lost its people: ${[...seen.test]}, ${skulls.test} skull(s)`);
-  return `the Keeper's Stair on seed ${seed}: none of the ${RESIDENTS.length} residents, no skull, ${peddlers} peddlers (the test world's: all ${seen.test.size} and the skull)`;
+  return `the Keeper's Stair on seed ${seed}: none of the ${RESIDENTS.length} residents, Brann's skull on floor 2 alone, ${peddlers} peddlers (the test world's: all ${seen.test.size} and the skull)`;
 }
 const GROUND_SKIP = new Set([B.LEAVES, B.TRUNK]);
 // The ground a seam rule compares: the top of the terrain column (water at the datum counts), or null where a plan
