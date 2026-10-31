@@ -6,7 +6,8 @@
 // world/zonegen.js asks legacyZone for the levels when a site's dungeon is the legacy one.
 import { generateDungeonLevel, legacyParams, LEGACY_LEVELS } from "../gen/dungeon.js";
 import { makeItem } from "../items.js";
-import { FLOOR_Z } from "../world.js";
+import { FLOOR_Z, standWith } from "../world.js";
+import { reachable, PLAYER_STEP_UP, PLAYER_DROP } from "../pathing.js";
 import { distance } from "../rng.js";
 
 export const LEGACY_SITE = { id: "legacy", wx: 0, wy: 0, levels: LEGACY_LEVELS };
@@ -21,13 +22,15 @@ export const RESIDENTS = ["corwin", "ess", "tee", "brann", "mira", "rook", "lio"
 export const SKULL_FLOOR = 2;
 function placeSkull(zone) {
   const from = zone.upStairs || zone.spawn || { x: zone.w / 2, y: zone.d / 2 };
+  // (a tile you walk to from the stair: not an island in a hall's chasm or lake, reached only by jumping in 3D; review of b499abe)
+  const walk = reachable(standWith(zone, "open"), zone.w, zone.d, Math.floor(from.x), Math.floor(from.y), PLAYER_STEP_UP, PLAYER_DROP);
   const rooms = (zone.rooms || []).filter((r) => r.cx !== undefined)
     .sort((a, b) => distance(b.cx - from.x, b.cy - from.y) - distance(a.cx - from.x, a.cy - from.y));
   for (const r of rooms)
     for (let d = 0; d < 3; d++)
       for (let y = r.cy - d; y <= r.cy + d; y++)
         for (let x = r.cx - d; x <= r.cx + d; x++)
-          if (zone.stand?.[x + y * zone.w] === FLOOR_Z) {
+          if (zone.stand?.[x + y * zone.w] === FLOOR_Z && walk[x + y * zone.w] >= 0) {
             zone.items.push(makeItem({ kind: "quest", id: "skull", name: "Brann's skull", info: "Brann's ghost, in Hollowmere's crypt, wants it back." }, x + 0.5, y + 0.5, FLOOR_Z));
             return;
           }

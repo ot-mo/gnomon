@@ -327,7 +327,17 @@ function keepersStair(seed, run, expect) {
   }
   expect(!seen.real.size && skulls.real === 1 && skullAt === 2, `the real Keeper's Stair holds ${[...seen.real]} and ${skulls.real} skull(s) (on floor ${skullAt}; want one, on floor 2: C5 #4)`);
   expect(seen.test.size === RESIDENTS.length && skulls.test === 1, `the test world's stack lost its people: ${[...seen.test]}, ${skulls.test} skull(s)`);
-  return `the Keeper's Stair on seed ${seed}: none of the ${RESIDENTS.length} residents, Brann's skull on floor 2 alone, ${peddlers} peddlers (the test world's: all ${seen.test.size} and the skull)`;
+  // Brann's skull where you walk to from floor 2's stair, on 60 seeds (review of b499abe: on 4 of them it sat on an island).
+  let walked = 0;
+  for (let s = 1; s <= 60; s++) {
+    const r = buildRun(s, REAL_WORLD), f = legacyZone({ seed: s, run: r }, { wx: 5, wy: 16, z: 2 }, siteWithDungeon(r, 5, 16));
+    const sk = f.items.find((it) => it.kind === "quest" && it.id === "skull"), from = f.upStairs || f.spawn;
+    const walk = reachable(standWith(f, "open"), f.w, f.d, Math.floor(from.x), Math.floor(from.y), PLAYER_STEP_UP, PLAYER_DROP);
+    const ok = !!sk && walk[Math.floor(sk.x) + Math.floor(sk.y) * f.w] >= 0;
+    expect(ok, `seed ${s}: Brann's skull on floor 2 isn't reached on foot from its stair`);
+    if (ok) walked++;
+  }
+  return `the Keeper's Stair on seed ${seed}: none of the ${RESIDENTS.length} residents, Brann's skull on floor 2 alone, ${peddlers} peddlers (the test world's: all ${seen.test.size} and the skull); the skull on foot from the stair on ${walked} of 60 seeds`;
 }
 const GROUND_SKIP = new Set([B.LEAVES, B.TRUNK]);
 // The ground a seam rule compares: the top of the terrain column (water at the datum counts), or null where a plan
