@@ -1241,6 +1241,19 @@ async function starterChain(env, { fail, game, p, RUN, real, at }) {
       if (!q("dialFloor")?.done) fail("the Dial Floor not done at Tamsin");
       out.push("the Dial Floor, triangulated and visited");
     }
+    // A deed done before its step is taken (review of b499abe: it softlocked): the Grub Mother killed, then Grubs taken from
+    // Hallen, starts at the culvert; the Dial Floor triangulated, then taken from Tamsin, starts at the visit.
+    {
+      const k = { quests: game.quests, campaign: JSON.parse(JSON.stringify(game.state.campaign)) };
+      game.quests = game.quests.filter((x) => !["starter:grubs", "starter:dialFloor"].includes(x.id));
+      delete game.state.campaign.starterDeeds;
+      EV.emit(game, "kill", { c: { uid: `legend:${ksite.id}`, type: "brineGrub", name: "the Grub Mother" }, uid: `legend:${ksite.id}` });
+      if (r) EV.emit(game, "triangulate", { key: r.eventId, xp: 0 });
+      take(hallen); take(tamsin);
+      if (q("grubs")?.stage !== "culvert" || (r && q("dialFloor")?.stage !== "visit")) fail(`deeds done first: Grubs ${q("grubs")?.stage}, the Dial Floor ${q("dialFloor")?.stage}`);
+      game.quests = k.quests; game.state.campaign = k.campaign;
+      out.push("a deed done before its step taken moves it on");
+    }
     // Mira's Blank Corner: begun, waiting on its wreck.
     take(talker("Mira", "mira@real"));
     if (q("blankCorner")?.stage !== "open" || q("blankCorner").done) fail("Mira's Blank Corner not begun at Mira");

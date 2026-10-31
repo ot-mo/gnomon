@@ -19,6 +19,7 @@ import { registerQuest, startQuest, advanceQuest, questOf } from "./quests.js";
 import { registerTalkOptions, node, bye } from "../talk.js";
 import { QUESTS } from "../content/quests.js";
 import { campaignOf } from "./campaign.js";
+import { journalOf } from "./journal.js";
 import { giveCampaignItems, payGlim, isGiver } from "./beats.js";
 import { dialFloorReading } from "../content/world/plans/dialFloor.js";
 import { POWERS } from "../content/powers.js";
@@ -58,8 +59,22 @@ registerQuest("starter", {
 export function startStep(game, id, quiet = false) {
   const s = stepOf(id);
   if (!s || quest(game, id)) return null;
-  return startQuest(game, "starter", { id: qid(id), title: s.title, text: s.text, quiet, vars: { step: id } });
+  const q = startQuest(game, "starter", { id: qid(id), title: s.title, text: s.text, quiet, vars: { step: id } });
+  // A deed done before the step was taken moves it on at once (the Grub Mother never comes back; an event is triangulated
+  // once): campaign.starterDeeds, and the journal's triangulated events.
+  const D = campaignOf(game).starterDeeds || {}, ev = dial(game)?.eventId;
+  if (q && id === "grubs" && D.grubMother) advanceQuest(game, q, "culvert", { quiet: true });
+  if (q && id === "dialFloor" && (D.dialFloor || (ev && journalOf(game).triangulated?.[ev] !== undefined))) advanceQuest(game, q, "visit", { quiet: true });
+  return q;
 }
+// What a step's deed is, remembered whether or not the step is taken yet.
+on("kill", (game, ev) => {
+  const s = siteOfLandmark(game, "kettleMesa");
+  if (s && ev?.uid === `legend:${s.id}` && game.state?.campaign) (game.state.campaign.starterDeeds ||= {}).grubMother = true;
+});
+on("triangulate", (game, ev) => {
+  if (ev?.key && ev.key === dial(game)?.eventId && game.state?.campaign) (game.state.campaign.starterDeeds ||= {}).dialFloor = true;
+});
 
 // A free power of the tree a reward names: its first you can take (one with no `needs`, not held to its max).
 function powerOfTree(p, tree) {
